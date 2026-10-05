@@ -176,6 +176,9 @@ service cloud.firestore {
       allow list: if signedIn();
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if signedIn() && resource.data.userId == request.auth.uid;
+      // Excluir a conta libera o @. Sem isto o nome ficava preso para sempre
+      // a um uid que não existe mais.
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /publicProfiles/{userId} {

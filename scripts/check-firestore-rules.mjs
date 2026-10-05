@@ -290,6 +290,14 @@ await t("visitante NAO reserva nome", () =>
 await t("logado NAO toma nome de outra pessoa", () =>
   assertFails(updateDoc(doc(outro, "usernames/@tomado"), { userId: "outro" })));
 
+// Excluir a conta libera o @ (05/10/2026). Só o dono do nome solta o nome.
+await t("estranho NAO apaga o nome de outra pessoa", () =>
+  assertFails(deleteDoc(doc(outro, "usernames/@tomado"))));
+await t("visitante NAO apaga nome", () =>
+  assertFails(deleteDoc(doc(visitante, "usernames/@tomado"))));
+await t("o dono LIBERA o proprio nome ao excluir a conta", () =>
+  assertSucceeds(deleteDoc(doc(dono, "usernames/@tomado"))));
+
 await env.cleanup();
 console.log(`\n${pass} passaram, ${fail} falharam\n`);
 process.exit(fail === 0 ? 0 : 1);
