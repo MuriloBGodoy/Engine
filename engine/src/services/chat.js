@@ -47,11 +47,15 @@ export const toMillis = (value) => {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
+// `deletedAt` é gravado por quem exclui a conta (services/accountDeletion.js).
+// O @ fica vazio de propósito: ele foi liberado, e "ver perfil" levaria ao
+// próximo dono do nome.
 const memberCard = (person = {}) => ({
   author: person.author || person.displayName || "Usuário Engine",
-  username: person.username || "@engine",
+  username: person.deletedAt ? "" : person.username || "@engine",
   avatar: person.avatar || "",
   avatarInitials: person.avatarInitials || "",
+  deleted: Boolean(person.deletedAt),
 });
 
 /** Cartão do usuário logado a partir dos settings — usado ao criar conversas. */

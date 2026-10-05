@@ -128,3 +128,33 @@ export const getNotificationCopy = (notification) => {
     }
   );
 };
+
+// Tipo de aviso → chave em `settings.notifications`. O que não está aqui
+// (status de anúncio) é aviso sobre a conta e não se desliga, como o
+// "sua conta" do Instagram.
+const notificationPreferenceByType = {
+  like: "likes",
+  rating: "likes",
+  comment: "comments",
+  follow: "follows",
+  message: "messages",
+  achievement: "achievements",
+};
+
+export const NOTIFICATION_PREFERENCES = [
+  "likes",
+  "comments",
+  "follows",
+  "messages",
+  "achievements",
+];
+
+/**
+ * Filtro de quem RECEBE: quem notifica não lê as preferências alheias (elas
+ * moram em `users/{uid}/private`). O aviso desligado continua gravado e
+ * simplesmente não aparece no sino — religar traz o histórico de volta.
+ */
+export const isNotificationMuted = (notification, preferences = {}) => {
+  const key = notificationPreferenceByType[notification?.type];
+  return Boolean(key) && preferences[key] === false;
+};

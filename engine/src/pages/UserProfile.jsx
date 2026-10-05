@@ -184,7 +184,12 @@ export function UserProfile({ settings = {}, user = null }) {
             ...(followingList || []),
           ];
           const found = await engineDB.getPublicProfilesByIds(ids);
-          if (vivo) setPublicProfiles(found);
+          if (!vivo) return;
+          setPublicProfiles(found);
+          // Quem seguia uma conta que depois foi excluída guarda o espelho
+          // (a regra não deixa a conta excluída apagá-lo): some da lista e
+          // da contagem em vez de virar "Usuário Engine" sem link.
+          setFollowing((list) => list.filter((id) => !engineDB.isProfileGone(id)));
         })
         .catch((error) => {
           console.error("Error loading user profile:", error);

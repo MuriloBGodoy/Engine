@@ -427,68 +427,74 @@ export function Messages({ user, settings }) {
               onDelete={handleDeleteMessage}
             />
 
-            <form
-              onSubmit={handleSend}
-              className="flex shrink-0 items-stretch gap-2 border-t border-[var(--engine-border)] p-3"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,image/gif"
-                onChange={handleImageSelected}
-                className="hidden"
-                aria-label="Upload image"
-              />
-
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={sending || compressing}
-                  title="Foto"
-                  aria-label="Foto"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
-                >
-                  <Image size={18} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowGiphyPicker(true)}
-                  disabled={sending}
-                  title="GIF"
-                  aria-label="GIF"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 font-black text-xs"
-                >
-                  GIF
-                </button>
-
-                <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-              </div>
-
-              <textarea
-                value={draft}
-                rows={1}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && isDesktop) {
-                    handleSend(event);
-                  }
-                }}
-                placeholder={t("messages.composerPlaceholder")}
-                className="engine-scroll max-h-32 min-h-11 w-full min-w-0 flex-1 resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-2 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
-                style={{ lineHeight: "1.5" }}
-              />
-              <button
-                type="submit"
-                disabled={!draft.trim() || sending}
-                title={t("messages.send")}
-                aria-label={t("messages.send")}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95 disabled:opacity-40"
+            {partner?.deleted ? (
+              <p className="shrink-0 border-t border-[var(--engine-border)] p-4 text-center text-sm text-[var(--engine-text-muted)]">
+                {t("messages.accountDeleted")}
+              </p>
+            ) : (
+              <form
+                onSubmit={handleSend}
+                className="flex shrink-0 items-stretch gap-2 border-t border-[var(--engine-border)] p-3"
               >
-                <Send size={18} />
-              </button>
-            </form>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,image/gif"
+                  onChange={handleImageSelected}
+                  className="hidden"
+                  aria-label="Upload image"
+                />
+  
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending || compressing}
+                    title="Foto"
+                    aria-label="Foto"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
+                  >
+                    <Image size={18} />
+                  </button>
+  
+                  <button
+                    type="button"
+                    onClick={() => setShowGiphyPicker(true)}
+                    disabled={sending}
+                    title="GIF"
+                    aria-label="GIF"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 font-black text-xs"
+                  >
+                    GIF
+                  </button>
+  
+                  <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                </div>
+  
+                <textarea
+                  value={draft}
+                  rows={1}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && isDesktop) {
+                      handleSend(event);
+                    }
+                  }}
+                  placeholder={t("messages.composerPlaceholder")}
+                  className="engine-scroll max-h-32 min-h-11 w-full min-w-0 flex-1 resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-2 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
+                  style={{ lineHeight: "1.5" }}
+                />
+                <button
+                  type="submit"
+                  disabled={!draft.trim() || sending}
+                  title={t("messages.send")}
+                  aria-label={t("messages.send")}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95 disabled:opacity-40"
+                >
+                  <Send size={18} />
+                </button>
+              </form>
+            )}
 
             {previewImage && (
               <ImagePreviewModal

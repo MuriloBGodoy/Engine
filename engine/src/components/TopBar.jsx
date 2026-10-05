@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Bell, Moon, Sun } from "lucide-react";
 import { engineDB } from "../services/db";
 import { NotificationsPanel } from "./NotificationsPanel";
-import { getNotificationTarget } from "../services/notifications";
+import {
+  getNotificationTarget,
+  isNotificationMuted,
+} from "../services/notifications";
 
 function TopbarIconButton({ onClick, title, active = false, children }) {
   return (
@@ -28,12 +31,18 @@ export function Topbar({ settings, onSettingsUpdate, user }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [allNotifications, setNotifications] = useState([]);
 
   const currentTheme = settings.preferences.theme;
+  const notificationPrefs = settings.notifications || {};
+  const notifications = allNotifications.filter(
+    (notification) => !isNotificationMuted(notification, notificationPrefs),
+  );
   const unreadCount = notifications.filter(
     (notification) => !notification.read,
   ).length;
+  // "Pausar tudo" é o não-perturbe: a lista continua lá, só o número some.
+  const badgeCount = notificationPrefs.pauseAll ? 0 : unreadCount;
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -81,9 +90,9 @@ export function Topbar({ settings, onSettingsUpdate, user }) {
           active={notificationsOpen}
         >
           <Bell size={21} />
-          {unreadCount > 0 && (
+          {badgeCount > 0 && (
             <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--engine-accent)] px-1 text-[9px] font-black text-white">
-              {unreadCount > 9 ? "9+" : unreadCount}
+              {badgeCount > 9 ? "9+" : badgeCount}
             </span>
           )}
         </TopbarIconButton>

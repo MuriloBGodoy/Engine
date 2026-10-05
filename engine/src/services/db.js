@@ -47,35 +47,30 @@ const defaultSettings = {
     bio: "",
     avatar: "",
   },
+  // Só entra aqui o que alguma tela LÊ. Até 05/10/2026 a página de
+  // configurações exibia moeda, fuso, densidade, página inicial, meta anual,
+  // alertas por e-mail, 2FA e tempo de sessão — chaves gravadas e nunca
+  // consultadas por ninguém. Documentos antigos ainda as carregam; são inertes.
   preferences: {
     language: "pt-BR",
-    currency: "BRL",
-    timezone: "America/Sao_Paulo",
     theme: "dark",
-    density: "comfortable",
     navLayout: "sidebar",
-    startPage: "/",
     defaultGarageSort: "progress-desc",
-    annualIncomeGoal: "",
   },
+  // Avisos DENTRO do app, por tipo (o sino). O Engine não envia e-mail nem
+  // push; o filtro é aplicado em quem recebe, ao exibir — ver
+  // `isNotificationMuted` em services/notifications.js.
   notifications: {
-    emailGoalProgress: true,
-    emailMarketUpdates: true,
-    emailSecurity: true,
-    inAppReminders: true,
-    weeklyDigest: false,
-    quietHours: true,
+    pauseAll: false,
+    likes: true,
+    comments: true,
+    follows: true,
+    messages: true,
+    achievements: true,
   },
   privacy: {
     showEmailInSidebar: true,
-    shareAnonymousUsage: false,
-    saveImagesLocally: true,
     lockSensitiveValues: false,
-  },
-  security: {
-    twoFactorReminder: true,
-    sessionTimeout: "30",
-    loginAlerts: true,
   },
   // Renda e despesa são da PESSOA, não do carro. Antes disso a renda morava em
   // `car.ownership` e portanto estava duplicada no documento de cada carro:
@@ -209,7 +204,6 @@ const mergeSettings = (settings = {}) => ({
     ...(settings.notifications || {}),
   },
   privacy: { ...defaultSettings.privacy, ...(settings.privacy || {}) },
-  security: { ...defaultSettings.security, ...(settings.security || {}) },
   budget: { ...defaultSettings.budget, ...(settings.budget || {}) },
 });
 
@@ -1497,6 +1491,14 @@ export const engineDB = {
       if (profile) result[id] = profile;
     });
     return result;
+  },
+
+  /**
+   * O servidor respondeu e o perfil não existe — conta excluída. Diferente de
+   * "não consegui ler": erro de rede não grava `null` no cache.
+   */
+  isProfileGone(userId) {
+    return publicProfileCache.get(String(userId)) === null;
   },
 
   /**
