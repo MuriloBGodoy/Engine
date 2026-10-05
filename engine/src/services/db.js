@@ -2699,10 +2699,7 @@ export const engineDB = {
     if (!userId) {
       await this.reserveUsername(mergedSettings.profile.username, userId);
       await setLocalSettings(mergedSettings, userId);
-      if (!savedToServer) {
-      throw new Error(SETTINGS_NOT_SYNCED_MESSAGE);
-    }
-    return mergedSettings;
+      return mergedSettings;
     }
 
     if (apiEnabled()) {
@@ -2729,6 +2726,9 @@ export const engineDB = {
     }
 
     await setLocalSettings(mergedSettings, userId);
+    if (!savedToServer) {
+      throw new Error(SETTINGS_NOT_SYNCED_MESSAGE);
+    }
     await this.syncPublicProfile(mergedSettings, userId).catch((error) =>
       warnFirestoreFallback("syncPublicProfile", error),
     );
