@@ -341,9 +341,11 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               <Line
                 label={t("ownership.results.licensing")}
                 source={
-                  isBR && state
+                  result.licensingVerified
                     ? t("ownership.lean.licensingSource", { state: stateLabel })
-                    : t("ownership.lean.licensingSourceGeneric")
+                    : isBR && state
+                      ? t("ownership.lean.licensingApprox", { state: stateLabel })
+                      : t("ownership.lean.licensingSourceGeneric")
                 }
                 value={money(result.monthly.licensing)}
               />

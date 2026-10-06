@@ -281,6 +281,9 @@ const LICENSING_BR = {
   RO: 125, RR: 115, TO: 118,
 };
 const LICENSING_BR_DEFAULT = 140;
+// As únicas UFs com a taxa de 2026 conferida em fonte primária (ver acima). As
+// outras são aproximação, e a tela precisa dizer isso em vez de citar o DETRAN.
+const LICENSING_BR_VERIFIED = new Set(["SP", "RS"]);
 
 // Fator de preço de combustível por UF sobre a média nacional.
 //
@@ -1110,6 +1113,8 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
       basis: insuranceResult.basis,
       fullCoverageMaxAge: INSURANCE_FULL_COVERAGE_MAX_AGE,
     },
+    // Se a taxa de licenciamento desta UF foi conferida ou é aproximação.
+    licensingVerified: country === "BR" && LICENSING_BR_VERIFIED.has(state),
     // Idem para o IPVA. Ver annualVehicleTax.
     tax: {
       basis: taxResult.basis,
