@@ -301,7 +301,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
             </p>
             <h2 className="mt-0.5 text-[15px] font-extrabold leading-tight tracking-tight text-[var(--engine-text)] sm:text-lg">
               {carName}
-              <span className="mt-0.5 block text-[12px] font-medium text-[var(--engine-text-muted)] sm:ml-2 sm:inline sm:text-[13px]">
+              <span className="mt-1 block whitespace-nowrap text-[12.5px] font-medium tracking-normal text-[var(--engine-text-muted)] sm:text-[13px]">
                 {t("ownership.headerMeta", { year: carYear, value: money(result.value) })}
               </span>
             </h2>
