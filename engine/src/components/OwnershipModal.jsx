@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X, Save, Loader2 } from "lucide-react";
+import { X, Save, Loader2, Hammer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   estimateOwnership,
@@ -7,10 +7,11 @@ import {
   defaultOwnershipInputs,
   DEFAULT_CONSUMPTION,
   FUEL_TYPES,
+  isSimulatorAvailable,
 } from "../services/ownership";
 import { pickReferenceCar } from "../services/expenses";
 import { engineDB } from "../services/db";
-import { countries, getStates, getStateName, DEFAULT_COUNTRY } from "../services/locations";
+import { getStates, getStateName } from "../services/locations";
 import { consumptionFor } from "../services/consumption";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatCarName, formatFipeYear } from "../services/carDisplay";
@@ -149,6 +150,10 @@ export function OwnershipModal({
   onSettingsUpdate,
 }) {
   if (!isOpen || !car) return null;
+  const country = car.ownership?.country || settings?.profile?.country;
+  if (!isSimulatorAvailable(country)) {
+    return <ComingSoon car={car} onClose={onClose} />;
+  }
   // key={car.id} garante estado limpo do formulário a cada carro aberto.
   return (
     <OwnershipDialog
@@ -163,15 +168,65 @@ export function OwnershipModal({
   );
 }
 
+/**
+ * Fora do Brasil. O valor do carro vem da FIPE, que é brasileira e em reais,
+ * então qualquer conta aqui seria um carro brasileiro com imposto de outro
+ * país. Melhor dizer que está sendo feito do que mostrar número inventado.
+ */
+function ComingSoon({ car, onClose }) {
+  const { t } = useTranslation();
+  useHistoryDismiss(true, onClose);
+  return (
+    <div className="engine-modal-overlay">
+      <div className="engine-modal-panel engine-pop sm:max-w-md">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--engine-text-muted)]">
+              {t("ownership.kicker")}
+            </p>
+            <h2 className="mt-0.5 text-[15px] font-extrabold leading-tight tracking-tight text-[var(--engine-text)] sm:text-lg">
+              {formatCarName(car)}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label={t("common.close")}
+            className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] sm:h-10 sm:w-10"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="engine-modal-body px-6 py-10 text-center sm:px-8">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]">
+            <Hammer size={26} />
+          </span>
+          <h3 className="mt-5 text-[20px] font-extrabold tracking-tight text-[var(--engine-text)]">
+            {t("ownership.lean.soonTitle")}
+          </h3>
+          <p className="mx-auto mt-3 max-w-[38ch] text-[14px] leading-relaxed text-[var(--engine-text-muted)]">
+            {t("ownership.lean.soonBody")}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-7 min-h-12 rounded-xl bg-[var(--engine-accent)] px-6 text-[15px] font-bold text-white transition hover:brightness-95"
+          >
+            {t("ownership.lean.soonCta")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdate }) {
   const showToast = useToast();
   const { i18n, t } = useTranslation();
   const [inputs, setInputs] = useState(() =>
     car.ownership ? normalizeOwnershipInputs(car.ownership) : defaultOwnershipInputs(),
   );
-  const [country, setCountry] = useState(
-    () => car.ownership?.country || settings?.profile?.country || DEFAULT_COUNTRY,
-  );
+  // Só o Brasil chega aqui (ver OwnershipModal).
+  const country = "BR";
   const [state, setState] = useState(
     () => car.ownership?.state || settings?.profile?.state || "",
   );
@@ -340,9 +395,6 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 {t("ownership.lean.share", { pct: sharePct, income: money(income) })}
               </p>
             ) : null}
-            <p className="mt-4 max-w-[54ch] text-[13px] leading-relaxed text-[var(--engine-slab-fg-muted)]">
-              {t("ownership.lean.promise")}
-            </p>
 
             <GroupLabel>{t("ownership.lean.monthlyGroup")}</GroupLabel>
             <div className="mt-2 border-t border-[var(--engine-slab-line)]">
@@ -581,49 +633,27 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
             </div>
           </Section>
 
-          <Section title={t("ownership.lean.whereTitle")}>
+          <Section title={t("ownership.lean.lastTitle")} hint={t("ownership.lean.lastHint")}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={t("ownership.fields.country")} htmlFor="engine-own-country">
+              <Field label={t("ownership.fields.state")} htmlFor="engine-own-state">
                 <select
-                  id="engine-own-country"
-                  value={country}
-                  onChange={(event) => {
-                    setCountry(event.target.value);
-                    setState("");
-                  }}
+                  id="engine-own-state"
+                  value={state}
+                  onChange={(event) => setState(event.target.value)}
                   className={fieldClass}
                 >
-                  {countries.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.name}
+                  <option value="">—</option>
+                  {states.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name}
                     </option>
                   ))}
                 </select>
               </Field>
-              {states.length ? (
-                <Field label={t("ownership.fields.state")} htmlFor="engine-own-state">
-                  <select
-                    id="engine-own-state"
-                    value={state}
-                    onChange={(event) => setState(event.target.value)}
-                    className={fieldClass}
-                  >
-                    <option value="">—</option>
-                    {states.map((s) => (
-                      <option key={s.code} value={s.code}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ) : null}
+              <Field label={t("ownership.fields.monthlyIncome")} htmlFor="engine-own-income">
+                <MoneyInput id="engine-own-income" value={income} onChange={setIncome} />
+              </Field>
             </div>
-          </Section>
-
-          <Section title={t("ownership.lean.incomeTitle")} hint={t("ownership.lean.incomeHint")}>
-            <Field label={t("ownership.fields.monthlyIncome")} htmlFor="engine-own-income">
-              <MoneyInput id="engine-own-income" value={income} onChange={setIncome} />
-            </Field>
           </Section>
         </div>
 

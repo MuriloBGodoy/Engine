@@ -345,28 +345,23 @@ const FUEL_PRICE_BR = {
 };
 
 // ---------------------------------------------------------------------------
-// Outros países — perfis genéricos (estimativas convertidas para BRL)
+// País
 // ---------------------------------------------------------------------------
-// taxPct: imposto anual de circulação/propriedade como % do valor do veículo.
-// registrationFlat: taxa anual fixa de registro/vistoria (BRL).
-// insuranceFactor: multiplicador sobre a curva etária brasileira.
-// maintenanceFactor: custo de mão de obra/peças relativo ao Brasil.
-// fuelPrice: BRL/L equivalente (gasolina); electric em BRL/kWh.
-// monthlyRate: juros médios de financiamento ao mês.
+// Só o Brasil, desde 06/10/2026. Havia perfis de 11 países (imposto, seguro,
+// combustível e juros "convertidos para BRL") sem fonte nenhuma — e, pior, o
+// valor do carro vem SEMPRE da FIPE, que é brasileira e em reais. Uma pessoa
+// em Portugal simulava um carro brasileiro, a preço brasileiro, com imposto
+// português chutado. Fora do Brasil a tela diz "estamos trabalhando nisso";
+// volta no dia em que houver tabela de preço de carro por país.
+// taxPct/registrationFlat nulos: o Brasil usa as tabelas por UF acima.
 const COUNTRY_PROFILES = {
   BR: { taxPct: null, registrationFlat: null, insuranceFactor: 1, maintenanceFactor: 1, fuelPrice: FUEL_PRICE_BR, monthlyRate: 0.0199 },
-  PT: { taxPct: 0.006, registrationFlat: 250, insuranceFactor: 0.55, maintenanceFactor: 1.25, fuelPrice: { gasoline: 10.5, ethanol: 10.5, diesel: 9.6, electric: 1.4 }, monthlyRate: 0.006 },
-  US: { taxPct: 0.01, registrationFlat: 400, insuranceFactor: 1.1, maintenanceFactor: 1.3, fuelPrice: { gasoline: 4.8, ethanol: 4.2, diesel: 5.2, electric: 0.9 }, monthlyRate: 0.0065 },
-  ES: { taxPct: 0.005, registrationFlat: 300, insuranceFactor: 0.5, maintenanceFactor: 1.2, fuelPrice: { gasoline: 9.3, ethanol: 9.3, diesel: 8.7, electric: 1.5 }, monthlyRate: 0.0065 },
-  AR: { taxPct: 0.035, registrationFlat: 200, insuranceFactor: 1.0, maintenanceFactor: 0.9, fuelPrice: { gasoline: 6.5, ethanol: 6.0, diesel: 6.8, electric: 0.6 }, monthlyRate: 0.04 },
-  MX: { taxPct: 0.003, registrationFlat: 220, insuranceFactor: 0.7, maintenanceFactor: 0.9, fuelPrice: { gasoline: 6.7, ethanol: 6.7, diesel: 7.0, electric: 0.7 }, monthlyRate: 0.0115 },
-  CL: { taxPct: 0.015, registrationFlat: 180, insuranceFactor: 0.7, maintenanceFactor: 1.0, fuelPrice: { gasoline: 7.5, ethanol: 7.5, diesel: 6.9, electric: 1.0 }, monthlyRate: 0.01 },
-  CO: { taxPct: 0.015, registrationFlat: 160, insuranceFactor: 0.8, maintenanceFactor: 0.85, fuelPrice: { gasoline: 4.5, ethanol: 4.5, diesel: 4.2, electric: 0.6 }, monthlyRate: 0.015 },
-  GB: { taxPct: 0.004, registrationFlat: 1300, insuranceFactor: 1.0, maintenanceFactor: 1.35, fuelPrice: { gasoline: 10.3, ethanol: 10.3, diesel: 10.7, electric: 1.8 }, monthlyRate: 0.0075 },
-  FR: { taxPct: 0.001, registrationFlat: 250, insuranceFactor: 0.6, maintenanceFactor: 1.3, fuelPrice: { gasoline: 11.1, ethanol: 7.2, diesel: 10.6, electric: 1.4 }, monthlyRate: 0.005 },
-  DE: { taxPct: 0.004, registrationFlat: 300, insuranceFactor: 0.7, maintenanceFactor: 1.35, fuelPrice: { gasoline: 10.5, ethanol: 9.0, diesel: 9.9, electric: 2.2 }, monthlyRate: 0.005 },
-  IT: { taxPct: 0.006, registrationFlat: 280, insuranceFactor: 0.85, maintenanceFactor: 1.25, fuelPrice: { gasoline: 10.8, ethanol: 10.8, diesel: 10.3, electric: 1.7 }, monthlyRate: 0.006 },
 };
+
+export const SIMULATOR_COUNTRIES = Object.keys(COUNTRY_PROFILES);
+/** O simulador responde por este país? Sem país, vale o padrão (Brasil). */
+export const isSimulatorAvailable = (country) =>
+  SIMULATOR_COUNTRIES.includes(String(country || "BR").toUpperCase());
 
 // ---------------------------------------------------------------------------
 // Curvas de risco/uso

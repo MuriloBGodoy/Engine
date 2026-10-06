@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { resolveVehicleSpecSheet } from "../services/carSpecSheet";
 import { summaryTokens } from "./specsheet/labels";
-import { estimateOwnership } from "../services/ownership";
+import { estimateOwnership, isSimulatorAvailable } from "../services/ownership";
 import { forecastCompletion } from "../services/forecast";
 import { expenseInsights } from "../services/expenses";
 import { CAR_TYPE_OWNED } from "../services/db";
@@ -183,9 +183,12 @@ export function CarCard({
   hideValues = false,
 }) {
   const { i18n, t } = useTranslation();
-  const ownershipTotal = car.ownership
-    ? estimateOwnership(car, car.ownership, car.ownership).totals.monthlyTotal
-    : null;
+  // Fora do Brasil o simulador não responde: o botão vira só a porta para o
+  // "estamos trabalhando nisso", sem número.
+  const ownershipTotal =
+    car.ownership && isSimulatorAvailable(car.ownership.country)
+      ? estimateOwnership(car, car.ownership, car.ownership).totals.monthlyTotal
+      : null;
   const isOwned = car.type === CAR_TYPE_OWNED;
   // Meta batida mas ainda não confirmada: não faz sentido anunciar "falta
   // R$ 0,00". Vira convite pra pessoa declarar a conquista.

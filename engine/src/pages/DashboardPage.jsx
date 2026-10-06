@@ -5,7 +5,7 @@ import { Calculator, Check, ChevronRight, Trophy } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
 import { useIsDark } from "../hooks/useIsDark";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { estimateOwnership } from "../services/ownership";
+import { estimateOwnership, isSimulatorAvailable } from "../services/ownership";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarName } from "../services/carDisplay";
 
@@ -32,6 +32,8 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
                 country: settings?.profile?.country,
                 state: settings?.profile?.state,
               };
+          // Fora do Brasil o simulador não responde — sem linha no comparador.
+          if (!isSimulatorAvailable(location.country)) return null;
           const result = estimateOwnership(car, car.ownership || {}, location);
           return {
             car,
@@ -42,6 +44,7 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
             downGap: result.recommendations.downPaymentGap,
           };
         })
+        .filter(Boolean)
         .sort((a, b) => a.monthlyTotal - b.monthlyTotal),
     [cars, settings],
   );

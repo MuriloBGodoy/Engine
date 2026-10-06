@@ -805,6 +805,12 @@ const resources = {
       ownership: {
         lean: {
           kicker: "Quanto custa ter este carro",
+          lastTitle: "Onde você mora e quanto ganha",
+          lastHint: "O estado decide o IPVA e o licenciamento. A renda é opcional, fica só com você e serve para mostrar a porcentagem.",
+          soonTitle: "Estamos trabalhando nisso",
+          soonBody:
+            "O simulador de custo ainda só funciona com carros e impostos do Brasil. Estamos preparando a versão para o seu país — quando ficar pronta, ela aparece aqui.",
+          soonCta: "Entendi",
           plusYearly: "+ {{value}} por ano de IPVA e licenciamento",
           monthlyGroup: "Todo mês",
           yearlyGroup: "Uma vez por ano",
@@ -2474,6 +2480,12 @@ const resources = {
       ownership: {
         lean: {
           kicker: "What owning this car costs",
+          lastTitle: "Where you live and what you earn",
+          lastHint: "The state sets IPVA and licensing. Income is optional, stays with you and is only used to show the percentage.",
+          soonTitle: "We're working on it",
+          soonBody:
+            "The cost simulator only works with Brazilian cars and taxes for now. We're preparing the version for your country — when it's ready, it shows up here.",
+          soonCta: "Got it",
           plusYearly: "+ {{value}} a year in IPVA and licensing",
           monthlyGroup: "Every month",
           yearlyGroup: "Once a year",
@@ -4135,6 +4147,12 @@ const resources = {
       ownership: {
         lean: {
           kicker: "Cuánto cuesta tener este auto",
+          lastTitle: "Dónde vives y cuánto ganas",
+          lastHint: "El estado define el IPVA y la licencia. Los ingresos son opcionales, quedan solo contigo y sirven para mostrar el porcentaje.",
+          soonTitle: "Estamos trabajando en ello",
+          soonBody:
+            "El simulador de costos todavía solo funciona con autos e impuestos de Brasil. Estamos preparando la versión para tu país — cuando esté lista, aparecerá aquí.",
+          soonCta: "Entendido",
           plusYearly: "+ {{value}} por año de IPVA y licencia",
           monthlyGroup: "Todos los meses",
           yearlyGroup: "Una vez al año",

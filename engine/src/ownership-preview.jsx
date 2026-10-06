@@ -63,7 +63,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       car={alvo}
       cars={[alvo, atual]}
       settings={{
-        profile: { country: "BR", state: "SP" },
+        // ?pais=PT fotografa a tela de fora do Brasil ("estamos trabalhando nisso").
+        profile: { country: QUERY.get("pais") || "BR", state: QUERY.get("pais") ? "" : "SP" },
         // ?sem=1 derruba a renda: é o estado 2 (primeira visita), que é o mais
         // comum e por isso precisa ser fotografado tambem.
         // ?renda= e ?contas= fotografam qualquer celula da grade medida — em
