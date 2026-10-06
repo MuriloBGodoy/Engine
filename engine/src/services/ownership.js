@@ -458,6 +458,10 @@ export const defaultOwnershipInputs = () => ({
   monthlyIncome: 0,
   parkingMonthly: 0,
   tollsMonthly: 0,
+  // Seguro e manutenção são o que a PESSOA informa (cotação, o que já paga).
+  // 0 = não informado, e não informado fica fora da conta. Ver estimateOwnership.
+  insuranceMonthly: 0,
+  maintenanceMonthly: 0,
 });
 
 export const normalizeOwnershipInputs = (raw = {}) => {
@@ -491,6 +495,8 @@ export const normalizeOwnershipInputs = (raw = {}) => {
     monthlyIncome: clamp(num(raw.monthlyIncome, 0), 0, 100000000),
     parkingMonthly: clamp(num(raw.parkingMonthly, 0), 0, 1000000),
     tollsMonthly: clamp(num(raw.tollsMonthly, 0), 0, 1000000),
+    insuranceMonthly: clamp(num(raw.insuranceMonthly, 0), 0, 1000000),
+    maintenanceMonthly: clamp(num(raw.maintenanceMonthly, 0), 0, 1000000),
   };
 };
 
@@ -1035,10 +1041,19 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
   );
   const tax = taxResult.annual;
   const licensing = annualLicensing(country, state);
-  const insuranceResult = annualInsurance(value, carAge, inputs, country, state);
+  // Seguro e manutenção saíram do cálculo automático em 06/10/2026, a pedido
+  // do Murilo ("algo mais enxuto, que acerte de verdade"). As duas curvas não
+  // têm fonte que diga quanto ESTE carro custa — a de seguro nem olha o modelo,
+  // e a de manutenção cobra igual de um Lancer e de um Onix do mesmo preço.
+  // Agora entram só quando a pessoa informa o número dela. As estimativas
+  // continuam exportadas (estimateInsuranceAnnual / estimateMaintenanceAnnual)
+  // para voltar no dia em que houver fonte; nenhuma tela as usa.
+  const insuranceResult = inputs.insuranceMonthly > 0
+    ? { annual: inputs.insuranceMonthly * 12, basis: "user" }
+    : { annual: 0, basis: "not_informed" };
   const insurance = insuranceResult.annual;
   const fuel = monthlyFuel(inputs, country, state);
-  const maintenance = annualMaintenance(value, carAge, inputs, country);
+  const maintenance = inputs.maintenanceMonthly * 12;
   const depreciation = (value * annualDepreciationRate(carAge)) / 12;
 
   const monthly = {
@@ -1210,3 +1225,8 @@ export function affordabilityLevers(car, rawInputs = {}, location = {}) {
 
   return levers.sort((a, b) => b.delta - a.delta);
 }
+
+// Estimativas que saíram da conta em 06/10/2026 — ver estimateOwnership.
+// Ficam exportadas, e não apagadas, para voltar no dia em que houver fonte.
+export const estimateInsuranceAnnual = annualInsurance;
+export const estimateMaintenanceAnnual = annualMaintenance;
