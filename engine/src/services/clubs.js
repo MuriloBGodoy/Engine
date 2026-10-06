@@ -49,6 +49,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { auth, firestore } from "./firebase";
+import { grantAchievement, grantOwn, grantSeries } from "./achievements";
 import { engineDB, normalizeCommunityGoal, POST_KIND_POST } from "./db";
 import { normalizeFipeBrand } from "./fipeVersion";
 
@@ -72,6 +73,22 @@ const LOTE_IN = 30;
 const clubRef = (clubId) => doc(firestore, CLUBS, String(clubId));
 const membersRef = (clubId) => collection(firestore, CLUBS, String(clubId), MEMBERS);
 const memberRef = (clubId, uid) => doc(firestore, CLUBS, String(clubId), MEMBERS, String(uid));
+
+/**
+ * Degraus de "seu clube chegou a N membros", para quem fundou. Conta a
+ * SUBCOLEÇÃO de membros, nunca o `memberCount` do clube: aquele é número de
+ * vitrine que cada membro incrementa, e empurrá-lo daria o selo sem gente.
+ * Sem await em quem chama: falhar aqui não pode desfazer a entrada.
+ */
+const concederMembrosAoFundador = async (clubId, founderId) => {
+  if (!founderId) return;
+  try {
+    const total = (await getCountFromServer(membersRef(clubId))).data().count;
+    await grantSeries(String(founderId), "club_members", total);
+  } catch {
+    // Conquista é enfeite: a entrada no clube já aconteceu.
+  }
+};
 const requestsRef = (clubId) => collection(firestore, CLUBS, String(clubId), REQUESTS);
 const requestRef = (clubId, uid) => doc(firestore, CLUBS, String(clubId), REQUESTS, String(uid));
 const tagRef = (tag) => doc(firestore, CLUB_TAGS, String(tag));
@@ -890,6 +907,11 @@ export async function createClub(form) {
     throw erro;
   }
 
+  // Fundou e, por consequência, entrou. Sem await: conquista é enfeite e não
+  // pode atrasar a criação.
+  grantOwn("club_founder");
+  grantOwn("club_joined");
+
   const criado = await getDoc(ref).catch(() => null);
   return criado?.exists()
     ? normalizeClub(ref.id, criado.data(), { myRole: "founder" })
@@ -943,6 +965,8 @@ export async function joinClub(clubId) {
   lote.update(clubRef(clubId), { memberCount: increment(1), updatedAt: agora });
   await lote.commit();
 
+  grantOwn("club_joined");
+  concederMembrosAoFundador(clubId, club.founderId);
   return "member";
 }
 
@@ -1014,6 +1038,11 @@ export async function approveRequest(clubId, alvoUid) {
   lote.delete(requestRef(clubId, alvoUid));
   lote.update(clubRef(clubId), { memberCount: increment(1), updatedAt: agora });
   await lote.commit();
+
+  // Quem aprova concede a quem entrou — é escrita no perfil alheio, que a
+  // regra permite só para ids da lista fechada.
+  grantAchievement(alvoUid, "club_joined").catch(() => false);
+  concederMembrosAoFundador(clubId, club.founderId);
 }
 
 export async function rejectRequest(clubId, alvoUid) {
@@ -1105,7 +1134,7 @@ export async function createClubPost(clubId, { text, images = [], videoUrl = "",
     throw erroDeClube("not-member", "Entre no clube para postar no mural.");
   }
 
-  return engineDB.createCommunityPost({
+  const id = await engineDB.createCommunityPost({
     text,
     images,
     videoUrl,
@@ -1113,6 +1142,8 @@ export async function createClubPost(clubId, { text, images = [], videoUrl = "",
     clubId: String(clubId),
     clubTag: club.tag,
   });
+  grantOwn("club_first_post");
+  return id;
 }
 
 // ---------------------------------------------------------------------------

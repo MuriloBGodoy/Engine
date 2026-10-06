@@ -1,5 +1,5 @@
 import { Heart } from "lucide-react";
-import { LIKE_TIERS } from "../../services/achievements";
+import { POST_BADGE_TIERS } from "../../services/achievementTiers";
 import { formatTierLabel } from "./icons";
 
 /**
@@ -28,7 +28,10 @@ const TIER_STYLES = [
 ];
 
 export function AchievementBadge({ tier, state = "unlocked" }) {
-  const rank = LIKE_TIERS.indexOf(tier);
+  // A intensidade segue a escada do POST (1K a 1M). Os degraus pequenos do
+  // perfil (10 a 500) não chegam aqui como selo de post; se chegarem, ficam
+  // no estilo mais leve.
+  const rank = Math.max(POST_BADGE_TIERS.indexOf(tier), 0);
   const locked = state === "locked";
 
   return (

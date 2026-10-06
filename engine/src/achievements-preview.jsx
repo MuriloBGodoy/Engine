@@ -20,29 +20,39 @@ import "./services/i18n";
 const QUERY = new URLSearchParams(window.location.search);
 if (QUERY.get("dark") === "1") document.documentElement.classList.add("dark");
 
-/* Os três momentos. "hoje" é o dado real medido em produção: 11 curtidas
-   somadas, nenhum degrau batido, nenhum marco além da primeira meta. */
+/* Os três momentos, com o catálogo de 06/10/2026. "hoje" é o dado real medido
+   em produção (11 curtidas, 3 seguidores) com o que essas contas já ganham no
+   catálogo novo: primeira meta e o degrau de 10 curtidas. */
 const CENARIOS = {
   hoje: {
     rotulo: "Hoje (dado real)",
-    unlocked: new Set(["first_goal"]),
+    unlocked: new Set(["first_goal", likeTierId(10)]),
     likesReceived: 11,
     followersCount: 3,
   },
   quase: {
-    rotulo: "Quase lá",
-    unlocked: new Set(["first_goal", "first_conquest"]),
-    likesReceived: 950,
-    followersCount: 612,
+    rotulo: "Conta ativa",
+    unlocked: new Set([
+      "first_goal", "first_contribution", "halfway", "streak_3",
+      "owned_car", "first_expense", "expenses_10",
+      "first_post", "first_comment", likeTierId(10), likeTierId(50), "followers_10",
+      "club_joined", "event_rsvp",
+    ]),
+    likesReceived: 74,
+    followersCount: 38,
   },
   cheio: {
-    rotulo: "Cheio (futuro)",
+    rotulo: "Veterano",
     unlocked: new Set([
-      "first_goal",
-      "first_conquest",
-      "owned_car",
-      likeTierId(1000),
-      likeTierId(10000),
+      "first_goal", "first_conquest", "owned_car", "first_contribution", "halfway",
+      "streak_3", "streak_6", "streak_12",
+      "first_expense", "expenses_10", "expenses_50", "measured_consumption",
+      "first_post", "first_comment",
+      ...[10, 50, 100, 500, 1000, 10000].map(likeTierId),
+      "followers_10", "followers_100",
+      "club_joined", "club_founder", "club_first_post", "club_members_10",
+      "event_rsvp", "event_organizer", "event_attendees_10",
+      "first_simulation",
     ]),
     likesReceived: 12400,
     followersCount: 612,
@@ -94,8 +104,7 @@ export function Bench() {
 
       <AchievementCelebration
         open={festa}
-        kind="milestone"
-        milestoneId="first_conquest"
+        achievementId="club_founder"
         onClose={() => setFesta(false)}
         onShare={() => setFesta(false)}
       />

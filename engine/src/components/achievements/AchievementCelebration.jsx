@@ -1,6 +1,7 @@
-import { Heart, Share2, X } from "lucide-react";
+import { Share2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { MILESTONE_ICON } from "./icons";
+import { likeTierId } from "../../services/achievementTiers";
+import { AchievementIcon, achievementName } from "./icons";
 
 /**
  * Celebração em tela cheia — só na 1ª conquista de cada categoria (Marcos ou
@@ -13,23 +14,26 @@ import { MILESTONE_ICON } from "./icons";
  *
  * Props:
  *   open          — controla a exibição
- *   kind          — "milestone" | "likes"
- *   milestoneId   — obrigatório quando kind === "milestone" (um dos MILESTONE_IDS)
- *   tier          — obrigatório quando kind === "likes" (um dos LIKE_TIERS)
+ *   achievementId — qualquer id do catálogo (marco ou degrau de série)
+ *   kind/milestoneId/tier — forma antiga, ainda aceita: "likes" + tier, ou
+ *                   "milestone" + milestoneId
  *   onClose       — fecha a celebração
  *   onShare       — opcional; quando ausente, o botão "Compartilhar" some
  */
-export function AchievementCelebration({ open, kind, milestoneId, tier, onClose, onShare }) {
+export function AchievementCelebration({
+  open,
+  achievementId,
+  kind,
+  milestoneId,
+  tier,
+  onClose,
+  onShare,
+}) {
   const { t, i18n } = useTranslation();
   if (!open) return null;
 
-  const isMilestone = kind === "milestone";
-  const Icon = isMilestone ? MILESTONE_ICON[milestoneId] : Heart;
-  const title = isMilestone
-    ? t(`achievements.items.${milestoneId}.name`)
-    : t("achievements.likeTierLabel", {
-        alvo: new Intl.NumberFormat(i18n.language).format(tier),
-      });
+  const id = achievementId || (kind === "likes" ? likeTierId(tier) : milestoneId);
+  const title = achievementName(t, i18n.language, id);
 
   return (
     <div
@@ -58,7 +62,7 @@ export function AchievementCelebration({ open, kind, milestoneId, tier, onClose,
             boxShadow: "0 0 0 6px var(--engine-ring), 0 20px 40px -12px var(--engine-accent)",
           }}
         >
-          {Icon ? <Icon size={52} aria-hidden="true" /> : null}
+          <AchievementIcon id={id} size={52} aria-hidden="true" />
         </div>
 
         <p className="mb-2.5 text-[11px] font-black uppercase tracking-widest text-[var(--engine-accent)]">

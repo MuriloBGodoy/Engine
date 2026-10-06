@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart } from "lucide-react";
-import {
-  LIKE_TIERS,
-  likeTierId,
-  listAchievements,
-  subscribeAchievementUnlocked,
-} from "../../services/achievements";
+import { listAchievements, subscribeAchievementUnlocked } from "../../services/achievements";
+import { ACHIEVEMENT_CATALOG, categoryOf } from "../../services/achievementTiers";
 import { useToast } from "../ToastProvider";
 import { AchievementCelebration } from "./AchievementCelebration";
-import { MILESTONE_ICON } from "./icons";
+import { achievementIcon, achievementName } from "./icons";
+
+const CATEGORIES = ACHIEVEMENT_CATALOG.map((c) => c.key);
+const contarPorCategoria = (ids) =>
+  Object.fromEntries(
+    CATEGORIES.map((key) => [key, [...ids].filter((id) => categoryOf(id) === key).length]),
+  );
 
 /**
  * O aviso de conquista, montado uma vez no App.
  *
- * A conquista é concedida no fundo, em três lugares que não sabem desenhar nada
- * (curtir, seguir, abrir a garagem). Este componente escuta o anúncio e decide
+ * A conquista é concedida no fundo, em lugares que não sabem desenhar nada
+ * (curtir, seguir, abrir a garagem, entrar num clube, confirmar presença...). Este componente escuta o anúncio e decide
  * COMO avisar — decisão 3 de 22/08/2026: tela cheia só na primeira conquista de
  * cada categoria, todas as seguintes no toast compacto. A festa que acontece
  * toda vez deixa de ser festa.
@@ -33,18 +34,11 @@ export function AchievementAnnouncer({ userId }) {
   // cheia indevida.
   const jaTinha = useRef(null);
 
-  const categoria = (id) => (id.startsWith("likes_") ? "likes" : "milestone");
+  // Seis categorias desde 06/10/2026 (Garagem, Diário, Comunidade, Clubes,
+  // Eventos, Simulador). A tela cheia continua sendo só a primeira de cada uma.
+  const categoria = (id) => categoryOf(id) || "garage";
 
-  const nomeDe = useCallback(
-    (id) => {
-      if (categoria(id) !== "likes") return t(`achievements.items.${id}.name`);
-      const tier = LIKE_TIERS.find((valor) => likeTierId(valor) === id);
-      return t("achievements.likeTierLabel", {
-        alvo: new Intl.NumberFormat(i18n.language).format(tier || 0),
-      });
-    },
-    [t, i18n.language],
-  );
+  const nomeDe = useCallback((id) => achievementName(t, i18n.language, id), [t, i18n.language]);
 
   useEffect(() => {
     let vivo = true;
@@ -52,10 +46,7 @@ export function AchievementAnnouncer({ userId }) {
     if (!userId) return () => { vivo = false; };
     listAchievements(userId).then((ids) => {
       if (!vivo) return;
-      jaTinha.current = {
-        milestone: [...ids].filter((id) => categoria(id) === "milestone").length,
-        likes: [...ids].filter((id) => categoria(id) === "likes").length,
-      };
+      jaTinha.current = contarPorCategoria(ids);
     });
     return () => {
       vivo = false;
@@ -76,7 +67,7 @@ export function AchievementAnnouncer({ userId }) {
         }
         showToast(`${t("achievements.toast.unlocked")} — ${nomeDe(id)}`, {
           tone: "achievement",
-          icon: tipo === "likes" ? Heart : MILESTONE_ICON[id],
+          icon: achievementIcon(id),
         });
       }),
     [showToast, t, nomeDe],
@@ -85,8 +76,6 @@ export function AchievementAnnouncer({ userId }) {
   const atual = fila[0];
   if (!atual) return null;
 
-  const tipo = categoria(atual);
-  const tier = tipo === "likes" ? LIKE_TIERS.find((v) => likeTierId(v) === atual) : undefined;
   // Compartilhar só onde o sistema tem para onde mandar. No desktop sem a API,
   // o botão some em vez de virar um clique que não faz nada.
   const compartilhar = navigator.share
@@ -104,9 +93,7 @@ export function AchievementAnnouncer({ userId }) {
   return (
     <AchievementCelebration
       open
-      kind={tipo}
-      milestoneId={tipo === "milestone" ? atual : undefined}
-      tier={tier}
+      achievementId={atual}
       onClose={() => setFila((lista) => lista.slice(1))}
       onShare={compartilhar}
     />

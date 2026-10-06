@@ -31,7 +31,14 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { auth, firestore } from "./firebase";
-import { earnedLikeTiers, isAchievementId, likeTierId } from "./achievementTiers";
+import {
+  earnedLikeTiers,
+  earnedTiers,
+  isAchievementId,
+  likeTierId,
+  seriesTierId,
+  tiersOf,
+} from "./achievementTiers";
 
 const ACHIEVEMENTS_SUBCOLLECTION = "achievements";
 
@@ -46,6 +53,16 @@ export {
   visibleLikeTiers,
   earnedLikeTiers,
   postBadgeTier,
+  POST_BADGE_TIERS,
+  FOLLOWER_TIERS,
+  ACHIEVEMENT_CATALOG,
+  categoryOf,
+  seriesOf,
+  tiersOf,
+  visibleTiers,
+  earnedTiers,
+  seriesTierId,
+  garageAchievementIds,
 } from "./achievementTiers";
 
 const achievementsRef = (userId) =>
@@ -100,18 +117,51 @@ export const listAchievements = async (userId) => {
  * decide se a notificação sai, e é o que impede duas abas abertas de avisarem
  * duas vezes. O `create` que perde a corrida falha na regra, não aqui.
  */
+// Já sabido nesta sessão: conquistado, ou tentado e negado por já existir.
+// Sem isto, "primeiro post" tentaria gravar em todo post — uma escrita negada
+// por post, para sempre. Chave `${uid}/${id}`.
+const jaResolvido = new Set();
+
 export const grantAchievement = async (userId, achievementId) => {
   if (!userId || !auth.currentUser || !isAchievementId(achievementId)) return false;
+  const chave = `${userId}/${achievementId}`;
+  if (jaResolvido.has(chave)) return false;
   try {
     const alvo = doc(firestore, "users", userId, ACHIEVEMENTS_SUBCOLLECTION, achievementId);
     // `create` puro: sem merge, para o Firestore negar quando já existe. Com
     // merge isto viraria update e a dedup sumiria.
     await setDoc(alvo, { unlockedAt: serverTimestamp() });
+    jaResolvido.add(chave);
     anunciar(userId, achievementId);
     return true;
   } catch {
+    // Negado = já existia (ou sem permissão): não adianta tentar de novo
+    // nesta sessão.
+    jaResolvido.add(chave);
     return false;
   }
+};
+
+/** Conquista de uma ação da própria pessoa (primeiro post, entrou num clube...). */
+export const grantOwn = (achievementId) =>
+  grantAchievement(auth.currentUser?.uid, achievementId).catch(() => false);
+
+/**
+ * Concede os degraus de uma série que `value` já cruzou, para `userId`.
+ * Devolve só os que ESTA chamada concedeu. Sequencial, para as notificações
+ * saírem na ordem dos degraus.
+ */
+export const grantSeries = async (userId, series, value) => {
+  if (!userId) return [];
+  const alvos = earnedTiers(tiersOf(series), value).map((tier) => seriesTierId(series, tier));
+  if (!alvos.length) return [];
+  const jaTem = await listAchievements(userId);
+  const concedidos = [];
+  for (const id of alvos) {
+    if (jaTem.has(id)) continue;
+    if (await grantAchievement(userId, id)) concedidos.push(id);
+  }
+  return concedidos;
 };
 
 /** Revoga. É do dono (ou da moderação) — a rede de segurança contra fraude. */
@@ -130,22 +180,17 @@ export const revokeAchievement = async (userId, achievementId) => {
 /**
  * Concede os marcos que dependem só da garagem da própria pessoa.
  *
- * Recebe os fatos já apurados em vez dos carros: assim este módulo não precisa
- * saber o que é "tipo do carro" nem "aporte total" — quem sabe disso é o
- * `db.js`, e o serviço de conquistas fica com uma responsabilidade só.
+ * Recebe a lista de ids já apurada (`garageAchievementIds`, na régua pura) em
+ * vez dos carros: assim este módulo não precisa saber o que é "tipo do carro"
+ * nem como se mede consumo, e o serviço de conquistas fica com uma
+ * responsabilidade só.
  *
  * Escrita no próprio perfil, então não tem a complicação dos marcos de curtida:
  * sem concorrência de terceiro, sem notificação (a pessoa está na tela, quem
  * avisa é o toast).
  */
-export const syncOwnMilestones = async (userId, { temMeta, temProprio, temConquistado }) => {
-  if (!userId) return [];
-  const alvos = [
-    temMeta && "first_goal",
-    temProprio && "owned_car",
-    temConquistado && "first_conquest",
-  ].filter(Boolean);
-  if (!alvos.length) return [];
+export const syncOwnMilestones = async (userId, alvos = []) => {
+  if (!userId || !alvos.length) return [];
 
   const jaTem = await listAchievements(userId);
   const concedidos = [];

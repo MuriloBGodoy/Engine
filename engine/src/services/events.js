@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, firestore } from "./firebase";
+import { grantOwn, grantSeries } from "./achievements";
 
 const EVENTS_COLLECTION = "events";
 
@@ -109,6 +110,7 @@ export const engineEvents = {
     });
 
     const docRef = await addDoc(collection(firestore, EVENTS_COLLECTION), normalized);
+    grantOwn("event_organizer");
     return { id: docRef.id, ...normalized };
   },
 
@@ -259,6 +261,16 @@ export const engineEvents = {
     }
 
     await setDoc(participantRef(eventId, uid), participantData);
+
+    grantOwn("event_rsvp");
+    // "Seu evento com N confirmados", para quem organizou. Conta a
+    // subcoleção de participantes — o mesmo número que decide a lotação.
+    const organizer = eventSnap.data().createdBy;
+    if (organizer) {
+      contarParticipantes(eventId)
+        .then((total) => grantSeries(String(organizer), "event_attendees", total))
+        .catch(() => {});
+    }
     return participantData;
   },
 

@@ -27,13 +27,15 @@ import {
 } from "firebase/firestore";
 import { auth, firestore } from "./firebase";
 import {
-  grantAchievement,
+  grantOwn,
+  grantSeries,
+  garageAchievementIds,
   syncLikeAchievements,
   syncOwnMilestones,
 } from "./achievements";
 import { inferLocation } from "./locations";
 import { normalizeOwnershipInputs, LIFE_SITUATION_TYPES } from "./ownership";
-import { normalizeExpense, normalizeExpenses } from "./expenses";
+import { normalizeExpense, normalizeExpenses, realConsumption } from "./expenses";
 import { normalizeSpecSheet, publicSpecSheet } from "./carSpecSheet";
 
 const defaultSettings = {
@@ -1841,6 +1843,8 @@ export const engineDB = {
       { merge: true },
     );
 
+    // Sem await: a conquista não pode atrasar nem derrubar a publicação.
+    grantOwn("first_post");
     return payload.id;
   },
 
@@ -1916,6 +1920,7 @@ export const engineDB = {
     assertCarFitsDocument(payload);
 
     await setDoc(doc(firestore, COMMUNITY_COLLECTION, id), payload);
+    grantOwn("first_post");
     return id;
   },
 
@@ -2047,13 +2052,13 @@ export const engineDB = {
   async sincronizarMarcosDaGaragem(cars = []) {
     if (!currentUserId || !cars.length) return [];
     try {
-      return await syncOwnMilestones(currentUserId, {
-        temMeta: cars.some((car) => car.type !== CAR_TYPE_OWNED),
-        temProprio: cars.some((car) => car.type === CAR_TYPE_OWNED),
-        temConquistado: cars.some(
-          (car) => Number(car.targetValue) > 0 && Number(car.savedValue) >= Number(car.targetValue),
-        ),
-      });
+      return await syncOwnMilestones(
+        currentUserId,
+        garageAchievementIds(cars, {
+          ownedType: CAR_TYPE_OWNED,
+          hasMeasuredConsumption: cars.some((car) => realConsumption(car.expenses || [])),
+        }),
+      );
     } catch (error) {
       warnFirestoreFallback("sincronizarMarcosDaGaragem", error);
       return [];
@@ -2065,7 +2070,10 @@ export const engineDB = {
     try {
       const total = await this.countLikesReceived(ownerId);
       const novos = await syncLikeAchievements(ownerId, total);
-      for (const id of novos) {
+      // Só o maior degrau novo vira aviso: quem já tinha 60 curtidas antes dos
+      // degraus pequenos existirem ganha 10 e 50 juntos na próxima curtida, e
+      // dois avisos seguidos dizendo a mesma coisa é ruído.
+      for (const id of novos.slice(-1)) {
         // Quem recebeu o selo pode estar offline: por isso vira notificação, e
         // não um aviso na tela de quem curtiu.
         await this.notifyUser(ownerId, {
@@ -2217,14 +2225,20 @@ export const engineDB = {
         const total = (await getCountFromServer(followersCollection(targetUserId)))
           .data()
           .count;
-        if (total >= 1000 && (await grantAchievement(targetUserId, "followers_1000"))) {
+        // A série inteira (10, 100, 1.000), não só o marco de mil. Notifica só
+        // o maior degrau que esta chamada concedeu, para não chegarem três
+        // avisos de uma vez quando alguém cruza vários degraus juntos.
+        const novos = await grantSeries(targetUserId, "followers", total);
+        const maior = novos[novos.length - 1];
+        if (maior) {
+          const degrau = Number(maior.split("_")[1]);
           await this.notifyUser(targetUserId, {
             type: "achievement",
-            achievementId: "followers_1000",
+            achievementId: maior,
             targetPath: "/settings",
             notificationTitle: "Conquista desbloqueada",
-            notificationBody: "Mil pessoas seguem sua garagem.",
-            text: "Você alcançou 1.000 seguidores.",
+            notificationBody: `${degrau.toLocaleString("pt-BR")} pessoas seguem sua garagem.`,
+            text: `Você alcançou ${degrau.toLocaleString("pt-BR")} seguidores.`,
           });
         }
       } catch (error) {
@@ -2561,6 +2575,7 @@ export const engineDB = {
       }),
       updatedAt: serverTimestamp(),
     });
+    grantOwn("first_comment");
 
     if (goalData) {
       await this.notifyUser(goalData.ownerId, {
