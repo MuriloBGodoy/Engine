@@ -970,6 +970,10 @@ const resources = {
           insurance: "Seguro",
           fullCoverageUnavailable:
             "Seguradora tradicional não vende cobertura completa para carro com mais de {{age}} anos. O valor acima é só de terceiros (RCF).",
+          taxAgeExempt: "Carro com {{age}} anos ou mais não paga IPVA neste estado.",
+          taxSpHybridExempt:
+            "Híbrido flex até R$ 261 mil é isento de IPVA em SP até 31/12/2026. Volta em 1% em 2027 e sobe 1 ponto por ano até 4% em 2030.",
+          taxSpHybridReduced: "Híbrido flex em SP paga {{rate}}% neste ano, na escada que chega a 4% em 2030.",
           fuel: "Combustível",
           maintenance: "Manutenção e pneus",
           parking: "Estacionamento",
@@ -2597,6 +2601,10 @@ const resources = {
           insurance: "Insurance",
           fullCoverageUnavailable:
             "Traditional insurers don't sell comprehensive cover for cars over {{age}} years old. The figure above is third-party only.",
+          taxAgeExempt: "Cars {{age}} years or older pay no IPVA in this state.",
+          taxSpHybridExempt:
+            "Flex hybrids up to R$ 261k are IPVA-exempt in São Paulo until 12/31/2026. The tax returns at 1% in 2027 and rises 1 point a year to 4% in 2030.",
+          taxSpHybridReduced: "Flex hybrids in São Paulo pay {{rate}}% this year, stepping up to 4% by 2030.",
           fuel: "Fuel",
           maintenance: "Maintenance and tires",
           parking: "Parking",
@@ -4216,6 +4224,10 @@ const resources = {
           insurance: "Seguro",
           fullCoverageUnavailable:
             "La aseguradora tradicional no vende cobertura total para autos de más de {{age}} años. El valor de arriba es solo de terceros (RC).",
+          taxAgeExempt: "Los autos con {{age}} años o más no pagan IPVA en este estado.",
+          taxSpHybridExempt:
+            "Los híbridos flex de hasta R$ 261 mil están exentos de IPVA en São Paulo hasta el 31/12/2026. El impuesto vuelve con 1% en 2027 y sube 1 punto por año hasta 4% en 2030.",
+          taxSpHybridReduced: "Los híbridos flex en São Paulo pagan {{rate}}% este año, en la escala que llega a 4% en 2030.",
           fuel: "Combustible",
           maintenance: "Mantenimiento y neumáticos",
           parking: "Estacionamiento",

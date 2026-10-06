@@ -32,8 +32,7 @@ erro, e o produto segue sendo decidido no escuro.
 - O rasterizador de PDF, ~1h, que destrava Hilux, Tracker MY≤2025 e o 1.2T de
   132/133 CV de uma vez
 - O parser por coluna do anexo SFP-40/25, meio dia
-- Híbrido em SP isento até 31/12/2026 — hoje cobramos 4%, o que é R$ 600/mês a
-  mais num híbrido de R$ 180 mil
+- [x] ~~Híbrido em SP isento até 31/12/2026~~ — fechado em 06/10/2026
 - Isenção de IPVA por idade nas ~15 UFs que faltam, um dia, lei por lei
 - [x] ~~O corte de 1 ponto na régua de conforto~~ — fechado em 21/08/2026
   (`ade8575`), e o caso real era pior do que o anotado: sobra de **R$ 17.789
@@ -246,10 +245,12 @@ Na ordem de retorno:
       motor fica na de usado de propósito — ver `SIMULADOR-FONTES.md` —, e o
       lugar certo disso é uma linha de **custo de entrada** que a tela não tem,
       junto com transferência e emplacamento
-- [ ] **Híbrido em SP é isento até 31/12/2026** (Lei 18.065/2024), depois 1% em
-      2027, 2% em 2028, 3% em 2029, 4% de 2030. Cobramos 4% hoje: R$ 600/mês
-      num híbrido de R$ 180 mil. Depende de `FUEL_TYPES` distinguir híbrido de
-      combustão, que hoje não distingue
+- [x] ~~**Híbrido em SP é isento até 31/12/2026**~~ — feito em 06/10/2026. Não
+      precisou de combustível novo: a isenção é do CARRO (híbrido pleno, flex,
+      até R$ 261.154,45), não do que se põe no tanque. Regra por lista
+      (Corolla, Corolla Cross, Yaris Cross híbridos), porque o nome da FIPE não
+      separa híbrido leve de pleno — isentar pelo marcador daria IPVA zero a um
+      Pulse Hybrid. Escada 2027–2029 já modelada. `npm run check:ipva`
 - [ ] **Medir o viés FIPE × base do IPVA.** Formato do anexo da Resolução
       SFP-40/25 conferido em 17/08/2026: é **PDF** (8,3 MB, 286 páginas) — mas
       com camada de texto e coordenadas, então um parser por coluna lê a tabela.

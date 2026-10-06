@@ -774,6 +774,14 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
       label:
         result.country === "BR" ? t("ownership.results.taxBR") : t("ownership.results.tax"),
       value: result.monthly.tax,
+      note:
+        result.tax?.basis === "age_exempt"
+          ? t("ownership.results.taxAgeExempt", { age: result.tax.exemptAge })
+          : result.tax?.basis === "sp_hybrid"
+            ? result.tax.rate === 0
+              ? t("ownership.results.taxSpHybridExempt")
+              : t("ownership.results.taxSpHybridReduced", { rate: decimal(result.tax.rate * 100) })
+            : "",
     },
     { key: "licensing", label: t("ownership.results.licensing"), value: result.monthly.licensing },
     result.monthly.parking > 0

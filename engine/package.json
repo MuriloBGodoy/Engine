@@ -21,6 +21,7 @@
     "check:leitura": "node scripts/check-leitura-honesta.mjs",
     "check:events-i18n": "node scripts/check-events-i18n.mjs",
     "check:achievements": "node scripts/check-achievements.mjs",
+    "check:ipva": "node scripts/check-ipva.mjs",
     "icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {

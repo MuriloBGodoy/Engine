@@ -43,16 +43,10 @@
 // "exclusivamente" a álcool, que flex nunca cumpriu. Só escapam locadora (1%,
 // § 1º) e GNV adaptado em carro fabricado até 31/12/2008 (3%, § 3º).
 //
-// LACUNA CONHECIDA EM SP, com prazo: híbrido de motor elétrico + combustão a
-// etanol, de valor até R$ 250.000 (corrigido por IPCA), é ISENTO em 2025 e
-// 2026 — Disposições Transitórias art. 5º, acrescido pela Lei 18.065/2024,
-// regulamentado pela Portaria SRE-94/24. Depois volta escalonado: 1% em 2027,
-// 2% em 2028, 3% em 2029, 4% de 2030. Não dá para modelar enquanto FUEL_TYPES
-// não distinguir híbrido de combustão. Hoje cobramos 4% — erro para cima, e o
-// maior de SP em valor absoluto: R$ 600/mês num híbrido de R$ 180 mil.
-// O 100% elétrico NÃO entra nessa isenção: o dispositivo cobre hidrogênio
-// exclusivo ou híbrido COM motor a combustão, e um BEV não é nenhum dos dois.
-// É por isso que SP fica fora de IPVA_BR_ELECTRIC.
+// Híbrido flex em SP tem regime próprio, com prazo — ver SP_FLEX_HYBRID.
+// O 100% elétrico NÃO entra nele: o dispositivo cobre hidrogênio exclusivo ou
+// híbrido COM motor a combustão, e um BEV não é nenhum dos dois. É por isso que
+// SP fica fora de IPVA_BR_ELECTRIC.
 //
 // MS, PI e BA — os três "suspeitos de erro para baixo" foram conferidos em
 // 17/08/2026 e o escalar de cada um está CERTO para o caso modal (automóvel de
@@ -150,6 +144,47 @@ const IPVA_BR_DIESEL = {
 // congelado em 2011 e NÃO contém esta redação — não usar como fonte.
 const IPVA_BR_VALUE_BRACKET = {
   PI: { threshold: 150000, above: 0.03 },
+};
+
+// SP — híbrido com motor a combustão que aceita etanol, de valor até o teto.
+//
+// Lei 13.296/2008, Disposições Transitórias art. 5º, acrescido pela Lei
+// 18.065/2024 (texto conferido na ALESP em 06/10/2026): ISENTO em 2025 e 2026,
+// depois 1% em 2027, 2% em 2028, 3% em 2029 e a alíquota cheia de 2030 em
+// diante. O teto de R$ 250.000 é corrigido por IPCA todo ano; para 2026 a
+// SEFAZ-SP publicou R$ 261.154,45. Para 2027 em diante o teto corrigido ainda
+// não existe, e fica o de 2026 — menor que o futuro, então erra para cima.
+//
+// A Portaria SRE-94/24 exige motor elétrico de 40 kW ou mais e tensão de 150 V
+// ou mais. Isso tira o híbrido leve (os "Hybrid"/"Bio-Hybrid" de 12 V e 48 V da
+// Stellantis), e a exigência de etanol tira o híbrido só a gasolina (Camry,
+// Prius, RAV4, BYD DM-i, Haval). A SEFAZ aplica a isenção sozinha, e os modelos
+// que a imprensa relata recebendo são Corolla, Corolla Cross e Yaris Cross
+// híbridos — todos Toyota flex fabricados em SP.
+//
+// Por isso a regra é uma LISTA, e não "o nome diz híbrido": o nome da FIPE não
+// separa híbrido leve de pleno nem flex de gasolina (`YARIS Cross XRE 1.5 16V
+// 5p Aut. (Híbrido)` não escreve Flex), e isentar pelo marcador daria IPVA zero
+// a um Pulse Hybrid, que paga 4%. Modelo fora da lista paga a alíquota cheia,
+// que é o lado do erro que este motor escolhe em todo o resto.
+const SP_FLEX_HYBRID = {
+  valueCap: 261154.45,
+  // Exercício -> alíquota. Ausente = alíquota normal da UF.
+  rateByYear: { 2025: 0, 2026: 0, 2027: 0.01, 2028: 0.02, 2029: 0.03 },
+  // Nomes como a FIPE grava: `Corolla Altis 1.8 16V Aut. (Híbrido)`,
+  // `Corolla Cross XRX 1.8 16V Aut. (Híbrido)`, `YARIS Cross XRE 1.5 ...`.
+  models: /^\s*(COROLLA|YARIS\s+CROSS)\b/i,
+  brand: /^\s*TOYOTA\b/i,
+};
+const HYBRID_NAME = /\(H[IÍ]BRIDO\)|\bH[IÍ]BRID[OA]\b|\bHYBRID\b|\bHEV\b/i;
+
+const isSpFlexHybrid = (car) => {
+  const model = String(car?.model || "");
+  return (
+    SP_FLEX_HYBRID.brand.test(String(car?.brand || "")) &&
+    SP_FLEX_HYBRID.models.test(model) &&
+    HYBRID_NAME.test(model)
+  );
 };
 
 // Alíquota efetiva de IPVA de um automóvel de passeio, na ordem em que as
@@ -430,19 +465,33 @@ const countryProfile = (country) => COUNTRY_PROFILES[country] || COUNTRY_PROFILE
 //    mostra; cobrar 5% de ano cheio somaria dois erros para cima, porque a
 //    aproximação 2 já ignora a proporcionalidade que quase sempre acompanha o
 //    zero km. O 5% é custo de ENTRADA, e a tela ainda não tem essa linha.
-const annualVehicleTax = (value, country, state, fuelType, carAge) => {
+//
+// Devolve { annual, basis }, pelo mesmo motivo do seguro: um IPVA zero precisa
+// dizer por que é zero, senão parece defeito.
+//   "rate"              alíquota da UF
+//   "age_exempt"        imune ou isento pela idade (`exemptAge` acompanha)
+//   "sp_hybrid"         híbrido flex em SP, isento ou na escada até 2030
+const annualVehicleTax = (car, value, country, state, fuelType, carAge, year) => {
   if (country === "BR") {
     // Imunidade por idade antes de qualquer alíquota: acima do limite não há
     // imposto a calcular. Ver IPVA_BR_EXEMPT_AGE.
     const exemptAge = IPVA_BR_EXEMPT_AGE[state] ?? IPVA_BR_EXEMPT_AGE_DEFAULT;
-    if (carAge >= exemptAge) return 0;
+    if (carAge >= exemptAge) return { annual: 0, basis: "age_exempt", exemptAge };
 
-    // Híbrido cai na alíquota cheia porque o simulador ainda não distingue
-    // híbrido de combustão — ver FUEL_TYPES.
-    return value * ipvaRateBR(state, fuelType, value);
+    const hybridRate = SP_FLEX_HYBRID.rateByYear[year];
+    if (
+      state === "SP" &&
+      hybridRate !== undefined &&
+      value <= SP_FLEX_HYBRID.valueCap &&
+      isSpFlexHybrid(car)
+    ) {
+      return { annual: value * hybridRate, basis: "sp_hybrid", rate: hybridRate };
+    }
+
+    return { annual: value * ipvaRateBR(state, fuelType, value), basis: "rate" };
   }
   const profile = countryProfile(country);
-  return value * (profile.taxPct || 0);
+  return { annual: value * (profile.taxPct || 0), basis: "rate" };
 };
 
 const annualLicensing = (country, state) => {
@@ -918,7 +967,10 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
   }
 
   // --- Custos mensais de manutenção da posse ----------------------------
-  const tax = annualVehicleTax(value, country, state, inputs.fuelType, carAge);
+  const taxResult = annualVehicleTax(
+    car, value, country, state, inputs.fuelType, carAge, new Date().getFullYear(),
+  );
+  const tax = taxResult.annual;
   const licensing = annualLicensing(country, state);
   const insuranceResult = annualInsurance(value, carAge, inputs, country, state);
   const insurance = insuranceResult.annual;
@@ -979,6 +1031,12 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
     insurance: {
       basis: insuranceResult.basis,
       fullCoverageMaxAge: INSURANCE_FULL_COVERAGE_MAX_AGE,
+    },
+    // Idem para o IPVA. Ver annualVehicleTax.
+    tax: {
+      basis: taxResult.basis,
+      exemptAge: taxResult.exemptAge,
+      rate: taxResult.rate,
     },
     totals: {
       monthlyMaintain,
