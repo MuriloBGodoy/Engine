@@ -38,12 +38,12 @@ import { useToast } from "./ToastProvider";
  */
 
 const fieldClass =
-  "w-full min-h-11 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3.5 py-2.5 text-sm text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]";
+  "w-full min-h-12 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[15px] text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]";
 const labelClass =
   "ml-0.5 block text-[11px] font-bold uppercase tracking-wider text-[var(--engine-text-muted)]";
-const questionClass = "text-[14px] font-bold text-[var(--engine-text)]";
+const questionClass = "text-[16px] font-bold text-[var(--engine-text)]";
 const optionClass = (active) =>
-  `flex min-h-11 flex-col justify-center rounded-xl border px-3 py-2 text-left text-[13px] font-semibold transition-colors ${
+  `flex min-h-12 flex-col justify-center rounded-xl border px-3.5 py-2.5 text-left text-[14px] font-semibold transition-colors ${
     active
       ? "border-[var(--engine-accent)] bg-[var(--engine-accent-soft)] text-[var(--engine-text)]"
       : "border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] hover:border-[var(--engine-border-strong)]"
@@ -77,48 +77,59 @@ function MoneyInput({ id, value, onChange, placeholder }) {
 
 function Field({ label, htmlFor, hint, children }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <label className={labelClass} htmlFor={htmlFor}>
         {label}
       </label>
       {children}
       {hint ? (
-        <p className="ml-0.5 text-[11.5px] leading-relaxed text-[var(--engine-text-muted)]">{hint}</p>
+        <p className="ml-0.5 text-[12px] leading-relaxed text-[var(--engine-text-muted)]">{hint}</p>
       ) : null}
     </div>
   );
 }
 
-/** Uma linha da conta: o que é, de onde vem e quanto. Fora do total = tracejada. */
+/**
+ * Uma linha da conta. Título e valor dividem a primeira linha; a explicação de
+ * onde o número vem fica embaixo, na largura inteira — dividindo a largura com
+ * o valor ela virava uma coluna de quatro palavras no celular.
+ */
 function Line({ label, source, value, missing = false }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-[var(--engine-slab-line)] py-2.5 last:border-b-0">
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-semibold text-[var(--engine-slab-fg)]">{label}</span>
-        {source ? (
-          <small className="mt-0.5 block text-[11.5px] leading-snug text-[var(--engine-slab-fg-muted)]">
-            {source}
-          </small>
-        ) : null}
-      </span>
-      <span
-        className={`shrink-0 font-display text-[14.5px] font-bold tabular-nums ${
-          missing ? "text-[var(--engine-slab-fg-muted)]" : "text-[var(--engine-slab-fg)]"
-        }`}
-      >
-        {value}
-      </span>
+    <div className="border-b border-[var(--engine-slab-line)] py-3.5 last:border-b-0">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="min-w-0 text-[15px] font-semibold text-[var(--engine-slab-fg)]">{label}</span>
+        <span
+          className={`shrink-0 font-display text-[16px] font-bold tabular-nums ${
+            missing ? "text-[var(--engine-slab-fg-muted)]" : "text-[var(--engine-slab-fg)]"
+          }`}
+        >
+          {value}
+        </span>
+      </div>
+      {source ? (
+        <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--engine-slab-fg-muted)]">{source}</p>
+      ) : null}
     </div>
+  );
+}
+
+/** Rótulo de grupo dentro do slab ("Todo mês", "Uma vez por ano"). */
+function GroupLabel({ children }) {
+  return (
+    <p className="mt-7 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
+      {children}
+    </p>
   );
 }
 
 function Section({ title, hint, children }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
+    <section className="space-y-4 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-5">
       <h4 className={questionClass}>
         {title}
         {hint ? (
-          <span className="mt-0.5 block text-[12px] font-medium leading-snug text-[var(--engine-text-muted)]">
+          <span className="mt-1 block text-[13px] font-medium leading-relaxed text-[var(--engine-text-muted)]">
             {hint}
           </span>
         ) : null}
@@ -304,39 +315,37 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </button>
         </div>
 
-        <div className="engine-modal-body engine-scroll grid content-start gap-4 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="engine-modal-body engine-scroll grid content-start gap-5 px-4 py-5 sm:px-6 sm:py-6">
           {/* ============================ a resposta ============================ */}
           {/* Duas contas que NÃO se misturam, porque não se pagam do mesmo jeito.
               O que sai todo mês fica em cima; IPVA e licenciamento são boletos
               anuais e aparecem com o valor cheio e a forma de pagar. Dividir
               por 12 mostrava "R$ 15 de licenciamento por mês", uma cobrança
               que não existe — em SP a taxa nem pode ser parcelada. */}
-          <div className="engine-slab px-5 py-5 sm:px-6">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
+          <div className="engine-slab px-5 py-6 sm:px-7 sm:py-7">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
               {t("ownership.lean.kicker")}
             </p>
-            <p className="mt-1.5 font-display text-[40px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--engine-slab-fg)]">
+            <p className="mt-3 font-display text-[44px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--engine-slab-fg)]">
               {money(monthlyOnly)}
               <span className="ml-1.5 text-[15px] font-semibold tracking-normal text-[var(--engine-slab-fg-muted)]">
                 {t("ownership.lean.perMonth")}
               </span>
             </p>
-            <p className="mt-1.5 text-[15px] font-semibold text-[var(--engine-slab-fg)]">
+            <p className="mt-3 text-[16px] font-semibold leading-snug text-[var(--engine-slab-fg)]">
               {t("ownership.lean.plusYearly", { value: money(yearly) })}
             </p>
             {sharePct !== null ? (
-              <p className="mt-2 text-[13.5px] text-[var(--engine-slab-fg)]">
+              <p className="mt-4 rounded-xl bg-[var(--engine-slab-raise)] px-3.5 py-3 text-[14px] leading-snug text-[var(--engine-slab-fg)]">
                 {t("ownership.lean.share", { pct: sharePct, income: money(income) })}
               </p>
             ) : null}
-            <p className="mt-2 max-w-[52ch] text-[12.5px] leading-relaxed text-[var(--engine-slab-fg-muted)]">
+            <p className="mt-4 max-w-[54ch] text-[13px] leading-relaxed text-[var(--engine-slab-fg-muted)]">
               {t("ownership.lean.promise")}
             </p>
 
-            <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
-              {t("ownership.lean.monthlyGroup")}
-            </p>
-            <div className="mt-1 border-t border-[var(--engine-slab-line)]">
+            <GroupLabel>{t("ownership.lean.monthlyGroup")}</GroupLabel>
+            <div className="mt-2 border-t border-[var(--engine-slab-line)]">
               {isFinance && financing ? (
                 <Line
                   label={t("ownership.results.installment")}
@@ -388,10 +397,8 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               ) : null}
             </div>
 
-            <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
-              {t("ownership.lean.yearlyGroup")}
-            </p>
-            <div className="mt-1 border-t border-[var(--engine-slab-line)]">
+            <GroupLabel>{t("ownership.lean.yearlyGroup")}</GroupLabel>
+            <div className="mt-2 border-t border-[var(--engine-slab-line)]">
               <Line
                 label={isBR ? t("ownership.lean.ipva") : t("ownership.lean.taxCountry")}
                 source={[taxSource, isBR ? t(state === "SP" ? "ownership.lean.ipvaPaySP" : "ownership.lean.ipvaPay") : null]
@@ -431,7 +438,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               ))}
             </div>
             {isFinance ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   label={t("ownership.fields.downPayment")}
                   htmlFor="engine-own-down"
@@ -512,7 +519,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 </button>
               ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-3">
               <Field label={t("ownership.fields.kmPerMonth")} htmlFor="engine-own-km">
                 <input
                   id="engine-own-km"
@@ -556,7 +563,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </Section>
 
           <Section title={t("ownership.lean.extrasTitle")} hint={t("ownership.lean.extrasHint")}>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t("ownership.lean.insuranceField")} htmlFor="engine-own-insurance">
                 <MoneyInput
                   id="engine-own-insurance"
@@ -575,7 +582,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </Section>
 
           <Section title={t("ownership.lean.whereTitle")}>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t("ownership.fields.country")} htmlFor="engine-own-country">
                 <select
                   id="engine-own-country"
@@ -621,8 +628,8 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--engine-border)] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-4">
-          <p className="min-w-0 text-[13px] text-[var(--engine-text-muted)]">
-            <span className="font-display text-[16px] font-bold tabular-nums text-[var(--engine-text)]">
+          <p className="min-w-0 text-[13px] leading-snug text-[var(--engine-text-muted)]">
+            <span className="font-display text-[18px] font-bold tabular-nums text-[var(--engine-text)]">
               {money(monthlyOnly)}
             </span>{" "}
             {t("ownership.lean.perMonth")}
@@ -632,10 +639,11 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex min-h-11 items-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-[14px] font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+            className="flex min-h-12 shrink-0 items-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-[15px] font-bold text-white transition hover:brightness-95 disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {t("ownership.save")}
+            <span className="sm:hidden">{t("common.save")}</span>
+            <span className="hidden sm:inline">{t("ownership.save")}</span>
           </button>
         </div>
       </div>
