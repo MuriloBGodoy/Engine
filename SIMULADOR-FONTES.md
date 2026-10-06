@@ -261,6 +261,33 @@ Dois presentes que o PDF dá de graça:
    medição existir, o comentário no código não pode afirmar direção nenhuma, e
    agora não afirma. A medição completa é o próximo item desta linha.
 
+**Medição completa feita em 06/10/2026** — `engine/scripts/measure-sp-ipva-base.py`
+(lê o Anexo I por coordenada, casa com a FIPE por regra rígida e resume). O
+anexo tem 13.571 linhas; das 3.316 das 12 marcas grandes, 145 casaram com uma
+versão FIPE única (a SEFAZ abrevia muito: `CRETA1TA`, `10TAT`). 295 pontos
+versão × ano contra a FIPE de **outubro/2026**. Positivo = base ACIMA da FIPE:
+
+| recorte | n | mediana | p25 | p75 | base > FIPE |
+| --- | --- | --- | --- | --- | --- |
+| todos | 295 | **−4,3%** | −7,4% | −1,0% | 19% |
+| estrito (SEFAZ escreve a cilindrada) | 133 | −3,0% | −5,9% | −0,3% | 23% |
+| relaxado | 162 | −5,4% | −8,8% | −2,0% | 16% |
+| ano-modelo 2023-2025 | 34 | **+2,1%** | −0,1% | +4,0% | 74% |
+| ano-modelo 2019-2022 | 91 | −2,7% | −5,4% | −0,8% | 18% |
+| ano-modelo 2015-2018 | 91 | −5,4% | −8,3% | −2,7% | 12% |
+| ano-modelo 2012-2014 | 79 | −7,1% | −9,6% | −4,2% | 5% |
+
+Os dois grupos de casamento concordam na direção. **O sinal depende da idade:**
+carro novo deprecia depois de setembro e a base congelada fica acima da FIPE
+(o motor subestima ~2%); usado velho valoriza no nominal e a base fica abaixo
+(o motor superestima 5-7%). O spot check de agosto tinha caído justo na faixa
+nova — por isso apontava o lado errado da média.
+
+**Decisão: medido, não modelado.** Em reais é ~R$ 7/mês num carro novo de
+R$ 100 mil e ~R$ 8/mês no sentido contrário num velho de R$ 40 mil. E um fator
+apodreceria: o tamanho depende de quantos meses se passaram desde setembro.
+Rodar o script de novo quando sair a resolução de dezembro.
+
 ### Suspeitos de erro para baixo — MS, PI e BA: fechados em 17/08/2026
 
 Levantados por diff contra uma calculadora comercial (camada 5, oráculo de

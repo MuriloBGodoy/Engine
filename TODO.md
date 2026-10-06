@@ -3,7 +3,7 @@
 Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 `ROADMAP.md`; aqui é só o que fazer.
 
-Última atualização: 20 de agosto de 2026.
+Última atualização: 6 de outubro de 2026 (Monte 2 fechado).
 
 ---
 
@@ -35,7 +35,9 @@ erro, e o produto segue sendo decidido no escuro.
   perdido. **Tracker MY≤2025 e o 1.2T de 132/133 CV NÃO destravam**: a imagem
   mostra duas calibrações por motor no mesmo ano-modelo, separadas pelo tipo de
   injeção, que a FIPE não escreve. Continuam retendo, pelo motivo certo
-- O parser por coluna do anexo SFP-40/25, meio dia
+- [x] ~~O parser por coluna do anexo SFP-40/25~~ — feito em 06/10/2026: base do
+  IPVA de SP 4,3% abaixo da FIPE na mediana, mas +2,1% nos carros 2023-2025.
+  Poucos reais por mês nas duas pontas; medido, não modelado
 - [x] ~~Híbrido em SP isento até 31/12/2026~~ — fechado em 06/10/2026
 - [x] ~~Isenção de IPVA por idade nas ~15 UFs que faltam~~ — fechado em 06/10/2026
 - [x] ~~O corte de 1 ponto na régua de conforto~~ — fechado em 21/08/2026
@@ -44,7 +46,7 @@ erro, e o produto segue sendo decidido no escuro.
   penhasco de lugar (pior caso R$ 15.414), então entrou junto a **folga
   enfática**: quem termina o mês com mais da metade da renda livre não é
   rebaixado pela fatia. Rebaixadas caem de 453 para 297 células
-- Os 5 erros de lint anteriores em `Services.jsx`
+- [x] ~~Os 5 erros de lint anteriores em `Services.jsx`~~ — zerados no `12cc612`
 
 ### Monte 3 — não tem fim, e tudo bem
 
@@ -255,7 +257,8 @@ Na ordem de retorno:
       (Corolla, Corolla Cross, Yaris Cross híbridos), porque o nome da FIPE não
       separa híbrido leve de pleno — isentar pelo marcador daria IPVA zero a um
       Pulse Hybrid. Escada 2027–2029 já modelada. `npm run check:ipva`
-- [ ] **Medir o viés FIPE × base do IPVA.** Formato do anexo da Resolução
+- [x] ~~**Medir o viés FIPE × base do IPVA.**~~ Medido em 06/10/2026, ver
+      `SIMULADOR-FONTES.md` e `scripts/measure-sp-ipva-base.py`. Texto antigo: Formato do anexo da Resolução
       SFP-40/25 conferido em 17/08/2026: é **PDF** (8,3 MB, 286 páginas) — mas
       com camada de texto e coordenadas, então um parser por coluna lê a tabela.
       Meio dia. O PDF ainda declara na folha `MÊS BASE: SETEMBRO/2025`, o que
@@ -365,7 +368,7 @@ para quem adicionou o app à tela de início.
 
 ### Dívida técnica conhecida
 
-- [ ] `Services.jsx` tem 5 erros de lint anteriores a esta sessão: dois
+- [x] ~~`Services.jsx` tem 5 erros de lint~~ — zerados no `12cc612`. Texto antigo:: dois
       `setState` dentro de efeito e três funções de moderação declaradas e nunca
       usadas (`approveListing`, `openReturnListing`, `openRejectListing`) —
       cheiram a funcionalidade que ficou pela metade

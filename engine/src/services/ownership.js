@@ -500,20 +500,24 @@ const countryProfile = (country) => COUNTRY_PROFILES[country] || COUNTRY_PROFILE
 // Blocos de cálculo
 // ---------------------------------------------------------------------------
 
-// Duas aproximações conhecidas, as duas erram para cima e nenhuma é modelável
-// com o que o simulador sabe hoje:
+// Aproximações conhecidas, nenhuma modelável com o que o simulador sabe hoje.
+// A 2 e a 3 erram para cima; a 1 foi medida e erra para os dois lados, pouco:
 //
 // 1. A base de cálculo não é a FIPE. Em SP (Lei 13.296/2008, art. 7º, §§ 1º-2º)
 //    é tabela própria da SEFAZ, publicada por resolução e congelada nos preços
 //    médios de SETEMBRO do ano anterior — 4 a 15 meses de defasagem contra a
 //    FIPE do mês corrente, que é o `car.targetValue` que entra aqui. Em mercado
 //    de usado em alta a base tende a ser menor que a FIPE, então o imposto
-//    sairia superestimado. A DIREÇÃO DESSA SUPOSIÇÃO NÃO SE SUSTENTOU: o Anexo
-//    I da Resolução SFP-40/25 diz na própria folha "MÊS BASE: SETEMBRO/2025", e
-//    numa amostra de 4 versões 2024 contra a FIPE de agosto/2026 a base do IPVA
-//    ficou em +2,0%, +0,2%, +1,9% e −2,2% — pequena e sem sinal definido, e não
-//    do lado que estava escrito aqui. Quatro pontos não medem viés; a medição
-//    inteira está pendente e o anexo é parseável. Ver SIMULADOR-FONTES.md.
+//    sairia superestimado. MEDIDO em 06/10/2026 (scripts/measure-sp-ipva-base.py,
+//    Anexo I da SFP-40/25 inteiro contra a FIPE de outubro/2026, 295 pontos em
+//    145 versões casadas por regra rígida): a base fica 4,3% ABAIXO da FIPE na
+//    mediana, mas o sinal depende da idade — ano-modelo 2023-2025 +2,1% (a
+//    base acima: aqui SUBestimamos), 2019-2022 −2,7%, 2015-2018 −5,4%,
+//    2012-2014 −7,1%. É depreciação de um lado e usado velho valorizando no
+//    nominal do outro. Na tela isso é ~R$ 7/mês num carro de R$ 100 mil novo e
+//    ~R$ 8/mês no sentido contrário num de R$ 40 mil velho — pouco demais para
+//    virar fator, e o fator apodreceria: o tamanho depende de quantos meses se
+//    passaram desde setembro. Fica medido e anotado, não modelado.
 // 2. Zero km paga PROPORCIONAL aos meses restantes do ano (art. 11). Aqui sai
 //    sempre o ano cheio, porque o simulador não sabe o mês da compra — quem
 //    compra em outubro paga 3/12 e a tela mostra 12/12.
