@@ -270,6 +270,10 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
   ).toFixed(1);
   const kmShown = Number(inputs.kmPerMonth || 0).toLocaleString(i18n.language);
 
+  // O que sai todo mês e o que é boleto anual, separados (ver o slab).
+  const yearly = (result.monthly.tax + result.monthly.licensing) * 12;
+  const monthlyOnly = result.totals.monthlyTotal - yearly / 12;
+  // A fatia da renda usa o custo inteiro, com os boletos anuais diluídos.
   const total = result.totals.monthlyTotal;
   const sharePct = income > 0 ? Math.round((total / income) * 100) : null;
 
@@ -302,18 +306,26 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
 
         <div className="engine-modal-body engine-scroll grid content-start gap-4 px-4 py-4 sm:px-6 sm:py-5">
           {/* ============================ a resposta ============================ */}
+          {/* Duas contas que NÃO se misturam, porque não se pagam do mesmo jeito.
+              O que sai todo mês fica em cima; IPVA e licenciamento são boletos
+              anuais e aparecem com o valor cheio e a forma de pagar. Dividir
+              por 12 mostrava "R$ 15 de licenciamento por mês", uma cobrança
+              que não existe — em SP a taxa nem pode ser parcelada. */}
           <div className="engine-slab px-5 py-5 sm:px-6">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
               {t("ownership.lean.kicker")}
             </p>
             <p className="mt-1.5 font-display text-[40px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--engine-slab-fg)]">
-              {money(total)}
+              {money(monthlyOnly)}
               <span className="ml-1.5 text-[15px] font-semibold tracking-normal text-[var(--engine-slab-fg-muted)]">
                 {t("ownership.lean.perMonth")}
               </span>
             </p>
+            <p className="mt-1.5 text-[15px] font-semibold text-[var(--engine-slab-fg)]">
+              {t("ownership.lean.plusYearly", { value: money(yearly) })}
+            </p>
             {sharePct !== null ? (
-              <p className="mt-2 text-[14px] font-semibold text-[var(--engine-slab-fg)]">
+              <p className="mt-2 text-[13.5px] text-[var(--engine-slab-fg)]">
                 {t("ownership.lean.share", { pct: sharePct, income: money(income) })}
               </p>
             ) : null}
@@ -321,7 +333,10 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               {t("ownership.lean.promise")}
             </p>
 
-            <div className="mt-4 border-t border-[var(--engine-slab-line)]">
+            <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
+              {t("ownership.lean.monthlyGroup")}
+            </p>
+            <div className="mt-1 border-t border-[var(--engine-slab-line)]">
               {isFinance && financing ? (
                 <Line
                   label={t("ownership.results.installment")}
@@ -334,24 +349,8 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 />
               ) : null}
               <Line
-                label={isBR ? t("ownership.results.taxBR") : t("ownership.results.tax")}
-                source={taxSource}
-                value={money(result.monthly.tax)}
-              />
-              <Line
-                label={t("ownership.results.licensing")}
-                source={
-                  result.licensingVerified
-                    ? t("ownership.lean.licensingSource", { state: stateLabel })
-                    : isBR && state
-                      ? t("ownership.lean.licensingApprox", { state: stateLabel })
-                      : t("ownership.lean.licensingSourceGeneric")
-                }
-                value={money(result.monthly.licensing)}
-              />
-              <Line
                 label={t("ownership.results.fuel")}
-                source={`${t("ownership.groups.fuelNote", { km: kmShown, value: shownConsumption })} ${t(
+                source={`${t("ownership.lean.fuelKm", { km: kmShown })} ${t(
                   `ownership.fields.consumption${consumptionSource}Hint`,
                   { value: shownConsumption, year: modelConsumption?.tableYear },
                 )}`}
@@ -370,6 +369,49 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 }
                 value={inputs.maintenanceMonthly > 0 ? money(result.monthly.maintenance) : t("ownership.lean.outside")}
                 missing={!(inputs.maintenanceMonthly > 0)}
+              />
+              {/* Vindos da tela antiga: valores que a pessoa informou e que
+                  continuam na conta — então continuam à vista. */}
+              {result.monthly.parking > 0 ? (
+                <Line
+                  label={t("ownership.results.parking")}
+                  source={t("ownership.lean.yourValue")}
+                  value={money(result.monthly.parking)}
+                />
+              ) : null}
+              {result.monthly.tolls > 0 ? (
+                <Line
+                  label={t("ownership.results.tolls")}
+                  source={t("ownership.lean.yourValue")}
+                  value={money(result.monthly.tolls)}
+                />
+              ) : null}
+            </div>
+
+            <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
+              {t("ownership.lean.yearlyGroup")}
+            </p>
+            <div className="mt-1 border-t border-[var(--engine-slab-line)]">
+              <Line
+                label={isBR ? t("ownership.lean.ipva") : t("ownership.lean.taxCountry")}
+                source={[taxSource, isBR ? t(state === "SP" ? "ownership.lean.ipvaPaySP" : "ownership.lean.ipvaPay") : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+                value={`${money(result.monthly.tax * 12)}${t("ownership.lean.perYearShort")}`}
+              />
+              <Line
+                label={t("ownership.results.licensing")}
+                source={[
+                  result.licensingVerified
+                    ? t("ownership.lean.licensingSource", { state: stateLabel })
+                    : isBR && state
+                      ? t("ownership.lean.licensingApprox", { state: stateLabel })
+                      : t("ownership.lean.licensingSourceGeneric"),
+                  isBR ? t(state === "SP" ? "ownership.lean.licensingPaySP" : "ownership.lean.licensingPay") : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                value={`${money(result.monthly.licensing * 12)}${t("ownership.lean.perYearShort")}`}
               />
             </div>
           </div>
@@ -581,9 +623,10 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--engine-border)] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-4">
           <p className="min-w-0 text-[13px] text-[var(--engine-text-muted)]">
             <span className="font-display text-[16px] font-bold tabular-nums text-[var(--engine-text)]">
-              {money(total)}
+              {money(monthlyOnly)}
             </span>{" "}
             {t("ownership.lean.perMonth")}
+            <span className="block text-[12px]">{t("ownership.lean.plusYearly", { value: money(yearly) })}</span>
           </p>
           <button
             type="button"

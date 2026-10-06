@@ -805,8 +805,19 @@ const resources = {
       ownership: {
         lean: {
           kicker: "Quanto custa ter este carro",
+          plusYearly: "+ {{value}} por ano de IPVA e licenciamento",
+          monthlyGroup: "Todo mês",
+          yearlyGroup: "Uma vez por ano",
+          perYearShort: "/ano",
+          ipva: "IPVA",
+          taxCountry: "Imposto anual",
+          fuelKm: "Rodando {{km}} km por mês — mude lá embaixo.",
+          ipvaPaySP: "à vista em janeiro com 3% de desconto, ou em até 5 parcelas de janeiro a maio",
+          ipvaPay: "cobrado no começo do ano; desconto e parcelamento dependem do estado",
+          licensingPaySP: "pago de uma vez, sem parcelar; vence de julho a dezembro pelo final da placa",
+          licensingPay: "taxa paga uma vez por ano",
           perMonth: "por mês",
-          share: "{{pct}}% da sua renda de {{income}}",
+          share: "{{pct}}% da sua renda de {{income}}, já contando IPVA e licenciamento divididos no ano",
           promise:
             "Só entra na soma o que tem lei, conta ou número seu por trás. O que a gente não sabe com certeza fica de fora — e aparece aqui como fora.",
           rateAverage: "taxa média do Banco Central; coloque a sua se já tiver",
@@ -2463,8 +2474,19 @@ const resources = {
       ownership: {
         lean: {
           kicker: "What owning this car costs",
+          plusYearly: "+ {{value}} a year in IPVA and licensing",
+          monthlyGroup: "Every month",
+          yearlyGroup: "Once a year",
+          perYearShort: "/yr",
+          ipva: "IPVA",
+          taxCountry: "Yearly tax",
+          fuelKm: "Driving {{km}} km a month — change it below.",
+          ipvaPaySP: "paid in full in January with a 3% discount, or in up to 5 installments from January to May",
+          ipvaPay: "charged at the start of the year; discount and installments depend on the state",
+          licensingPaySP: "paid in one go, no installments; due July to December by plate number",
+          licensingPay: "fee paid once a year",
           perMonth: "per month",
-          share: "{{pct}}% of your {{income}} income",
+          share: "{{pct}}% of your {{income}} income, with IPVA and licensing spread over the year",
           promise:
             "Only what has a law, a formula or your own number behind it is added up. What we can't know for sure stays out — and is shown here as out.",
           rateAverage: "Central Bank average rate; enter yours if you have it",
@@ -4113,8 +4135,19 @@ const resources = {
       ownership: {
         lean: {
           kicker: "Cuánto cuesta tener este auto",
+          plusYearly: "+ {{value}} por año de IPVA y licencia",
+          monthlyGroup: "Todos los meses",
+          yearlyGroup: "Una vez al año",
+          perYearShort: "/año",
+          ipva: "IPVA",
+          taxCountry: "Impuesto anual",
+          fuelKm: "Recorriendo {{km}} km por mes — cámbialo abajo.",
+          ipvaPaySP: "al contado en enero con 3% de descuento, o en hasta 5 cuotas de enero a mayo",
+          ipvaPay: "se cobra a comienzos del año; descuento y cuotas dependen del estado",
+          licensingPaySP: "se paga de una vez, sin cuotas; vence de julio a diciembre según el final de la placa",
+          licensingPay: "tasa que se paga una vez al año",
           perMonth: "por mes",
-          share: "{{pct}}% de tus ingresos de {{income}}",
+          share: "{{pct}}% de tus ingresos de {{income}}, contando IPVA y licencia repartidos en el año",
           promise:
             "Solo se suma lo que tiene una ley, una cuenta o un número tuyo detrás. Lo que no sabemos con certeza queda afuera — y aparece aquí como afuera.",
           rateAverage: "tasa media del Banco Central; pon la tuya si ya la tienes",
