@@ -29,8 +29,12 @@ erro, e o produto segue sendo decidido no escuro.
   recebendo o tempo do aspirado incluindo as TB. Cobertura de desempenho caiu
   de 4,8% para 3,4%: 48 perdas, todas de outro carro, zero ganho por
   afrouxamento
-- O rasterizador de PDF, ~1h, que destrava Hilux, Tracker MY≤2025 e o 1.2T de
-  132/133 CV de uma vez
+- [x] ~~O rasterizador de PDF~~ — feito em 06/10/2026, com resultado diferente
+  do previsto. **Hilux destravada** (82 versões×ano ganharam número, 0 perdas,
+  0 trocas): o torque "ilegível" era daN.m sem o prefixo, não algarismo
+  perdido. **Tracker MY≤2025 e o 1.2T de 132/133 CV NÃO destravam**: a imagem
+  mostra duas calibrações por motor no mesmo ano-modelo, separadas pelo tipo de
+  injeção, que a FIPE não escreve. Continuam retendo, pelo motivo certo
 - O parser por coluna do anexo SFP-40/25, meio dia
 - [x] ~~Híbrido em SP isento até 31/12/2026~~ — fechado em 06/10/2026
 - [x] ~~Isenção de IPVA por idade nas ~15 UFs que faltam~~ — fechado em 06/10/2026

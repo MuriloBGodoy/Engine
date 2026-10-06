@@ -225,6 +225,15 @@ const badgeMatches = (badge, model) => {
     if (digits && new RegExp(`\\b${digits}\\b`).test(text)) return true;
     const bare = alternative.replace(/[^A-Za-z]/g, "");
     if (bare.length >= 3 && new RegExp(`\\b${bare}\\b`, "i").test(text)) return true;
+    // Badge com hífen, como `GR-S`: tirar a pontuação vira `GRS`, que não casa
+    // com `Hilux CD GR-S 4x4`. Aqui o hífen vale como hífen, espaço ou nada.
+    if (alternative.includes("-")) {
+      const pattern = alternative
+        .split("-")
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("[-\\s]?");
+      if (new RegExp(`\\b${pattern}\\b`, "i").test(text)) return true;
+    }
   }
   return false;
 };
@@ -240,6 +249,14 @@ const engineRowMatches = (row, parsed) => {
   // filtro — vira só desempate mais adiante.
   const rowValves = row.valves ? Number(String(row.valves).replace(/\D/g, "")) : null;
   if (rowValves && parsed.valves?.value && rowValves !== parsed.valves.value) return false;
+
+  // Câmbio só entra quando a linha declara, e só quando o fabricante publica
+  // número diferente por câmbio: a Hilux 2.8 manual tem 430 Nm e a automática
+  // 500, com o mesmo motor. Câmbio desconhecido não descarta — sobram as duas
+  // linhas e a ficha retém, que é o certo.
+  if (!transmissionCompatible(parsed.transmission?.value, parseTableTransmission(row.transmission))) {
+    return false;
+  }
 
   return true;
 };
@@ -374,12 +391,17 @@ export function matchEngineRow(parsed) {
   // dizer "temos, mas de outro ano". Filtrando por ano primeiro, a linha do
   // Onix sumia antes de ser vista e sobrava a de outro modelo — que é, aliás,
   // por onde o número errado entrava.
+  //
+  // `excludeBadge` é o mesmo filtro pelo lado de fora: a linha da Hilux vale
+  // para o modelo inteiro MENOS a GR-S, que tem calibração própria. Sem ele, a
+  // GR-S de um ano em que só existe a linha comum receberia os 204 cv dela.
   const names = carNameplates(parsed);
   const forThisModel = all.filter(
     (row) =>
-      !(row.models || []).length ||
-      listsAnyOf(row.models, names) ||
-      findOverride(row, parsed, names),
+      (!(row.models || []).length ||
+        listsAnyOf(row.models, names) ||
+        findOverride(row, parsed, names)) &&
+      badgeMatches(row.excludeBadge, parsed.raw.model) !== true,
   );
   if (!forThisModel.length) {
     // Havia linha para o motor e nenhuma responde por este modelo. Não é "não

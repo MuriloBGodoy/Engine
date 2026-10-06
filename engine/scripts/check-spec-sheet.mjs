@@ -381,21 +381,69 @@ console.log("== assertivas ==\n");
   check("sw4: verificado no modelo", sw4.fields.powerCv.scope, MATCH_SCOPE.MODEL_VERIFIED);
 
   // A CONTRAPARTIDA, e é ela que impede o conserto de virar o bug anterior de
-  // sinal trocado: a Hilux NÃO pode herdar a linha do SW4. Enquanto a picape
-  // não tiver linha própria (falta o corte por acabamento entre GR-S e o resto,
-  // e o torque está ilegível no PDF), a resposta certa é não ter número.
+  // sinal trocado: a Hilux NÃO pode herdar a linha do SW4. Desde 06/10/2026 a
+  // picape tem linhas próprias — o torque "ilegível" era daN.m sem o prefixo,
+  // e a GR-S saiu da linha comum por `excludeBadge` —, então o que se verifica
+  // agora é que cada Hilux pega o número DELA, e não o do irmão.
   const hilux = getFactorySpecs({
     brand: "Toyota",
     model: "Hilux CD SRX 4x4 2.8 TDI 16V Diesel Aut.",
     year: "2023 Diesel",
   });
-  check("hilux: continua sem potência de fábrica", hilux.fields.powerCv.status, SPEC_STATUS.ABSENT);
-  check("hilux: e não recebe os 224 cv do SW4", hilux.fields.powerCv.value, null);
-  // O motivo MUDOU com a linha do SW4, e mudou para melhor: antes era
-  // `no_engine_row` ("não temos este motor"), agora é `no_row_for_this_model`
-  // ("temos o motor, a ficha que temos é de outro carro"). A segunda frase é
-  // verdadeira e a primeira deixou de ser — o 1GD-FTV está na tabela.
-  check("hilux: o motivo é a ficha ser de outro modelo", hilux.fields.powerCv.reason, ABSENT_REASON.NO_ROW_FOR_THIS_MODEL);
+  check("hilux SRX aut 2023: 204 cv, não os 224 do SW4", hilux.fields.powerCv.value, 204);
+  check("hilux SRX aut 2023: 500 Nm (50 daN.m)", hilux.fields.torque.value, 500);
+
+  const hiluxGrs = getFactorySpecs({
+    brand: "Toyota",
+    model: "Hilux CD GR-S 4x4 2.8 TDI Dies. Aut.",
+    year: "2023 Diesel",
+  });
+  check("hilux GR-S 2023: 224 cv", hiluxGrs.fields.powerCv.value, 224);
+  check("hilux GR-S 2023: 550 Nm", hiluxGrs.fields.torque.value, 550);
+
+  const hiluxManual = getFactorySpecs({
+    brand: "Toyota",
+    model: "Hilux CS 4x4 2.8 TDI Diesel Mec.",
+    year: "2024 Diesel",
+  });
+  check("hilux manual 2024: mesmos 204 cv", hiluxManual.fields.powerCv.value, 204);
+  check("hilux manual 2024: 430 Nm, não os 500 do automático", hiluxManual.fields.torque.value, 430);
+
+  const hiluxManual25 = getFactorySpecs({
+    brand: "Toyota",
+    model: "Hilux Chassi 4x4 2.8 TDI Diesel Mec.",
+    year: "2025 Diesel",
+  });
+  check("hilux manual 2025: 420 Nm (42 daN.m no MY25)", hiluxManual25.fields.torque.value, 420);
+
+  // A GR-S de 2025 não tem documento. A linha comum de 2025 existe e NÃO pode
+  // responder por ela — é o que o `excludeBadge` garante. Sem ele, a GR-S
+  // receberia 204 cv num carro de 224.
+  const hiluxGrs25 = getFactorySpecs({
+    brand: "Toyota",
+    model: "Hilux CD GR-S 4x4 2.8 TDI Dies. Aut.",
+    year: "2025 Diesel",
+  });
+  check("hilux GR-S 2025: sem número", hiluxGrs25.fields.powerCv.status, SPEC_STATUS.ABSENT);
+  // O motivo é "temos a GR-S, mas de outro ano" — a linha dela é 2023-2024.
+  check("hilux GR-S 2025: e o motivo é a janela de ano", hiluxGrs25.fields.powerCv.reason, ABSENT_REASON.OUTSIDE_YEAR_WINDOW);
+
+  // Câmbio desconhecido: as linhas de manual e de automático sobrevivem juntas
+  // e a ficha retém, em vez de escolher uma.
+  const hiluxNoGear = getFactorySpecs({
+    brand: "Toyota",
+    model: "Hilux 4x2 2.8 Diesel",
+    year: "2023 Diesel",
+  });
+  check("hilux sem câmbio no nome: retém", hiluxNoGear.fields.torque.status, SPEC_STATUS.HELD);
+
+  // Janela: 2022 não foi relido.
+  const hilux22 = getFactorySpecs({
+    brand: "Toyota",
+    model: "Hilux CD SRX 4x4 2.8 TDI 16V Diesel Aut.",
+    year: "2022 Diesel",
+  });
+  check("hilux 2022: fora da janela", hilux22.fields.powerCv.reason, ABSENT_REASON.OUTSIDE_YEAR_WINDOW);
 
   // Janela: a linha é do manual MY23 e só responde por MY23. O SW4 2.8 de 2016
   // a 2020 é a calibração de 177 cv — servir 224 nele seria o mesmo erro com
