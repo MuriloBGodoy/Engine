@@ -33,6 +33,8 @@
 // VII, DOE Extra de 23/12/2025; 2% até 1.000 cc). Era 3,45% aqui, que é a
 // alíquota de utilitários de GOIÁS — provável contaminação entre UFs vizinhas.
 // GO: 3,75% para automóvel acima de 100 cv (Secretaria da Economia/GO) — certo.
+// PE: 2,4% — Lei 10.849/92, art. 12-B, III, desde 01/01/2024; a SEFAZ-PE
+// anunciou o IPVA 2026 com a alíquota mantida. Era 3% aqui, 25% a mais.
 //
 // SP: 4% para automóvel de passeio, INCLUSIVE FLEX E 100% ELÉTRICO. Conferido
 // no texto consolidado da Lei 13.296/2008 em 14/08/2026, porque a hipótese
@@ -61,7 +63,7 @@
 const IPVA_BR = {
   AC: 0.02, AL: 0.0325, AP: 0.03, AM: 0.02, BA: 0.025, CE: 0.03, DF: 0.035,
   ES: 0.02, GO: 0.0375, MA: 0.025, MT: 0.03, MS: 0.03, MG: 0.04, PA: 0.025,
-  PB: 0.025, PR: 0.019, PE: 0.03, PI: 0.025, RJ: 0.04, RN: 0.03, RS: 0.03,
+  PB: 0.025, PR: 0.019, PE: 0.024, PI: 0.025, RJ: 0.04, RN: 0.03, RS: 0.03,
   RO: 0.03, RR: 0.03, SC: 0.02, SP: 0.04, SE: 0.025, TO: 0.02,
 };
 const IPVA_BR_DEFAULT = 0.03;
@@ -88,10 +90,67 @@ const IPVA_BR_DEFAULT = 0.03;
 // ano-MODELO, que é igual ou um ano maior. O motor enxerga o carro até um ano
 // mais novo e atrasa a isenção — de novo, errando para cima.
 const IPVA_BR_EXEMPT_AGE_DEFAULT = 20;
+//
+// Regra de conversão, a mesma em todas as linhas: "N anos ou mais" vira N;
+// "mais de N anos" vira N+1; e onde a lei só começa a contar no ano SEGUINTE ao
+// da fabricação ou do registro, soma-se mais 1. Onde a prática publicada pela
+// fazenda ("em 2026 ficam isentos os fabricados até X") dava um número diferente
+// da leitura literal, ficou o MAIOR dos dois.
+//
+// Conferido em 06/10/2026, lei ou página oficial do governo em cada linha:
+//   - UFs que NÃO isentam antes dos 20 e por isso ficam fora, de propósito: TO
+//     (a própria SEFAZ-TO noticia "veículos com 15 ou mais anos de fabricação
+//     devem pagar IPVA", o contrário do que as listas da imprensa dizem), PE
+//     (SEFAZ-PE: isenção só a partir dos 20, pela EC 137) e MG (SEF-MG, idem).
+//   - As listas de imprensa de 2026 erram várias linhas (GO "10 anos", TO "15")
+//     e não servem de fonte.
 const IPVA_BR_EXEMPT_AGE = {
+  // "mais de 10 anos, contados do ano seguinte à data de sua fabricação" —
+  // Decreto 258/2004, art. 4º, § 2º, I. É um decreto de 2004; a imprensa de
+  // 2026 confirma a regra de 10 anos, mas a consolidação vigente não foi achada.
+  AP: 12,
+  // "mais de 15 anos de fabricação" — SEFAZ-AM: "a partir do décimo sexto ano"
+  AM: 16,
+  // "mais de 15 anos de fabricação" — Lei 6.348/91 (redação da Lei 9.837/2005),
+  // lista de isenções da SEFAZ-BA reproduzida pelo DETRAN-BA
+  BA: 16,
+  // "veículos de uso rodoviário com mais de 15 anos de fabricação" — Lei
+  // 12.023/92, art. 4º, VIII, na página de isenções da SEFAZ-CE. Há indicação
+  // de 2026 na Assembleia para baixar a 10; não é lei.
+  CE: 16,
+  // "veículos com tempo de uso superior a 15 anos" — RIPVA-DF, Decreto
+  // 34.024/2012, isenções, VIII (a Lei 7.431/85 delega ao governador)
+  DF: 16,
+  // "veículos automotores terrestres com mais de 15 anos de fabricação" — Lei
+  // 6.999/2001, art. 6º, I, "e", consolidada da SEFAZ-ES
+  ES: 16,
   GO: 15, // "15 anos ou mais de uso" — Lei 11.651/91; FAQ da Secretaria da Economia/GO
-  RJ: 16, // "mais de 15 anos" — Lei 2.877/97, art. 5º, VII; SEFAZ-RJ isenta 2010 e anteriores
+  // "a partir do 16º ano de fabricação" — Lei 7.799/2002, DETRAN-MA
+  MA: 16,
   MT: 18, // Lei 10.252/2017, que altera a 7.301/2000 — portal da ALMT, falta o texto da lei
+  // "veículos rodoviários com mais de 15 anos de fabricação" — SEFA-PA
+  PA: 16,
+  // "15 anos completos do ano de fabricação"; em 2026, fabricados até 2010 —
+  // SEFAZ-PB e DETRAN-PB
+  PB: 16,
+  // "mais de 15 anos de fabricação", isenção automática — Governo do Piauí
+  PI: 16,
+  RJ: 16, // "mais de 15 anos" — Lei 2.877/97, art. 5º, VII; SEFAZ-RJ isenta 2010 e anteriores
+  // "veículos rodoviários com mais de 10 anos de fabricação, contados a partir
+  // do primeiro mês do exercício seguinte ao do registro" — Lei 6.967/96, art.
+  // 8º, IV, na página da SEFAZ-RN. Não revogado pela Lei 12.026/2024, que
+  // mexeu no mesmo art. 8º (incisos I e XI).
+  RN: 12,
+  // "15 anos ou mais de uso" — Lei 950/2000, art. de isenções, X (consolidada
+  // da SEFIN-RO). A SEFIN isentou em 2024 os fabricados ANTES de 2009, ou seja,
+  // 16 anos; fica a prática, que é a maior.
+  RO: 16,
+  // "mais de 10 anos de fabricação" — Lei 59/93, art. 97, § 3º; em 2024 a
+  // SEFAZ-RR cobrou só dos fabricados de 2014 em diante. Lido em busca restrita
+  // ao domínio da SEFAZ-RR; a página em si não abriu.
+  RR: 11,
+  // "mais de 15 anos de fabricação completos" — Governo de Sergipe
+  SE: 16,
 };
 
 // Alíquota reduzida para elétrico e híbrido, SÓ onde a redução foi confirmada

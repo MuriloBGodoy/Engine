@@ -113,6 +113,33 @@ check(
   check("a imunidade vem rotulada com a idade", [result.tax.basis, result.tax.exemptAge], ["age_exempt", 20]);
 }
 
+// --- Isenção estadual por idade, antes dos 20 -------------------------------
+// As duas bordas de cada regra: no ano em que isenta e no ano anterior.
+{
+  const gol = (age) => ({
+    brand: "Volkswagen",
+    model: "Gol 1.0",
+    year: `${YEAR - age} Gasolina`,
+    targetValue: 20000,
+  });
+  const cases = [
+    // [UF, primeira idade isenta, alíquota da UF]
+    ["BA", 16, 0.025],
+    ["ES", 16, 0.02],
+    ["RN", 12, 0.03],
+    ["RR", 11, 0.03],
+    ["AP", 12, 0.03],
+    ["GO", 15, 0.0375],
+  ];
+  for (const [uf, age, rate] of cases) {
+    check(`${uf}: ${age} anos é isento`, annualTax(gol(age), uf), 0);
+    check(`${uf}: ${age - 1} anos ainda paga`, annualTax(gol(age - 1), uf), round(20000 * rate));
+  }
+  // O caso que as listas da imprensa erram: Tocantins cobra de quem tem 15+.
+  check("TO: 18 anos ainda paga (TO não isenta antes dos 20)", annualTax(gol(18), "TO"), 400);
+  check("PE: 19 anos ainda paga, a 2,4%", annualTax(gol(19), "PE"), 480);
+}
+
 console.log("");
 console.log(failures ? `${failures} FALHA(S)` : "Tudo certo.");
 process.exit(failures ? 1 : 0);

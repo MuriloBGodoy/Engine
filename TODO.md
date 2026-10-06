@@ -33,7 +33,7 @@ erro, e o produto segue sendo decidido no escuro.
   132/133 CV de uma vez
 - O parser por coluna do anexo SFP-40/25, meio dia
 - [x] ~~Híbrido em SP isento até 31/12/2026~~ — fechado em 06/10/2026
-- Isenção de IPVA por idade nas ~15 UFs que faltam, um dia, lei por lei
+- [x] ~~Isenção de IPVA por idade nas ~15 UFs que faltam~~ — fechado em 06/10/2026
 - [x] ~~O corte de 1 ponto na régua de conforto~~ — fechado em 21/08/2026
   (`ade8575`), e o caso real era pior do que o anotado: sobra de **R$ 17.789
   por mês** perdida por 0,2 ponto de fatia. A zona morta sozinha só mudou o
@@ -261,10 +261,16 @@ Na ordem de retorno:
       sustentou, e o erro pode ser para baixo. Quatro pontos não medem viés; a
       medição completa virou a parte que falta, e o comentário no código já não
       afirma direção
-- [ ] **Isenção por idade nas ~15 UFs que faltam.** O piso nacional de 20 anos
-      já está aplicado e erra para cima, então isto é ganho marginal: são as UFs
-      que isentam antes (o "grupo dos 15" em fonte secundária, mais AP e RR com
-      10 anos e fontes que se contradizem). Um dia de trabalho, lei por lei
+- [x] ~~**Isenção por idade nas ~15 UFs que faltam.**~~ — feito em 06/10/2026.
+      14 UFs entraram (AP, AM, BA, CE, DF, ES, MA, PA, PB, PI, RN, RO, RR, SE),
+      cada uma com lei ou página oficial no comentário. As listas da imprensa
+      erram: Tocantins COBRA de quem tem 15+ anos, e ficou no piso de 20. AP
+      (decreto de 2004) e RR (página da SEFAZ-RR não abriu) são as duas de
+      confiança menor. Na mesma pesquisa: **PE cobra 2,4%, não 3%** — corrigido
+- [ ] **Elétrico no CE e no RN.** A página de isenções da SEFAZ-CE lista "veículos
+      movidos a motor elétrico" (Lei 12.023/92, art. 4º, IX) — conferir se ainda
+      vale antes de isentar. O RN revogou a isenção do elétrico (Lei 12.026/2024)
+      e pôs 0,5% subindo meio ponto por ano até metade da alíquota normal
 - [ ] **Alíquota de elétrico por UF.** Existe `IPVA_BR_ELECTRIC`, mas só com o
       AM — e continua só com o AM depois da rodada de 14/08: o MT não tem inciso
       de elétrico na portaria vigente, e o DF isenta mas de forma **condicional**
