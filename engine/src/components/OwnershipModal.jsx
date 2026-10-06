@@ -8,6 +8,7 @@ import {
   DEFAULT_CONSUMPTION,
   FUEL_TYPES,
   isSimulatorAvailable,
+  MARKET_DATA_DATES,
 } from "../services/ownership";
 import { pickReferenceCar } from "../services/expenses";
 import { engineDB } from "../services/db";
@@ -343,6 +344,18 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
   const total = result.totals.monthlyTotal;
   const sharePct = income > 0 ? Math.round((total / income) * 100) : null;
 
+  // De quando são os números de mercado (ANP e Banco Central), para a tela dizer.
+  const fuelDate = MARKET_DATA_DATES.fuelTo
+    ? new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short", year: "numeric" }).format(
+        new Date(`${MARKET_DATA_DATES.fuelTo}T12:00:00`),
+      )
+    : "";
+  const rateMonth = MARKET_DATA_DATES.rateMonth
+    ? new Intl.DateTimeFormat(i18n.language, { month: "short", year: "numeric" }).format(
+        new Date(`${MARKET_DATA_DATES.rateMonth}-15T12:00:00`),
+      )
+    : "";
+
   const carName = formatCarName(car);
   const carYear = formatFipeYear(String(car.year || "").split(" ")[0], t("car.zeroKm"));
 
@@ -405,7 +418,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                     months: financing.months,
                     principal: money(financing.principal),
                     rate: decimal(financing.monthlyRate * 100),
-                  })}${inputs.monthlyRatePct > 0 ? "" : ` · ${t("ownership.lean.rateAverage")}`}`}
+                  })}${inputs.monthlyRatePct > 0 ? "" : ` · ${t("ownership.lean.rateAverage", { month: rateMonth })}`}`}
                   value={money(result.monthly.financing)}
                 />
               ) : null}
@@ -414,7 +427,10 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 source={`${t("ownership.lean.fuelKm", { km: kmShown })} ${t(
                   `ownership.fields.consumption${consumptionSource}Hint`,
                   { value: shownConsumption, year: modelConsumption?.tableYear },
-                )}`}
+                )}. ${t(state ? "ownership.lean.fuelPrice" : "ownership.lean.fuelPriceBR", {
+                  state: stateLabel,
+                  date: fuelDate,
+                })}`}
                 value={money(result.monthly.fuel)}
               />
               <Line

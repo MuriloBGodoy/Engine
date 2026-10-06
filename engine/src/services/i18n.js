@@ -826,7 +826,9 @@ const resources = {
           share: "{{pct}}% da sua renda de {{income}}, já contando IPVA e licenciamento divididos no ano",
           promise:
             "Só entra na soma o que tem lei, conta ou número seu por trás. O que a gente não sabe com certeza fica de fora — e aparece aqui como fora.",
-          rateAverage: "taxa média do Banco Central; coloque a sua se já tiver",
+          rateAverage: "taxa média do Banco Central ({{month}}); coloque a sua se já tiver",
+          fuelPrice: "Preço médio da ANP em {{state}}, coleta até {{date}}.",
+          fuelPriceBR: "Preço médio da ANP no Brasil, coleta até {{date}} — escolha o estado para o preço de lá.",
           taxSource: "{{rate}}% do valor FIPE, pela lei de {{state}}",
           taxSourceNoState: "escolha o estado lá embaixo para usar a alíquota certa",
           taxSourceCountry: "estimativa do imposto anual do país",
@@ -2501,7 +2503,9 @@ const resources = {
           share: "{{pct}}% of your {{income}} income, with IPVA and licensing spread over the year",
           promise:
             "Only what has a law, a formula or your own number behind it is added up. What we can't know for sure stays out — and is shown here as out.",
-          rateAverage: "Central Bank average rate; enter yours if you have it",
+          rateAverage: "Central Bank average rate ({{month}}); enter yours if you have it",
+          fuelPrice: "ANP average price in {{state}}, collected up to {{date}}.",
+          fuelPriceBR: "ANP average price in Brazil, collected up to {{date}} — pick the state for its price.",
           taxSource: "{{rate}}% of the FIPE value, under {{state}} law",
           taxSourceNoState: "pick the state below to use the right rate",
           taxSourceCountry: "estimate of the country's yearly tax",
@@ -4168,7 +4172,9 @@ const resources = {
           share: "{{pct}}% de tus ingresos de {{income}}, contando IPVA y licencia repartidos en el año",
           promise:
             "Solo se suma lo que tiene una ley, una cuenta o un número tuyo detrás. Lo que no sabemos con certeza queda afuera — y aparece aquí como afuera.",
-          rateAverage: "tasa media del Banco Central; pon la tuya si ya la tienes",
+          rateAverage: "tasa media del Banco Central ({{month}}); pon la tuya si ya la tienes",
+          fuelPrice: "Precio medio de la ANP en {{state}}, recolectado hasta {{date}}.",
+          fuelPriceBR: "Precio medio de la ANP en Brasil, recolectado hasta {{date}} — elige el estado para su precio.",
           taxSource: "{{rate}}% del valor FIPE, por la ley de {{state}}",
           taxSourceNoState: "elige el estado abajo para usar la alícuota correcta",
           taxSourceCountry: "estimación del impuesto anual del país",

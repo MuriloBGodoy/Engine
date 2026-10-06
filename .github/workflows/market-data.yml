@@ -1,0 +1,49 @@
+# Atualiza preço de combustível (ANP) e juros de veículo (Banco Central) que o
+# simulador usa. Roda toda segunda de manhã; se algum número mudou, faz commit
+# de engine/src/services/market-data.json na main, e a Netlify republica o
+# site com o push. Sem mudança, não faz commit.
+#
+# Rodar na mão: aba Actions do GitHub -> "Dados de mercado" -> Run workflow.
+
+name: Dados de mercado
+
+on:
+  schedule:
+    # Segunda, 12h UTC (9h em Brasília). A ANP publica o levantamento semanal
+    # no fim da semana anterior.
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # O script só usa o Node (fetch nativo): não precisa de npm install.
+      - name: Baixar ANP e Banco Central
+        run: node engine/scripts/update-market-data.mjs
+
+      - name: Commit se mudou
+        run: |
+          if git diff --quiet -- engine/src/services/market-data.json; then
+            echo "Sem mudança nos dados."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add engine/src/services/market-data.json
+          git commit -m "data(simulator): weekly ANP fuel prices and BCB vehicle loan rate"
+          git push

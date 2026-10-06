@@ -7,13 +7,15 @@
 //   - seguro estimado por faixa etária do condutor (referência SUSEP: jovens de
 //     18-25 pagam ~9,5% do valor do carro/ano; 56+ pagam ~4,4%), região,
 //     garagem e tipo de cobertura;
-//   - combustível (médias ANP jul/2026, ajustadas por UF) × consumo × km/mês;
+//   - combustível (média semanal da ANP, por UF — market-data.json) × consumo × km/mês;
 //   - manutenção preventiva/corretiva por idade do carro e rodagem;
 //   - financiamento (tabela Price) com entrada, prazo e juros médios de mercado;
 //   - depreciação (custo "invisível", informativo);
 //   - regra de comprometimento de renda (padrão: custo total ≤ 20% da renda).
 //
 // Todos os valores são ESTIMATIVAS de planejamento, não cotações.
+
+import marketData from "./market-data.json" with { type: "json" };
 
 // ---------------------------------------------------------------------------
 // Brasil — dados por UF
@@ -285,41 +287,22 @@ const LICENSING_BR_DEFAULT = 140;
 // outras são aproximação, e a tela precisa dizer isso em vez de citar o DETRAN.
 const LICENSING_BR_VERIFIED = new Set(["SP", "RS"]);
 
-// Fator de preço de combustível por UF sobre a média nacional.
+// Preço de combustível: média nacional e fator por UF, medidos na ANP.
 //
-// Medidos no CSV semanal da ANP em 14/08/2026 (coletas de 07 e 08/2026):
-// 17.619 postos de gasolina e 14.989 de etanol, preço de bomba por município.
+// Vêm de market-data.json, que `scripts/update-market-data.mjs` regrava toda
+// semana a partir do levantamento da ANP (posto a posto, últimas 4 semanas) —
+// ver o workflow market-data.yml. Até 06/10/2026 eram constantes medidas à mão
+// em 14/08/2026, e envelheciam em silêncio: o diesel estava em R$ 6,30 quando
+// a bomba marcava R$ 7,21, 14% a menos em toda picape a diesel.
 //
-// Gasolina e etanol precisam de tabelas SEPARADAS, e essa é a correção que
-// justifica o retrabalho: os dois têm formação de preço diferente — a gasolina
-// segue frete e ICMS a partir da refinaria, o etanol segue distância da usina.
-// Onde se planta cana o etanol é barato e a gasolina não é. Um fator só, como
-// era antes, errava até 13,6 p.p.:
-//
-//   UF   fator gasolina   fator etanol
-//   SP        0,97            0,86     ← maior produtor: etanol estruturalmente barato
-//   RS        0,96            1,09
-//   SC        0,99            1,07
-//   RJ        1,01            1,12
-//   MT        1,03            0,87
-//
-// Em SP o etanol saía 12% mais caro do que é — R$ 93/mês a mais na maior linha
-// do orçamento de quem roda a álcool.
-const FUEL_FACTOR_BR = {
-  AC: 1.12, AL: 1.05, AM: 1.13, AP: 0.99, BA: 1.07, CE: 1.05, DF: 0.97,
-  ES: 1.0, GO: 1.01, MA: 1.05, MG: 0.96, MS: 1.0, MT: 1.03, PA: 1.03,
-  PB: 0.99, PE: 1.05, PI: 1.04, PR: 1.0, RJ: 1.01, RN: 1.04, RO: 1.11,
-  RR: 1.15, RS: 0.96, SC: 0.99, SE: 1.07, SP: 0.97, TO: 1.07,
-};
-
-// O AP fica de fora: só 3 postos de etanol na amostra, que não sustenta média.
-// Sem entrada aqui, cai em 1 — a média nacional, que é o chute honesto.
-const FUEL_FACTOR_BR_ETHANOL = {
-  AC: 1.2, AL: 1.2, AM: 1.17, BA: 1.11, CE: 1.21, DF: 0.96, ES: 1.1,
-  GO: 0.97, MA: 1.24, MG: 0.94, MS: 0.94, MT: 0.87, PA: 1.16, PB: 1.13,
-  PE: 1.19, PI: 1.14, PR: 0.97, RJ: 1.12, RN: 1.27, RO: 1.25, RR: 1.26,
-  RS: 1.09, SC: 1.07, SE: 1.26, SP: 0.86, TO: 1.17,
-};
+// Gasolina, etanol e diesel têm tabelas de fator SEPARADAS. Os três têm
+// formação de preço diferente — a gasolina segue frete e ICMS a partir da
+// refinaria, o etanol segue distância da usina. Um fator só errava até 13,6
+// p.p. (SP: gasolina 0,97, etanol 0,86). UF com menos de 10 postos na amostra
+// fica sem fator e cai na média nacional (o etanol no AP, por exemplo).
+const FUEL_FACTOR_BR = marketData.fuel?.gasoline?.factors || {};
+const FUEL_FACTOR_BR_ETHANOL = marketData.fuel?.ethanol?.factors || {};
+const FUEL_FACTOR_BR_DIESEL = marketData.fuel?.diesel?.factors || {};
 
 // Fator regional de risco do seguro (roubo/furto/sinistralidade).
 const INSURANCE_REGION_BR = {
@@ -327,21 +310,24 @@ const INSURANCE_REGION_BR = {
   CE: 1.05, PA: 1.05, GO: 1.02, MG: 1.0, PR: 1.0, ES: 1.0, SC: 0.92,
 };
 
-// Preços médios de combustível no Brasil, BRL por litro/kWh.
-//
-// Gasolina e etanol medidos no CSV da ANP em 14/08/2026, mesma amostra dos
-// fatores acima. A gasolina estava certa (6,61 contra 6,594 medido); o etanol
-// estava 4,8% alto.
-//
-// O diesel NÃO vem dessa medição: o CSV de "últimas 4 semanas" da ANP só traz
-// gasolina, gasolina aditivada e etanol. O valor segue sendo o de jul/2026 e
-// não foi reconferido — o mesmo vale para o kWh, que é tarifa residencial e
-// nem sequer é publicada pela ANP.
+// Preços médios no Brasil, BRL por litro (ANP, ver acima) e por kWh.
+// O kWh é tarifa residencial média com impostos e NÃO vem da ANP, que não
+// publica energia elétrica — continua sendo o número antigo, sem atualização.
 const FUEL_PRICE_BR = {
-  gasoline: 6.59,
-  ethanol: 4.28,
-  diesel: 6.3,
-  electric: 0.85, // BRL por kWh (tarifa residencial média com impostos)
+  gasoline: marketData.fuel?.gasoline?.national ?? 6.59,
+  ethanol: marketData.fuel?.ethanol?.national ?? 4.28,
+  diesel: marketData.fuel?.diesel?.national ?? 7.21,
+  electric: 0.85,
+};
+
+/**
+ * De quando são os números de mercado que a conta usa, para a tela dizer.
+ * `fuelTo` é o último dia de coleta da ANP; `rateMonth` é o mês da taxa do
+ * Banco Central ("2026-08").
+ */
+export const MARKET_DATA_DATES = {
+  fuelTo: marketData.fuel?.gasoline?.to || null,
+  rateMonth: marketData.rate?.month || null,
 };
 
 // ---------------------------------------------------------------------------
@@ -355,7 +341,16 @@ const FUEL_PRICE_BR = {
 // volta no dia em que houver tabela de preço de carro por país.
 // taxPct/registrationFlat nulos: o Brasil usa as tabelas por UF acima.
 const COUNTRY_PROFILES = {
-  BR: { taxPct: null, registrationFlat: null, insuranceFactor: 1, maintenanceFactor: 1, fuelPrice: FUEL_PRICE_BR, monthlyRate: 0.0199 },
+  // Juros: SGS 25471 do Banco Central (aquisição de veículos, PF), atualizado
+  // pelo mesmo script. 1,99% era o valor da última medição à mão.
+  BR: {
+    taxPct: null,
+    registrationFlat: null,
+    insuranceFactor: 1,
+    maintenanceFactor: 1,
+    fuelPrice: FUEL_PRICE_BR,
+    monthlyRate: (marketData.rate?.monthlyPct ?? 1.99) / 100,
+  },
 };
 
 export const SIMULATOR_COUNTRIES = Object.keys(COUNTRY_PROFILES);
@@ -688,10 +683,13 @@ const monthlyFuel = (inputs, country, state) => {
   // um carro no Acre por um motivo que não existe na conta de luz.
   let stateFactor = 1;
   if (country === "BR" && inputs.fuelType !== "electric") {
-    stateFactor =
-      (inputs.fuelType === "ethanol"
-        ? FUEL_FACTOR_BR_ETHANOL[state]
-        : FUEL_FACTOR_BR[state]) || 1;
+    const factors =
+      inputs.fuelType === "ethanol"
+        ? FUEL_FACTOR_BR_ETHANOL
+        : inputs.fuelType === "diesel"
+          ? FUEL_FACTOR_BR_DIESEL
+          : FUEL_FACTOR_BR;
+    stateFactor = factors[state] || 1;
   }
 
   // Hierarquia: user informado > consumption > default

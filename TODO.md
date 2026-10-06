@@ -219,12 +219,12 @@ cancelamento vem no segundo mês.
 Inventário completo, com endpoints verificados, em **`SIMULADOR-FONTES.md`**.
 Na ordem de retorno:
 
-- [ ] **ANP semanal → Firestore.** Os valores foram remedidos à mão em
+- [x] ~~**ANP semanal**~~ — automático desde 06/10/2026 (script + GitHub Action semanal, em JSON no repo em vez do Firestore). Diesel incluído: estava R$ 6,30, a bomba marcava R$ 7,21. Texto antigo: **ANP semanal → Firestore.** Os valores foram remedidos à mão em
       14/08/2026 (preços, `FUEL_FACTOR_BR` e o novo `FUEL_FACTOR_BR_ETHANOL`),
       então o ganho agora é não apodrecer. CSV público, sem autenticação, ~8 MB
       por semana. Falta também o **diesel**, que está noutro arquivo da ANP e
       segue com valor de jul/2026 não reconferido
-- [ ] **BCB SGS 25471 mensal → Firestore.** Cinco linhas. Hoje o ganho é nulo
+- [x] ~~**BCB SGS 25471 mensal**~~ — automático desde 06/10/2026, mesmo script. Texto antigo: **BCB SGS 25471 mensal → Firestore.** Cinco linhas. Hoje o ganho é nulo
       (1,97% contra 1,99%), mas a série já marcou 1,63% e vai divergir de novo
 - [x] ~~**IPVA do Amazonas está 2× errado**~~ — corrigido em 13/08/2026: AM foi
       para 2,0% (1,5% elétrico), CE para 3,0%, e o PR já estava certo com 1,9%
