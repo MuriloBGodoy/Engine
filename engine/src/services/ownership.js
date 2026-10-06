@@ -267,25 +267,54 @@ const ipvaRateBR = (state, fuelType, value) => {
   return IPVA_BR[state] ?? IPVA_BR_DEFAULT;
 };
 
-// Taxa anual de licenciamento (CRLV) aproximada por UF, em BRL.
+// Taxa anual de licenciamento (CRLV) por UF, exercício 2026, em BRL.
 //
-// Cada UF indexa a uma unidade fiscal própria (SP à UFESP, RS à UPF/RS, RJ à
-// UFIR-RJ) e republica portaria em janeiro — a tabela inteira apodrece em bloco
-// todo começo de ano. Conferidos em fonte primária no exercício 2026:
-//   SP 174,08 — carta de serviço do Governo de SP, base Lei 15.266/2013
-//   RS 114,09 — Portaria DETRAN/RS 036/2026, código 7714
-// O RJ segue em 231 por falta de fonte: a tabela de DUDAs do DETRAN-RJ publica
-// transferência e 2ª via, mas não a linha do licenciamento anual.
+// Levantada estado por estado em 06/10/2026, em fonte oficial (DETRAN, SEFAZ,
+// lei de taxas). A tabela anterior era uma aproximação sem fonte e errava
+// feio: MG estava em 161 e a taxa é 35,62; GO em 128 e é 274,60; PA em 120 e é
+// 300,93. Cada linha diz de onde veio. Detalhe completo, com os becos sem
+// saída, em SIMULADOR-FONTES.md.
+//
+// Três estados cobram em unidade fiscal que muda TODO MÊS (MS em UFERMS, SE em
+// UFP-SE, PB em UFR-PB): o valor aqui é o de out/2026, e varia alguns reais ao
+// longo do ano.
 const LICENSING_BR = {
-  SP: 174, MG: 161, RJ: 231, RS: 114, PR: 107, SC: 138, ES: 127, BA: 132,
-  PE: 122, CE: 127, DF: 145, GO: 128, MT: 150, MS: 140, PA: 120, MA: 110,
-  PB: 115, PI: 110, RN: 118, AL: 115, SE: 112, AM: 130, AC: 120, AP: 115,
-  RO: 125, RR: 115, TO: 118,
+  AC: 198.15, // DETRAN-AC, valores de serviços: "Licenciamento anual, com emissão de CRLV"
+  AM: 155.73, // DETRAN-AM, tabela a partir de 01/04/2026: V24 140,05 + D07 protocolo 15,68
+  BA: 181.13, // Lei 11.631/2009, item 6.2.18, compilada pela SEFAZ-BA (Decreto 24.236/25, +4,46%)
+  CE: 220.46, // Governo do CE, calendário de licenciamento 2026 (Detran-CE)
+  DF: 106.26, // DETRAN-DF, tabela 2026, código 09001 (Lei 3.932/2006)
+  ES: 237.04, // Lei 7.001/2001, Tabela III, item 2.2: 48 VRTE × 4,9383 (VRTE 2026, SEFAZ-ES)
+  GO: 274.6, // Lei 11.651, Anexo III, A.3, subitem 26 (+4,26% em 01/02/26); parcela junto com o IPVA
+  MA: 157.33, // DETRAN-MA, taxas: renovação 101,80 + consulta RENAVAM 55,53
+  MG: 35.62, // SEF-MG / Agência Minas: TRLAV 2026, vence 31/03 para todas as placas
+  MS: 251.42, // DETRAN-MS, código 2006: 4,53 UFERMS (valor de out/2026)
+  MT: 197.79, // DETRAN-MT, serviço "Licenciamento Anual" (página sem o ano escrito)
+  PA: 300.93, // DETRAN-PA, taxas 2026: 60 UPF-PA × 5,0155
+  PB: 255.75, // DETRAN-PB: 3,00 UFR licenciamento + 0,45 UFR bombeiros, UFR-PB de out/2026 (74,13)
+  PR: 94.61, // DETRAN-PR, consulta oficial de taxas: "LICENCIAMENTO ANUAL"
+  RO: 230.25, // DETRAN-RO, valores de serviços 2026: 1,85 UPF/RO × 124,46
+  RR: 172.3, // DETRAN-RR, tabela de taxas 2026, 3.1.14.1 (PBT até 3.500 kg)
+  RS: 114.09, // Portaria DETRAN/RS 036/2026, código 7714
+  SC: 149.37, // Lei 7.541/88, item 2.4.2.8 (Decreto 420/2023), congelado desde 2024
+  SE: 261.57, // DETRAN-SE, taxas: 3,00 UFP-SE (valor de out/2026)
+  SP: 174.08, // Carta de serviço do Governo de SP, Lei 15.266/2013
+  TO: 79.63, // DETRAN-TO, taxas de veículos (valor igual desde 2022)
+  // ---- sem fonte oficial de 2026: ficam marcados como aproximados na tela
+  RJ: 293.71, // 209,78 taxa + 83,93 emissão do CRLV-e: só imprensa; a linha não está na tabela de DUDAs
+  AL: 223.38, // DETRAN-AL, tabela oficial de 2025 (6,20 UPFAL × 36,03); a UPFAL 2026 não foi achada
+  RN: 90, // DETRAN-RN (página fora do ar na consulta) e imprensa de 2026: "R$ 90 desde 2018"
+  PE: 122, // sem fonte: a lei fixa em UFIR extinta e não há ato de 2026 em reais
+  PI: 110, // sem fonte: 40 UFR-PI pela Lei 6.441/2013, UFR-PI de 2026 não achada
+  AP: 115, // sem fonte: a lei de taxas do DETRAN-AP não foi achada
 };
 const LICENSING_BR_DEFAULT = 140;
-// As únicas UFs com a taxa de 2026 conferida em fonte primária (ver acima). As
-// outras são aproximação, e a tela precisa dizer isso em vez de citar o DETRAN.
-const LICENSING_BR_VERIFIED = new Set(["SP", "RS"]);
+// UFs cuja taxa de 2026 está em fonte oficial. As outras a tela chama de
+// aproximação, em vez de citar o DETRAN.
+const LICENSING_BR_VERIFIED = new Set([
+  "AC", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT", "PA",
+  "PB", "PR", "RO", "RR", "RS", "SC", "SE", "SP", "TO",
+]);
 
 // Preço de combustível: média nacional e fator por UF, medidos na ANP.
 //

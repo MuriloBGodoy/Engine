@@ -1186,3 +1186,46 @@ trocar consumo INMETRO por EPA ou por ciclo europeu "porque é o que tem".
 **Fazer agora, barato:** persistir `codigoFipe`, `codigoMarca`, `codigoModelo` e
 `codigoAno` no submit do `ModalNewCar.jsx`. Sem isso, qualquer fonte de ficha
 técnica futura vai depender de casar string, e com isso vira `join` por chave.
+
+## Licenciamento por UF — levantado em 06/10/2026
+
+Pesquisa estado por estado (três rodadas do Han em paralelo), só fonte oficial.
+A tabela anterior era aproximação sem fonte e errava feio: **MG 161 → 35,62**,
+**GO 128 → 274,60**, **PA 120 → 300,93**, **RO 125 → 230,25**, **TO 118 → 79,63**.
+Os valores e a fonte de cada um estão comentados linha a linha em
+`LICENSING_BR` (`engine/src/services/ownership.js`).
+
+**Conferidos (21):** AC, AM, BA, CE, DF, ES, GO, MA, MG, MS, MT, PA, PB, PR,
+RO, RR, RS, SC, SE, SP, TO. Ressalvas:
+
+- AC, MA, MT e TO: página oficial atual, mas sem o ano escrito. TO está igual
+  desde 2022; MA igual a 2025; AC bate com reajuste pelo IGP-M.
+- ES é conta, não valor publicado: 48 VRTE (Lei 7.001/2001) × VRTE 2026. Um
+  boleto real confirmaria. Os R$ 168,40 que circulam são de antes de 2024.
+- MS (UFERMS), SE (UFP-SE) e PB (UFR-PB) cobram em unidade fiscal **mensal**: o
+  número guardado é o de out/2026. Em PB, as 0,45 UFR de bombeiros estão na
+  tabela do DETRAN-PB, mas não achei confirmação de 2026.
+- AM: valor a partir de 01/04/2026; quem pagou antes pagou um valor anterior.
+- GO: a taxa é **parcelada junto com o IPVA** (Portaria DETRAN/GO 907/2025). Por
+  isso a frase genérica da tela não diz mais "paga uma vez por ano".
+- RR: o `pdftotext -layout` desloca a coluna e devolve 68,92; o certo, por
+  coordenada e imagem, é 172,30.
+
+**Sem fonte oficial de 2026 (6), marcados como aproximados na tela:**
+
+- RJ 293,71 — só imprensa (209,78 + 83,93 do CRLV-e). A tabela de DUDAs do
+  DETRAN-RJ não tem a linha; o portal da SEFAZ-RJ bloqueia por IP.
+- AL 223,38 — tabela oficial de **2025**. A UPFAL 2026 não foi achada; o widget
+  da SEFAZ-AL está parado em 2023.
+- RN 90 — página do DETRAN-RN fora do ar (503) na consulta; imprensa diz "desde
+  2018".
+- PE — a lei fixa em UFIR (extinta); nenhum ato de 2026 em reais. Os agregadores
+  (119,42 / 120 / 138,98 / 158) não batem entre si.
+- PI — `taxas.detran.pi.gov.br` recusa conexão; 40 UFR-PI pela Lei 6.441/2013,
+  UFR de 2026 não achada.
+- AP — a lei de taxas do DETRAN-AP não foi achada; o portal carrega por JS.
+
+**Becos sem saída:** agregadores (ecarts, consultadeplaca, garagem360) erraram
+PA, AM, SE, PE, AL, ES, RJ e GO nesta rodada — servem só como lista de suspeitos.
+A tabela "oficial" do DETRAN-PB está em reais de 2018/19 (só a quantidade de UFR
+serve). DETRAN-MT e DETRAN-SE derrubam cliente sem user-agent de navegador.
