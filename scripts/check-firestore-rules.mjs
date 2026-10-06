@@ -214,6 +214,12 @@ await t("visitante deslogado NÃO cria", () =>
 // a defesa é a lista fechada e o corpo de um campo só.
 await t("logado cria conquista no perfil de outro (é assim que funciona sem Function)", () =>
   assertSucceeds(setDoc(doc(outro, "users/dono/achievements/likes_1000"), { unlockedAt: 1 })));
+// Catálogo de 06/10/2026: os ids novos passam (fundador concede membros ao
+// clube dele, quem confirma presença concede ao organizador).
+await t("id do catálogo novo é aceito", () =>
+  assertSucceeds(setDoc(doc(outro, "users/dono/achievements/club_members_10"), { unlockedAt: 1 })));
+await t("degrau pequeno de curtida é aceito", () =>
+  assertSucceeds(setDoc(doc(outro, "users/dono/achievements/likes_10"), { unlockedAt: 1 })));
 await t("marco fora da lista fechada é negado", () =>
   assertFails(setDoc(doc(outro, "users/dono/achievements/likes_9999999"), { unlockedAt: 1 })));
 await t("selo inventado é negado", () =>
