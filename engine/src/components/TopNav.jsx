@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../services/firebase";
+import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import { Logo } from "./Logo";
@@ -47,7 +48,7 @@ export function TopNav({
   const isGuest = !user;
   const displayName = profileSettings.displayName || user?.displayName;
   const avatar = profileSettings.avatar || user?.photoURL;
-  const username = profileSettings.username || user?.email?.split("@")[0] || "";
+  const username = publicUsername(profileSettings.username, user?.uid);
   const unreadMessages = useUnreadMessages(user?.uid);
 
   const handleLogout = async () => {
@@ -72,20 +73,24 @@ export function TopNav({
     },
     { name: t("nav.services"), path: "/services", icon: BriefcaseBusiness },
     { name: t("nav.events"), path: "/events", icon: Calendar },
-    { name: t("nav.settings"), path: "/settings", icon: Settings },
   ];
+  // Configurações vai como ícone à direita, junto do avatar: com ela, oito
+  // itens com nome não cabiam na faixa e se espremiam uns nos outros.
+  const settingsActive = location.pathname.startsWith("/settings");
 
   const isActivePath = (path) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   return (
     <header className="sticky top-0 z-40 hidden border-b border-[var(--engine-border)] bg-[var(--engine-bg)]/85 backdrop-blur-xl lg:block">
-      <div className="engine-container flex h-16 items-center gap-4 px-6 lg:px-10">
+      {/* Mais largo que o engine-container (1200px) do conteúdo: o menu com
+          nomes precisa de ~1150px só para os itens e as ações. */}
+      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-4 px-6 lg:px-10">
         <Link to="/" className="shrink-0">
           <Logo markSize={30} />
         </Link>
 
-        <nav className="ml-2 flex items-center gap-1">
+        <nav className="ml-2 flex min-w-0 items-center gap-0.5">
           {menuItems.map((item) => {
             const active = isActivePath(item.path);
             const Icon = item.icon;
@@ -93,7 +98,9 @@ export function TopNav({
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex h-9 items-center gap-2 rounded-lg px-3 text-[13px] font-medium transition-colors ${
+                title={item.name}
+                aria-label={item.name}
+                className={`flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
                   active
                     ? "bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
                     : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
@@ -111,8 +118,8 @@ export function TopNav({
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
-          <RegionPicker className="mr-1" />
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <RegionPicker compact className="mr-1" />
           {isGuest ? (
             <div className="relative">
               <Link
@@ -132,9 +139,21 @@ export function TopNav({
                 onSettingsUpdate={onSettingsUpdate}
                 user={user}
               />
+              <Link
+                to="/settings"
+                title={t("nav.settings")}
+                aria-label={t("nav.settings")}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
+                  settingsActive
+                    ? "bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
+                    : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
+                }`}
+              >
+                <Settings size={20} strokeWidth={settingsActive ? 2.4 : 2} />
+              </Link>
               <span className="mx-1.5 h-6 w-px bg-[var(--engine-border)]" />
               <Link
-                to={username ? `/community/@${username.replace(/^@/, "")}` : "/community"}
+                to={username ? `/community/${username}` : "/community"}
                 title={t("settings.sections.profile")}
                 className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--engine-accent)] text-xs font-bold text-white transition-transform active:scale-95"
               >

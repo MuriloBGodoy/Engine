@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../services/firebase";
+import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import { Logo } from "./Logo";
@@ -43,7 +44,7 @@ export function Sidebar({
   const isGuest = !user;
   const displayName = profileSettings.displayName || user?.displayName;
   const avatar = profileSettings.avatar || user?.photoURL;
-  const username = profileSettings.username || user?.email?.split("@")[0] || "";
+  const username = publicUsername(profileSettings.username, user?.uid);
   const showEmail = privacySettings.showEmailInSidebar !== false;
   const unreadMessages = useUnreadMessages(user?.uid);
 
@@ -210,7 +211,7 @@ export function Sidebar({
             }`}
           >
             <Link
-              to={username ? `/community/@${username.replace(/^@/, "")}` : "/community"}
+              to={username ? `/community/${username}` : "/community"}
               title={t("settings.sections.profile")}
               className="shrink-0 rounded-full transition-transform active:scale-95"
             >

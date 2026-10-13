@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../services/firebase";
+import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import { Logo } from "./Logo";
@@ -69,7 +70,7 @@ export function MobileNav({
   const isGuest = !currentUser;
   const displayName = profileSettings.displayName || currentUser?.displayName;
   const avatar = profileSettings.avatar || currentUser?.photoURL;
-  const username = profileSettings.username || currentUser?.email?.split("@")[0] || "";
+  const username = publicUsername(profileSettings.username, currentUser?.uid);
   const unreadMessages = useUnreadMessages(currentUser?.uid);
 
   const handleLogout = async () => {
@@ -141,7 +142,7 @@ export function MobileNav({
               </Link>
               {/* O avatar é a porta de entrada de Perfil no mobile. */}
               <Link
-                to={username ? `/community/@${username.replace(/^@/, "")}` : "/community"}
+                to={username ? `/community/${username}` : "/community"}
                 title={t("settings.sections.profile")}
                 aria-label={t("settings.sections.profile")}
                 className={`ml-0.5 flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--engine-accent)] text-xs font-bold text-white transition-transform active:scale-95`}

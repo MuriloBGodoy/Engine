@@ -581,10 +581,17 @@ const followingDoc = (userId, targetUserId) =>
 
 const usernameDocId = (username) => normalizeUsername(username).replace(/^@/, "");
 
+// O @ que vai para o perfil público. Quem nunca escolheu um ganha
+// `@engine.<uid>` (o backend faz igual em EngineNormalizer), e todo link para o
+// próprio perfil precisa sair daqui: o menu montava o @ com o começo do e-mail,
+// que não existe no banco, e o perfil abria em "Usuário não encontrado".
+export const publicUsername = (username, userId = "") =>
+  normalizeUsername(username || "") || (userId ? `@engine.${userId.slice(0, 6)}` : "");
+
 const getProfileSnapshot = (settings = {}, userId = currentUserId) => {
   const profile = settings.profile || {};
   const author = profile.displayName || "Usuário Engine";
-  const username = normalizeUsername(profile.username) || `@engine.${userId.slice(0, 6)}`;
+  const username = publicUsername(profile.username, userId);
 
   return {
     author,
