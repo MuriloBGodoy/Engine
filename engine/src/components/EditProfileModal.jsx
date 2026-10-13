@@ -1,32 +1,38 @@
 import { useState, useRef } from 'react';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
-import { auth, firestore } from '../services/firebase';
+import { auth } from '../services/firebase';
+import { engineDB } from '../services/db';
+import { splitPhone, isPhoneValid } from '../services/phone';
+import { PhoneField } from './PhoneField';
 import { countries, getStates } from '../services/locations';
 import { AVATAR, BANNER, reduzirImagem } from '../services/imagens';
 import { useToast } from './ToastProvider';
 import { useHistoryDismiss } from '../hooks/useHistoryDismiss';
 
-export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {} }) {
+// Salva pelo mesmo caminho das Configurações (engineDB.saveSettings), que
+// reserva o @, grava os ajustes e espelha o perfil público. Antes o modal
+// escrevia direto em publicProfiles, com o @ sem a arroba e com nomes de campo
+// que o perfil não lê: o nome não mudava, a capa não aparecia e o perfil
+// sumia da busca por @.
+export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
   const user = auth.currentUser;
   const showToast = useToast();
+  const profile = settings.profile || {};
 
   const [formData, setFormData] = useState({
-    displayName: profileSettings?.displayName || profileSettings?.profile?.displayName || user?.displayName || '',
-    username: profileSettings?.username || profileSettings?.profile?.username || '',
-    bio: profileSettings?.bio || profileSettings?.profile?.bio || '',
-    phoneCountry: profileSettings?.phoneCountry || profileSettings?.profile?.phoneCountry || '+55',
-    phone: profileSettings?.phone || profileSettings?.profile?.phone || '',
-    country: profileSettings?.country || profileSettings?.profile?.country || 'BR',
-    state: profileSettings?.state || profileSettings?.profile?.state || '',
-    city: profileSettings?.city || profileSettings?.profile?.city || '',
+    displayName: profile.displayName || user?.displayName || '',
+    username: profile.username || '',
+    bio: profile.bio || '',
+    phone: profile.phone || '',
+    country: profile.country || 'BR',
+    state: profile.state || '',
+    city: profile.location || '',
   });
 
   const [preview, setPreview] = useState({
-    avatar: profileSettings?.avatar || profileSettings?.profile?.avatar || null,
-    banner: profileSettings?.bannerURL || profileSettings?.profile?.bannerURL || null,
+    avatar: profile.avatar || null,
+    banner: profile.banner || null,
   });
-
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -76,41 +82,13 @@ export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {}
       return;
     }
 
-    // Remove caracteres inválidos (keep only alphanumeric and underscore)
-    cleanValue = cleanValue.replace(/[^a-zA-Z0-9_]/g, '');
-
-    // Limita a 30 caracteres (+ @ na frente)
-    if (cleanValue.length > 30) {
-      cleanValue = cleanValue.slice(0, 30);
-    }
+    // Mesmas regras do normalizeUsername do db: minúsculas, números, . e _,
+    // até 24. Aceitar mais aqui e cortar lá mudava o @ sem avisar.
+    cleanValue = cleanValue.toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 24);
 
     // Adiciona @ na frente
     const newUsername = `@${cleanValue}`;
     handleFieldChange('username', newUsername);
-  };
-
-  const handlePhoneChange = (value) => {
-    // Remove caracteres não numéricos
-    let cleaned = value.replace(/\D/g, '');
-
-    // Limita a 11 dígitos
-    if (cleaned.length > 11) {
-      cleaned = cleaned.slice(0, 11);
-    }
-
-    // Formata: (XX) XXXXX-XXXX
-    let formatted = '';
-    if (cleaned.length > 0) {
-      if (cleaned.length <= 2) {
-        formatted = `(${cleaned}`;
-      } else if (cleaned.length <= 7) {
-        formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
-      } else {
-        formatted = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
-      }
-    }
-
-    handleFieldChange('phone', formatted);
   };
 
   const validateForm = () => {
@@ -128,15 +106,13 @@ export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {}
     }
     // Remove @ pra validar apenas os caracteres
     const usernameWithoutAt = formData.username.replace(/^@/, '');
-    if (usernameWithoutAt.length < 3 || usernameWithoutAt.length > 30) {
-      newErrors.username = 'Username deve ter 3–30 caracteres';
-    }
-    if (!/^[a-zA-Z0-9_]*$/.test(usernameWithoutAt)) {
-      newErrors.username = 'Apenas letras, números e underscore';
+    if (usernameWithoutAt.length < 3 || usernameWithoutAt.length > 24) {
+      newErrors.username = 'Username deve ter 3–24 caracteres';
     }
 
-    if (formData.phone && !/^[\d\s()-]*$/.test(formData.phone)) {
-      newErrors.phone = 'Formato de telefone inválido';
+    const { dial, number } = splitPhone(formData.phone);
+    if (number && !isPhoneValid(dial, number)) {
+      newErrors.phone = 'Telefone incompleto';
     }
 
     setErrors(newErrors);
@@ -199,39 +175,38 @@ export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {}
 
     setLoading(true);
     try {
-      // A foto é a versão reduzida do preview (ver handleFileInput); quando o
-      // Storage for ligado, é aqui que ela passa a subir como arquivo.
-      let photoURL = preview.avatar || null;
-      let bannerURL = preview.banner || null;
+      // Só o código do país, sem número, é campo vazio — não "+55".
+      const phone = splitPhone(formData.phone).number ? formData.phone : '';
+      const saved = await engineDB.saveSettings(
+        {
+          ...settings,
+          profile: {
+            ...profile,
+            displayName: formData.displayName,
+            username: formData.username,
+            bio: formData.bio,
+            phone,
+            country: formData.country,
+            state: formData.state,
+            location: formData.city,
+            // A foto é a versão reduzida do preview (ver handleFileInput).
+            avatar: preview.avatar || '',
+            banner: preview.banner || '',
+          },
+        },
+        user.uid,
+      );
 
       // O `photoURL` do Auth so aceita URL curta; um data URI de foto passa do
-      // limite e derruba o salvamento inteiro, inclusive os campos de texto.
-      // Enquanto a foto mora no Firestore, o Auth fica so com o nome.
-      const urlParaAuth = /^https?:\/\//.test(photoURL || '') ? photoURL : null;
+      // limite. Enquanto a foto mora no Firestore, o Auth fica so com o nome.
+      const urlParaAuth = /^https?:\/\//.test(preview.avatar || '') ? preview.avatar : null;
       await updateProfile(user, {
         displayName: formData.displayName,
         ...(urlParaAuth ? { photoURL: urlParaAuth } : {}),
-      });
-
-      const profileRef = doc(firestore, 'publicProfiles', user.uid);
-      const updateData = {
-        displayName: formData.displayName,
-        username: formData.username.toLowerCase().replace(/^@/, ''),
-        bio: formData.bio,
-        phoneCountry: formData.phoneCountry,
-        phone: formData.phone,
-        country: formData.country,
-        state: formData.state,
-        city: formData.city,
-        avatar: photoURL,
-        bannerURL: bannerURL,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await updateDoc(profileRef, updateData);
+      }).catch((error) => console.warn('updateProfile', error));
 
       if (onSave) {
-        onSave(updateData);
+        onSave(saved);
       }
 
       showToast('Perfil atualizado.');
@@ -240,10 +215,11 @@ export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {}
       console.error('Save error:', err);
       // Erro que so ia pro console: a pessoa apertava Salvar, nada acontecia e
       // o modal ficava aberto sem dizer por que.
+      // saveSettings recusa @ já usado com mensagem própria; essa vale mostrar.
       showToast(
         err?.code === 'permission-denied'
           ? 'Sem permissao para salvar este perfil.'
-          : 'Nao consegui salvar o perfil. Tente de novo.',
+          : err?.message || 'Nao consegui salvar o perfil. Tente de novo.',
         { tone: 'warning' },
       );
     } finally {
@@ -377,7 +353,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {}
                     errors.username ? 'border-red-500' : 'border-[var(--engine-border)]'
                   }`}
                 />
-                <p className="text-xs text-[var(--engine-text-subtle)] mt-1">@ é adicionado automaticamente • 3–30 caracteres</p>
+                <p className="text-xs text-[var(--engine-text-subtle)] mt-1">@ é adicionado automaticamente • 3–24 caracteres: letras, números, . e _</p>
                 {errors.username && (
                   <p className="text-xs text-red-500 mt-1">{errors.username}</p>
                 )}
@@ -401,42 +377,25 @@ export function EditProfileModal({ isOpen, onClose, onSave, profileSettings = {}
           {/* Contact */}
           <div>
             <p className="text-xs font-semibold uppercase text-[var(--engine-text-muted)] mb-4">Contato</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-[var(--engine-text)]">Código País</label>
-                <select
-                  value={formData.phoneCountry}
-                  onChange={(e) => handleFieldChange('phoneCountry', e.target.value)}
-                  className="w-full px-3 py-2.5 mt-2 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm text-[var(--engine-text)] transition focus:outline-none focus:border-[var(--engine-accent)]"
-                >
-                  <option value="+55">Brasil (+55)</option>
-                  <option value="+1">EUA (+1)</option>
-                  <option value="+34">Espanha (+34)</option>
-                  <option value="+54">Argentina (+54)</option>
-                  <option value="+56">Chile (+56)</option>
-                  <option value="+57">Colômbia (+57)</option>
-                  <option value="+51">Peru (+51)</option>
-                  <option value="+55">Portugal (+351)</option>
-                  <option value="+55">México (+52)</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-[var(--engine-text)]">Telefone</label>
-                <input
-                  type="tel"
-                  placeholder="(11) 99999-9999"
-                  maxLength={15}
-                  value={formData.phone}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  className={`w-full px-3 py-2.5 mt-2 bg-[var(--engine-elevated)] border rounded-lg text-sm font-mono transition focus:outline-none focus:border-[var(--engine-accent)] ${
-                    errors.phone ? 'border-red-500' : 'border-[var(--engine-border)]'
-                  }`}
-                />
-                {errors.phone && (
-                  <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
-                )}
-              </div>
+            <label htmlFor="edit-profile-phone" className="text-sm font-medium text-[var(--engine-text)]">Telefone</label>
+            {/* O mesmo campo do cadastro: uma string só, "+55 (11) 91234-5678".
+                O modal antigo guardava o código num campo à parte e recusava o
+                "+" do número que veio do cadastro. */}
+            <div className="mt-2">
+              <PhoneField
+                inputId="edit-profile-phone"
+                value={formData.phone}
+                onChange={(value) => handleFieldChange('phone', value)}
+                placeholder="(11) 99999-9999"
+                selectClassName="py-2.5 pl-3 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm text-[var(--engine-text)] transition focus:outline-none focus:border-[var(--engine-accent)]"
+                inputClassName={`px-3 py-2.5 bg-[var(--engine-elevated)] border rounded-lg text-sm text-[var(--engine-text)] transition focus:outline-none focus:border-[var(--engine-accent)] ${
+                  errors.phone ? 'border-red-500' : 'border-[var(--engine-border)]'
+                }`}
+              />
             </div>
+            {errors.phone && (
+              <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
+            )}
           </div>
 
           {/* Location */}

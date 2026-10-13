@@ -395,6 +395,8 @@ public class EngineFirestoreService {
             "avatarInitials", snapshot.get("avatarInitials"),
             "city", snapshot.get("city"),
             "note", snapshot.get("note"),
+            // Capa só no perfil público, igual ao front (buildPublicProfile).
+            "banner", EngineNormalizer.string(EngineNormalizer.mutableMap(settings.get("profile")).get("banner")),
             "updatedAt", FieldValue.serverTimestamp()));
   }
 

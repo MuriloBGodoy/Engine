@@ -48,6 +48,8 @@ const defaultSettings = {
     location: "",
     bio: "",
     avatar: "",
+    // Capa do perfil, data URI reduzido (ver BANNER em services/imagens).
+    banner: "",
   },
   // Só entra aqui o que alguma tela LÊ. Até 05/10/2026 a página de
   // configurações exibia moeda, fuso, densidade, página inicial, meta anual,
@@ -614,6 +616,9 @@ const buildPublicProfile = (settings = {}, userId = currentUserId) => {
     id: userId,
     userId,
     ...profile,
+    // A capa vai só aqui: o retrato acima também é copiado em post,
+    // comentário e notificação, e até 400 KB de imagem não cabem em cada um.
+    banner: settings.profile?.banner || "",
     updatedAt: serverTimestamp(),
   };
 };

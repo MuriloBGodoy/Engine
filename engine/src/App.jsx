@@ -433,7 +433,7 @@ function App() {
           />
           <Route
             path="/community/:identifier"
-            element={<UserProfile settings={settings} user={user} />}
+            element={<UserProfile settings={settings} user={user} onSettingsUpdate={setSettings} />}
           />
           {/* Clubes tem endereço próprio além da aba da Comunidade: um clube
               é a coisa que se manda para alguém ("olha o nosso clube"), e um

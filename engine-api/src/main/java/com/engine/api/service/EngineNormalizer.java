@@ -18,7 +18,8 @@ final class EngineNormalizer {
               "phone", "",
               "location", "",
               "bio", "",
-              "avatar", ""),
+              "avatar", "",
+              "banner", ""),
           "preferences",
           Map.of(
               "language", "pt-BR",

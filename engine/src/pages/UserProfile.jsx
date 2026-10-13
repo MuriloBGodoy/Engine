@@ -6,7 +6,6 @@ import {
   MessageCircle,
   Share2,
   Users,
-  ArrowLeft,
   UserPlus,
   UserCheck,
   Mail,
@@ -74,7 +73,7 @@ function UserListItem({ userId, profiles, fallback = {} }) {
   );
 }
 
-export function UserProfile({ settings = {}, user = null }) {
+export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const { identifier } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -294,6 +293,10 @@ export function UserProfile({ settings = {}, user = null }) {
   }
 
   const avatar = profile.avatar || null;
+  // `bannerURL` é onde o modal antigo (até 13/10/2026) gravava a capa, direto
+  // no perfil público e fora dos ajustes. Quem pôs capa naquela época só a tem
+  // lá; o próximo salvar a leva para `banner`.
+  const banner = profile.banner || profile.bannerURL || null;
   const initials = profile.author
     ?.split(" ")
     .map((n) => n[0])
@@ -303,19 +306,16 @@ export function UserProfile({ settings = {}, user = null }) {
 
   return (
     <div className="min-h-screen bg-[var(--engine-bg)]">
-      {/* Back Button - Fixed Sticky */}
-      <div className="sticky top-0 z-50 flex items-center px-4 py-3 backdrop-blur-md sm:px-6 border-b border-[var(--engine-border)] bg-[var(--engine-bg)]/95 shadow-sm">
-        <button
-          onClick={() => window.history.back()}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
-          aria-label="Voltar"
-          title="Voltar para a página anterior"
-        >
-          <ArrowLeft size={20} />
-        </button>
-      </div>
-
       <div className="mx-auto w-full max-w-2xl">
+        {/* Capa: só aparece quem escolheu uma. */}
+        {banner && (
+          <img
+            src={banner}
+            alt=""
+            className="h-32 w-full object-cover sm:mt-4 sm:h-44 sm:rounded-2xl"
+          />
+        )}
+
         {/* Profile Info - Instagram Style */}
         <div className="border-b border-[var(--engine-border)] px-4 py-6 sm:px-6">
           {/* Avatar + Name/Username Row */}
@@ -570,9 +570,23 @@ export function UserProfile({ settings = {}, user = null }) {
         <EditProfileModal
           isOpen={isEditing}
           onClose={() => setIsEditing(false)}
-          profileSettings={settings.profile || profile}
-          onSave={(updated) => {
-            setProfile(prev => ({ ...prev, ...updated }));
+          settings={{
+            ...settings,
+            profile: {
+              ...settings.profile,
+              banner: settings.profile?.banner || banner || "",
+            },
+          }}
+          onSave={(saved) => {
+            onSettingsUpdate?.(saved);
+            // Trocar o @ muda o endereço do perfil; sem trocar, relê o perfil
+            // público para mostrar nome, bio e capa novos.
+            const novo = saved?.profile?.username;
+            if (novo && novo.replace(/^@/, "") !== identifier?.replace(/^@/, "").toLowerCase()) {
+              navigate(`/community/${novo}`, { replace: true });
+            } else {
+              setReloadKey((value) => value + 1);
+            }
           }}
         />
       )}
