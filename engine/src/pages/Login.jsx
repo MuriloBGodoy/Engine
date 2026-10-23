@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { auth } from "../services/firebase";
+import { sendPasswordReset, signInWithEmail } from "../services/supabase";
 import { AuthShell } from "../components/AuthShell";
 import { SocialAuthButtons } from "../components/SocialAuthButtons";
 
@@ -24,7 +23,7 @@ export function Login() {
     setMessage("");
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      await signInWithEmail(email.trim(), password);
       navigate("/");
     } catch {
       setError(t("auth.loginError"));
@@ -46,9 +45,7 @@ export function Login() {
     setMessage("");
 
     try {
-      await sendPasswordResetEmail(auth, cleanEmail, {
-        url: `${window.location.origin}/reset-password`,
-      });
+      await sendPasswordReset(cleanEmail);
       setMessage(t("auth.resetEmailSent"));
     } catch {
       setError(t("auth.resetEmailError"));
@@ -64,14 +61,6 @@ export function Login() {
       subtitle={t("auth.loginSubtitle")}
     >
       <SocialAuthButtons />
-
-      <div className="my-4 flex items-center gap-3">
-        <span className="h-px flex-1 bg-[var(--engine-border)]" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
-          {t("auth.social.or")}
-        </span>
-        <span className="h-px flex-1 bg-[var(--engine-border)]" />
-      </div>
 
       <form onSubmit={handleLogin} className="auth-form">
         <label className="auth-field">

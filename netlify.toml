@@ -5,13 +5,10 @@
 
 # Funções de servidor: guardam as chaves dos gateways (que nunca podem ir pro
 # navegador) e recebem os webhooks de pagamento.
-#
-# firebase-admin fica como external porque usa require dinâmico — empacotar
-# quebra o carregamento das credenciais.
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["firebase-admin"]
 
 # Geolocalização por IP na borda (chute inicial de região p/ visitante).
 # A pasta padrão das edge functions é <base>/netlify/edge-functions.

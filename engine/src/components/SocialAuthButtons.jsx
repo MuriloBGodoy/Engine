@@ -1,65 +1,67 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  FacebookAuthProvider,
-  GoogleAuthProvider,
-  signInWithPopup,
-} from "firebase/auth";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebookF } from "react-icons/fa6";
-import { auth } from "../services/firebase";
+import { signInWithProvider } from "../services/supabase";
 
 /**
- * Botões de login social (Google, Facebook, Apple) via Firebase Auth.
- * Compartilhado por Login e Register.
+ * Botões de login social (Google, Facebook). Compartilhado por Login e
+ * Register.
  *
- * IMPORTANTE — cada provedor precisa ser habilitado no Firebase Console
- * (Authentication → Sign-in method):
- *   - Google: basta habilitar (funciona na hora).
- *   - Facebook: exige App ID + App Secret de um app no Meta for Developers.
- * Enquanto um provedor não estiver habilitado, o clique cai no onError com
- * uma mensagem amigável em vez de quebrar.
+ * No Supabase o login social é REDIRECIONAMENTO: a página sai para o Google e
+ * volta logada. Não existe mais popup bloqueado nem popup fechado.
+ *
+ * Cada provedor precisa estar ligado no painel do Supabase (Authentication →
+ * Providers), com o Client ID e o segredo do app no Google Cloud / Meta. Botão
+ * de provedor desligado levaria a uma página de erro em JSON do servidor —
+ * por isso a lista abaixo pergunta ao servidor quais estão ligados e só
+ * mostra esses.
  */
 
-const PROVIDERS = {
-  google: () => new GoogleAuthProvider(),
-  facebook: () => new FacebookAuthProvider(),
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+let enabledProviders = null;
+const loadEnabledProviders = async () => {
+  if (enabledProviders) return enabledProviders;
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/settings`, {
+      headers: { apikey: SUPABASE_KEY },
+    });
+    const settings = await response.json();
+    enabledProviders = settings?.external || {};
+  } catch {
+    enabledProviders = {};
+  }
+  return enabledProviders;
 };
 
 export function SocialAuthButtons() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
+  const [enabled, setEnabled] = useState(enabledProviders);
+
+  useEffect(() => {
+    let alive = true;
+    loadEnabledProviders().then((providers) => {
+      if (alive) setEnabled(providers);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleSocial = async (key) => {
     setError("");
     setPending(key);
     try {
-      const provider = PROVIDERS[key]();
-      await signInWithPopup(auth, provider);
-      navigate("/");
+      // Volta para a home logado; quem acabou de criar a conta pelo Google
+      // cai no mesmo lugar que quem já tinha.
+      await signInWithProvider(key, "/");
     } catch (err) {
-      // Popup fechado pelo usuário não é erro que mereça alarme.
-      if (err?.code === "auth/popup-closed-by-user" || err?.code === "auth/cancelled-popup-request") {
-        return;
-      }
-      // Loga o código real para diagnóstico (o texto na tela é amigável).
       console.error("Social sign-in falhou:", err?.code, err?.message);
-      if (err?.code === "auth/unauthorized-domain") {
-        // Domínio (ex.: *.netlify.app) não está em Authentication →
-        // Settings → Authorized domains no Firebase Console.
-        setError(t("auth.social.unauthorizedDomain"));
-      } else if (err?.code === "auth/operation-not-allowed") {
-        // Provedor não habilitado em Authentication → Sign-in method.
-        setError(t("auth.social.notEnabled"));
-      } else if (err?.code === "auth/popup-blocked") {
-        setError(t("auth.social.popupBlocked"));
-      } else {
-        setError(t("auth.social.error"));
-      }
-    } finally {
+      setError(t("auth.social.error"));
       setPending("");
     }
   };
@@ -80,9 +82,14 @@ export function SocialAuthButtons() {
     },
   ];
 
+  const visible = buttons.filter((button) => enabled?.[button.key]);
+  if (!visible.length) return null;
+
+  // O divisor "ou" mora aqui: sem provedor ligado, some junto com os botões.
   return (
+    <>
     <div className="flex flex-col gap-2.5">
-      {buttons.map((button) => (
+      {visible.map((button) => (
         <button
           key={button.key}
           type="button"
@@ -96,5 +103,14 @@ export function SocialAuthButtons() {
       ))}
       {error && <p className="auth-feedback auth-feedback-error">{error}</p>}
     </div>
+
+    <div className="my-4 flex items-center gap-3">
+      <span className="h-px flex-1 bg-[var(--engine-border)]" />
+      <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
+        {t("auth.social.or")}
+      </span>
+      <span className="h-px flex-1 bg-[var(--engine-border)]" />
+    </div>
+    </>
   );
 }

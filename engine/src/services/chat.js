@@ -1,41 +1,44 @@
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  increment,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-  writeBatch,
-  getDocs,
-} from "firebase/firestore";
-import { firestore } from "./firebase";
+import { must, supabase, watchTable } from "./supabase";
 
 /**
  * Mensagens diretas (DM) do Engine.
  *
- * Modelo no Firestore:
- *   conversations/{id}                -> id determinístico "uidA__uidB"
- *     memberIds: [uidA, uidB]         (ordenado; usado no array-contains)
- *     members:   { uid: {author, username, avatar, avatarInitials} }
- *     unread:    { uid: number }
- *     lastMessage: { text, senderId, type, createdAt }
- *   conversations/{id}/messages/{msgId}
- *     { senderId, text, type: "text" | "post", attachment?, createdAt }
+ * Modelo no banco:
+ *   conversations                     -> id determinístico "uidA__uidB"
+ *     member_ids: [uidA, uidB]        (ordenado)
+ *     members:    { uid: {author, username, avatar, avatarInitials} }
+ *     unread:     { uid: number }
+ *     last_message: { text, senderId, type, createdAt }
+ *   messages (conversation_id)
+ *     { sender_id, text, type: "text" | "post" | "image" | "gif", data, created_at }
  *
  * O cartão do autor fica desnormalizado na conversa para a lista renderizar
- * sem N leituras de perfil.
+ * sem N leituras de perfil. Abrir conversa, mandar mensagem e marcar como lida
+ * são funções do banco: cada uma mexe na conversa dos DOIS, e é lá que se
+ * garante que ninguém entra em conversa alheia nem mexe no contador do outro.
  */
-const CONVERSATIONS = "conversations";
 const MESSAGES_LIMIT = 200;
 const MESSAGE_MAX_LENGTH = 2000;
+
+const conversationFromRow = (row) => ({
+  id: row.id,
+  memberIds: row.member_ids || [],
+  members: row.members || {},
+  unread: row.unread || {},
+  lastMessage: row.last_message || null,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const messageFromRow = (row) => ({
+  ...(row.data || {}),
+  id: row.id,
+  senderId: row.sender_id || "",
+  text: row.text,
+  type: row.type,
+  status: row.status,
+  createdAt: row.created_at,
+});
 
 export const conversationIdFor = (a, b) =>
   [String(a || ""), String(b || "")].sort().join("__");
@@ -129,27 +132,31 @@ export const subscribeConversations = (userId, callback) => {
     return () => {};
   }
 
-  // Sem orderBy: "array-contains" + orderBy exigiria índice composto no
-  // Firestore. A lista de conversas é curta, então ordenamos no cliente.
-  const conversationsQuery = query(
-    collection(firestore, CONVERSATIONS),
-    where("memberIds", "array-contains", userId),
-    limit(60),
-  );
-
-  return onSnapshot(
-    conversationsQuery,
-    (snapshot) => {
-      const conversations = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
-      callback(conversations);
-    },
-    (error) => {
+  let active = true;
+  const load = async () => {
+    try {
+      const rows = must(
+        await supabase
+          .from("conversations")
+          .select("*")
+          .contains("member_ids", [userId])
+          .order("updated_at", { ascending: false })
+          .limit(60),
+      );
+      if (active) callback(rows.map(conversationFromRow));
+    } catch (error) {
       console.warn("[chat] subscribeConversations", error);
-      callback([], error);
-    },
-  );
+      if (active) callback([], error);
+    }
+  };
+
+  load();
+  // A RLS já limita o aviso às conversas da pessoa.
+  const stop = watchTable("conversations", { table: "conversations" }, load);
+  return () => {
+    active = false;
+    stop();
+  };
 };
 
 /** Mensagens de uma conversa. Mesmo contrato: `(mensagens, erro)`. */
@@ -159,82 +166,60 @@ export const subscribeMessages = (conversationId, callback) => {
     return () => {};
   }
 
-  const messagesQuery = query(
-    collection(firestore, CONVERSATIONS, conversationId, "messages"),
-    orderBy("createdAt", "desc"),
-    limit(MESSAGES_LIMIT),
-  );
-
-  return onSnapshot(
-    messagesQuery,
-    (snapshot) => {
-      const messages = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .reverse();
-      callback(messages);
-    },
-    (error) => {
+  let active = true;
+  const load = async () => {
+    try {
+      const rows = must(
+        await supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", conversationId)
+          .order("created_at", { ascending: false })
+          .limit(MESSAGES_LIMIT),
+      );
+      if (active) callback(rows.map(messageFromRow).reverse());
+    } catch (error) {
       console.warn("[chat] subscribeMessages", error);
-      callback([], error);
-    },
+      if (active) callback([], error);
+    }
+  };
+
+  load();
+  const stop = watchTable(
+    "messages",
+    { table: "messages", filter: `conversation_id=eq.${conversationId}` },
+    load,
   );
+  return () => {
+    active = false;
+    stop();
+  };
 };
 
 /**
  * Garante que a conversa entre duas pessoas existe e devolve o id.
  * Como o id é determinístico, abrir a mesma pessoa duas vezes nunca duplica.
+ * Reabrir atualiza o PRÓPRIO cartão (nome e avatar podem ter mudado).
  */
 export const startConversation = async (me, other) => {
   if (!me?.userId || !other?.userId || me.userId === other.userId) {
     throw new Error("Conversa inválida.");
   }
 
-  const conversationId = conversationIdFor(me.userId, other.userId);
-  const conversationRef = doc(firestore, CONVERSATIONS, conversationId);
-  const snapshot = await getDoc(conversationRef);
-
-  if (!snapshot.exists()) {
-    await setDoc(conversationRef, {
-      memberIds: [me.userId, other.userId].sort(),
-      members: {
-        [me.userId]: memberCard(me),
-        [other.userId]: memberCard(other),
-      },
-      unread: { [me.userId]: 0, [other.userId]: 0 },
-      lastMessage: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return conversationId;
-  }
-
-  // Mantém o próprio cartão em dia (nome/avatar podem ter mudado).
-  await updateDoc(conversationRef, {
-    [`members.${me.userId}`]: memberCard(me),
-  }).catch((error) => console.warn("[chat] startConversation", error));
-
-  return conversationId;
+  return must(
+    await supabase.rpc("start_conversation", {
+      p_other: other.userId,
+      p_my_card: memberCard(me),
+      p_other_card: memberCard(other),
+    }),
+  );
 };
 
-const notifyNewMessage = async (recipientId, senderId, sender, conversationId) => {
-  const author = sender.author || "Alguém";
-
-  await addDoc(collection(firestore, "users", recipientId, "notifications"), {
-    type: "message",
-    actorId: senderId,
-    actorName: author,
-    actorUsername: sender.username || "",
-    recipientId,
-    conversationId,
-    targetPath: `/messages/${conversationId}`,
-    notificationTitle: "Nova mensagem",
-    notificationBody: `${author} te enviou uma mensagem.`,
-    text: `${author} te enviou uma mensagem.`,
-    read: false,
-    createdAt: serverTimestamp(),
-  });
-};
-
+/**
+ * Manda a mensagem. Prévia na lista, contador de não lidas e o aviso no sino
+ * (só quando a conversa estava zerada para quem recebe) saem do banco, no
+ * mesmo passo da mensagem.
+ */
 export const sendMessage = async (
   conversationId,
   { senderId, text = "", attachment = null, imageData = null, gifData = null, gifId = null },
@@ -242,83 +227,32 @@ export const sendMessage = async (
   const body = String(text || "").trim().slice(0, MESSAGE_MAX_LENGTH);
   if (!conversationId || !senderId || (!body && !attachment && !imageData && !gifData)) return null;
 
-  const conversationRef = doc(firestore, CONVERSATIONS, conversationId);
-  const snapshot = await getDoc(conversationRef);
-  if (!snapshot.exists()) throw new Error("Conversa não encontrada.");
-
-  const conversation = snapshot.data();
-  const recipientId = (conversation.memberIds || []).find(
-    (id) => id !== senderId,
-  );
-
   const messageType = gifData ? "gif" : imageData ? "image" : attachment ? "post" : "text";
-  const created = await addDoc(collection(conversationRef, "messages"), {
-    senderId,
-    text: body,
-    type: messageType,
-    status: "delivered",
-    ...(attachment ? { attachment } : {}),
-    ...(imageData ? { imageData } : {}),
-    ...(gifData ? { gifData, gifId } : {}),
-    createdAt: serverTimestamp(),
-  });
-
-  await updateDoc(conversationRef, {
-    updatedAt: serverTimestamp(),
-    lastMessage: {
-      text: body || (gifData ? "🎬 GIF" : imageData ? "📷 Imagem" : attachmentSummary(attachment)),
-      senderId,
-      type: messageType,
-      createdAt: serverTimestamp(),
-    },
-    [`unread.${senderId}`]: 0,
-    ...(recipientId ? { [`unread.${recipientId}`]: increment(1) } : {}),
-  });
-
-  // Só avisa no sino quando a conversa estava "zerada": mensagens seguidas de
-  // um mesmo papo não viram uma enxurrada de notificações.
-  if (recipientId && !conversationUnread(conversation, recipientId)) {
-    await notifyNewMessage(
-      recipientId,
-      senderId,
-      memberCard(conversation.members?.[senderId]),
-      conversationId,
-    ).catch((error) => console.warn("[chat] notifyNewMessage", error));
-  }
-
-  return created.id;
+  return must(
+    await supabase.rpc("send_message", {
+      p_conversation: conversationId,
+      p_text: body,
+      p_type: messageType,
+      p_data: {
+        ...(attachment ? { attachment } : {}),
+        ...(imageData ? { imageData } : {}),
+        ...(gifData ? { gifData, gifId } : {}),
+      },
+    }),
+  );
 };
 
+/** Zera o meu contador e marca como vistas as mensagens que o outro mandou. */
 export const markConversationRead = async (conversationId, userId) => {
   if (!conversationId || !userId) return;
 
-  await updateDoc(doc(firestore, CONVERSATIONS, conversationId), {
-    [`unread.${userId}`]: 0,
-  }).catch((error) => console.warn("[chat] markConversationRead", error));
-
-  // Marcar mensagens não-lidas como vistas
-  try {
-    const messagesRef = collection(firestore, CONVERSATIONS, conversationId, "messages");
-    const messagesQuery = query(messagesRef, where("senderId", "!=", userId), where("status", "==", "delivered"));
-    const snapshot = await getDocs(messagesQuery);
-
-    if (!snapshot.empty) {
-      const batch = writeBatch(firestore);
-      snapshot.docs.forEach((messageDoc) => {
-        batch.update(messageDoc.ref, { status: "seen" });
-      });
-      await batch.commit();
-    }
-  } catch (error) {
-    console.warn("[chat] markMessagesAsSeen", error);
-  }
+  const { error } = await supabase.rpc("mark_conversation_read", { p_conversation: conversationId });
+  if (error) console.warn("[chat] markConversationRead", error);
 };
 
 export const deleteMessage = async (conversationId, messageId) => {
   if (!conversationId || !messageId) return;
-  await deleteDoc(
-    doc(firestore, CONVERSATIONS, conversationId, "messages", messageId),
-  );
+  must(await supabase.from("messages").delete().eq("id", messageId));
 };
 
 /* ===== Formatação ===== */

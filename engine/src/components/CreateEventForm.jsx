@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ImagePlus, Plus, Wrench, ExternalLink } from "lucide-react";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { storage } from "../services/firebase";
-import { auth } from "../services/firebase";
+import { auth } from "../services/supabase";
+import { uploadUserPhoto } from "../services/photos";
 import { useToast } from "./ToastProvider";
 import { eventTypeOptions } from "../services/eventTypes";
 import { engineEvents } from "../services/events";
@@ -162,10 +161,11 @@ export function CreateEventForm({ onSuccess, onCancel }) {
           continue;
         }
 
-        const fileName = `events/${Date.now()}-${file.name}`;
-        const storageRef = ref(storage, fileName);
-        const snapshot = await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(snapshot.ref);
+        // Mesmo caminho das outras fotos: reduzida, na pasta da pessoa.
+        const url = await uploadUserPhoto(file, {
+          userId: auth.currentUser?.uid,
+          folder: "events",
+        });
 
         setForm((prev) => ({
           ...prev,

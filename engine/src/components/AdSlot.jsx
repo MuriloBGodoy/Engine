@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sparkles } from "lucide-react";
-import { auth } from "../services/firebase";
+import { auth } from "../services/supabase";
 import { useIsPremium } from "../hooks/useIsPremium";
 
 /**

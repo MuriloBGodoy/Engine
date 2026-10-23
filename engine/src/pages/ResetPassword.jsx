@@ -1,20 +1,19 @@
-import { useMemo, useState } from "react";
-import {
-  confirmPasswordReset,
-  sendPasswordResetEmail,
-  verifyPasswordResetCode,
-} from "firebase/auth";
+import { useEffect, useState } from "react";
 import { ArrowLeft, KeyRound, Loader2, Mail } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthShell } from "../components/AuthShell";
-import { auth } from "../services/firebase";
+import {
+  isPasswordRecovery,
+  onAuthChange,
+  sendPasswordReset,
+  setNewPassword,
+  signOut,
+} from "../services/supabase";
 
 export function ResetPassword() {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const oobCode = searchParams.get("oobCode") || "";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,7 +21,18 @@ export function ResetPassword() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const hasResetCode = useMemo(() => Boolean(oobCode), [oobCode]);
+  // O link do e-mail abre esta página já com uma sessão de recuperação (o
+  // Supabase lê o token da URL). É ela que libera o formulário de senha nova.
+  const [hasResetCode, setHasResetCode] = useState(
+    () => isPasswordRecovery() || window.location.hash.includes("type=recovery"),
+  );
+  useEffect(
+    () =>
+      onAuthChange((_user, event) => {
+        if (event === "PASSWORD_RECOVERY") setHasResetCode(true);
+      }),
+    [],
+  );
 
   const handleSendEmail = async (event) => {
     event.preventDefault();
@@ -31,9 +41,7 @@ export function ResetPassword() {
     setMessage("");
 
     try {
-      await sendPasswordResetEmail(auth, email.trim(), {
-        url: `${window.location.origin}/reset-password`,
-      });
+      await sendPasswordReset(email.trim());
       setMessage(t("auth.resetEmailSent"));
     } catch {
       setError(t("auth.resetEmailError"));
@@ -55,8 +63,10 @@ export function ResetPassword() {
     }
 
     try {
-      await verifyPasswordResetCode(auth, oobCode);
-      await confirmPasswordReset(auth, oobCode, password);
+      await setNewPassword(password);
+      // A sessão de recuperação serve só para trocar a senha: sai dela e
+      // entra de novo com a senha nova, como era antes.
+      await signOut().catch(() => {});
       setMessage(t("auth.passwordResetSuccess"));
       setPassword("");
       setConfirmPassword("");

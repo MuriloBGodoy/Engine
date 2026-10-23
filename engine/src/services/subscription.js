@@ -1,4 +1,4 @@
-import { auth } from "./firebase";
+import { auth } from "./supabase";
 
 /**
  * Início da assinatura do Premium.
@@ -6,7 +6,7 @@ import { auth } from "./firebase";
  * O cliente não fala com gateway nenhum: pede o checkout a uma Netlify
  * Function, que guarda a chave secreta e decide o provedor pela região. A
  * confirmação do pagamento nunca passa por aqui — chega por webhook e vira
- * `users/{uid}.plan`, que o cliente só lê.
+ * `user_plans.plan`, que o cliente só lê.
  */
 export async function startSubscription({ country } = {}) {
   const user = auth.currentUser;

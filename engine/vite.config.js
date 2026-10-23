@@ -51,9 +51,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         // SPA: qualquer rota cai no index.html.
         navigateFallback: '/index.html',
-        // Firestore e Storage falam por long-polling e URLs assinadas; cachear
-        // quebraria o tempo real e serviria imagem vencida.
-        navigateFallbackDenylist: [/^\/__/, /firestore\.googleapis\.com/],
+        navigateFallbackDenylist: [/^\/__/],
         runtimeCaching: [
           {
             // As fontes vêm do Google e mudam quase nunca.
@@ -66,10 +64,11 @@ export default defineConfig({
             },
           },
           {
-            // Fotos de carro e avatar: entrega do cache e revalida atrás,
-            // pra segunda visita não baixar tudo de novo.
-            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
+            // Fotos de carro e avatar no Storage do Supabase. Todo arquivo
+            // nasce com nome único e nunca é reescrito (foto nova = nome
+            // novo), então o cache pode responder sem perguntar à rede.
+            urlPattern: /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
+            handler: 'CacheFirst',
             options: {
               cacheName: 'engine-images',
               expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 },

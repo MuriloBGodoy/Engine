@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { auth } from "../services/firebase";
+import { signUpWithEmail, supabase } from "../services/supabase";
 import { engineDB } from "../services/db";
 import { AuthShell } from "../components/AuthShell";
 import { SocialAuthButtons } from "../components/SocialAuthButtons";
@@ -61,29 +60,23 @@ export function Register() {
       }
       await engineDB.reserveUsername(normalizedUsername, "pending");
 
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password,
-      );
-      createdUser = userCredential.user;
+      // O nome vai junto na criação: não precisa de um segundo passo para
+      // gravar o nome de exibição na conta.
+      createdUser = await signUpWithEmail(email.trim(), password, { displayName: name.trim() });
 
-      engineDB.setCurrentUser(userCredential.user.uid);
+      engineDB.setCurrentUser(createdUser.uid);
       try {
-        await engineDB.reserveUsername(normalizedUsername, userCredential.user.uid);
+        await engineDB.reserveUsername(normalizedUsername, createdUser.uid);
       } catch (reserveError) {
         // Perdeu a corrida pelo nome (alguém reservou no mesmo instante).
         // Desfaz a conta: uma conta sem nome prende o e-mail — a próxima
         // tentativa diria "e-mail já cadastrado" e a pessoa não entraria mais.
-        await createdUser.delete().catch(() => {});
+        await supabase.rpc("delete_my_account").catch(() => {});
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
         createdUser = null;
         engineDB.setCurrentUser(null);
         throw reserveError;
       }
-      await updateProfile(userCredential.user, {
-        displayName: name.trim(),
-      });
-
       const settings = engineDB.getDefaultSettings();
       // Conta e nome já existem neste ponto. Se as configurações não
       // chegarem ao servidor, a pessoa entra mesmo assim (ficam neste
@@ -101,7 +94,7 @@ export function Register() {
             state,
           },
         },
-        userCredential.user.uid,
+        createdUser.uid,
       ).catch((error) => console.warn("[register] configurações só locais", error));
 
       // Conta nova vai para a Garagem, cujo estado vazio convida a cadastrar
@@ -132,14 +125,6 @@ export function Register() {
       subtitle={t("auth.registerSubtitle")}
     >
       <SocialAuthButtons />
-
-      <div className="my-4 flex items-center gap-3">
-        <span className="h-px flex-1 bg-[var(--engine-border)]" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
-          {t("auth.social.or")}
-        </span>
-        <span className="h-px flex-1 bg-[var(--engine-border)]" />
-      </div>
 
       <form onSubmit={handleRegister} className="auth-form auth-register-form">
         <label className="auth-field auth-span-two">

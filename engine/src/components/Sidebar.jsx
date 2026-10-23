@@ -11,13 +11,13 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../services/firebase";
+import { auth, signOut } from "../services/supabase";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import { Logo } from "./Logo";
 import { GuestLoginHint } from "./GuestLoginHint";
+import { InstallButton } from "./InstallButton";
 
 const getInitials = (name) => {
   if (!name) return "U";
@@ -50,7 +50,7 @@ export function Sidebar({
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut();
       navigate("/login");
     } catch (error) {
       console.error("Erro ao deslogar:", error);
@@ -150,6 +150,10 @@ export function Sidebar({
             </Link>
           );
         })}
+        {/* Instalar o app — só aparece quando o navegador permite. Fica no
+            menu, e não na base, porque a dica de visitante (GuestLoginHint)
+            ocupa a base da barra e cobria o botão. */}
+        <InstallButton variant="sidebar" collapsed={collapsed} />
       </nav>
 
       {/* Recolher / expandir — carrinho que acelera no hover */}

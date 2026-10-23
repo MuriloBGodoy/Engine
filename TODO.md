@@ -3,7 +3,52 @@
 Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 `ROADMAP.md`; aqui é só o que fazer.
 
-Última atualização: 6 de outubro de 2026 (Monte 2 fechado).
+Última atualização: 20 de outubro de 2026 (próximas atividades).
+
+---
+
+## Próximas atividades (20/10/2026)
+
+- [ ] **Comprar o domínio** (Murilo, esta semana). Sugestão:
+      `enginegarage.com.br`, livre no registro.br em 20/10. Só o domínio, DNS
+      padrão, sem adicionais. Depois disso, numa tacada: Netlify, Resend como
+      SMTP (modelos já prontos em `supabase/templates/`), `site_url` no
+      Supabase, tela de consentimento do Google e os três lugares que usam
+      `enginegarage.netlify.app` (ver "Domínio próprio" mais abaixo).
+- [ ] **Página de contribuição dentro do Engine** — para quem quiser apoiar o
+      projeto (doação avulsa e/ou recorrente). Usa o mesmo gateway da
+      mensalidade.
+- [ ] **Configurar os anúncios no app** — o `AdSlot` já existe e fica
+      desligado sem as variáveis; falta a conta (AdSense) e o consentimento de
+      cookies (ver "Termos e privacidade").
+- [ ] **Gateway de pagamento** para a mensalidade dos prestadores **e** para a
+      página de contribuição. Passo a passo em `SETUP-PAGAMENTOS.md`
+      (Mercado Pago e Stripe, ambos aceitam CPF). Pix entra aqui.
+
+---
+
+## Supabase — o que falta para virar a chave (17/10/2026)
+
+O app inteiro fala com o Supabase (banco, login, fotos). Dados e contas do
+Firebase já foram copiados, com as senhas preservadas. Detalhes, credenciais e
+comandos em **`supabase/README.md`**. Na ordem:
+
+- [x] **Login com Google** — feito em 19/10/2026: projeto GCP `engine-512201`
+      (conta muxdtuber@), cliente "Engine Supabase", ligado em `config.toml`.
+      Credenciais em `C:\engine-credentials\google-oauth.env`.
+- [ ] **SMTP próprio** — sem ele o Supabase só manda e-mail para quem é da
+      equipe do projeto, e "esqueci a senha" não chega em ninguém. Plano: um
+      Gmail só do Engine + senha de app (bloco pronto e comentado em
+      `config.toml`; os modelos em `supabase/templates/` sobem junto). Falta
+      o Murilo criar o Gmail. Com domínio próprio, trocar para o Resend.
+- [ ] Ressincronizar os dados logo antes do push (o Firebase segue recebendo
+      escrita até o deploy): `export-firebase.mjs` + `import-to-supabase.mjs --reset`
+- [ ] Push → a Netlify publica com o Supabase
+- [ ] `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` nas variáveis do Netlify
+      (só para as funções de pagamento; o site não precisa)
+- [ ] Usar o app publicado um dia; aí sim apagar o projeto do Firebase
+- [ ] Backend Java (`engine-api`) ainda valida login e lê dados pelo Firebase:
+      portar para o Supabase antes de subir na VM da Oracle
 
 ---
 
@@ -14,7 +59,7 @@ abaixo; aqui é só a **ordem de grandeza** e quem é o dono de cada monte.
 
 ### Monte 1 — depende de você. Poucas horas, e é o que trava o resto
 
-Sentry, PostHog, domínio, chave do `dados.gov.br`, Blaze, advogado. Somando, é
+Sentry, PostHog, domínio, chave do `dados.gov.br`, advogado. Somando, é
 o trabalho de um sábado. Não é grande em horas; é grande em consequência —
 enquanto o Sentry não tiver chave, ninguém fica sabendo quando um usuário toma
 erro, e o produto segue sendo decidido no escuro.
@@ -93,7 +138,7 @@ produto no escuro.
 
 Checklist completo e passo a passo em **`SETUP-PAGAMENTOS.md`**. Resumo:
 
-- [ ] Service account do Firebase
+- [ ] Chave `service_role` do Supabase no Netlify (ver `supabase/README.md`)
 - [ ] Conta Mercado Pago (aceita CPF) + access token + webhook
 - [ ] Conta Stripe (também aceita CPF) + produto/preços + webhook
 - [ ] Seis variáveis de ambiente no Netlify
@@ -108,12 +153,11 @@ Checklist completo e passo a passo em **`SETUP-PAGAMENTOS.md`**. Resumo:
       `subscription-create.js`, e os endereços de webhook cadastrados nos dois
       gateways
 
-### Firebase Blaze — quando decidir
+### ~~Firebase Blaze~~ — resolvido pela troca para o Supabase (17/10/2026)
 
-Enquanto o Storage estiver desligado, `photos.js` cai no fallback e grava a
-imagem em **base64 dentro do documento do Firestore** (teto de 1 MiB por
-documento; o feed lê 20 documentos por página com a imagem embutida). Funciona
-com poucos usuários; quebra com gente de verdade subindo foto.
+O Storage do Supabase vem ligado no plano grátis (1 GB). Foto nova vai para
+lá e o banco guarda só a URL; as 39 fotos antigas em base64 subiram na
+migração. Os 10 posts do feed caíram de megabytes para 6,8 KB no banco.
 
 ### Legal — antes de divulgar
 

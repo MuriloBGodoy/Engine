@@ -129,11 +129,11 @@ const migracao = db.slice(
 );
 check(
   "a ESCRITA da migracao esta protegida por try/catch",
-  /await batch\.commit\(\);/.test(migracao) &&
+  /from\("cars"\)\.upsert\(/.test(migracao) &&
     /\} catch \(error\) \{\s*warnFirestoreFallback\("migrateLegacyData\/escrita", error\);/.test(
       migracao,
     ),
-  "batch.commit() solto aborta o efeito do App antes do getCars()",
+  "gravação solta aborta o efeito do App antes do getCars()",
 );
 check(
   "migracao que falha nao impede o App de ler a garagem",

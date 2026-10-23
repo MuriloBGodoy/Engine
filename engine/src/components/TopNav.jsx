@@ -11,8 +11,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../services/firebase";
+import { signOut } from "../services/supabase";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
@@ -20,6 +19,7 @@ import { Logo } from "./Logo";
 import { Topbar } from "./TopBar";
 import { GuestLoginHint } from "./GuestLoginHint";
 import { RegionPicker } from "./RegionPicker";
+import { InstallButton } from "./InstallButton";
 
 const getInitials = (name) => {
   if (!name) return "U";
@@ -53,7 +53,7 @@ export function TopNav({
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut();
       navigate("/login");
     } catch (error) {
       console.error("Erro ao deslogar:", error);
@@ -119,6 +119,7 @@ export function TopNav({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          <InstallButton variant="topnav" />
           <RegionPicker compact className="mr-1" />
           {isGuest ? (
             <div className="relative">

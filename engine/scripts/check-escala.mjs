@@ -63,9 +63,16 @@ check(
 const busca = db.slice(db.indexOf("async searchPublicProfiles"), db.indexOf("async searchPublicProfiles") + 2500);
 check("searchPublicProfiles sempre com limit()", (busca.match(/limit\(/g) || []).length >= 2);
 
-// O perfil decide "não existe" com resposta do servidor, não do cache.
+// O perfil decide "não existe" com resposta do servidor, não do cache. No
+// Firestore isso exigia `getDocsFromServer`; no Supabase toda consulta vai ao
+// servidor, e o que a trava confere é que a resposta vem DA consulta pelo @ e
+// não de `publicProfileCache` (o cache só é escrito depois dela).
 const porNome = db.slice(db.indexOf("async getPublicProfileByUsername"), db.indexOf("async getPublicProfileByUsername") + 800);
-check("perfil por @nome lê do servidor (getDocsFromServer)", /getDocsFromServer\(/.test(porNome));
+check(
+  "perfil por @nome lê do servidor, não do cache",
+  /from\("public_profiles"\)[\s\S]*\.eq\("username", normalized\)/.test(porNome) &&
+    !/publicProfileCache\.get\(/.test(porNome),
+);
 
 const perfil = semComentarios(read("src/pages/UserProfile.jsx"));
 check(

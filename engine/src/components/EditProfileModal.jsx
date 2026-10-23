@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react';
-import { updateProfile } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { auth, updateAuthProfile } from '../services/supabase';
 import { engineDB } from '../services/db';
 import { splitPhone, isPhoneValid } from '../services/phone';
 import { PhoneField } from './PhoneField';
 import { countries, getStates } from '../services/locations';
 import { AVATAR, BANNER, reduzirImagem } from '../services/imagens';
+import { storeDataUri } from '../services/photos';
 import { useToast } from './ToastProvider';
 import { useHistoryDismiss } from '../hooks/useHistoryDismiss';
 
@@ -177,6 +177,12 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
     try {
       // Só o código do país, sem número, é campo vazio — não "+55".
       const phone = splitPhone(formData.phone).number ? formData.phone : '';
+      // A foto reduzida sobe para o Storage e o perfil guarda só a URL: ela
+      // é copiada em post, comentário e conversa, e em base64 pesava em todos.
+      const [avatar, banner] = await Promise.all([
+        storeDataUri(preview.avatar || '', { userId: user.uid, folder: 'avatar' }),
+        storeDataUri(preview.banner || '', { userId: user.uid, folder: 'banner' }),
+      ]);
       const saved = await engineDB.saveSettings(
         {
           ...settings,
@@ -190,17 +196,17 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
             state: formData.state,
             location: formData.city,
             // A foto é a versão reduzida do preview (ver handleFileInput).
-            avatar: preview.avatar || '',
-            banner: preview.banner || '',
+            avatar,
+            banner,
           },
         },
         user.uid,
       );
 
-      // O `photoURL` do Auth so aceita URL curta; um data URI de foto passa do
-      // limite. Enquanto a foto mora no Firestore, o Auth fica so com o nome.
-      const urlParaAuth = /^https?:\/\//.test(preview.avatar || '') ? preview.avatar : null;
-      await updateProfile(user, {
+      // Foto em data URI não vai para a conta: ela viajaria dentro do token,
+      // em toda requisição. Só URL do Storage.
+      const urlParaAuth = /^https?:\/\//.test(avatar) ? avatar : null;
+      await updateAuthProfile({
         displayName: formData.displayName,
         ...(urlParaAuth ? { photoURL: urlParaAuth } : {}),
       }).catch((error) => console.warn('updateProfile', error));

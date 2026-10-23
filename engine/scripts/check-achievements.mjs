@@ -6,15 +6,15 @@
  * Duas coisas separadas:
  *
  * 1. A lógica dos degraus, que é pura e decide o que a tela mostra.
- * 2. Que a lista de ids do serviço é IDÊNTICA à lista fechada da regra do
- *    Firestore. Essa é a mais importante: são duas cópias da mesma verdade, em
- *    linguagens diferentes, e o servidor nega calado o id que não estiver na
+ * 2. Que a lista de ids do serviço é IDÊNTICA à lista fechada do banco (o
+ *    `check` da tabela `achievements`, em supabase/migrations). Essa é a mais
+ *    importante: são duas cópias da mesma verdade, em linguagens diferentes, e o servidor nega calado o id que não estiver na
  *    dele. Sem esta trava, acrescentar uma conquista só no JavaScript daria uma
  *    feature que parece pronta e é negada em produção — foi exatamente assim
  *    que a coleção `events` passou meses sem funcionar.
  *
- * O comportamento contra o Firestore (dedup, lista fechada, revogação) é testado
- * no emulador, em `scripts/check-firestore-rules.mjs` na raiz do repositório.
+ * O comportamento no banco (dedup, lista fechada, revogação, data carimbada) é
+ * testado de verdade em `npm run check:rls`.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -55,14 +55,19 @@ const igual = (nome, obtido, esperado) =>
 
 console.log("\nconquistas\n");
 
-// --- os ids batem com a regra do Firestore
-const regras = fs.readFileSync(path.join(REPO, "firestore.rules"), "utf8");
-const bloco = regras.slice(
-  regras.indexOf("match /users/{userId}/achievements/{achievementId}"),
-);
-const naRegra = [...bloco.slice(0, bloco.indexOf("];")).matchAll(/"([a-z0-9_]+)"/g)].map(
-  (m) => m[1],
-);
+// --- os ids batem com a lista fechada do banco
+// A lista mora no `check` da coluna `achievements.achievement_id`. Vale a
+// definição MAIS RECENTE: migração nova que mexer na lista substitui a velha,
+// então as migrações são lidas em ordem e a última ocorrência vence.
+const PASTA_MIGRACOES = path.join(REPO, "supabase", "migrations");
+const migracoes = fs
+  .readdirSync(PASTA_MIGRACOES)
+  .filter((nome) => nome.endsWith(".sql"))
+  .sort()
+  .map((nome) => fs.readFileSync(path.join(PASTA_MIGRACOES, nome), "utf8"))
+  .join(" ");
+const definicoes = [...migracoes.matchAll(/achievement_id in \(([\s\S]*?)\)\)/g)];
+const naRegra = [...(definicoes.at(-1)?.[1] || "").matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]);
 igual("a lista de ids do serviço é idêntica à da regra", ACHIEVEMENT_IDS, naRegra);
 
 // --- a régua
@@ -163,8 +168,9 @@ const eventos = fs.readFileSync(path.join(ROOT, "src/services/events.js"), "utf8
 // mutação — o método existia, ninguém invocava, e o teste dizia que estava tudo
 // certo.
 const ligacoes = [
-  ["curtir concede degrau ao dono do post", db, "await this.concederDegrausDeCurtida("],
-  ["o degrau usa a contagem da subcoleção, não o likesCount", db, "await this.countLikesReceived("],
+  // Sem await de propósito: o aviso de curtida sai antes, a conquista depois.
+  ["curtir concede degrau ao dono do post", db, "this.concederDegrausDeCurtida(goalData.ownerId, goalData.title);"],
+  ["o degrau usa a contagem das curtidas, não o likesCount", db, "await this.countLikesReceived("],
   ["seguir confere a série de seguidores", db, 'grantSeries(targetUserId, "followers", total)'],
   ["a garagem usa o cálculo puro", db, "garageAchievementIds(cars, {"],
   ["publicar dá primeiro post", db, 'grantOwn("first_post")'],
@@ -172,7 +178,8 @@ const ligacoes = [
   ["criar clube dá fundador", clubes, 'grantOwn("club_founder")'],
   ["entrar em clube dá a conquista", clubes, 'grantOwn("club_joined")'],
   ["aprovar pedido dá a conquista a quem entrou", clubes, 'grantAchievement(alvoUid, "club_joined")'],
-  ["membros do clube contam a subcoleção", clubes, "getCountFromServer(membersRef(clubId))).data().count"],
+  // Conta as linhas de membro, nunca o `member_count` de vitrine.
+  ["membros do clube contam as linhas de membro", clubes, 'from("club_members").select("*", { count: "exact", head: true }).eq("club_id", String(clubId))'],
   ["entrar ou ser aprovado confere os membros do fundador", clubes, "concederMembrosAoFundador(clubId, club.founderId);"],
   ["postar no mural do clube dá a conquista", clubes, 'grantOwn("club_first_post")'],
   ["criar evento dá organizador", eventos, 'grantOwn("event_organizer")'],

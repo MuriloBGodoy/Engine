@@ -1,62 +1,61 @@
 /* global document -- usado dentro de page.evaluate(), que roda no navegador */
 /**
- * Configurações, pela tela e contra as regras reais (emuladores).
+ * Configurações, pela tela e contra o banco de verdade.
  *
- *   node scripts/e2e-configuracoes.mjs   (com emuladores + vite, ver e2e-emulator.mjs)
+ *   node scripts/e2e-configuracoes.mjs   (com o vite no ar, ver e2e-emulator.mjs)
+ *   node scripts/supabase/cleanup-test-users.mjs   # sempre, no fim
  *
  * Até 05/10/2026 a página exibia ~30 opções e só umas 10 faziam alguma
  * coisa; "Resetar banco local" apagava os carros do SERVIDOR; e "Excluir
  * conta" deixava perfil, @, seguidores e anúncios para trás. Cada etapa aqui
  * prova uma promessa da tela nova: o que muda grava sozinho e sobrevive à
  * recarga, o aviso desligado some do sino, a senha troca de verdade, e a
- * conta excluída não deixa rastro que as regras permitam apagar.
+ * conta excluída não deixa rastro.
  *
- * A conferência do banco usa a API REST do emulador com `Bearer owner`, que
- * ignora as regras — é o olho de fora, não o caminho do app.
+ * A conferência do banco usa a chave de servidor do Supabase, que ignora a
+ * RLS — é o olho de fora, não o caminho do app.
  */
+import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
+import { createClient } from "@supabase/supabase-js";
 import {
   novaSessao, etapa, cadastrar, relatorio, USUARIOS, textoDaPagina, fecharSobreposicoes,
 } from "./e2e-emulator.mjs";
 
 const BASE = process.env.E2E_BASE || "http://localhost:5190";
-const DB = "http://127.0.0.1:8099/v1/projects/engine-garage/databases/(default)/documents";
 const NOVA_SENHA = "Engine!2026trocada";
 
-const lerDoc = async (caminho) => {
-  const r = await fetch(`${DB}/${caminho}`, { headers: { Authorization: "Bearer owner" } });
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error(`REST ${caminho}: ${r.status}`);
-  return r.json();
-};
-const listar = async (caminho) => {
-  const r = await fetch(`${DB}/${caminho}`, { headers: { Authorization: "Bearer owner" } });
-  if (r.status === 404) return [];
-  return (await r.json()).documents || [];
-};
-// Valor JS → formato tipado da API REST do Firestore.
-const valor = (v) => {
-  if (v === null) return { nullValue: null };
-  if (typeof v === "boolean") return { booleanValue: v };
-  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-  if (typeof v === "string") return { stringValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(valor) } };
-  return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, valor(x)])) } };
-};
-// Plantar dado pelo olho de fora: o que se prova é a EXCLUSÃO pelas regras
-// reais, não a criação de cada um (essa tem suíte própria).
-const plantar = async (caminho, dados) => {
-  const r = await fetch(`${DB}/${caminho}`, {
-    method: "PATCH",
-    headers: { Authorization: "Bearer owner", "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: valor(dados).mapValue.fields }),
-  });
-  if (!r.ok) throw new Error(`plantar ${caminho}: ${r.status} ${await r.text()}`);
-};
-const campo = (docu, nome) => docu?.fields?.[nome];
+const env = Object.fromEntries(
+  readFileSync(process.env.SUPABASE_ENV_FILE || "C:/engine-credentials/supabase.env", "utf8")
+    .split(/\r?\n/)
+    .filter((line) => line.includes("="))
+    .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+);
+const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
-const uidDe = async (usuario) =>
-  (await lerDoc(`usernames/${usuario.toLowerCase()}`))?.fields?.userId?.stringValue;
+/** Uma linha (ou null), filtrando por coluna = valor. */
+const linha = async (tabela, filtros) => {
+  let q = db.from(tabela).select("*");
+  for (const [coluna, valor] of Object.entries(filtros)) q = q.eq(coluna, valor);
+  const { data, error } = await q.limit(1).maybeSingle();
+  if (error) throw new Error(`${tabela}: ${error.message}`);
+  return data;
+};
+const linhas = async (tabela, filtros) => {
+  let q = db.from(tabela).select("*");
+  for (const [coluna, valor] of Object.entries(filtros)) q = q.eq(coluna, valor);
+  const { data, error } = await q;
+  if (error) throw new Error(`${tabela}: ${error.message}`);
+  return data;
+};
+// Plantar dado pelo olho de fora: o que se prova é a EXCLUSÃO, não a criação
+// de cada um (essa tem suíte própria).
+const plantar = async (tabela, dados) => {
+  const { error } = await db.from(tabela).insert(dados);
+  if (error) throw new Error(`plantar ${tabela}: ${error.message}`);
+};
+
+const uidDe = async (usuario) => (await linha("usernames", { username: usuario.toLowerCase() }))?.user_id;
 
 const browser = await chromium.launch();
 const A = await novaSessao(browser);
@@ -106,8 +105,8 @@ await etapa("Privacidade: 'Ocultar valores' grava sozinho e sobrevive à recarga
   await chave("Ocultar valores").click();
   await pa.waitForTimeout(2500);
   const uid = await uidDe(ana.usuario);
-  const salvo = await lerDoc(`users/${uid}/private/settings`);
-  const noBanco = salvo?.fields?.privacy?.mapValue?.fields?.lockSensitiveValues?.booleanValue;
+  const salvo = await linha("user_private", { user_id: uid, doc_id: "settings" });
+  const noBanco = salvo?.data?.privacy?.lockSensitiveValues;
   if (noBanco !== true) throw new Error(`no banco ficou ${noBanco}`);
   await pa.reload({ waitUntil: "load" });
   await pa.waitForTimeout(2500);
@@ -205,7 +204,7 @@ await etapa("Ana segue o Bruno (para a exclusão ter o que limpar)", A, async ()
   await pa.getByRole("button", { name: /^Seguir$/ }).first().click();
   await pa.waitForTimeout(3000);
   const uidBruno = await uidDe(bruno.usuario);
-  if (!(await lerDoc(`publicProfiles/${uidBruno}/followers/${uidAna}`))) {
+  if (!(await linha("follows", { follower_id: uidAna, target_id: uidBruno }))) {
     throw new Error("seguir não gravou");
   }
   return "seguindo";
@@ -214,53 +213,52 @@ await etapa("Ana segue o Bruno (para a exclusão ter o que limpar)", A, async ()
 let uidBruno = "";
 const futuro = new Date(Date.now() + 7 * 864e5).toISOString();
 const passado = new Date(Date.now() - 7 * 864e5).toISOString();
+let clubeAna = "";
+let clubeBruno = "";
+let clubeFechado = "";
+let conversa = "";
 await etapa("Ana tem dado em todo canto (carro, post, comentário, clube, evento, conversa)", A, async () => {
   uidBruno = await uidDe(bruno.usuario);
-  const conversa = [uidAna, uidBruno].sort().join("__");
-  await Promise.all([
-    plantar(`users/${uidAna}/cars/carro1`, { name: "Golf GTI", targetValue: 150000 }),
-    plantar("communityGoals/post_ana", { ownerId: uidAna, userId: uidAna, title: "Meta da Ana" }),
-    plantar("communityGoals/post_bruno", {
-      ownerId: uidBruno,
-      userId: uidBruno,
-      title: "Meta do Bruno",
-      likesCount: 1,
-      comments: [
-        { id: "c1", userId: uidAna, text: "comentário da Ana" },
-        { id: "c2", userId: uidBruno, text: "resposta do Bruno" },
-      ],
-      ratingsBy: { [uidAna]: 5, [uidBruno]: 4 },
-    }),
-    plantar(`communityGoals/post_bruno/likes/${uidAna}`, { likerId: uidAna, postOwnerId: uidBruno }),
-    plantar(`conversations/${conversa}`, {
-      memberIds: [uidAna, uidBruno].sort(),
-      members: {
-        [uidAna]: { author: ana.nome, username: ana.usuario, avatar: "" },
-        [uidBruno]: { author: bruno.nome, username: bruno.usuario, avatar: "" },
-      },
-    }),
-    plantar("clubs/clube_ana", {
-      name: "Clube da Ana", tag: "ANA", founderId: uidAna, memberCount: 1, archived: false,
-      official: false, joinPolicy: "open", contentVisibility: "public",
-    }),
-    plantar(`clubs/clube_ana/members/${uidAna}`, { uid: uidAna, role: "founder", displayName: ana.nome, username: ana.usuario, avatar: "" }),
-    plantar(`users/${uidAna}/clubs/clube_ana`, { role: "founder" }),
-    plantar("clubs/clube_bruno", {
-      name: "Clube do Bruno", tag: "BRU", founderId: uidBruno, memberCount: 2, archived: false,
-      official: false, joinPolicy: "open", contentVisibility: "public",
-    }),
-    plantar(`clubs/clube_bruno/members/${uidAna}`, { uid: uidAna, role: "member", displayName: ana.nome }),
-    plantar(`users/${uidAna}/clubs/clube_bruno`, { role: "member" }),
-    plantar("clubs/clube_fechado", {
-      name: "Clube Fechado", tag: "FEC", founderId: uidBruno, memberCount: 1, archived: false,
-      official: false, joinPolicy: "approval", contentVisibility: "members",
-    }),
-    plantar(`clubs/clube_fechado/requests/${uidAna}`, { uid: uidAna, displayName: ana.nome }),
-    plantar("events/evento_ana", { createdBy: uidAna, title: "Encontro da Ana", eventDate: futuro }),
-    plantar("events/evento_passado", { createdBy: uidBruno, title: "Track day", eventDate: passado }),
-    plantar(`events/evento_passado/participants/${uidAna}`, { uid: uidAna, displayName: ana.nome }),
-    plantar("serviceListings/servico_ana", { ownerId: uidAna, moderationStatus: "pending", title: "Polimento" }),
-  ]);
+  conversa = [uidAna, uidBruno].sort().join("__");
+  clubeAna = `e2e-ana-${uidAna.slice(0, 8)}`;
+  clubeBruno = `e2e-bruno-${uidBruno.slice(0, 8)}`;
+  clubeFechado = `e2e-fechado-${uidBruno.slice(0, 8)}`;
+  const sigla = uidAna.replace(/[^0-9a-f]/g, "").slice(0, 3).toUpperCase();
+  await plantar("cars", { user_id: uidAna, id: "carro1", data: { name: "Golf GTI", targetValue: 150000 } });
+  await plantar("community_goals", { id: `post-ana-${uidAna}`, owner_id: uidAna, data: { title: "Meta da Ana" } });
+  await plantar("community_goals", {
+    id: `post-bruno-${uidBruno}`,
+    owner_id: uidBruno,
+    data: { title: "Meta do Bruno" },
+    comments: [
+      { id: "c1", userId: uidAna, text: "comentário da Ana" },
+      { id: "c2", userId: uidBruno, text: "resposta do Bruno" },
+    ],
+    ratings_by: { [uidAna]: 5, [uidBruno]: 4 },
+  });
+  await plantar("post_likes", { post_id: `post-bruno-${uidBruno}`, liker_id: uidAna });
+  await plantar("conversations", {
+    id: conversa,
+    member_ids: [uidAna, uidBruno].sort(),
+    members: {
+      [uidAna]: { author: ana.nome, username: ana.usuario, avatar: "" },
+      [uidBruno]: { author: bruno.nome, username: bruno.usuario, avatar: "" },
+    },
+  });
+  await plantar("clubs", { id: clubeAna, founder_id: uidAna, tag: `A${sigla}`, name_lower: "clube da ana", data: { name: "Clube da Ana" } });
+  await plantar("club_members", { club_id: clubeAna, uid: uidAna, role: "founder", display_name: ana.nome });
+  await plantar("clubs", { id: clubeBruno, founder_id: uidBruno, tag: `B${sigla}`, name_lower: "clube do bruno", data: { name: "Clube do Bruno" } });
+  await plantar("club_members", { club_id: clubeBruno, uid: uidBruno, role: "founder", display_name: bruno.nome });
+  await plantar("club_members", { club_id: clubeBruno, uid: uidAna, role: "member", display_name: ana.nome });
+  await plantar("clubs", {
+    id: clubeFechado, founder_id: uidBruno, tag: `F${sigla}`, name_lower: "clube fechado",
+    join_policy: "approval", content_visibility: "members", data: { name: "Clube Fechado" },
+  });
+  await plantar("club_requests", { club_id: clubeFechado, uid: uidAna, display_name: ana.nome });
+  await plantar("events", { id: `e2e-evento-ana-${uidAna}`, created_by: uidAna, event_date: futuro, data: { title: "Encontro da Ana" } });
+  await plantar("events", { id: `e2e-evento-passado-${uidBruno}`, created_by: uidBruno, event_date: passado, data: { title: "Track day" } });
+  await plantar("event_participants", { event_id: `e2e-evento-passado-${uidBruno}`, uid: uidAna, data: { displayName: ana.nome } });
+  await plantar("service_listings", { id: `e2e-servico-${uidAna}`, owner_id: uidAna, data: { title: "Polimento" } });
   return "11 lugares";
 });
 
@@ -279,48 +277,53 @@ await etapa("Excluir conta: senha errada não apaga nada", A, async () => {
   const texto = await dialogo.innerText();
   if (!texto.includes("Senha incorreta.")) throw new Error("sem aviso de senha");
   if (!texto.includes("Clube da Ana")) throw new Error("não avisou que o clube fundado será arquivado");
-  if (!(await lerDoc(`publicProfiles/${uidAna}`))) throw new Error("apagou o perfil mesmo com a senha errada");
+  if (!(await linha("public_profiles", { user_id: uidAna }))) throw new Error("apagou o perfil mesmo com a senha errada");
   return "nada saiu";
 });
 
 await etapa("Excluir conta: apaga perfil, @, seguir e espaço privado", A, async () => {
   const dialogo = pa.getByRole("dialog");
   await dialogo.locator('input[type="password"]').fill(ana.senha);
+  const antes = A.erros.length;
   await dialogo.getByRole("button", { name: "Excluir minha conta" }).click();
   await pa.waitForURL((u) => !u.pathname.startsWith("/settings"), { timeout: 60000 });
   await pa.waitForTimeout(2000);
+  // Sair depois de a conta já não existir: o servidor responde 403 ao
+  // `/logout` e a biblioteca do Supabase trata como "já saiu". É o próprio
+  // efeito da exclusão, não defeito.
+  A.erros.splice(antes, A.erros.length, ...A.erros.slice(antes).filter((e) => !/status of 403/.test(e)));
 
   const sobras = [];
-  const conversa = [uidAna, uidBruno].sort().join("__");
-  if (await lerDoc(`publicProfiles/${uidAna}`)) sobras.push("perfil público");
-  if (await lerDoc(`usernames/${ana.usuario.toLowerCase()}`)) sobras.push("@ reservado");
-  if (await lerDoc(`publicProfiles/${uidBruno}/followers/${uidAna}`)) sobras.push("seguidor no Bruno");
-  if ((await listar(`publicProfiles/${uidAna}/following`)).length) sobras.push("lista de seguindo");
-  if (await lerDoc(`users/${uidAna}/private/settings`)) sobras.push("configurações");
-  if ((await listar(`users/${uidAna}/notifications`)).length) sobras.push("notificações");
-  if ((await listar(`users/${uidAna}/cars`)).length) sobras.push("carro");
-  if (await lerDoc("communityGoals/post_ana")) sobras.push("post próprio");
-  const postBruno = await lerDoc("communityGoals/post_bruno");
-  const comentarios = campo(postBruno, "comments")?.arrayValue?.values || [];
-  if (comentarios.some((c) => c.mapValue.fields.userId.stringValue === uidAna)) sobras.push("comentário");
+  const postBruno = await linha("community_goals", { id: `post-bruno-${uidBruno}` });
+  const comentarios = postBruno?.comments || [];
+  const cartao = (await linha("conversations", { id: conversa }))?.members?.[uidAna];
+  const vazio = async (tabela, filtros, nome) => {
+    if ((await linhas(tabela, filtros)).length) sobras.push(nome);
+  };
+  await vazio("public_profiles", { user_id: uidAna }, "perfil público");
+  await vazio("usernames", { username: ana.usuario.toLowerCase() }, "@ reservado");
+  await vazio("follows", { follower_id: uidAna }, "seguindo");
+  await vazio("user_private", { user_id: uidAna }, "configurações");
+  await vazio("notifications", { user_id: uidAna }, "notificações");
+  await vazio("cars", { user_id: uidAna }, "carro");
+  await vazio("community_goals", { owner_id: uidAna }, "post próprio");
+  if (comentarios.some((c) => c.userId === uidAna)) sobras.push("comentário");
   if (comentarios.length !== 1) sobras.push(`comentário do Bruno (${comentarios.length})`);
-  if (campo(postBruno, "ratingsBy")?.mapValue?.fields?.[uidAna]) sobras.push("avaliação");
-  if (await lerDoc(`communityGoals/post_bruno/likes/${uidAna}`)) sobras.push("curtida");
-  if (campo(postBruno, "likesCount")?.integerValue !== "0") sobras.push("likesCount");
-  const cartao = campo(await lerDoc(`conversations/${conversa}`), "members")?.mapValue?.fields?.[uidAna]?.mapValue?.fields;
-  if (cartao?.author?.stringValue !== "Conta excluída" || cartao?.username?.stringValue) sobras.push("cartão na conversa");
-  if (campo(await lerDoc("clubs/clube_ana"), "archived")?.booleanValue !== true) sobras.push("clube fundado não arquivado");
-  const fundador = (await lerDoc(`clubs/clube_ana/members/${uidAna}`))?.fields;
-  if (fundador?.displayName?.stringValue !== "Conta excluída") sobras.push("nome no clube fundado");
-  if (await lerDoc(`clubs/clube_bruno/members/${uidAna}`)) sobras.push("membro no clube do Bruno");
-  if (campo(await lerDoc("clubs/clube_bruno"), "memberCount")?.integerValue !== "1") sobras.push("memberCount");
-  if (await lerDoc(`clubs/clube_fechado/requests/${uidAna}`)) sobras.push("pedido pendente");
-  if ((await listar(`users/${uidAna}/clubs`)).length) sobras.push("espelho de clubes");
-  if (await lerDoc("events/evento_ana")) sobras.push("evento criado");
-  if (await lerDoc(`events/evento_passado/participants/${uidAna}`)) sobras.push("presença em evento passado");
-  if (await lerDoc("serviceListings/servico_ana")) sobras.push("anúncio");
+  if (postBruno?.ratings_by?.[uidAna]) sobras.push("avaliação");
+  await vazio("post_likes", { liker_id: uidAna }, "curtida");
+  if (postBruno?.likes_count !== 0) sobras.push(`likes_count (${postBruno?.likes_count})`);
+  if (cartao?.author !== "Conta excluída" || cartao?.username) sobras.push("cartão na conversa");
+  if ((await linha("clubs", { id: clubeAna }))?.archived !== true) sobras.push("clube fundado não arquivado");
+  await vazio("club_members", { uid: uidAna }, "membro em clube");
+  const membrosBruno = (await linha("clubs", { id: clubeBruno }))?.member_count;
+  if (membrosBruno !== 1) sobras.push(`member_count (${membrosBruno})`);
+  await vazio("club_requests", { uid: uidAna }, "pedido pendente");
+  await vazio("events", { created_by: uidAna }, "evento criado");
+  await vazio("event_participants", { uid: uidAna }, "presença em evento passado");
+  await vazio("service_listings", { owner_id: uidAna }, "anúncio");
+  if ((await db.auth.admin.getUserById(uidAna)).data?.user) sobras.push("a própria conta");
   if (sobras.length) throw new Error(`sobrou: ${sobras.join(", ")}`);
-  return "nada sobrou (24 conferências)";
+  return "nada sobrou (22 conferências)";
 });
 
 await etapa("Conta excluída não entra mais", A, async () => {
@@ -344,7 +347,6 @@ await etapa("Bruno: o @ da Ana ficou livre e o perfil sumiu", B, async () => {
 });
 
 await etapa("Bruno: a conversa com a Ana fica trancada e sem link de perfil", B, async () => {
-  const conversa = [uidAna, uidBruno].sort().join("__");
   await pb.goto(`${BASE}/messages/${conversa}`, { waitUntil: "load" });
   await pb.waitForTimeout(5000);
   const t = await textoDaPagina(pb);

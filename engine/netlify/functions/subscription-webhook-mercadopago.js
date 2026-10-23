@@ -12,7 +12,7 @@
  */
 import crypto from "node:crypto";
 import MercadoPagoConfig, { PreApproval } from "mercadopago";
-import { json, setUserPlan } from "./lib/firebase.js";
+import { json, setUserPlan } from "./lib/supabase.js";
 import { MERCADO_PAGO } from "./lib/providers.js";
 
 /**

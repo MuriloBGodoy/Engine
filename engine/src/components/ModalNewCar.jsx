@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, Save, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
-import { auth } from "../services/firebase";
+import { auth } from "../services/supabase";
 import { CAR_TYPE_GOAL, CAR_TYPE_OWNED, MAX_CAR_PHOTOS } from "../services/db";
 import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
 import { ImageCropper } from "./ImageCropper";

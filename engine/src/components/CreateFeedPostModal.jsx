@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Car, ImagePlus, Info, Loader2, Trash2, Video, X } from "lucide-react";
-import { auth } from "../services/firebase";
+import { auth } from "../services/supabase";
 import { engineDB } from "../services/db";
 import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
 import { trackEvent } from "../services/observability";

@@ -9,7 +9,7 @@ import { LegalPage, LegalSection } from "../components/LegalPage";
  */
 export function Privacy() {
   return (
-    <LegalPage title="Política de Privacidade" updatedAt="6 de agosto de 2026">
+    <LegalPage title="Política de Privacidade" updatedAt="17 de outubro de 2026">
       <p>
         Esta página explica quais dados o Engine coleta, por que coleta e o que
         você pode fazer a respeito. A linguagem é direta de propósito.
@@ -29,8 +29,8 @@ export function Privacy() {
       <LegalSection title="O que coletamos">
         <p>
           <strong className="text-[var(--engine-text)]">Conta.</strong> E-mail e
-          senha. A senha é gerenciada pelo Firebase Authentication, do Google, e
-          nunca fica visível para nós.
+          senha. A senha é guardada pelo Supabase Auth só como hash (uma cifra de
+          mão única) e nunca fica visível para nós.
         </p>
         <p>
           <strong className="text-[var(--engine-text)]">Perfil.</strong> Nome de
@@ -100,8 +100,13 @@ export function Privacy() {
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <strong className="text-[var(--engine-text)]">Google Firebase</strong> —
-            autenticação, banco de dados e armazenamento de imagens.
+            <strong className="text-[var(--engine-text)]">Supabase</strong> —
+            autenticação, banco de dados e armazenamento de imagens, em servidores
+            em São Paulo (Brasil).
+          </li>
+          <li>
+            <strong className="text-[var(--engine-text)]">Google</strong> — só
+            para quem escolhe entrar com a conta Google.
           </li>
           <li>
             <strong className="text-[var(--engine-text)]">Sentry</strong> —

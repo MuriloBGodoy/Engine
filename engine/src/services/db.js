@@ -1,31 +1,5 @@
 import { get, set, del } from "idb-keyval";
-import {
-  addDoc,
-  arrayRemove,
-  arrayUnion,
-  collection,
-  collectionGroup,
-  deleteDoc,
-  doc,
-  getDoc,
-  getCountFromServer,
-  documentId,
-  getDocs,
-  getDocsFromServer,
-  increment,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  startAfter,
-  updateDoc,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { auth, firestore } from "./firebase";
+import { auth, must, nowIso, supabase, watchTable } from "./supabase";
 import {
   grantOwn,
   grantSeries,
@@ -96,23 +70,90 @@ const defaultSettings = {
 const USERNAME_REGISTRY_KEY = "engine_username_registry";
 const LEGACY_CARS_KEY = "engine_cars";
 const LEGACY_SETTINGS_KEY = "engine_settings";
-const USERS_COLLECTION = "users";
-const USERNAMES_COLLECTION = "usernames";
-const LIKES_SUBCOLLECTION = "likes";
-const COMMUNITY_COLLECTION = "communityGoals";
-const PUBLIC_PROFILES_COLLECTION = "publicProfiles";
-const REPORTS_COLLECTION = "reports";
-const SERVICE_LISTINGS_COLLECTION = "serviceListings";
 const SERVICE_STATUS_APPROVED = "approved";
 const SERVICE_STATUS_PENDING = "pending";
 const SERVICE_STATUS_CHANGES_REQUESTED = "changes_requested";
 const SERVICE_STATUS_REJECTED = "rejected";
 const FIRESTORE_TIMEOUT_MS = 7000;
-// A garagem carrega as fotos junto (base64 dentro do documento), então baixar
-// alguns megabytes é normal enquanto o Storage não estiver ligado.
+// Carro antigo ainda pode trazer foto em base64 guardada neste aparelho; a
+// leitura do servidor já vem com URL do Storage desde a migração.
 const CARS_TIMEOUT_MS = 20000;
-const ENGINE_API_URL = import.meta.env.VITE_API_URL || "";
 const COMMUNITY_GOALS_PAGE_SIZE = 20;
+
+// --- linhas do banco <-> objetos das telas ---------------------------------
+//
+// No Supabase cada coleção virou tabela: o que regra e consulta enxergam é
+// coluna, o resto mora em `data`. As telas continuam recebendo o objeto plano
+// de sempre (`goal.ownerId`, `goal.likesCount`...), montado aqui.
+
+const omitKeys = (object, keys) =>
+  Object.fromEntries(Object.entries(object || {}).filter(([key]) => !keys.includes(key)));
+
+const GOAL_COLUMN_KEYS = [
+  "id", "ownerId", "userId", "kind", "clubId", "likesCount", "likesBy", "comments",
+  "ratingsBy", "createdAt", "updatedAt",
+];
+
+const goalFromRow = (row) => ({
+  ...(row.data || {}),
+  id: row.id,
+  ownerId: row.owner_id,
+  userId: row.owner_id,
+  kind: row.kind,
+  clubId: row.club_id,
+  likesCount: row.likes_count,
+  comments: row.comments || [],
+  ratingsBy: row.ratings_by || {},
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+/** Só o conteúdo: curtida, comentário e avaliação o banco não deixa o dono escrever. */
+const goalToRow = (goal) => ({
+  id: goal.id,
+  owner_id: goal.ownerId,
+  kind: goal.kind === POST_KIND_POST ? POST_KIND_POST : POST_KIND_GOAL,
+  club_id: String(goal.clubId || ""),
+  data: serializeForFirestore(omitKeys(goal, GOAL_COLUMN_KEYS)),
+});
+
+export { goalFromRow };
+
+const profileFromRow = (row) => ({
+  ...(row.data || {}),
+  id: row.user_id,
+  userId: row.user_id,
+  username: row.username,
+  author: row.author,
+  updatedAt: row.updated_at,
+});
+
+const LISTING_COLUMN_KEYS = [
+  "id", "ownerId", "moderationStatus", "viewCount", "detailCount", "whatsappCount",
+  "createdAt", "updatedAt",
+];
+
+const listingFromRow = (row) => ({
+  ...(row.data || {}),
+  id: row.id,
+  ownerId: row.owner_id,
+  moderationStatus: row.moderation_status,
+  viewCount: row.view_count,
+  detailCount: row.detail_count,
+  whatsappCount: row.whatsapp_count,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const notificationFromRow = (row) => ({
+  ...(row.data || {}),
+  id: row.id,
+  type: row.type,
+  actorId: row.actor_id || "",
+  recipientId: row.user_id,
+  read: row.read,
+  createdAt: row.created_at,
+});
 const defaultCommunityState = {
   interactions: {},
   following: [],
@@ -143,52 +184,22 @@ const refreshMyLikedGoals = async (userId) => {
     return;
   }
   try {
-    const snapshot = await getDocs(
-      query(collectionGroup(firestore, LIKES_SUBCOLLECTION), where("likerId", "==", userId)),
-    );
-    // O pai do documento de curtida é a subcoleção; o pai dela é o post.
-    myLikedGoalIds = new Set(snapshot.docs.map((d) => d.ref.parent.parent?.id).filter(Boolean));
+    const rows = must(await supabase.from("post_likes").select("post_id").eq("liker_id", userId));
+    myLikedGoalIds = new Set(rows.map((row) => row.post_id));
   } catch (error) {
-    // Índice de grupo ainda propagando, ou rede caindo: o coração fica apagado
-    // até a próxima carga, e curtir de novo é idempotente (o id é o uid).
+    // Rede caindo: o coração fica apagado até a próxima carga, e curtir de
+    // novo é idempotente (a chave é post + pessoa).
     warnFirestoreFallback("refreshMyLikedGoals", error);
   }
 };
-let communityGoalsCursorDoc = null;
+// Paginação do feed por cursor: o `updated_at` e o id do último post da página.
+let communityGoalsCursor = null;
 let communityGoalsHasMore = true;
 
-const apiEnabled = () => Boolean(ENGINE_API_URL && auth.currentUser);
-
-const apiRequest = async (path, options = {}) => {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) {
-    throw new Error("Usuário não autenticado.");
-  }
-
-  const response = await fetch(`${ENGINE_API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.message || "Falha ao chamar Engine API.");
-  }
-
-  if (response.status === 204) return null;
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-};
-
-const apiJson = (method, path, body) =>
-  apiRequest(path, {
-    method,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+// O backend Java (engine-api) saiu do caminho do front em 16/10/2026, junto
+// com o Firebase. Os ramos `apiEnabled()` só existiam em dev — produção nunca
+// os usou — e cada um deles já tinha custado um bug que só aparecia num
+// ambiente. O front fala direto com o Supabase em todo lugar.
 
 const scopedKey = (name, userId = currentUserId) => {
   if (!userId) {
@@ -278,10 +289,10 @@ const recoverSettingsAvatar = async (settings = {}, userId = currentUserId) => {
   }
 
   try {
-    const profileSnapshot = await getDoc(publicProfileDoc(userId));
-    const publicAvatar = profileSnapshot.exists()
-      ? profileSnapshot.data()?.avatar || ""
-      : "";
+    const row = must(
+      await supabase.from("public_profiles").select("data").eq("user_id", userId).maybeSingle(),
+    );
+    const publicAvatar = row?.data?.avatar || "";
     if (publicAvatar) {
       return {
         ...normalized,
@@ -316,9 +327,9 @@ const normalizeCarImages = (car = {}) => {
   return Array.from(new Set(all)).slice(0, MAX_CAR_PHOTOS);
 };
 
-// Teto real do Firestore por documento. A margem cobre o que o SDK acrescenta
-// (nome dos campos, timestamps, overhead de serialização) e o que o
-// JSON.stringify não mede com precisão.
+// Teto por registro. O Postgres aguenta muito mais, mas foto em base64 dentro
+// do registro é o que derrubava o feed: com o Storage ligado a foto vira URL,
+// e este teto só pega o caso de a subida ter falhado e caído no base64.
 const FIRESTORE_DOC_LIMIT = 1048576;
 const DOC_SAFE_BUDGET = Math.floor(FIRESTORE_DOC_LIMIT * 0.85);
 const CAR_TOO_LARGE_MESSAGE =
@@ -518,68 +529,46 @@ const usernameTakenError = () =>
   Object.assign(new Error("Este usuário já está em uso."), { code: "username-taken" });
 
 const warnFirestoreFallback = (operation, error) => {
-  console.warn(`Firestore indisponivel em ${operation}. Usando fallback local.`, error);
+  console.warn(`Servidor indisponivel em ${operation}. Usando fallback local.`, error);
 };
 
-const userDoc = (userId = currentUserId) => {
+const requireUserId = (userId = currentUserId) => {
   if (!userId) {
     throw new Error("Usuário não identificado.");
   }
-  return doc(firestore, USERS_COLLECTION, userId);
+  return userId;
 };
 
-const userCarsCollection = (userId = currentUserId) =>
-  collection(userDoc(userId), "cars");
+// settings, community e moderation (lista de bloqueados): o espaço privado,
+// que só o dono lê.
+const readPrivateDoc = async (docId, userId = currentUserId) => {
+  const row = must(
+    await supabase
+      .from("user_private")
+      .select("data")
+      .eq("user_id", requireUserId(userId))
+      .eq("doc_id", docId)
+      .maybeSingle(),
+  );
+  return row ? row.data : null;
+};
 
-const userCarDoc = (carId, userId = currentUserId) =>
-  doc(userCarsCollection(userId), String(carId));
-
-const userSettingsDoc = (userId = currentUserId) =>
-  doc(userDoc(userId), "private", "settings");
-
-const userCommunityDoc = (userId = currentUserId) =>
-  doc(userDoc(userId), "private", "community");
-
-// Lista de bloqueados: mora no espaço privado do usuário, que só ele lê.
-const userModerationDoc = (userId = currentUserId) =>
-  doc(userDoc(userId), "private", "moderation");
-
-const userNotificationsCollection = (userId = currentUserId) =>
-  collection(userDoc(userId), "notifications");
-
-const publicProfilesCollection = () => collection(firestore, PUBLIC_PROFILES_COLLECTION);
+/** Grava por cima (`merge: false`) ou mescla no nível de cima (`merge: true`). */
+const writePrivateDoc = async (docId, data, { merge = true, userId = currentUserId } = {}) => {
+  const uid = requireUserId(userId);
+  const next = merge ? { ...((await readPrivateDoc(docId, uid)) || {}), ...data } : data;
+  must(
+    await supabase
+      .from("user_private")
+      .upsert({ user_id: uid, doc_id: docId, data: serializeForFirestore(next), updated_at: nowIso() }),
+  );
+  return next;
+};
 
 // Perfis já lidos nesta sessão. Perfil muda pouco e a mesma pessoa aparece
 // em várias telas (post, comentário, lista de seguidores): ler de novo a
 // cada tela é o custo que a escuta da coleção inteira pagava em dobro.
 const publicProfileCache = new Map();
-
-const publicProfileDoc = (userId) =>
-  doc(firestore, PUBLIC_PROFILES_COLLECTION, String(userId));
-
-const followersCollection = (userId) =>
-  collection(firestore, PUBLIC_PROFILES_COLLECTION, String(userId), "followers");
-
-const followerDoc = (targetUserId, followerId) =>
-  doc(
-    firestore,
-    PUBLIC_PROFILES_COLLECTION,
-    String(targetUserId),
-    "followers",
-    String(followerId),
-  );
-
-const followingCollection = (userId) =>
-  collection(firestore, PUBLIC_PROFILES_COLLECTION, String(userId), "following");
-
-const followingDoc = (userId, targetUserId) =>
-  doc(
-    firestore,
-    PUBLIC_PROFILES_COLLECTION,
-    String(userId),
-    "following",
-    String(targetUserId),
-  );
 
 const usernameDocId = (username) => normalizeUsername(username).replace(/^@/, "");
 
@@ -619,7 +608,7 @@ const buildPublicProfile = (settings = {}, userId = currentUserId) => {
     // A capa vai só aqui: o retrato acima também é copiado em post,
     // comentário e notificação, e até 400 KB de imagem não cabem em cada um.
     banner: settings.profile?.banner || "",
-    updatedAt: serverTimestamp(),
+    updatedAt: nowIso(),
   };
 };
 
@@ -655,8 +644,8 @@ const buildCommunityGoal = (goal, userId, settings = {}, note = "", club = null)
     likesCount: 0,
     comments: [],
     ratingsBy: {},
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
   };
 };
 
@@ -727,7 +716,7 @@ const communityCarPatch = (car) => ({
   // criaria uma cópia que envelhece sozinha quando a tabela do Han melhorar —
   // que é exatamente o defeito do `fipe-consumption-db.json`.
   specs: publicSpecSheet(car),
-  updatedAt: serverTimestamp(),
+  updatedAt: nowIso(),
 });
 
 /**
@@ -962,6 +951,61 @@ const normalizeServiceListing = (listing = {}) => {
   };
 };
 
+// Id de usuário no Supabase é UUID. Link antigo, comentário de conta excluída
+// e anexo de conversa ainda podem trazer o uid do Firebase, e mandar isso para
+// uma coluna UUID derruba a consulta inteira — não só aquele id.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUserId = (value) => UUID_PATTERN.test(String(value || ""));
+
+/** `%` e `_` são curinga no `ilike`: quem digita "a_b" procura "a_b". */
+const escapeLike = (text) => String(text).replace(/[\\%_]/g, (char) => `\\${char}`);
+
+const countRows = async (table, column, value) => {
+  const { count, error } = await supabase
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq(column, value);
+  if (error) throw error;
+  return count || 0;
+};
+
+const fetchFeedPage = async (cursor) => {
+  let request = supabase
+    .from("community_goals")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(COMMUNITY_GOALS_PAGE_SIZE);
+  if (cursor) {
+    request = request.or(
+      `updated_at.lt."${cursor.updatedAt}",and(updated_at.eq."${cursor.updatedAt}",id.lt."${cursor.id}")`,
+    );
+  }
+  const rows = must(await request);
+  const last = rows[rows.length - 1];
+  return {
+    goals: rows.map((row) => normalizeCommunityGoal(goalFromRow(row))),
+    cursor: last ? { updatedAt: last.updated_at, id: last.id } : cursor,
+    hasMore: rows.length === COMMUNITY_GOALS_PAGE_SIZE,
+  };
+};
+
+const fetchListings = async ({ isAdmin, userId }) => {
+  let request = supabase.from("service_listings").select("*").order("updated_at", { ascending: false });
+  // A RLS já entrega a cada um só o que ele pode ver (aprovados, os próprios,
+  // e tudo para a moderação). O filtro aqui é para o admin navegando como
+  // usuário comum ver o que o público vê.
+  if (!isAdmin) {
+    request = isUserId(userId)
+      ? request.or(`moderation_status.eq.${SERVICE_STATUS_APPROVED},owner_id.eq.${userId}`)
+      : request.eq("moderation_status", SERVICE_STATUS_APPROVED);
+  }
+  return must(await request)
+    .map((row) => normalizeServiceListing(listingFromRow(row)))
+    .filter((listing) => listing.active)
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+};
+
 export const engineDB = {
   setCurrentUser(userId) {
     currentUserId = userId || null;
@@ -983,13 +1027,13 @@ export const engineDB = {
         get(LEGACY_SETTINGS_KEY),
       ]);
 
-    let firestoreCars;
-    let firestoreSettings;
+    let serverCarCount;
+    let serverSettings;
 
     try {
-      [firestoreCars, firestoreSettings] = await Promise.all([
-        withTimeout(getDocs(userCarsCollection(userId)), "migracao de carros"),
-        withTimeout(getDoc(userSettingsDoc(userId)), "migracao de configuracoes"),
+      [serverCarCount, serverSettings] = await Promise.all([
+        withTimeout(countRows("cars", "user_id", userId), "migracao de carros"),
+        withTimeout(readPrivateDoc("settings", userId), "migracao de configuracoes"),
       ]);
     } catch (error) {
       warnFirestoreFallback("migrateLegacyData", error);
@@ -998,32 +1042,33 @@ export const engineDB = {
     }
 
     // A migracao e oportunista: subir dado antigo e bom, mas falhar nisso nao
-    // pode custar a leitura da garagem. So a LEITURA estava protegida — a
-    // escrita, nao. Um `batch.commit()` recusado subia ate o App, abortava o
-    // efeito ANTES do `getCars()` e deixava `cars: []` com `carsError: null`:
-    // exatamente a tela do vazio legitimo, que agora diz o nome da conta. Seria
-    // a mentira de sempre com endereco errado — acusar a conta por uma escrita
-    // que falhou. `migratedKey` fica sem marcar de proposito, para tentar de
-    // novo na proxima sessao em vez de desistir do dado antigo para sempre.
+    // pode custar a leitura da garagem. `migratedKey` fica sem marcar quando a
+    // escrita falha, para tentar de novo na proxima sessao em vez de desistir
+    // do dado antigo para sempre.
     try {
-      if (firestoreCars.empty) {
+      if (serverCarCount === 0) {
         const carsToMigrate = existingCars?.length ? existingCars : legacyCars;
         if (carsToMigrate?.length) {
-          const batch = writeBatch(firestore);
-          carsToMigrate.map(normalizeCar).forEach((car) => {
-            batch.set(userCarDoc(car.id, userId), serializeForFirestore(car));
-          });
-          await batch.commit();
+          must(
+            await supabase.from("cars").upsert(
+              carsToMigrate.map(normalizeCar).map((car) => ({
+                user_id: userId,
+                id: car.id,
+                data: serializeForFirestore(car),
+                updated_at: nowIso(),
+              })),
+            ),
+          );
         }
       }
 
-      if (!firestoreSettings.exists()) {
+      if (!serverSettings) {
         const settingsToMigrate = existingSettings || legacySettings;
         if (settingsToMigrate) {
-          await setDoc(
-            userSettingsDoc(userId),
-            serializeForFirestore(normalizeSettings(settingsToMigrate)),
-          );
+          await writePrivateDoc("settings", normalizeSettings(settingsToMigrate), {
+            merge: false,
+            userId,
+          });
         }
       }
     } catch (error) {
@@ -1034,23 +1079,17 @@ export const engineDB = {
     await set(migratedKey, true);
   },
 
-  // Sem branch de API: GET /cars devolve o carro sem `images`, `ownership`,
-  // `contributions` nem `type`, e o front deriva a capa de `images[0]` — o
-  // carro voltava sem galeria e o save seguinte apagava a foto no banco. Foi
-  // assim que a imagem do Corsa se perdeu.
   async getCars() {
     if (!currentUserId) return getLocalCars();
 
     try {
-      const snapshot = await withTimeout(
-        getDocs(userCarsCollection()),
+      const rows = await withTimeout(
+        supabase.from("cars").select("id, data").eq("user_id", currentUserId).then(must),
         "buscar carros",
-        // Documento com foto em base64 é pesado: 7s derrubava a leitura da
-        // garagem inteira e jogava a tela no cache, que vinha incompleto.
         CARS_TIMEOUT_MS,
       );
-      const cars = snapshot.docs
-        .map((item) => normalizeCar({ id: item.id, ...item.data() }))
+      const cars = rows
+        .map((row) => normalizeCar({ ...row.data, id: row.id }))
         .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
 
       // O cache precisa refletir o que o servidor tem. Sem isto ele só
@@ -1078,14 +1117,7 @@ export const engineDB = {
     }
   },
 
-  /**
-   * Um carro só, pelo id.
-   *
-   * Existe porque lançar um aporte ou um gasto não justifica ler a garagem
-   * inteira: com as fotos em base64 dentro do documento, cada leitura dessas
-   * arrasta megabytes por um carro que já se sabe qual é. Foi assim que a cota
-   * diária do Firestore virou um teto alcançável.
-   */
+  /** Um carro só, pelo id: lançar um aporte não justifica ler a garagem inteira. */
   async getCar(carId) {
     if (!carId) return null;
 
@@ -1095,14 +1127,18 @@ export const engineDB = {
     }
 
     try {
-      const snapshot = await withTimeout(
-        getDoc(userCarDoc(carId)),
+      const row = await withTimeout(
+        supabase
+          .from("cars")
+          .select("id, data")
+          .eq("user_id", currentUserId)
+          .eq("id", String(carId))
+          .maybeSingle()
+          .then(must),
         "buscar carro",
         CARS_TIMEOUT_MS,
       );
-      if (snapshot.exists()) {
-        return normalizeCar({ id: snapshot.id, ...snapshot.data() });
-      }
+      if (row) return normalizeCar({ ...row.data, id: row.id });
     } catch (error) {
       warnFirestoreFallback("getCar", error);
     }
@@ -1140,9 +1176,6 @@ export const engineDB = {
     });
 
     await this.saveCar(updated);
-    // Devolve o carro montado aqui, e não o retorno de saveCar: em dev o
-    // backend Java responde sem os campos que ele não conhece, e o histórico
-    // sumiria da tela logo depois de ser registrado.
     return updated;
   },
 
@@ -1168,8 +1201,7 @@ export const engineDB = {
    * Lança um gasto do carro.
    *
    * Diferente do aporte, não mexe em `savedValue`: aporte é dinheiro que se
-   * acumula rumo a um alvo, gasto é dinheiro que saiu. Somar os dois no mesmo
-   * campo misturaria as duas leituras da garagem.
+   * acumula rumo a um alvo, gasto é dinheiro que saiu.
    */
   async addCarExpense(carId, expense) {
     const value = Math.max(Number(expense?.amount) || 0, 0);
@@ -1217,29 +1249,24 @@ export const engineDB = {
       return normalizedCar;
     }
 
-    // Enquanto o Storage estiver desligado, a foto vai em base64 DENTRO do
-    // documento, e o Firestore corta em 1 MiB. Passar disso fazia a gravação
-    // ser recusada e o erro morria num console.warn: a tela dizia que salvou e
-    // a foto sumia no refresh. Melhor barrar antes, com um motivo que a pessoa
-    // entenda.
+    // Foto que não conseguiu subir para o Storage cai em base64 dentro do
+    // registro. Passar do teto fazia a gravação ser recusada e o erro morria
+    // num console.warn: a tela dizia que salvou e a foto sumia no refresh.
     assertCarFitsDocument(normalizedCar);
 
-    // Sem branch de API pelo mesmo motivo do getCars: POST /cars responde sem
-    // os campos que o backend Java não conhece, e esse retorno virava o estado
-    // do app — a galeria e o tipo do carro sumiam da tela logo após salvar.
     let savedToServer = true;
     try {
       await withTimeout(
-        setDoc(
-          userCarDoc(normalizedCar.id),
-          serializeForFirestore(normalizedCar),
-          { merge: true },
-        ),
+        supabase
+          .from("cars")
+          .upsert({
+            user_id: currentUserId,
+            id: normalizedCar.id,
+            data: serializeForFirestore(normalizedCar),
+            updated_at: nowIso(),
+          })
+          .then(must),
         "salvar carro",
-        // Subir a foto em base64 dentro do documento passa fácil de 7s. Com o
-        // limite antigo o Promise.race desistia, o erro morria num warn, e o
-        // carro ficava salvo só neste aparelho — foi o que fez a foto voltar a
-        // sumir depois do refresh.
         CARS_TIMEOUT_MS,
       );
       await this.syncCommunityCar(normalizedCar).catch((error) =>
@@ -1281,25 +1308,18 @@ export const engineDB = {
       return;
     }
 
-    if (apiEnabled()) {
-      await apiRequest(`/cars/${id}`, { method: "DELETE" });
-      const cars = await getLocalCars();
-      await setLocalCars(cars.filter((c) => c.id !== String(id)));
-      return;
-    }
-
     try {
-      await Promise.all([
-        withTimeout(deleteDoc(userCarDoc(id)), "excluir carro"),
-        withTimeout(
-          deleteDoc(doc(firestore, COMMUNITY_COLLECTION, `goal-${currentUserId}-${id}`)),
-          "excluir post da comunidade",
-        ),
-        withTimeout(
-          deleteDoc(doc(firestore, COMMUNITY_COLLECTION, `goal-${currentUserId}-user-${id}`)),
-          "excluir post legado da comunidade",
-        ),
-      ]);
+      await withTimeout(
+        Promise.all([
+          supabase.from("cars").delete().eq("user_id", currentUserId).eq("id", String(id)).then(must),
+          supabase
+            .from("community_goals")
+            .delete()
+            .in("id", [`goal-${currentUserId}-${id}`, `goal-${currentUserId}-user-${id}`])
+            .then(must),
+        ]),
+        "excluir carro",
+      );
     } catch (error) {
       warnFirestoreFallback("deleteCar", error);
       // Tirar só daqui faria o carro "voltar" no próximo acesso, sem motivo
@@ -1317,22 +1337,8 @@ export const engineDB = {
       return;
     }
 
-    if (apiEnabled()) {
-      await apiRequest("/cars", { method: "DELETE" });
-      await setLocalCars([]);
-      return;
-    }
-
-    const [carsSnapshot, communitySnapshot] = await Promise.all([
-      getDocs(userCarsCollection()),
-      getDocs(query(collection(firestore, COMMUNITY_COLLECTION))),
-    ]);
-    const batch = writeBatch(firestore);
-    carsSnapshot.docs.forEach((item) => batch.delete(item.ref));
-    communitySnapshot.docs
-      .filter((item) => item.data().ownerId === currentUserId)
-      .forEach((item) => batch.delete(item.ref));
-    await batch.commit();
+    must(await supabase.from("cars").delete().eq("user_id", currentUserId));
+    must(await supabase.from("community_goals").delete().eq("owner_id", currentUserId));
   },
 
   async getCommunityState() {
@@ -1341,13 +1347,7 @@ export const engineDB = {
       return normalizeCommunityState(state);
     }
 
-    if (apiEnabled()) {
-      return normalizeCommunityState(await apiRequest("/community/state"));
-    }
-
-    const snapshot = await getDoc(userCommunityDoc());
-    const state = snapshot.exists() ? snapshot.data() : {};
-    return normalizeCommunityState(state);
+    return normalizeCommunityState((await readPrivateDoc("community")) || {});
   },
 
   async saveCommunityState(state) {
@@ -1357,82 +1357,57 @@ export const engineDB = {
       return normalizedState;
     }
 
-    if (apiEnabled()) {
-      return normalizeCommunityState(
-        await apiJson("PUT", "/community/state", normalizedState),
-      );
-    }
-
     try {
-      await setDoc(userCommunityDoc(), serializeForFirestore(normalizedState), {
-        merge: true,
-      });
+      await writePrivateDoc("community", normalizedState);
     } catch (error) {
       console.warn("Could not save to private community doc:", error);
     }
     return normalizedState;
   },
 
-  // Sem branch de API: GET /community/goals devolve o goal sem `note`,
-  // `image`, `images` nem `verified` (o normalizador do backend monta um
-  // `noteKey` e larga a legenda pra trás), então em dev a legenda publicada
-  // nunca chegava no feed. O Firestore ainda troca polling de 10s por
-  // tempo real.
+  /**
+   * Feed da Comunidade em tempo real: a primeira página, relida quando algum
+   * post muda (o Realtime avisa; a releitura é uma consulta de 20 linhas).
+   */
   subscribeCommunityGoals(callback) {
-    communityGoalsCursorDoc = null;
+    communityGoalsCursor = null;
     communityGoalsHasMore = true;
+    let active = true;
 
     // Uma consulta por assinatura do feed. Não bloqueia: quando a resposta
-    // chega, o próximo snapshot já sai com os corações certos.
+    // chega, o próximo carregamento já sai com os corações certos.
     refreshMyLikedGoals(currentUserId);
 
-    const communityQuery = query(
-      collection(firestore, COMMUNITY_COLLECTION),
-      orderBy("updatedAt", "desc"),
-      limit(COMMUNITY_GOALS_PAGE_SIZE),
-    );
-
-    return onSnapshot(
-      communityQuery,
-      (snapshot) => {
-        communityGoalsCursorDoc = snapshot.docs[snapshot.docs.length - 1] || null;
-        communityGoalsHasMore = snapshot.docs.length === COMMUNITY_GOALS_PAGE_SIZE;
-        callback(
-          snapshot.docs.map((item) =>
-            normalizeCommunityGoal({ id: item.id, ...item.data() }),
-          ),
-          { hasMore: communityGoalsHasMore },
-        );
-      },
-      (error) => {
+    const load = async () => {
+      try {
+        const page = await fetchFeedPage(null);
+        if (!active) return;
+        communityGoalsCursor = page.cursor;
+        communityGoalsHasMore = page.hasMore;
+        callback(page.goals, { hasMore: page.hasMore });
+      } catch (error) {
         warnFirestoreFallback("subscribeCommunityGoals", error);
-        callback([], { hasMore: false });
-      },
-    );
+        if (active) callback([], { hasMore: false });
+      }
+    };
+
+    load();
+    const stop = watchTable("feed", { table: "community_goals" }, load);
+    return () => {
+      active = false;
+      stop();
+    };
   },
 
   async loadMoreCommunityGoals() {
-    if (!communityGoalsCursorDoc || !communityGoalsHasMore) {
+    if (!communityGoalsCursor || !communityGoalsHasMore) {
       return { goals: [], hasMore: false };
     }
 
-    const nextPageQuery = query(
-      collection(firestore, COMMUNITY_COLLECTION),
-      orderBy("updatedAt", "desc"),
-      startAfter(communityGoalsCursorDoc),
-      limit(COMMUNITY_GOALS_PAGE_SIZE),
-    );
-
-    const snapshot = await getDocs(nextPageQuery);
-    communityGoalsCursorDoc = snapshot.docs[snapshot.docs.length - 1] || communityGoalsCursorDoc;
-    communityGoalsHasMore = snapshot.docs.length === COMMUNITY_GOALS_PAGE_SIZE;
-
-    return {
-      goals: snapshot.docs.map((item) =>
-        normalizeCommunityGoal({ id: item.id, ...item.data() }),
-      ),
-      hasMore: communityGoalsHasMore,
-    };
+    const page = await fetchFeedPage(communityGoalsCursor);
+    communityGoalsCursor = page.cursor;
+    communityGoalsHasMore = page.hasMore;
+    return { goals: page.goals, hasMore: page.hasMore };
   },
 
   /**
@@ -1445,52 +1420,51 @@ export const engineDB = {
       return () => {};
     }
 
-    // Sem branch de API: não existe GET /community/goals/{id} no backend Java,
-    // e o catch entregava callback(null) — abrir um post por link direto ou
-    // notificação simplesmente não achava a publicação em dev.
-    return onSnapshot(
-      doc(firestore, COMMUNITY_COLLECTION, String(goalId)),
-      (snapshot) => {
-        callback(
-          snapshot.exists()
-            ? normalizeCommunityGoal({ id: snapshot.id, ...snapshot.data() })
-            : null,
+    let active = true;
+    const load = async () => {
+      try {
+        const row = must(
+          await supabase.from("community_goals").select("*").eq("id", String(goalId)).maybeSingle(),
         );
-      },
-      (error) => {
+        if (active) callback(row ? normalizeCommunityGoal(goalFromRow(row)) : null);
+      } catch (error) {
         warnFirestoreFallback("subscribeCommunityGoal", error);
-        callback(null);
-      },
+        if (active) callback(null);
+      }
+    };
+
+    load();
+    const stop = watchTable(
+      "post",
+      { table: "community_goals", filter: `id=eq.${String(goalId)}` },
+      load,
     );
+    return () => {
+      active = false;
+      stop();
+    };
   },
 
   // --- perfis públicos: SEMPRE pontuais -----------------------------------
   //
   // Até 25/09/2026 existia `subscribePublicProfiles`, uma escuta viva da
   // coleção INTEIRA, usada por cinco telas. Medido em produção com 6
-  // usuários: 172 KB por abertura da Comunidade, porque os avatares moram em
-  // base64 dentro do perfil. Com ~200 usuários, as aberturas de um dia
-  // esgotavam a cota do plano Spark e o app parava para todo mundo. E o
-  // Perfil decidia "essa pessoa não existe" pela primeira resposta da
-  // escuta — que vem do cache com um documento só (o próprio usuário) — e
-  // redirecionava todo link direto de perfil para a Comunidade.
-  //
-  // Nenhuma tela precisa de todos. Estas três leituras cobrem as cinco, e
-  // `npm run check:escala` trava a volta da escuta.
+  // usuários: 172 KB por abertura da Comunidade. Nenhuma tela precisa de
+  // todos. Estas três leituras cobrem as cinco, e `npm run check:escala`
+  // trava a volta da escuta.
 
-  /** Só os perfis pedidos, em lotes de 30 (limite do `in`), com cache. */
+  /** Só os perfis pedidos, em lotes, com cache. */
   async getPublicProfilesByIds(ids = []) {
     const wanted = [...new Set((ids || []).filter(Boolean).map(String))];
+    // Id que não é UUID não é de ninguém no Supabase: vira "não existe" sem
+    // perguntar ao servidor (e sem derrubar o lote).
+    wanted.filter((id) => !isUserId(id)).forEach((id) => publicProfileCache.set(id, null));
     const missing = wanted.filter((id) => !publicProfileCache.has(id));
-    for (let i = 0; i < missing.length; i += 30) {
-      const chunk = missing.slice(i, i + 30);
+    for (let i = 0; i < missing.length; i += 100) {
+      const chunk = missing.slice(i, i + 100);
       try {
-        const snapshot = await getDocs(
-          query(publicProfilesCollection(), where(documentId(), "in", chunk)),
-        );
-        snapshot.docs.forEach((item) =>
-          publicProfileCache.set(item.id, { id: item.id, ...item.data() }),
-        );
+        const rows = must(await supabase.from("public_profiles").select("*").in("user_id", chunk));
+        rows.forEach((row) => publicProfileCache.set(row.user_id, profileFromRow(row)));
         // Quem não voltou não existe: guardar `null` evita pedir de novo.
         chunk.forEach((id) => {
           if (!publicProfileCache.has(id)) publicProfileCache.set(id, null);
@@ -1516,20 +1490,19 @@ export const engineDB = {
   },
 
   /**
-   * Um perfil pelo @nome, com resposta do SERVIDOR. `null` quer dizer "não
-   * existe" de verdade; erro de leitura é lançado, para a tela distinguir
-   * "não existe" de "não consegui ver" em vez de tratar os dois como sumiço.
+   * Um perfil pelo @nome. `null` quer dizer "não existe" de verdade; erro de
+   * leitura é lançado, para a tela distinguir "não existe" de "não consegui
+   * ver" em vez de tratar os dois como sumiço.
    */
   async getPublicProfileByUsername(username) {
     const normalized = normalizeUsername(username);
     if (!normalized) return null;
-    const snapshot = await getDocsFromServer(
-      query(publicProfilesCollection(), where("username", "==", normalized), limit(1)),
+    const row = must(
+      await supabase.from("public_profiles").select("*").eq("username", normalized).limit(1).maybeSingle(),
     );
-    if (snapshot.empty) return null;
-    const item = snapshot.docs[0];
-    const profile = { id: item.id, ...item.data() };
-    publicProfileCache.set(item.id, profile);
+    if (!row) return null;
+    const profile = profileFromRow(row);
+    publicProfileCache.set(row.user_id, profile);
     return profile;
   },
 
@@ -1542,30 +1515,26 @@ export const engineDB = {
     const raw = String(term || "").trim();
     try {
       if (!raw) {
-        const snapshot = await getDocs(
-          query(publicProfilesCollection(), orderBy("updatedAt", "desc"), limit(max)),
+        const rows = must(
+          await supabase
+            .from("public_profiles")
+            .select("*")
+            .order("updated_at", { ascending: false })
+            .limit(max),
         );
-        return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+        return rows.map(profileFromRow);
       }
+      // Sem diferenciar maiúscula: no Firestore "joão" não achava "João".
       const handle = normalizeUsername(raw);
-      const name = raw.charAt(0).toUpperCase() + raw.slice(1);
-      const prefixo = (campo, valor) =>
-        getDocs(
-          query(
-            publicProfilesCollection(),
-            where(campo, ">=", valor),
-            where(campo, "<", `${valor}\uf8ff`),
-            orderBy(campo),
-            limit(max),
-          ),
-        );
       const [porNome, porHandle] = await Promise.all([
-        prefixo("author", name),
-        handle ? prefixo("username", handle) : Promise.resolve({ docs: [] }),
+        supabase.from("public_profiles").select("*").ilike("author", `${escapeLike(raw)}%`).limit(max),
+        handle
+          ? supabase.from("public_profiles").select("*").ilike("username", `${escapeLike(handle)}%`).limit(max)
+          : Promise.resolve({ data: [], error: null }),
       ]);
       const vistos = new Map();
-      [...porHandle.docs, ...porNome.docs].forEach((item) => {
-        if (!vistos.has(item.id)) vistos.set(item.id, { id: item.id, ...item.data() });
+      [...must(porHandle), ...must(porNome)].forEach((row) => {
+        if (!vistos.has(row.user_id)) vistos.set(row.user_id, profileFromRow(row));
       });
       return [...vistos.values()].slice(0, max);
     } catch (error) {
@@ -1577,57 +1546,16 @@ export const engineDB = {
   subscribeServiceListings(callback, options = {}) {
     const isAdmin = Boolean(options.isAdmin);
     const userId = options.userId || currentUserId;
-    const listingsQuery = isAdmin
-      ? query(
-          collection(firestore, SERVICE_LISTINGS_COLLECTION),
-          orderBy("updatedAt", "desc"),
-        )
-      : query(
-          collection(firestore, SERVICE_LISTINGS_COLLECTION),
-          where("moderationStatus", "==", SERVICE_STATUS_APPROVED),
-        );
+    let active = true;
 
-    return onSnapshot(
-      listingsQuery,
-      (snapshot) => {
-        const publicListings = snapshot.docs
-          .map((item) => normalizeServiceListing({ id: item.id, ...item.data() }))
-          .filter((listing) => listing.active)
-          .sort((a, b) =>
-            String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")),
-          );
-
-        if (isAdmin || !userId) {
-          callback(publicListings);
-          return;
-        }
-
-        const ownerQuery = query(
-          collection(firestore, SERVICE_LISTINGS_COLLECTION),
-          where("ownerId", "==", userId),
-        );
-
-        getDocs(ownerQuery)
-          .then((ownerSnapshot) => {
-            const byId = new Map(publicListings.map((listing) => [listing.id, listing]));
-            ownerSnapshot.docs
-              .map((item) => normalizeServiceListing({ id: item.id, ...item.data() }))
-              .filter((listing) => listing.active)
-              .forEach((listing) => byId.set(listing.id, listing));
-            callback(
-              Array.from(byId.values()).sort((a, b) =>
-                String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")),
-              ),
-            );
-          })
-          .catch((error) => {
-            warnFirestoreFallback("subscribeServiceListingsOwner", error);
-            callback(publicListings);
-          });
-      },
-      async (error) => {
+    const load = async () => {
+      try {
+        const listings = await fetchListings({ isAdmin, userId });
+        if (active) callback(listings);
+      } catch (error) {
         warnFirestoreFallback("subscribeServiceListings", error);
         const localListings = (await get("engine_service_listings")) || [];
+        if (!active) return;
         callback(
           localListings
             .map(normalizeServiceListing)
@@ -1639,8 +1567,15 @@ export const engineDB = {
                 listing.moderationStatus === SERVICE_STATUS_APPROVED,
             ),
         );
-      },
-    );
+      }
+    };
+
+    load();
+    const stop = watchTable("listings", { table: "service_listings" }, load);
+    return () => {
+      active = false;
+      stop();
+    };
   },
 
   async saveServiceListing(listing, settings = {}, userId = currentUserId, options = {}) {
@@ -1669,20 +1604,27 @@ export const engineDB = {
       updatedAt: new Date().toISOString(),
     });
 
+    const row = {
+      owner_id: normalized.ownerId,
+      moderation_status: normalized.moderationStatus,
+      data: serializeForFirestore(omitKeys(normalized, LISTING_COLUMN_KEYS)),
+    };
+
     let sentToServer = true;
     try {
-      await withTimeout(
-        setDoc(
-          doc(firestore, SERVICE_LISTINGS_COLLECTION, normalized.id),
-          {
-            ...serializeForFirestore(normalized),
-            updatedAt: serverTimestamp(),
-            createdAt: listing.createdAt || serverTimestamp(),
-          },
-          { merge: true },
-        ),
+      // Atualiza se existe, cria se não. Não é `upsert` porque a regra de
+      // CRIAR exige status pendente e dono = quem grava — e o admin editando
+      // um anúncio aprovado de outra pessoa cairia nela mesmo sendo edição.
+      const updated = await withTimeout(
+        supabase.from("service_listings").update(row).eq("id", normalized.id).select("id").then(must),
         "salvar anuncio de servico",
       );
+      if (!updated.length) {
+        await withTimeout(
+          supabase.from("service_listings").insert({ ...row, id: normalized.id }).then(must),
+          "salvar anuncio de servico",
+        );
+      }
     } catch (error) {
       warnFirestoreFallback("saveServiceListing", error);
       sentToServer = false;
@@ -1716,13 +1658,18 @@ export const engineDB = {
       throw new Error("Status de moderacao invalido.");
     }
 
-    const listingRef = doc(firestore, SERVICE_LISTINGS_COLLECTION, String(listingId));
-    const listingSnapshot = await getDoc(listingRef).catch((error) => {
-      warnFirestoreFallback("moderateServiceListing.get", error);
-      return null;
-    });
-    const listing = listingSnapshot?.exists()
-      ? normalizeServiceListing({ id: listingSnapshot.id, ...listingSnapshot.data() })
+    const current = await supabase
+      .from("service_listings")
+      .select("*")
+      .eq("id", String(listingId))
+      .maybeSingle()
+      .then(must)
+      .catch((error) => {
+        warnFirestoreFallback("moderateServiceListing.get", error);
+        return null;
+      });
+    const listing = current
+      ? normalizeServiceListing(listingFromRow(current))
       : ((await get("engine_service_listings")) || [])
           .map(normalizeServiceListing)
           .find((item) => item.id === String(listingId));
@@ -1739,14 +1686,26 @@ export const engineDB = {
       moderationNote: cleanNote,
       reviewedBy: reviewerId,
       reviewedAt,
-      updatedAt: serverTimestamp(),
     };
 
     try {
-      await updateDoc(listingRef, {
-        ...patch,
-        moderationHistory: arrayUnion(historyEntry),
-      });
+      if (!current) throw new Error("Anúncio não encontrado no servidor.");
+      const data = current.data || {};
+      must(
+        await supabase
+          .from("service_listings")
+          .update({
+            moderation_status: status,
+            data: {
+              ...data,
+              moderationNote: cleanNote,
+              reviewedBy: reviewerId,
+              reviewedAt,
+              moderationHistory: [...(data.moderationHistory || []), historyEntry],
+            },
+          })
+          .eq("id", String(listingId)),
+      );
     } catch (error) {
       warnFirestoreFallback("moderateServiceListing.update", error);
       // Antes seguia: marcava aprovado na cópia local E notificava o
@@ -1813,7 +1772,7 @@ export const engineDB = {
 
     try {
       await withTimeout(
-        deleteDoc(doc(firestore, SERVICE_LISTINGS_COLLECTION, String(listingId))),
+        supabase.from("service_listings").delete().eq("id", String(listingId)).then(must),
         "excluir anuncio de servico",
       );
     } catch (error) {
@@ -1831,29 +1790,10 @@ export const engineDB = {
   async shareCommunityGoal(goal, settings, userId = currentUserId, note = "", club = null) {
     if (!userId) throw new Error("Usuário não identificado.");
 
-    // Sem branch de API por dois motivos concretos, os dois verificados no
-    // EngineFirestoreService.shareCommunityGoal:
-    //  - ele descarta a legenda recebida e grava `profile.note`, que é a BIO
-    //    do perfil — por isso a descrição escrita na hora nunca aparecia;
-    //  - ele grava só `image`, sem `images`, então a publicação saía com uma
-    //    foto só, em vez da galeria do carro.
+    // Republicar a mesma meta atualiza o conteúdo; curtidas, comentários,
+    // avaliações e a data de criação o banco preserva sozinho.
     const payload = buildCommunityGoal(goal, userId, settings, note, club);
-    const goalRef = doc(firestore, COMMUNITY_COLLECTION, payload.id);
-    const existing = await getDoc(goalRef);
-    const existingData = existing.exists() ? existing.data() : {};
-
-    await setDoc(
-      goalRef,
-      {
-        ...payload,
-        likesCount: existingData.likesCount ?? 0,
-        comments: existingData.comments || [],
-        ratingsBy: existingData.ratingsBy || {},
-        createdAt: existingData.createdAt || payload.createdAt,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
+    must(await supabase.from("community_goals").upsert(goalToRow(payload)));
 
     // Sem await: a conquista não pode atrasar nem derrubar a publicação.
     grantOwn("first_post");
@@ -1864,21 +1804,16 @@ export const engineDB = {
    * Publica um post livre no feed: texto, fotos e link de vídeo, podendo ou
    * não estar amarrado a um carro da garagem.
    *
-   * Vai para a mesma coleção das metas, marcado com `kind: "post"`, então
-   * herda curtida, comentário, denúncia, bloqueio e as regras de segurança
-   * que já existem — inclusive a que impede um visitante de editar conteúdo
-   * alheio.
+   * Vai para a mesma tabela das metas, marcado com `kind: "post"`, então
+   * herda curtida, comentário, denúncia, bloqueio e as regras de segurança.
    */
   async createCommunityPost({
     text,
     images = [],
     videoUrl = "",
     car = null,
-    // Carimbo de clube: campos NOVOS e opcionais. Post do mural de um clube é
-    // um post da Comunidade marcado, não uma coleção paralela — herda card,
-    // curtida em subcoleção, comentário, denúncia e bloqueio, e ainda aparece
-    // no feed geral com o chip `[TAG]`, que é propaganda do clube. A regra do
-    // Firestore exige ser MEMBRO para gravar o carimbo.
+    // Carimbo de clube: post do mural de um clube é um post da Comunidade
+    // marcado, não uma tabela paralela. O banco exige ser MEMBRO para gravar.
     clubId = "",
     clubTag = "",
   }) {
@@ -1897,7 +1832,6 @@ export const engineDB = {
     const payload = {
       id,
       kind: POST_KIND_POST,
-      userId: currentUserId,
       ownerId: currentUserId,
       author: profile.author,
       username: profile.username,
@@ -1915,23 +1849,13 @@ export const engineDB = {
       brand: car?.brand || "",
       model: car?.model || "",
       year: car?.year || "",
-      // "" e não ausente: a consulta do mural é igualdade em `clubId`, e campo
-      // que às vezes existe e às vezes não é o tipo de dado que faz uma
-      // consulta devolver menos do que devia sem ninguém notar.
       clubId: String(clubId || ""),
       clubTag: String(clubTag || ""),
-      likesCount: 0,
-      comments: [],
-      ratingsBy: {},
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
     };
 
-    // Mesmo teto do carro: sem Storage, a foto vai em base64 dentro do
-    // documento e o Firestore recusa acima de 1 MiB.
     assertCarFitsDocument(payload);
 
-    await setDoc(doc(firestore, COMMUNITY_COLLECTION, id), payload);
+    must(await supabase.from("community_goals").insert(goalToRow(payload)));
     grantOwn("first_post");
     return id;
   },
@@ -1941,122 +1865,111 @@ export const engineDB = {
     if (!userId || !goalId) return;
 
     const text = String(note || "").trim().slice(0, 280);
-
-    // Sem branch de API: não existe PATCH /community/goals/{id} no backend
-    // Java (só /like e /rating), então delegar pra lá derrubava o salvamento
-    // da legenda em dev.
-    await updateDoc(doc(firestore, COMMUNITY_COLLECTION, String(goalId)), {
-      note: text,
-      updatedAt: serverTimestamp(),
-    });
+    const row = must(
+      await supabase.from("community_goals").select("data").eq("id", String(goalId)).maybeSingle(),
+    );
+    if (!row) return;
+    must(
+      await supabase
+        .from("community_goals")
+        .update({ data: { ...row.data, note: text } })
+        .eq("id", String(goalId)),
+    );
   },
 
   async deleteCommunityGoal(goal, userId = currentUserId) {
     if (!userId) return;
-    const goalId = communityGoalId(goal, userId);
-
-    // Sem branch de API: é o mesmo caminho de escrita das outras publicações,
-    // e manter os dois já custou seis bugs entre ontem e hoje.
-    await Promise.all([
-      deleteDoc(doc(firestore, COMMUNITY_COLLECTION, goalId)),
-      deleteDoc(doc(firestore, COMMUNITY_COLLECTION, legacyCommunityGoalId(goal, userId))),
-    ]);
+    // Curtidas saem junto, em cascata no banco.
+    must(
+      await supabase
+        .from("community_goals")
+        .delete()
+        .in("id", [communityGoalId(goal, userId), legacyCommunityGoalId(goal, userId)]),
+    );
   },
 
   async resetMyCommunityPublications(userId = currentUserId) {
     if (!userId) return;
-
-    if (apiEnabled()) {
-      await apiRequest("/community/goals", { method: "DELETE" });
-      return;
-    }
-
-    const snapshot = await getDocs(
-      query(collection(firestore, COMMUNITY_COLLECTION), where("ownerId", "==", userId)),
-    );
-    const batch = writeBatch(firestore);
-    snapshot.docs.forEach((item) => batch.delete(item.ref));
-    if (!snapshot.empty) await batch.commit();
+    must(await supabase.from("community_goals").delete().eq("owner_id", userId));
   },
 
+  /**
+   * Nome, @ e avatar viajam copiados em cada publicação, para o feed não ler
+   * um perfil por card. Trocar nas configurações atualiza as cópias.
+   *
+   * A legenda NÃO entra aqui: até 16/10/2026 esta sincronia gravava a bio do
+   * perfil por cima da legenda de cada post — salvar as configurações apagava
+   * o que a pessoa tinha escrito ao publicar.
+   */
   async syncCommunityProfile(settings, userId = currentUserId) {
     if (!userId) return;
-    if (apiEnabled()) return;
 
     const profile = getProfileSnapshot(settings, userId);
-    const snapshot = await getDocs(
-      query(collection(firestore, COMMUNITY_COLLECTION), where("ownerId", "==", userId)),
+    const rows = must(
+      await supabase.from("community_goals").select("id, data").eq("owner_id", userId),
     );
-    const batch = writeBatch(firestore);
 
-    snapshot.docs.forEach((item) => {
-      batch.update(item.ref, {
-        author: profile.author,
-        username: profile.username,
-        avatar: profile.avatar,
-        avatarInitials: profile.avatarInitials,
-        city: profile.city,
-        note: profile.note,
-        updatedAt: serverTimestamp(),
-      });
-    });
-
-    if (!snapshot.empty) await batch.commit();
+    await Promise.all(
+      rows.map(async (row) =>
+        must(
+          await supabase
+            .from("community_goals")
+            .update({
+              data: {
+                ...row.data,
+                author: profile.author,
+                username: profile.username,
+                avatar: profile.avatar,
+                avatarInitials: profile.avatarInitials,
+                city: profile.city,
+              },
+            })
+            .eq("id", row.id),
+        ),
+      ),
+    );
   },
 
   async syncCommunityCar(car, userId = currentUserId) {
-    if (!userId || apiEnabled()) return;
+    if (!userId) return;
 
-    const goalIds = [
-      communityGoalId(car, userId),
-      legacyCommunityGoalId(car, userId),
-    ];
-    const batch = writeBatch(firestore);
-    let hasUpdates = false;
+    const rows = must(
+      await supabase
+        .from("community_goals")
+        .select("id, data")
+        .in("id", [communityGoalId(car, userId), legacyCommunityGoalId(car, userId)]),
+    );
+    const patch = omitKeys(serializeForFirestore(communityCarPatch(car)), ["updatedAt"]);
 
     await Promise.all(
-      goalIds.map(async (goalId) => {
-        const goalRef = doc(firestore, COMMUNITY_COLLECTION, goalId);
-        const snapshot = await getDoc(goalRef);
-        if (!snapshot.exists()) return;
-        batch.update(goalRef, communityCarPatch(car));
-        hasUpdates = true;
-      }),
+      rows.map(async (row) =>
+        must(
+          await supabase
+            .from("community_goals")
+            .update({ data: { ...row.data, ...patch } })
+            .eq("id", row.id),
+        ),
+      ),
     );
-
-    if (hasUpdates) await batch.commit();
   },
 
   async syncPublicProfile(settings, userId = currentUserId) {
-    if (!userId || apiEnabled()) return;
+    if (!userId) return;
 
-    await setDoc(publicProfileDoc(userId), buildPublicProfile(settings, userId), {
-      merge: true,
-    });
+    const profile = buildPublicProfile(settings, userId);
+    must(
+      await supabase.from("public_profiles").upsert({
+        user_id: userId,
+        username: profile.username,
+        author: profile.author,
+        data: serializeForFirestore(omitKeys(profile, ["id", "userId", "updatedAt"])),
+      }),
+    );
+    publicProfileCache.delete(String(userId));
   },
 
   /**
-   * Quantas curtidas UM post tem, contadas na subcoleção.
-   *
-   * Diferente de `likesCount`, que fica no documento do post e é mantido por
-   * quem curte: aquele é número de vitrine, e a regra só consegue prender o
-   * passo em 1 pra cima ou 1 pra baixo. Este aqui conta a fonte, e ninguém
-   * escreve no documento de curtida alheio. Marco de conquista se decide por
-   * este, nunca pelo outro.
-   */
-  /**
-   * Confere os degraus de curtida do dono do post e concede o que faltar.
-   *
-   * Roda no cliente de QUEM CURTIU — é escrita no perfil de outra pessoa, e a
-   * regra do Firestore é a defesa: lista fechada de ids e corpo de um campo só.
-   * Falha aqui nunca derruba a curtida: o selo é consequência, não o ato.
-   */
-  /**
    * Confere os marcos que dependem só da garagem da pessoa.
-   *
-   * Recebe os carros que o chamador já tem em mãos, para não ler de novo. Passa
-   * fatos, não carros: quem sabe o que é tipo de carro e aporte total é aqui, e
-   * o serviço de conquistas fica sem essa responsabilidade.
    *
    * Devolve os marcos que ESTA chamada concedeu, para a tela comemorar. Não
    * gera notificação: a pessoa está olhando.
@@ -2077,17 +1990,21 @@ export const engineDB = {
     }
   },
 
+  /**
+   * Confere os degraus de curtida do dono do post e concede o que faltar.
+   *
+   * Roda no cliente de QUEM CURTIU — é escrita no perfil de outra pessoa, e o
+   * banco é a defesa: lista fechada de ids, data carimbada por ele. Falha aqui
+   * nunca derruba a curtida: o selo é consequência, não o ato.
+   */
   async concederDegrausDeCurtida(ownerId, goalTitle) {
     if (!ownerId) return;
     try {
       const total = await this.countLikesReceived(ownerId);
       const novos = await syncLikeAchievements(ownerId, total);
       // Só o maior degrau novo vira aviso: quem já tinha 60 curtidas antes dos
-      // degraus pequenos existirem ganha 10 e 50 juntos na próxima curtida, e
-      // dois avisos seguidos dizendo a mesma coisa é ruído.
+      // degraus pequenos existirem ganha 10 e 50 juntos na próxima curtida.
       for (const id of novos.slice(-1)) {
-        // Quem recebeu o selo pode estar offline: por isso vira notificação, e
-        // não um aviso na tela de quem curtiu.
         await this.notifyUser(ownerId, {
           type: "achievement",
           achievementId: id,
@@ -2107,11 +2024,11 @@ export const engineDB = {
     }
   },
 
+  /** Quantas curtidas UM post tem, contadas nas linhas de curtida. */
   async countPostLikes(goalId) {
     if (!goalId) return 0;
     try {
-      const alvo = collection(firestore, COMMUNITY_COLLECTION, goalId, LIKES_SUBCOLLECTION);
-      return (await getCountFromServer(alvo)).data().count;
+      return await countRows("post_likes", "post_id", String(goalId));
     } catch (error) {
       warnFirestoreFallback("countPostLikes", error);
       return 0;
@@ -2119,20 +2036,13 @@ export const engineDB = {
   },
 
   /**
-   * Total de curtidas que a pessoa recebeu somando todos os posts dela.
-   *
-   * Uma consulta de grupo em vez de abrir post por post — é o número que os
-   * degraus de 1k a 1M olham. Também não dá pra forjar: `postOwnerId` é
-   * conferido contra o dono real do post na regra de escrita.
+   * Total de curtidas que a pessoa recebeu somando todos os posts dela. Não dá
+   * pra forjar: `post_owner_id` é carimbado pelo banco a partir do dono real.
    */
   async countLikesReceived(userId) {
-    if (!userId) return 0;
+    if (!isUserId(userId)) return 0;
     try {
-      const alvo = query(
-        collectionGroup(firestore, LIKES_SUBCOLLECTION),
-        where("postOwnerId", "==", userId),
-      );
-      return (await getCountFromServer(alvo)).data().count;
+      return await countRows("post_likes", "post_owner_id", userId);
     } catch (error) {
       warnFirestoreFallback("countLikesReceived", error);
       return 0;
@@ -2140,36 +2050,38 @@ export const engineDB = {
   },
 
   async getPublicProfile(userId) {
-    if (!userId) return null;
+    if (!isUserId(userId)) return null;
 
-    if (apiEnabled()) {
-      return apiRequest(`/community/users/${userId}`);
-    }
+    const [profileRow, goalRows, followersCount, myFollow] = await Promise.all([
+      supabase.from("public_profiles").select("*").eq("user_id", userId).maybeSingle().then(must),
+      supabase
+        .from("community_goals")
+        .select("*")
+        .eq("owner_id", userId)
+        .order("updated_at", { ascending: false })
+        .then(must),
+      countRows("follows", "target_id", userId).catch(() => 0),
+      currentUserId && currentUserId !== userId
+        ? supabase
+            .from("follows")
+            .select("follower_id")
+            .eq("follower_id", currentUserId)
+            .eq("target_id", userId)
+            .maybeSingle()
+            .then(must)
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
-    const [profileSnapshot, goalsSnapshot, followersSnapshot, myFollowSnapshot] =
-      await Promise.all([
-        getDoc(publicProfileDoc(userId)),
-        getDocs(query(collection(firestore, COMMUNITY_COLLECTION), where("ownerId", "==", userId))),
-        // Agregação em vez de baixar todo seguidor só para tirar o `.size`:
-        // com mil seguidores isso eram mil leituras para mostrar um número.
-        getCountFromServer(followersCollection(userId)).catch(() => null),
-        currentUserId && currentUserId !== userId
-          ? getDoc(followerDoc(userId, currentUserId)).catch(() => null)
-          : Promise.resolve(null),
-      ]);
-
-    const goals = goalsSnapshot.docs.map((item) =>
-      normalizeCommunityGoal({ id: item.id, ...item.data() }),
-    );
+    const goals = goalRows.map((row) => normalizeCommunityGoal(goalFromRow(row)));
     const totalProgress = goals.reduce((sum, goal) => {
       const target = Number(goal.targetValue) || 0;
       return sum + (target ? Math.min((Number(goal.savedValue) / target) * 100, 100) : 0);
     }, 0);
 
-    // O doc em publicProfiles só nasce quando a pessoa salva os ajustes; até
-    // lá, os dados do autor que viajam junto de cada meta são a melhor fonte
-    // (antes caíamos num "Usuário Engine / @engine" genérico).
-    const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+    // O perfil público só nasce quando a pessoa salva os ajustes; até lá, os
+    // dados do autor que viajam junto de cada meta são a melhor fonte.
+    const profile = profileRow ? profileFromRow(profileRow) : {};
     const fromGoals = goals[0] || {};
     const pick = (...values) => values.find(Boolean) || "";
 
@@ -2185,61 +2097,41 @@ export const engineDB = {
       note: pick(profile.note, fromGoals.note),
       goals,
       goalsCount: goals.length,
-      likesCount: goals.reduce(
-        (sum, goal) =>
-          sum +
-          (typeof goal.likesCount === "number"
-            ? goal.likesCount
-            : Object.keys(goal.likesBy || {}).length),
-        0,
-      ),
+      likesCount: goals.reduce((sum, goal) => sum + (Number(goal.likes) || 0), 0),
       averageProgress: goals.length ? totalProgress / goals.length : 0,
-      followersCount: followersSnapshot?.data?.().count || 0,
-      isFollowedByMe: Boolean(myFollowSnapshot?.exists?.()),
+      followersCount,
+      isFollowedByMe: Boolean(myFollow),
     };
   },
 
-  // Segue / deixa de seguir uma pessoa: grava (ou remove) o doc do seguidor
-  // em publicProfiles/{alvo}/followers/{eu}. A notificação de novo seguidor
-  // continua saindo de quem chama (Community.handleFollow).
+  // Segue / deixa de seguir uma pessoa. Uma linha (quem segue, quem é
+  // seguido) responde as duas listas — no Firestore eram dois espelhos que
+  // podiam discordar.
   async setFollow(targetUserId, isFollowing, followerId = currentUserId) {
-    if (!targetUserId || !followerId || targetUserId === followerId) return;
-
-    // Sem branch de API aqui de propósito: o endpoint /users/{id}/follow só
-    // dispara notificação (quem chama isso é notifyFollow). Delegar pra ele
-    // deixava o vínculo sem gravar nenhum lado e ainda notificava duas vezes.
-    const followerRef = followerDoc(targetUserId, followerId);
-    const followingRef = followingDoc(followerId, targetUserId);
+    if (!isUserId(targetUserId) || !followerId || targetUserId === followerId) return;
 
     if (isFollowing) {
       const actorSettings = await this.getSettings();
       const actor = getProfileSnapshot(actorSettings, followerId);
 
-      await Promise.all([
-        setDoc(followerRef, {
-          followerId,
-          author: actor.author,
-          username: actor.username,
-          avatar: actor.avatar,
-          avatarInitials: actor.avatarInitials,
-          createdAt: serverTimestamp(),
+      must(
+        await supabase.from("follows").upsert({
+          follower_id: followerId,
+          target_id: targetUserId,
+          data: {
+            author: actor.author,
+            username: actor.username,
+            avatar: actor.avatar,
+            avatarInitials: actor.avatarInitials,
+          },
         }),
-        // O espelho guarda só o id do alvo: os dados de exibição vêm de
-        // publicProfiles na hora de renderizar, então nunca ficam defasados.
-        setDoc(followingRef, {
-          userId: targetUserId,
-          createdAt: serverTimestamp(),
-        }),
-      ]);
+      );
 
       // Mesma forma do degrau de curtida: quem segue é quem detecta.
       try {
-        const total = (await getCountFromServer(followersCollection(targetUserId)))
-          .data()
-          .count;
-        // A série inteira (10, 100, 1.000), não só o marco de mil. Notifica só
-        // o maior degrau que esta chamada concedeu, para não chegarem três
-        // avisos de uma vez quando alguém cruza vários degraus juntos.
+        const total = await countRows("follows", "target_id", targetUserId);
+        // A série inteira (10, 100, 1.000). Notifica só o maior degrau que
+        // esta chamada concedeu.
         const novos = await grantSeries(targetUserId, "followers", total);
         const maior = novos[novos.length - 1];
         if (maior) {
@@ -2256,38 +2148,36 @@ export const engineDB = {
       } catch (error) {
         warnFirestoreFallback("marco de seguidores", error);
       }
-      // A notificação mora AQUI, e não em quem chama. Havia dois botões de
-      // seguir: o do card no feed chamava setFollow + notifyFollow; o da
-      // página de perfil chamava só followUser → setFollow. Mesmo vínculo
-      // gravado, mas "Novo seguidor" só saía por um deles (auditoria de
-      // 25/09/2026). Só notifica quando quem segue é quem está no app.
+      // A notificação mora AQUI, e não em quem chama: havia dois botões de
+      // seguir e só um deles avisava (auditoria de 25/09/2026).
       if (followerId === currentUserId) {
         await this.notifyFollow(targetUserId).catch((error) =>
           warnFirestoreFallback("notifyFollow", error),
         );
       }
     } else {
-      await Promise.all([
-        deleteDoc(followerRef),
-        deleteDoc(followingRef),
-      ]);
+      must(
+        await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", followerId)
+          .eq("target_id", targetUserId),
+      );
     }
   },
 
   async getUserGoals(userId) {
-    if (!userId) return [];
+    if (!isUserId(userId)) return [];
 
     try {
-      const goalsQuery = query(
-        collection(firestore, COMMUNITY_COLLECTION),
-        where("userId", "==", userId),
+      const rows = must(
+        await supabase
+          .from("community_goals")
+          .select("*")
+          .eq("owner_id", userId)
+          .order("updated_at", { ascending: false }),
       );
-      const snapshot = await getDocs(goalsQuery);
-      return snapshot.docs
-        .map((item) =>
-          normalizeCommunityGoal({ id: item.id, ...item.data() }),
-        )
-        .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+      return rows.map((row) => normalizeCommunityGoal(goalFromRow(row)));
     } catch (error) {
       console.error("Error fetching user goals:", error);
       return [];
@@ -2295,13 +2185,17 @@ export const engineDB = {
   },
 
   async getUserFollowers(userId) {
-    if (!userId) return [];
+    if (!isUserId(userId)) return [];
 
     try {
-      const snapshot = await getDocs(followersCollection(userId));
-      return snapshot.docs.map((doc) => ({
-        userId: doc.id,
-        ...doc.data(),
+      const rows = must(
+        await supabase.from("follows").select("follower_id, data, created_at").eq("target_id", userId),
+      );
+      return rows.map((row) => ({
+        userId: row.follower_id,
+        followerId: row.follower_id,
+        ...row.data,
+        createdAt: row.created_at,
       }));
     } catch (error) {
       console.error("Error fetching followers:", error);
@@ -2310,12 +2204,13 @@ export const engineDB = {
   },
 
   async getUserFollowing(userId) {
-    if (!userId) return [];
+    if (!isUserId(userId)) return [];
 
     try {
-      const snapshot = await getDocs(followingCollection(userId));
-      // O id do doc é o uid de quem está sendo seguido.
-      return snapshot.docs.map((doc) => doc.id);
+      const rows = must(
+        await supabase.from("follows").select("target_id").eq("follower_id", userId),
+      );
+      return rows.map((row) => row.target_id);
     } catch (error) {
       console.error("Error fetching user following:", error);
       return [];
@@ -2323,40 +2218,32 @@ export const engineDB = {
   },
 
   /**
-   * Abre uma denúncia. Só a moderação lê a coleção `reports` — quem denuncia
-   * não relê a própria denúncia, para ninguém mapear o que já foi reportado.
+   * Abre uma denúncia. Só a moderação lê — quem denuncia não relê a própria
+   * denúncia, para ninguém mapear o que já foi reportado.
    */
   async reportContent({ targetType, targetId, reportedUserId = "", reason = "" }) {
     if (!currentUserId || !targetId) return;
 
-    await addDoc(collection(firestore, REPORTS_COLLECTION), {
-      targetType: String(targetType || "goal"),
-      targetId: String(targetId),
-      reportedUserId: String(reportedUserId || ""),
-      reporterId: currentUserId,
-      reason: String(reason || "").slice(0, 280),
-      status: "pending",
-      createdAt: serverTimestamp(),
-    });
+    must(
+      await supabase.from("reports").insert({
+        target_type: String(targetType || "goal"),
+        target_id: String(targetId),
+        reported_user_id: String(reportedUserId || ""),
+        reporter_id: currentUserId,
+        reason: String(reason || "").slice(0, 280),
+      }),
+    );
   },
 
   /**
    * Conta uma visita, uma abertura de anúncio ou um clique no WhatsApp.
    *
-   * O contador vive no próprio documento do anúncio, e as regras só deixam
-   * subir de um em um — não dá pra zerar nem inflar a métrica alheia. Aqui do
-   * lado do cliente a trava é o sessionStorage: recarregar a página não conta
-   * de novo. Não é auditoria, é ordem de grandeza — o que o prestador precisa
-   * pra saber se está valendo.
+   * O banco só deixa subir de um em um, e só em anúncio aprovado. Aqui do lado
+   * do cliente a trava é o sessionStorage: recarregar a página não conta de
+   * novo. Não é auditoria, é ordem de grandeza.
    */
   async trackServiceListingMetric(listingId, metric) {
-    const fields = {
-      view: "viewCount",
-      detail: "detailCount",
-      whatsapp: "whatsappCount",
-    };
-    const field = fields[metric];
-    if (!listingId || !field) return;
+    if (!listingId || !["view", "detail", "whatsapp"].includes(metric)) return;
 
     const onceKey = `engine_metric:${listingId}:${metric}`;
     try {
@@ -2367,9 +2254,12 @@ export const engineDB = {
     }
 
     try {
-      await updateDoc(doc(firestore, SERVICE_LISTINGS_COLLECTION, String(listingId)), {
-        [field]: increment(1),
-      });
+      must(
+        await supabase.rpc("track_listing_metric", {
+          p_listing_id: String(listingId),
+          p_metric: metric,
+        }),
+      );
     } catch (error) {
       // Métrica nunca pode atrapalhar quem está usando o app.
       warnFirestoreFallback("trackServiceListingMetric", error);
@@ -2380,8 +2270,7 @@ export const engineDB = {
     if (!userId) return [];
 
     try {
-      const snapshot = await getDoc(userModerationDoc(userId));
-      return snapshot.exists() ? snapshot.data().blockedUserIds || [] : [];
+      return (await readPrivateDoc("moderation", userId))?.blockedUserIds || [];
     } catch (error) {
       warnFirestoreFallback("getBlockedUsers", error);
       return [];
@@ -2391,14 +2280,11 @@ export const engineDB = {
   async setUserBlocked(targetUserId, blocked, userId = currentUserId) {
     if (!userId || !targetUserId || targetUserId === userId) return;
 
-    await setDoc(
-      userModerationDoc(userId),
-      {
-        blockedUserIds: blocked ? arrayUnion(targetUserId) : arrayRemove(targetUserId),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
+    const atual = (await readPrivateDoc("moderation", userId))?.blockedUserIds || [];
+    const blockedUserIds = blocked
+      ? [...new Set([...atual, targetUserId])]
+      : atual.filter((id) => id !== targetUserId);
+    await writePrivateDoc("moderation", { blockedUserIds, updatedAt: nowIso() }, { userId });
   },
 
   async followUser(followerId, targetUserId) {
@@ -2413,24 +2299,22 @@ export const engineDB = {
 
   async notifyUser(userId, notification) {
     const actorId = notification?.actorId || currentUserId;
-    if (!userId || userId === actorId) return;
+    if (!isUserId(userId) || userId === actorId) return;
 
-    await addDoc(userNotificationsCollection(userId), {
-      ...notification,
-      actorId,
-      recipientId: userId,
-      read: false,
-      createdAt: serverTimestamp(),
-    });
+    const { type, ...data } = notification || {};
+    must(
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        actor_id: actorId,
+        type,
+        read: false,
+        data: serializeForFirestore(omitKeys(data, ["actorId", "recipientId", "read", "createdAt"])),
+      }),
+    );
   },
 
   async notifyFollow(userId) {
     if (!userId || userId === currentUserId) return;
-
-    if (apiEnabled()) {
-      await apiRequest(`/community/users/${userId}/follow`, { method: "POST" });
-      return;
-    }
 
     const actorSettings = await this.getSettings();
     const actor = getProfileSnapshot(actorSettings, currentUserId);
@@ -2449,240 +2333,183 @@ export const engineDB = {
   subscribeNotifications(userId = currentUserId, callback) {
     if (!userId) return () => {};
 
-    if (apiEnabled()) {
-      let active = true;
-      const load = async () => {
-        try {
-          const notifications = await apiRequest("/notifications");
-          if (active) callback(notifications);
-        } catch (error) {
-          warnFirestoreFallback("subscribeNotifications", error);
-          if (active) callback([]);
-        }
-      };
-      load();
-      const interval = window.setInterval(load, 10000);
-      return () => {
-        active = false;
-        window.clearInterval(interval);
-      };
-    }
-
-    return onSnapshot(
-      query(userNotificationsCollection(userId), orderBy("createdAt", "desc")),
-      (snapshot) => {
-        callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
-      },
-      (error) => {
+    let active = true;
+    const load = async () => {
+      try {
+        const rows = must(
+          await supabase
+            .from("notifications")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(200),
+        );
+        if (active) callback(rows.map(notificationFromRow));
+      } catch (error) {
         warnFirestoreFallback("subscribeNotifications", error);
-        callback([]);
-      },
-    );
+        if (active) callback([]);
+      }
+    };
+
+    load();
+    const stop = watchTable("notifications", { table: "notifications", filter: `user_id=eq.${userId}` }, load);
+    return () => {
+      active = false;
+      stop();
+    };
   },
 
   async markNotificationsRead(userId = currentUserId) {
     if (!userId) return;
-
-    if (apiEnabled()) {
-      await apiRequest("/notifications/read", { method: "PATCH" });
-      return;
-    }
-
-    const snapshot = await getDocs(userNotificationsCollection(userId));
-    const batch = writeBatch(firestore);
-    snapshot.docs
-      .filter((item) => !item.data().read)
-      .forEach((item) => batch.update(item.ref, { read: true }));
-
-    if (!snapshot.empty) await batch.commit();
+    must(
+      await supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("read", false),
+    );
   },
 
   async toggleCommunityLike(goalId, liked, userId = currentUserId) {
     if (!userId) return;
 
-    if (apiEnabled()) {
-      await apiJson("PATCH", `/community/goals/${goalId}/like`, { liked });
+    // As três leituras não dependem uma da outra: em paralelo, para a curtida
+    // não esperar três idas ao servidor em fila.
+    const [goalRow, likeRow, actorSettings] = await Promise.all([
+      supabase.from("community_goals").select("owner_id, data").eq("id", goalId).maybeSingle().then(must),
+      supabase
+        .from("post_likes")
+        .select("post_id")
+        .eq("post_id", goalId)
+        .eq("liker_id", userId)
+        .maybeSingle()
+        .then(must),
+      liked ? this.getSettings() : null,
+    ]);
+    const goalData = goalRow ? { ...goalRow.data, ownerId: goalRow.owner_id } : null;
+    // Uma linha por pessoa em `post_likes`; o contador do post é mantido pelo
+    // banco a partir dessas linhas, e é delas que o marco de conquista conta.
+    const jaCurtiu = Boolean(likeRow);
+
+    if (!liked) {
+      if (jaCurtiu) {
+        must(await supabase.from("post_likes").delete().eq("post_id", goalId).eq("liker_id", userId));
+      }
+      myLikedGoalIds.delete(goalId);
       return;
     }
+    if (jaCurtiu) return;
 
-    const goalRef = doc(firestore, COMMUNITY_COLLECTION, goalId);
-    const goal = await getDoc(goalRef);
-    const goalData = goal.exists() ? goal.data() : null;
+    must(await supabase.from("post_likes").insert({ post_id: goalId, liker_id: userId }));
+    myLikedGoalIds.add(goalId);
+    if (!goalData) return;
 
-    // A curtida virou um documento com o uid como id, na subcoleção `likes`.
-    // Antes era uma chave no mapa `likesBy`, dentro do próprio post — e
-    // documento no Firestore tem teto de 1 MiB, dividido com os comentários.
-    // Medido em 22/08/2026: o post travava em ~16.900 curtidas, e em ~2.800
-    // quando tinha 2.000 comentários. Quanto mais viral, menor o teto.
-    //
-    // `likesCount` fica no post só como número de vitrine, para a lista não
-    // precisar contar a subcoleção post a post. Quem manda na verdade é a
-    // subcoleção: marco de conquista se conta lá, com getCountFromServer, que
-    // ninguém consegue forjar.
-    const likeRef = doc(goalRef, LIKES_SUBCOLLECTION, userId);
-    const jaCurtiu = (await getDoc(likeRef)).exists();
+    // O aviso sai ANTES da conferência de conquista: ele é o que o dono do
+    // post precisa ver, e a conquista custa mais umas idas ao servidor. Quem
+    // curte e logo sai da página (recarregar, fechar a aba) cortava a
+    // corrente no meio — e era o aviso, que vinha por último, que se perdia.
+    const actor = getProfileSnapshot(actorSettings, userId);
+    await this.notifyUser(goalData.ownerId, {
+      type: "like",
+      actorId: userId,
+      actorName: actor.author,
+      actorUsername: actor.username,
+      goalId,
+      goalTitle: goalData.title,
+      targetPath: `/community?goal=${encodeURIComponent(goalId)}`,
+      notificationTitle: "Nova curtida",
+      notificationBody: `${actor.author} curtiu sua publicação.`,
+      text: `${actor.author} curtiu sua meta ${goalData.title}.`,
+    });
 
-    if (liked && !jaCurtiu) {
-      await setDoc(likeRef, {
-        likerId: userId,
-        postOwnerId: goalData?.ownerId || "",
-        createdAt: serverTimestamp(),
-      });
-      await updateDoc(goalRef, { likesCount: increment(1), updatedAt: serverTimestamp() });
-      myLikedGoalIds.add(goalId);
-
-      // Sem Cloud Function, quem detecta o marco é quem acabou de curtir. O
-      // total vem da subcoleção, não do `likesCount` do post: aquele é vitrine
-      // e a regra só prende o passo em 1, então dava pra empurrar até o selo.
-      await this.concederDegrausDeCurtida(goalData?.ownerId, goalData?.title);
-    } else if (!liked && jaCurtiu) {
-      await deleteDoc(likeRef);
-      await updateDoc(goalRef, { likesCount: increment(-1), updatedAt: serverTimestamp() });
-      myLikedGoalIds.delete(goalId);
-    }
-
-    if (liked && goalData) {
-      const actorSettings = await this.getSettings();
-      const actor = getProfileSnapshot(actorSettings, userId);
-      await this.notifyUser(goalData.ownerId, {
-        type: "like",
-        actorId: userId,
-        actorName: actor.author,
-        actorUsername: actor.username,
-        goalId,
-        goalTitle: goalData.title,
-        targetPath: `/community?goal=${encodeURIComponent(goalId)}`,
-        notificationTitle: "Nova curtida",
-        notificationBody: `${actor.author} curtiu sua publicação.`,
-        text: `${actor.author} curtiu sua meta ${goalData.title}.`,
-      });
-    }
+    // Sem await: a conquista é consequência, não o ato.
+    this.concederDegrausDeCurtida(goalData.ownerId, goalData.title);
   },
 
   async addCommunityComment(goalId, comment, userId = currentUserId) {
     if (!userId) return;
 
-    if (apiEnabled()) {
-      await apiJson("POST", `/community/goals/${goalId}/comments`, { comment });
-      return;
-    }
-
-    const goalRef = doc(firestore, COMMUNITY_COLLECTION, goalId);
-    const goal = await getDoc(goalRef);
-    const goalData = goal.exists() ? goal.data() : null;
     const actorSettings = await this.getSettings();
     const actor = getProfileSnapshot(actorSettings, userId);
-    const commentId = crypto.randomUUID();
-
-    await updateDoc(goalRef, {
-      comments: arrayUnion({
-        id: commentId,
-        userId,
-        author: actor.author,
-        username: actor.username,
-        avatar: actor.avatar,
-        avatarInitials: actor.avatarInitials,
-        text: String(comment).trim().slice(0, 180),
-        createdAt: new Date().toISOString(),
+    // Autor e data quem carimba é o banco; o cartão (nome, @, avatar) vem daqui.
+    const saved = must(
+      await supabase.rpc("add_comment", {
+        p_post_id: goalId,
+        p_comment: {
+          author: actor.author,
+          username: actor.username,
+          avatar: actor.avatar,
+          avatarInitials: actor.avatarInitials,
+          text: String(comment).trim().slice(0, 180),
+        },
       }),
-      updatedAt: serverTimestamp(),
-    });
+    );
     grantOwn("first_comment");
 
-    if (goalData) {
-      await this.notifyUser(goalData.ownerId, {
+    const goalRow = must(
+      await supabase.from("community_goals").select("owner_id, data").eq("id", goalId).maybeSingle(),
+    );
+    if (goalRow) {
+      await this.notifyUser(goalRow.owner_id, {
         type: "comment",
         actorId: userId,
         actorName: actor.author,
         actorUsername: actor.username,
         goalId,
-        goalTitle: goalData.title,
-        commentId,
+        goalTitle: goalRow.data?.title,
+        commentId: saved?.id,
         targetPath: `/community?goal=${encodeURIComponent(goalId)}&comments=1`,
         notificationTitle: "Novo comentário",
         notificationBody: `${actor.author} comentou na sua publicação.`,
-        text: `${actor.author} comentou na sua meta ${goalData.title}.`,
+        text: `${actor.author} comentou na sua meta ${goalRow.data?.title}.`,
       });
     }
   },
 
   async updateCommunityComment(goalId, commentId, text, userId = currentUserId) {
     if (!userId || !goalId || !commentId) return;
-
-    const goalRef = doc(firestore, COMMUNITY_COLLECTION, String(goalId));
-    const snapshot = await getDoc(goalRef);
-    if (!snapshot.exists()) return;
-
-    const comments = Array.isArray(snapshot.data().comments)
-      ? snapshot.data().comments
-      : [];
-    const updatedComments = comments.map((comment) => {
-      if (comment?.id !== commentId || comment?.userId !== userId) return comment;
-      return {
-        ...comment,
-        text: String(text || "").trim().slice(0, 180),
-        editedAt: new Date().toISOString(),
-      };
-    });
-
-    await updateDoc(goalRef, {
-      comments: updatedComments,
-      updatedAt: serverTimestamp(),
-    });
+    must(
+      await supabase.rpc("update_comment", {
+        p_post_id: String(goalId),
+        p_comment_id: String(commentId),
+        p_text: String(text || ""),
+      }),
+    );
   },
 
   async deleteCommunityComment(goalId, commentId, userId = currentUserId) {
     if (!userId || !goalId || !commentId) return;
-
-    const goalRef = doc(firestore, COMMUNITY_COLLECTION, String(goalId));
-    const snapshot = await getDoc(goalRef);
-    if (!snapshot.exists()) return;
-
-    const goalData = snapshot.data();
-    const comments = Array.isArray(goalData.comments) ? goalData.comments : [];
-    const updatedComments = comments.filter(
-      (comment) =>
-        comment?.id !== commentId ||
-        (comment?.userId !== userId && goalData.ownerId !== userId),
+    must(
+      await supabase.rpc("delete_comment", {
+        p_post_id: String(goalId),
+        p_comment_id: String(commentId),
+      }),
     );
-
-    await updateDoc(goalRef, {
-      comments: updatedComments,
-      updatedAt: serverTimestamp(),
-    });
   },
 
   async rateCommunityGoal(goalId, rating, userId = currentUserId) {
     if (!userId) return;
 
-    if (apiEnabled()) {
-      await apiJson("PATCH", `/community/goals/${goalId}/rating`, { rating });
-      return;
-    }
+    must(
+      await supabase.rpc("rate_goal", {
+        p_post_id: goalId,
+        p_rating: Math.max(1, Math.min(Number(rating) || 1, 5)),
+      }),
+    );
 
-    const goalRef = doc(firestore, COMMUNITY_COLLECTION, goalId);
-    const goal = await getDoc(goalRef);
-    const goalData = goal.exists() ? goal.data() : null;
-
-    await updateDoc(goalRef, {
-      [`ratingsBy.${userId}`]: Math.max(1, Math.min(Number(rating) || 1, 5)),
-      updatedAt: serverTimestamp(),
-    });
-
-    if (goalData && goalData.ownerId !== userId) {
+    const goalRow = must(
+      await supabase.from("community_goals").select("owner_id, data").eq("id", goalId).maybeSingle(),
+    );
+    if (goalRow && goalRow.owner_id !== userId) {
       const actorSettings = await this.getSettings();
       const actor = getProfileSnapshot(actorSettings, userId);
-      await this.notifyUser(goalData.ownerId, {
+      await this.notifyUser(goalRow.owner_id, {
         type: "rating",
         actorId: userId,
         actorName: actor.author,
         actorUsername: actor.username,
         goalId,
-        goalTitle: goalData.title,
+        goalTitle: goalRow.data?.title,
         targetPath: `/community?goal=${encodeURIComponent(goalId)}`,
         notificationTitle: "Nova avaliação",
         notificationBody: `${actor.author} avaliou sua publicação.`,
-        text: `${actor.author} avaliou sua meta ${goalData.title}.`,
+        text: `${actor.author} avaliou sua meta ${goalRow.data?.title}.`,
       });
     }
   },
@@ -2693,26 +2520,14 @@ export const engineDB = {
       return normalizeSettings(settings);
     }
 
-    if (apiEnabled()) {
-      const settings = await recoverSettingsAvatar(await apiRequest("/settings"));
-      await setLocalSettings(settings);
-      return settings;
-    }
-
     try {
-      const snapshot = await withTimeout(
-        getDoc(userSettingsDoc()),
-        "buscar configuracoes",
-      );
-      const settings = snapshot.exists() ? snapshot.data() : {};
+      const settings = (await withTimeout(readPrivateDoc("settings"), "buscar configuracoes")) || {};
       const normalized = await recoverSettingsAvatar(settings);
       await setLocalSettings(normalized);
       if (!settings?.profile?.avatar && normalized.profile.avatar) {
-        setDoc(
-          userSettingsDoc(),
-          { profile: { avatar: normalized.profile.avatar } },
-          { merge: true },
-        ).catch((error) => warnFirestoreFallback("persistRecoveredAvatar", error));
+        writePrivateDoc("settings", serializeForFirestore(normalized), { merge: false }).catch((error) =>
+          warnFirestoreFallback("persistRecoveredAvatar", error),
+        );
       }
       return normalized;
     } catch (error) {
@@ -2731,22 +2546,12 @@ export const engineDB = {
       return mergedSettings;
     }
 
-    if (apiEnabled()) {
-      const savedSettings = normalizeSettings(
-        await apiJson("PUT", "/settings", mergedSettings),
-      );
-      await setLocalSettings(savedSettings, userId);
-      return savedSettings;
-    }
-
     await this.reserveUsername(mergedSettings.profile.username, userId);
 
     let savedToServer = true;
     try {
       await withTimeout(
-        setDoc(userSettingsDoc(userId), serializeForFirestore(mergedSettings), {
-          merge: true,
-        }),
+        writePrivateDoc("settings", serializeForFirestore(mergedSettings), { userId }),
         "salvar configuracoes",
       );
     } catch (error) {
@@ -2773,11 +2578,9 @@ export const engineDB = {
       return defaultSettings;
     }
 
-    if (apiEnabled()) {
-      return normalizeSettings(await apiRequest("/settings", { method: "DELETE" }));
-    }
-
-    await deleteDoc(userSettingsDoc());
+    must(
+      await supabase.from("user_private").delete().eq("user_id", currentUserId).eq("doc_id", "settings"),
+    );
     return defaultSettings;
   },
 
@@ -2801,44 +2604,33 @@ export const engineDB = {
       return normalized;
     }
 
-    const usernameRef = doc(firestore, USERNAMES_COLLECTION, usernameDocId(normalized));
-    await runTransaction(firestore, async (transaction) => {
-      const snapshot = await transaction.get(usernameRef);
-      const owner = snapshot.exists() ? snapshot.data().userId : null;
-
-      if (owner && owner !== userId) {
-        throw usernameTakenError();
-      }
-
-      transaction.set(usernameRef, {
-        username: normalized,
-        userId,
-        updatedAt: serverTimestamp(),
-      });
-    });
+    // Atômico no banco: ler e gravar numa operação só, sem janela para dois
+    // cadastros pegarem o mesmo nome.
+    try {
+      must(await supabase.rpc("reserve_username", { p_username: normalized }));
+    } catch (error) {
+      if (error.code === "username-taken") throw usernameTakenError();
+      throw error;
+    }
 
     return normalized;
   },
 
   /**
-   * O nome já é de alguém? Consultado ANTES de criar a conta no Auth.
+   * O nome já é de alguém? Consultado ANTES de criar a conta, para não nascer
+   * conta órfã com o e-mail preso (auditoria de 25/09/2026).
    *
-   * Até 25/09/2026 o cadastro criava a conta primeiro e só depois descobria
-   * que o nome era repetido: a conta nascia órfã (sem nome, sem perfil), a
-   * tela dizia "não foi possível criar sua conta", e na segunda tentativa —
-   * com outro nome — a pessoa recebia "este e-mail já está cadastrado".
-   * Preso fora do app com o próprio e-mail.
-   *
-   * Devolve `null` quando não dá pra saber (regra antiga ainda publicada, sem
-   * rede): quem chama segue, e a reserva transacional depois da criação da
-   * conta continua sendo a trava de verdade.
+   * Devolve `null` quando não dá pra saber (sem rede): quem chama segue, e a
+   * reserva atômica depois da criação da conta continua sendo a trava.
    */
   async isUsernameAvailable(username) {
     const normalized = normalizeUsername(username);
     if (!normalized) return false;
     try {
-      const snapshot = await getDoc(doc(firestore, USERNAMES_COLLECTION, usernameDocId(normalized)));
-      return !snapshot.exists();
+      const row = must(
+        await supabase.from("usernames").select("username").eq("username", usernameDocId(normalized)).maybeSingle(),
+      );
+      return !row;
     } catch {
       return null;
     }
@@ -2865,6 +2657,4 @@ export const engineDB = {
   getDefaultCommunityState() {
     return defaultCommunityState;
   },
-
-
 };

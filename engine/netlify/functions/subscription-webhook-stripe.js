@@ -8,7 +8,7 @@
  * virar premium — o endpoint é público por natureza.
  */
 import Stripe from "stripe";
-import { json, setUserPlan } from "./lib/firebase.js";
+import { json, setUserPlan } from "./lib/supabase.js";
 import { STRIPE } from "./lib/providers.js";
 
 // Estados em que a Stripe considera a assinatura valendo.

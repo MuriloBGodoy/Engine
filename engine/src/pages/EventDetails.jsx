@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
-import { auth } from "../services/firebase";
+import { auth } from "../services/supabase";
 import { engineEvents } from "../services/events";
 import { useToast } from "../components/ToastProvider";
 import { eventTypeLabel } from "../services/eventTypes";

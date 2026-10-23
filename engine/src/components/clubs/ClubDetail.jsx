@@ -18,7 +18,7 @@ import {
 import { useToast } from "../ToastProvider";
 import { clubColorVars, clubMatchesCar } from "../../services/clubStyles";
 import { useIsDark } from "../../hooks/useIsDark";
-import { auth } from "../../services/firebase";
+import { auth } from "../../services/supabase";
 
 /**
  * O corpo da página do clube — cabeçalho, as 5 abas e o painel do capitão.

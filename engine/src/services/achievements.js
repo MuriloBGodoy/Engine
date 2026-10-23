@@ -1,36 +1,27 @@
 /**
  * Conquistas do Engine.
  *
- * Cada conquista é um documento em `users/{uid}/achievements/{id}`, com o id
- * sendo o próprio marco. Não há campo de estado: existir é ter conquistado.
+ * Cada conquista é uma linha em `achievements` (pessoa + marco). Não há campo
+ * de estado: existir é ter conquistado.
  *
  * Por que assim, e não um contador ou uma lista no perfil:
  *
- * - **Dedup de graça.** O Firestore nega `create` em documento que já existe.
- *   Duas detecções simultâneas do mesmo marco não viram duas conquistas nem
- *   duas notificações — a segunda falha sozinha, sem transação.
+ * - **Dedup de graça.** A chave primária (pessoa, marco) recusa o segundo
+ *   insert. Duas detecções simultâneas do mesmo marco não viram duas
+ *   conquistas nem duas notificações — a segunda falha sozinha.
  * - **Revogável.** Fraude descoberta depois se desfaz apagando o documento,
  *   sem reconstruir nada, porque ele não guarda estado incremental.
  * - **Escrita alheia contida.** Quem detecta o cruzamento é o cliente de quem
- *   praticou a ação (quem curtiu, quem seguiu), porque o Firebase está no plano
- *   Spark e não há Cloud Function pra fazer isso no servidor. Ou seja: é escrita
- *   no perfil de OUTRA pessoa. A regra prende por uma lista fechada de ids e por
- *   um corpo de um campo só, então o máximo que se consegue é dar a alguém uma
- *   conquista que ela já ia ganhar.
+ *   praticou a ação (quem curtiu, quem seguiu). Ou seja: é escrita no perfil de
+ *   OUTRA pessoa. O banco prende por uma lista fechada de ids e carimba a data
+ *   ele mesmo, então o máximo que se consegue é dar a alguém uma conquista que
+ *   ela já ia ganhar.
  *
- * A LISTA DE IDS AQUI ESPELHA A REGRA. Se mudar um, mude o outro — id fora da
- * lista é negado pelo servidor (ver `firestore.rules`, match
- * `/users/{userId}/achievements/{achievementId}`).
+ * A LISTA DE IDS AQUI ESPELHA A DO BANCO. Se mudar um, mude o outro — id fora
+ * da lista é recusado pelo `check` da tabela `achievements` (ver
+ * `supabase/migrations`).
  */
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { auth, firestore } from "./firebase";
+import { auth, must, supabase } from "./supabase";
 import {
   earnedLikeTiers,
   earnedTiers,
@@ -39,8 +30,6 @@ import {
   seriesTierId,
   tiersOf,
 } from "./achievementTiers";
-
-const ACHIEVEMENTS_SUBCOLLECTION = "achievements";
 
 // A régua vive num módulo sem dependência, para poder ser testada em Node.
 // Reexportada aqui para quem consome ter um endereço só.
@@ -64,9 +53,6 @@ export {
   seriesTierId,
   garageAchievementIds,
 } from "./achievementTiers";
-
-const achievementsRef = (userId) =>
-  collection(firestore, "users", userId, ACHIEVEMENTS_SUBCOLLECTION);
 
 // --- quem avisa a tela -------------------------------------------------------
 //
@@ -101,8 +87,10 @@ const anunciar = (userId, achievementId) => {
 export const listAchievements = async (userId) => {
   if (!userId) return new Set();
   try {
-    const snapshot = await getDocs(achievementsRef(userId));
-    return new Set(snapshot.docs.map((d) => d.id));
+    const rows = must(
+      await supabase.from("achievements").select("achievement_id").eq("user_id", userId),
+    );
+    return new Set(rows.map((row) => row.achievement_id));
   } catch {
     // Conquista é enfeite do perfil: se falhar, o perfil abre sem selo em vez
     // de não abrir.
@@ -127,10 +115,11 @@ export const grantAchievement = async (userId, achievementId) => {
   const chave = `${userId}/${achievementId}`;
   if (jaResolvido.has(chave)) return false;
   try {
-    const alvo = doc(firestore, "users", userId, ACHIEVEMENTS_SUBCOLLECTION, achievementId);
-    // `create` puro: sem merge, para o Firestore negar quando já existe. Com
-    // merge isto viraria update e a dedup sumiria.
-    await setDoc(alvo, { unlockedAt: serverTimestamp() });
+    // Insert puro, nunca upsert: a chave repetida TEM que falhar, é ela que
+    // diz que a conquista já existia.
+    must(
+      await supabase.from("achievements").insert({ user_id: userId, achievement_id: achievementId }),
+    );
     jaResolvido.add(chave);
     anunciar(userId, achievementId);
     return true;
@@ -168,8 +157,12 @@ export const grantSeries = async (userId, series, value) => {
 export const revokeAchievement = async (userId, achievementId) => {
   if (!userId || !isAchievementId(achievementId)) return false;
   try {
-    await deleteDoc(
-      doc(firestore, "users", userId, ACHIEVEMENTS_SUBCOLLECTION, achievementId),
+    must(
+      await supabase
+        .from("achievements")
+        .delete()
+        .eq("user_id", userId)
+        .eq("achievement_id", achievementId),
     );
     return true;
   } catch {

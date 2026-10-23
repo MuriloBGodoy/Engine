@@ -1,12 +1,17 @@
 /**
- * Passeio de ponta a ponta pelo app LOGADO, contra os emuladores do Firebase.
+ * Passeio de ponta a ponta pelo app LOGADO, contra o Supabase de verdade.
  *
- *   # terminal 1 (raiz do repo)
- *   npx firebase emulators:start --only auth,firestore --project engine-garage
+ *   # terminal 1 (engine/)
+ *   npx vite --port 5190 --strictPort
  *   # terminal 2 (engine/)
- *   VITE_USE_EMULATORS=true npx vite --port 5190 --strictPort
- *   # terminal 3 (engine/)
  *   node scripts/e2e-emulator.mjs [etapa]
+ *   node scripts/supabase/cleanup-test-users.mjs   # sempre, no fim
+ *
+ * Até 16/10/2026 rodava contra os emuladores do Firebase. O Supabase local
+ * pede Docker, que esta máquina não tem; então as contas são reais, com
+ * e-mail `@teste.dev`, e o script de limpeza apaga todas no fim (a conta leva
+ * em cascata tudo que é dela). As políticas do banco que respondem são as de
+ * produção — melhor que emulador, que roda uma cópia das regras.
  *
  * Por que existe: até 24/09/2026 as telas logadas — Garagem, Painel,
  * Mensagens, criar clube, postar — só tinham sido vistas pelo dono, com a
@@ -15,7 +20,7 @@
  * na regra que a maior parte dos defeitos deste projeto morou.
  *
  * Tudo aqui acontece PELA TELA, como uma pessoa faria: preencher, clicar,
- * esperar. Os emuladores rodam as regras reais do repo. Nada toca produção.
+ * esperar. Nenhum dado real é lido nem alterado: só o das contas de teste.
  *
  * Cada etapa registra o que viu (captura + erros de console + erros de
  * página) em `e2e-out/`. O relatório final é a lista de etapas com o
@@ -228,32 +233,15 @@ if (rodandoDireto) {
     return `ano: ${(card.match(/0 ?km|20\d\d/i) || ["?"])[0]} · falta 100%`;
   });
 
-  await etapa("Ana: simulador abre e pede renda", A, async () => {
+  // O simulador ficou enxuto em 06/10/2026: abre direto no custo do mês,
+  // sem convite de renda nem aba "Avançado".
+  await etapa("Ana: simulador abre com o custo do mês", A, async () => {
     await page.getByRole("button", { name: /Simular/ }).first().click();
     await page.waitForTimeout(2500);
     const t = await textoDaPagina(page);
-    if (!/Cabe no seu bolso/.test(t)) throw new Error(`convite de renda ausente — ${t.slice(0, 160)}`);
-    return "convite presente";
-  });
-
-  await etapa("Ana: informa renda e recebe veredito", A, async () => {
-    await page.getByLabel("Sua renda por mês").fill("5200");
-    await page.getByLabel(/Suas contas por mês/).fill("3400");
-    // Há dois "Ver se cabe" de propósito: o do convite e o da barra fixa.
-    await page.getByRole("button", { name: "Ver se cabe" }).first().click();
-    await page.waitForTimeout(3000);
-    const t = await textoDaPagina(page);
-    const veredito = (t.match(/Cabe com folga|Cabe, mas aperta|Não cabe[^.]*/) || [""])[0];
-    if (!veredito) throw new Error(`sem veredito — ${t.slice(0, 200)}`);
-    return veredito;
-  });
-
-  await etapa("Ana: aba Avançado do simulador", A, async () => {
-    const aba = page.getByRole("tab", { name: "Avançado" }).or(page.getByRole("button", { name: "Avançado" }));
-    await aba.first().click();
-    await page.waitForTimeout(1200);
-    const t = await textoDaPagina(page);
-    return /Idade do condutor|Estado/.test(t) ? "campos avançados visíveis" : `? ${t.slice(0, 120)}`;
+    const custo = (t.match(/R\$ ?[\d.]+ ?por mês/) || [""])[0];
+    if (!custo) throw new Error(`custo do mês ausente — ${t.slice(0, 160)}`);
+    return custo;
   });
 
   await etapa("Ana: fecha o simulador pelo X", A, async () => {
@@ -278,7 +266,16 @@ if (rodandoDireto) {
     return "os dois fecham com Esc";
   });
 
+  // O card mostra quanto FALTA ("FALTA 100% · R$ 103.519,00"). O preço FIPE
+  // muda todo mês, então o que se confere é a diferença antes/depois.
+  const faltaNoCard = (texto) => {
+    // O percentual pode ter casa decimal: "FALTA 95,2%".
+    const m = texto.match(/FALTA\s*[\d,]+%\s*R\$\s*([\d.]+),(\d{2})/i);
+    return m ? Number(m[1].replace(/\./g, "")) + Number(m[2]) / 100 : null;
+  };
+
   await etapa("Ana: registra aporte", A, async () => {
+    const faltavaAntes = faltaNoCard(await textoDaPagina(page));
     await page.getByRole("button", { name: /Registrar aporte|^Aporte$/ }).first().click();
     await page.waitForTimeout(1500);
     const campo = page.locator('input[inputmode="numeric"], input[inputmode="decimal"]').first();
@@ -289,8 +286,11 @@ if (rodandoDireto) {
     await page.waitForTimeout(3000);
     await fecharSobreposicoes(page);
     const t = await textoDaPagina(page);
-    // 118.557 − 5.000 = 113.557 é o que o card deve mostrar como restante.
-    return /113\.557/.test(t) ? "card mostra R$ 113.557 restante" : `card NÃO reflete o aporte — ${t.slice(0, 200)}`;
+    const faltaDepois = faltaNoCard(t);
+    if (faltavaAntes == null || faltaDepois == null || faltavaAntes - faltaDepois !== 5000) {
+      throw new Error(`card NÃO reflete o aporte — antes ${faltavaAntes}, depois ${faltaDepois}`);
+    }
+    return `falta caiu R$ 5.000 (${faltavaAntes} → ${faltaDepois})`;
   });
 
   await etapa("Ana: abre a ficha técnica", A, async () => {

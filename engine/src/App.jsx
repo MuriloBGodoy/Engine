@@ -1,8 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
 import { useTranslation } from "react-i18next";
-import { auth } from "./services/firebase";
+import { onAuthChange } from "./services/supabase";
 import { CAR_TYPE_OWNED, engineDB } from "./services/db";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { captureError, identifyUser, resetUser, trackPageView } from "./services/observability";
@@ -93,7 +92,7 @@ function App() {
   useThemeMode(settings.preferences.theme);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthChange((currentUser) => {
       engineDB.setCurrentUser(currentUser?.uid);
       setUser(currentUser);
       setAuthLoading(false);

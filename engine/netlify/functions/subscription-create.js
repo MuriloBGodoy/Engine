@@ -2,14 +2,14 @@
  * Inicia a assinatura do plano Premium e devolve o link do checkout.
  *
  * POST /.netlify/functions/subscription-create
- * Header: Authorization: Bearer <firebase id token>
+ * Header: Authorization: Bearer <token de sessão do Supabase>
  * Body:   { country: "BR" }  (opcional; sem isso cai no país do perfil)
  *
  * Premium libera duas coisas: navegar sem anúncio e publicar serviço.
  */
 import MercadoPagoConfig, { PreApproval } from "mercadopago";
 import Stripe from "stripe";
-import { db, json, requireUser } from "./lib/firebase.js";
+import { json, readSettings, requireUser } from "./lib/supabase.js";
 import {
   MERCADO_PAGO,
   PLAN_PRICES,
@@ -105,14 +105,9 @@ export default async (request) => {
 
     // País vem do perfil salvo; o corpo só serve de fallback pra quem ainda
     // não preencheu o cadastro. Nunca confiar só no que o cliente manda.
-    const settings = await db()
-      .collection("users")
-      .doc(user.uid)
-      .collection("private")
-      .doc("settings")
-      .get();
+    const settings = await readSettings(user.uid);
     const country =
-      settings.data()?.profile?.country || String(body.country || "BR").toUpperCase();
+      settings?.profile?.country || String(body.country || "BR").toUpperCase();
 
     const provider = providerForCountry(country);
     const email = user.email || body.email || undefined;

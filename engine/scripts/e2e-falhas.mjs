@@ -2,7 +2,7 @@
 /**
  * Gravação que falha AVISA — o caminho do erro, provado.
  *
- *   node scripts/e2e-falhas.mjs      (com emuladores + vite, ver e2e-emulator.mjs)
+ *   node scripts/e2e-falhas.mjs      (com o vite no ar, ver e2e-emulator.mjs)
  *
  * Até 25/09/2026 cinco gravações pegavam o erro do Firestore, guardavam uma
  * cópia no navegador e devolviam sucesso. O gatilho mais comum na vida real é
@@ -35,6 +35,21 @@ const lerToasts = () =>
       .filter(Boolean),
   );
 
+// O aviso dura ~2,6 s. Com o Firestore a falha offline só chegava depois do
+// tempo-limite de 7 s; com o Supabase o erro de rede chega na hora, e olhar
+// num instante fixo perdia o aviso que já tinha passado. Espera o aviso
+// APARECER, até `ms`.
+const esperarToast = async (padrao, ms = 10000) => {
+  const vistos = new Set();
+  const fim = Date.now() + ms;
+  while (Date.now() < fim) {
+    (await lerToasts()).forEach((t) => vistos.add(t));
+    if ([...vistos].some((t) => padrao.test(t))) break;
+    await p.waitForTimeout(200);
+  }
+  return [...vistos];
+};
+
 await etapa("cadastro + carro (online)", S, async () => {
   await cadastrar(p, USUARIOS.a);
   await p.waitForURL((u) => !u.pathname.startsWith("/register"), { timeout: 20000 });
@@ -65,8 +80,7 @@ await etapa("OFFLINE: excluir carro avisa e o carro fica", S, async () => {
   await p.getByRole("button", { name: "Excluir" }).first().click();
   await p.waitForTimeout(800);
   await p.getByRole("button", { name: "Excluir" }).last().click();
-  await p.waitForTimeout(9000); // passa do tempo-limite de 7 s
-  const toasts = await lerToasts();
+  const toasts = await esperarToast(/excluir|servidor/i);
   const aindaLa = /Mobi/i.test(await textoDaPagina(p));
   await S.ctx.setOffline(false);
   if (!toasts.some((x) => /excluir|servidor/i.test(x))) throw new Error(`sem aviso — toasts: ${toasts.join(" | ") || "(nenhum)"}`);
@@ -77,6 +91,8 @@ await etapa("OFFLINE: excluir carro avisa e o carro fica", S, async () => {
 await etapa("OFFLINE: anúncio de serviço avisa que NÃO foi enviado", S, async () => {
   await p.goto(`${BASE}/services`, { waitUntil: "load" });
   await p.waitForTimeout(3500);
+  // Sessão nova confere os marcos da garagem: "Primeira Meta" comemora aqui.
+  await fecharSobreposicoes(p);
   await p.getByRole("button", { name: /Cadastrar novo serviço|Novo serviço/i }).first().click();
   await p.waitForTimeout(1500);
   await p.getByPlaceholder("Limpeza premium de carros em domicílio").fill("Polimento técnico");
@@ -87,8 +103,7 @@ await etapa("OFFLINE: anúncio de serviço avisa que NÃO foi enviado", S, async
   await p.getByPlaceholder(/Zona Sul, ABC/).fill("Campinas e região").catch(() => {});
   await S.ctx.setOffline(true);
   await p.getByRole("button", { name: /Enviar para aprovação/i }).last().click();
-  await p.waitForTimeout(9500);
-  const toasts = await lerToasts();
+  const toasts = await esperarToast(/NÃO foi enviado|servidor|enviado para aprovação/i);
   await S.ctx.setOffline(false);
   if (toasts.some((x) => /enviado para aprovação/i.test(x) && !/NÃO/.test(x))) {
     throw new Error(`fingiu sucesso: ${toasts.join(" | ")}`);

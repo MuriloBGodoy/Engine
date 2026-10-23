@@ -42,10 +42,9 @@ import {
   ZoomIn,
   ZoomOut,
 } from"lucide-react";
-import { getDownloadURL, ref, uploadBytes } from"firebase/storage";
 import { FaInstagram, FaTiktok, FaWhatsapp } from"react-icons/fa";
 import { engineDB } from"../services/db";
-import { storage } from"../services/firebase";
+import { uploadToStorage } from "../services/photos";
 import {
   countries,
   getStates,
@@ -2352,15 +2351,10 @@ export function Services({ user, settings }) {
           }
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,"-");
           const path = `users/${user.uid}/services/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
-          const fileRef = ref(storage, path);
           try {
-            await withUploadTimeout(
-              uploadBytes(fileRef, file, { contentType: file.type }),
-              t("services.flash.photoUpload"),
-            );
             const url = await withUploadTimeout(
-              getDownloadURL(fileRef),
-              t("services.flash.photoFetch"),
+              uploadToStorage(path, file, file.type),
+              t("services.flash.photoUpload"),
             );
             return { url, fallback: false };
           } catch (error) {

@@ -241,8 +241,8 @@ permite trocar a paleta inteira depois sem tocar em dado nenhum.
 ## 8. Ordem de trabalho e onde cada um escreve
 
 **Han escreve, e só ele:**
-`src/services/clubs.js`, `firestore.rules`, `firestore.indexes.json`,
-`scripts/check-club-rules.mjs`, `scripts/seed-clubs.mjs`,
+`src/services/clubs.js`, as políticas de clube em `supabase/migrations/`,
+os casos de clube em `engine/scripts/check-rls.mjs`,
 e os campos novos em `src/services/events.js` / `db.js` (só o que o §2 pede).
 
 **Jesse escreve, e só ela:**

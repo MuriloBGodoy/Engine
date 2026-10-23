@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<title>Redefinir sua senha</title>
+</head>
+<body style="margin:0;padding:0;background:#e9ebf0;">
+<!-- Texto de pré-visualização: o que aparece ao lado do assunto na caixa de entrada. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Use o botão para criar uma senha nova. O link vale por 1 hora.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9ebf0;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+        <!-- Marca: o quadrado vermelho com o E, feito em HTML (Gmail bloqueia SVG). -->
+        <tr>
+          <td style="padding:0 4px 20px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="36" height="36" align="center" valign="middle" style="width:36px;height:36px;background:#e11d2a;border-radius:9px;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:900;font-style:italic;color:#ffffff;line-height:36px;">E</td>
+                <td style="padding-left:10px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;color:#131722;letter-spacing:-0.3px;">Engine</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border:1px solid #dde1e9;border-radius:16px;padding:36px 32px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#131722;">
+            <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#e11d2a;">Segurança da conta</p>
+            <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:800;color:#131722;">Vamos criar uma senha nova</h1>
+            <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#5b6472;">Recebemos um pedido para redefinir a senha da conta <strong style="color:#131722;">{{ .Email }}</strong> no Engine. Toque no botão abaixo para escolher a nova.</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+              <tr>
+                <td align="center" style="background:#e11d2a;border-radius:12px;">
+                  <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:15px 28px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Criar nova senha</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#5b6472;">O link vale por <strong style="color:#131722;">1 hora</strong> e só funciona uma vez.</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#f7f8fb;border-radius:12px;padding:16px 18px;font-size:14px;line-height:1.55;color:#5b6472;">
+                  <strong style="color:#131722;">Não foi você?</strong> Pode ignorar este e-mail com tranquilidade. Sua senha continua a mesma e ninguém entra na sua conta sem ela.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 8px 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#8a93a3;">
+            O botão não funciona? Copie e cole este endereço no navegador:<br>
+            <a href="{{ .ConfirmationURL }}" style="color:#5b6472;word-break:break-all;">{{ .ConfirmationURL }}</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 8px 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#8a93a3;">
+            Engine · a garagem dos seus carros<br>
+            Você recebeu este e-mail porque alguém pediu para redefinir a senha desta conta. Não responda: esta caixa não é lida.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

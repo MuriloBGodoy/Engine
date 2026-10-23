@@ -1,98 +1,94 @@
 /**
- * Clubes — camada de dados, falando com o Firestore direto.
- *
- * O que este arquivo era até 22/09/2026: um cliente HTTP do backend Java
- * (`clubsRequest` → `VITE_API_URL`). E `.env.production` tem essa variável
- * VAZIA, então em produção toda chamada ia para `undefined/api/clubs` e
- * estourava. Clubes não estava "pouco usado": estava MORTO no site publicado,
- * desde sempre, e a tela mostrava lista vazia — que soa como ausência e não
- * como erro. É o mesmo defeito que a feature de Eventos teve em agosto, pelo
- * mesmo motivo de fundo: caminho de dado que só existe em dev.
+ * Clubes — camada de dados, falando com o Supabase direto.
  *
  * A forma do que sai daqui é o `CLUBES-CONTRATO.md` §1 e §2, e a razão de cada
  * campo é o `CLUBES-MODELO.md` §2. Três regras de forma valem para tudo:
  *
- *   - data sai como string ISO; `Timestamp` do Firestore não chega em
- *     componente nenhum;
+ *   - data sai como string ISO;
  *   - cor sai como NOME da paleta ("azul-noite"), nunca hex — quem traduz é a
  *     tela, e é isso que permite trocar a paleta inteira sem tocar em dado;
  *   - campo que falta sai como "", [] ou null, nunca `undefined`, para a tela
  *     não precisar de `?.` em toda linha.
  *
- * Duas coisas que NÃO existem aqui, de propósito:
+ * O que mudou com o Supabase (16/10/2026), e por que o arquivo encolheu:
  *
- *   - `collectionGroup`. "Meus clubes" lê o espelho `users/{uid}/clubs`.
- *     Consulta de grupo não passa pela regra aninhada, pede match recursivo e
- *     índice COLLECTION_GROUP — a porta que o override de `members.userId`
- *     deixava aberta no `firestore.indexes.json` e que saiu junto com este
- *     port.
- *   - `postCount`. Contador que ninguém mantém honesto é número inventado com
- *     aparência de dado. Quantos posts o mural tem, se a tela algum dia pedir,
- *     sai de agregação.
+ *   - "Meus clubes" é uma consulta em `club_members` com o clube junto. O
+ *     espelho `users/{uid}/clubs`, que existia só para fugir da consulta de
+ *     grupo do Firestore, deixou de existir.
+ *   - A sigla única é restrição da tabela; o registro `clubTags/` acabou.
+ *   - `member_count` é mantido pelo banco a partir das linhas de membro.
+ *     Entrar e sair não mexem mais em contador nenhum.
+ *   - Quem pode o quê (fundador, capitão, membro) é decidido pelas políticas
+ *     e funções do banco — ver `supabase/migrations`. A checagem aqui é para
+ *     dar o erro certo à tela, não para proteger nada.
+ *
+ * `postCount` continua não existindo: contador que ninguém mantém honesto é
+ * número inventado com aparência de dado.
  */
 import { useCallback, useEffect, useState } from "react";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getCountFromServer,
-  getDoc,
-  getDocs,
-  increment,
-  limit as limitTo,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { auth, firestore } from "./firebase";
+import { auth, must, supabase } from "./supabase";
 import { grantAchievement, grantOwn, grantSeries } from "./achievements";
-import { engineDB, normalizeCommunityGoal, POST_KIND_POST } from "./db";
+import { engineDB, goalFromRow, isUserId, normalizeCommunityGoal, POST_KIND_POST } from "./db";
+import { eventFromRow } from "./events";
 import { normalizeFipeBrand } from "./fipeVersion";
-
-const CLUBS = "clubs";
-const MEMBERS = "members";
-const REQUESTS = "requests";
-const CLUB_TAGS = "clubTags";
-const USERS = "users";
-const USER_CLUBS = "clubs";
-const COMMUNITY = "communityGoals";
-const EVENTS = "events";
 
 const PAPEIS_DE_CARGO = ["founder", "captain"];
 
 /** Quantos membros a garagem automática varre. Ver CLUBES-CONTRATO.md §5. */
 export const GARAGEM_MAX_MEMBROS = 50;
 
-/** Teto do `in` do Firestore: a consulta da garagem vai em lotes deste tamanho. */
-const LOTE_IN = 30;
+/** A linha do banco no formato de documento que `normalizeClub` sempre leu. */
+const clubFromRow = (row) => ({
+  ...(row.data || {}),
+  founderId: row.founder_id || "",
+  tag: row.tag,
+  nameLower: row.name_lower,
+  archived: row.archived,
+  official: row.official,
+  memberCount: row.member_count,
+  country: row.country,
+  state: row.state,
+  joinPolicy: row.join_policy,
+  contentVisibility: row.content_visibility,
+  focus: {
+    ...(row.data?.focus || {}),
+    brands: row.focus_brands || [],
+    styles: row.focus_styles || [],
+  },
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
-const clubRef = (clubId) => doc(firestore, CLUBS, String(clubId));
-const membersRef = (clubId) => collection(firestore, CLUBS, String(clubId), MEMBERS);
-const memberRef = (clubId, uid) => doc(firestore, CLUBS, String(clubId), MEMBERS, String(uid));
+const memberFromRow = (row) => ({
+  role: row.role,
+  joinedAt: row.joined_at,
+  displayName: row.display_name,
+  username: row.username,
+  avatar: row.avatar,
+});
+
+const contar = async (request) => {
+  const { count, error } = await request;
+  if (error) throw error;
+  return count || 0;
+};
 
 /**
- * Degraus de "seu clube chegou a N membros", para quem fundou. Conta a
- * SUBCOLEÇÃO de membros, nunca o `memberCount` do clube: aquele é número de
- * vitrine que cada membro incrementa, e empurrá-lo daria o selo sem gente.
- * Sem await em quem chama: falhar aqui não pode desfazer a entrada.
+ * Degraus de "seu clube chegou a N membros", para quem fundou. Conta as
+ * linhas de membro, que só o banco escreve com honestidade. Sem await em quem
+ * chama: falhar aqui não pode desfazer a entrada.
  */
 const concederMembrosAoFundador = async (clubId, founderId) => {
   if (!founderId) return;
   try {
-    const total = (await getCountFromServer(membersRef(clubId))).data().count;
+    const total = await contar(
+      supabase.from("club_members").select("*", { count: "exact", head: true }).eq("club_id", String(clubId)),
+    );
     await grantSeries(String(founderId), "club_members", total);
   } catch {
     // Conquista é enfeite: a entrada no clube já aconteceu.
   }
 };
-const requestsRef = (clubId) => collection(firestore, CLUBS, String(clubId), REQUESTS);
-const requestRef = (clubId, uid) => doc(firestore, CLUBS, String(clubId), REQUESTS, String(uid));
-const tagRef = (tag) => doc(firestore, CLUB_TAGS, String(tag));
-const mirrorRef = (uid, clubId) => doc(firestore, USERS, String(uid), USER_CLUBS, String(clubId));
 
 // ---------------------------------------------------------------------------
 // Erros
@@ -120,7 +116,7 @@ const exigeLogin = () => {
 // Normalização
 // ---------------------------------------------------------------------------
 
-/** `Timestamp` do Firestore, Date ou string → string ISO. Nunca `undefined`. */
+/** Date, string ou carimbo antigo do Firestore → string ISO. Nunca `undefined`. */
 const paraIso = (valor) => {
   if (!valor) return "";
   if (typeof valor === "string") return valor;
@@ -177,8 +173,8 @@ export const normalizeTag = (tag) =>
   String(tag ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
 
 /**
- * O clube como a tela recebe (contrato §1). Documento antigo, documento do
- * backend Java e documento novo caem todos aqui: o que falta vira "", [] ou
+ * O clube como a tela recebe (contrato §1). Linha migrada do Firestore e
+ * linha nova caem todas aqui: o que falta vira "", [] ou
  * null, e nada sai como `undefined`.
  */
 const normalizeClub = (id, dados = {}, derivados = {}) => ({
@@ -279,8 +275,7 @@ const normalizeClubParaEscrita = (form = {}) => {
 
   return {
     name,
-    // Busca por prefixo precisa de um campo já em minúsculas: o Firestore não
-    // tem comparação que ignore caixa.
+    // Busca por prefixo num campo já em minúsculas.
     nameLower: name.toLowerCase(),
     tag,
     motto: texto(form.motto, 60),
@@ -344,30 +339,20 @@ const perfilDoUsuario = async () => {
 };
 
 /**
- * Consulta que depende de índice composto. Enquanto o índice não estiver
- * publicado, o Firestore devolve `failed-precondition` — e aí a tela tem que
- * mostrar seção vazia, não quebrar. O aviso no console nomeia o índice para
- * quem for investigar não concluir "não tem clube" quando é "falta índice".
+ * Consulta de leitura que, se falhar, vira seção vazia em vez de tela
+ * quebrada. O aviso no console nomeia a consulta para quem for investigar não
+ * concluir "não tem clube" quando é "deu erro".
  */
-const tentarConsulta = async (nomeDoIndice, executar) => {
-  try {
-    return await executar();
-  } catch (erro) {
-    if (erro?.code === "failed-precondition") {
-      console.warn(
-        `[clubes] consulta sem índice publicado (${nomeDoIndice}). ` +
-          "Veja firestore.indexes.json — precisa de deploy.",
-        erro?.message || "",
-      );
-      return null;
-    }
-    if (erro?.code === "permission-denied") return null;
-    throw erro;
+const tentarConsulta = async (nome, executar) => {
+  const { data, error } = await executar();
+  if (error) {
+    console.warn(`[clubes] consulta falhou (${nome}).`, error.message || error);
+    return null;
   }
+  return data;
 };
 
-const docsParaClubes = (snapshot) =>
-  snapshot.docs.map((item) => normalizeClub(item.id, item.data()));
+const rowsParaClubes = (rows) => rows.map((row) => normalizeClub(row.id, clubFromRow(row)));
 
 /**
  * Clube oficial do Engine é semente: ele enche a grade no dia 1 e ensina pelo
@@ -389,125 +374,114 @@ export async function checkTagAvailable(tag) {
   const limpa = normalizeTag(tag);
   if (!TAG_REGEX.test(limpa)) return false;
   try {
-    const snapshot = await getDoc(tagRef(limpa));
-    return !snapshot.exists();
+    const row = must(await supabase.from("clubs").select("id").eq("tag", limpa).maybeSingle());
+    return !row;
   } catch {
-    // Ler `clubTags` exige login. Sem conseguir ler, é mais honesto deixar o
-    // formulário seguir e falhar na criação (com `tag-taken`) do que pintar de
-    // vermelho uma sigla que pode estar livre.
+    // Sem conseguir ler, é mais honesto deixar o formulário seguir e falhar na
+    // criação (com `tag-taken`) do que pintar de vermelho uma sigla livre.
     return true;
   }
 }
 
-/** O próximo encontro datado do clube. Índice: `events` clubId + eventDate. */
+/** O próximo encontro datado do clube. */
 const proximoEncontro = async (clubId) => {
-  const snapshot = await tentarConsulta("events: clubId asc, eventDate asc", () =>
-    getDocs(
-      query(
-        collection(firestore, EVENTS),
-        where("clubId", "==", String(clubId)),
-        where("eventDate", ">=", hojeISO()),
-        orderBy("eventDate", "asc"),
-        limitTo(1),
-      ),
-    ),
+  const rows = await tentarConsulta("events por clube", () =>
+    supabase
+      .from("events")
+      .select("*")
+      .eq("club_id", String(clubId))
+      .gte("event_date", hojeISO())
+      .order("event_date", { ascending: true })
+      .limit(1),
   );
-  const primeiro = snapshot?.docs?.[0];
+  const primeiro = rows?.[0];
   if (!primeiro) return null;
-  const dados = primeiro.data();
+  const evento = eventFromRow(primeiro);
   return {
-    id: primeiro.id,
-    title: texto(dados.title, 120),
-    eventDate: texto(dados.eventDate, 32),
-    city: texto(dados.location, 120),
+    id: evento.id,
+    title: texto(evento.title, 120),
+    eventDate: texto(evento.eventDate, 32),
+    city: texto(evento.location, 120),
   };
 };
 
+const minhaLinha = async (tabela, clubId, uid) =>
+  uid
+    ? supabase
+        .from(tabela)
+        .select("*")
+        .eq("club_id", String(clubId))
+        .eq("uid", uid)
+        .maybeSingle()
+        .then(must)
+        .catch(() => null)
+    : null;
+
 export async function getClub(clubId) {
   if (!clubId) throw erroDeClube("not-found", "Clube não encontrado.");
-  const snapshot = await getDoc(clubRef(clubId));
-  if (!snapshot.exists()) throw erroDeClube("not-found", "Clube não encontrado.");
+  const row = must(await supabase.from("clubs").select("*").eq("id", String(clubId)).maybeSingle());
+  if (!row) throw erroDeClube("not-found", "Clube não encontrado.");
 
   const uid = auth.currentUser?.uid || null;
 
-  // Em clube `contentVisibility: members`, quem não é membro tem a leitura do
-  // próprio doc de membro NEGADA pela regra — o que é a resposta certa, não um
-  // erro de tela. Por isso cada uma destas leituras cai em null sozinha.
   const [meuDoc, meuPedido, encontro, contagem, realizados] = await Promise.all([
-    uid ? getDoc(memberRef(clubId, uid)).catch(() => null) : Promise.resolve(null),
-    uid ? getDoc(requestRef(clubId, uid)).catch(() => null) : Promise.resolve(null),
+    minhaLinha("club_members", clubId, uid),
+    minhaLinha("club_requests", clubId, uid),
     proximoEncontro(clubId),
-    getCountFromServer(membersRef(clubId))
-      .then((item) => item.data().count)
-      .catch(() => null),
-    tentarConsulta("events: clubId asc, eventDate asc", () =>
-      getCountFromServer(
-        query(
-          collection(firestore, EVENTS),
-          where("clubId", "==", String(clubId)),
-          where("eventDate", "<", hojeISO()),
-          orderBy("eventDate", "asc"),
-        ),
-      ).then((item) => item.data().count),
-    ),
+    contar(
+      supabase.from("club_members").select("*", { count: "exact", head: true }).eq("club_id", String(clubId)),
+    ).catch(() => null),
+    contar(
+      supabase
+        .from("events")
+        .select("*", { count: "exact", head: true })
+        .eq("club_id", String(clubId))
+        .lt("event_date", hojeISO()),
+    ).catch(() => 0),
   ]);
 
-  return normalizeClub(snapshot.id, snapshot.data(), {
-    myRole: meuDoc?.exists() ? normalizeMember(uid, meuDoc.data()).role : null,
-    myRequestPending: Boolean(meuPedido?.exists()),
+  // Em clube `contentVisibility: members`, quem é de fora não enxerga a lista
+  // de membros — e a contagem dela daria só a própria linha. `null` = não deu
+  // para contar; aí a tela cai no `memberCount` de vitrine.
+  const fechadoParaMim = row.content_visibility === "members" && !meuDoc;
+
+  return normalizeClub(row.id, clubFromRow(row), {
+    myRole: meuDoc ? normalizeMember(uid, memberFromRow(meuDoc)).role : null,
+    myRequestPending: Boolean(meuPedido),
     nextMeetup: encontro,
-    // O número em DESTAQUE da página é agregação, não vitrine: é uma tela só,
-    // e vitrine é forjável em ±1 por escrita. `null` = não deu para contar
-    // (clube fechado visto de fora); aí a tela cai no `memberCount`.
-    memberCountLive: contagem,
+    memberCountLive: fechadoParaMim ? null : contagem,
     meetupsHeld: realizados ?? 0,
   });
 }
 
-/**
- * Meus clubes: lê o espelho `users/{uid}/clubs` e hidrata os documentos. Uma
- * leitura da lista + N leituras diretas, nenhuma consulta de grupo.
- */
+/** Meus clubes: as minhas linhas de membro, com o clube junto. */
 export async function getMyClubs() {
   const uid = auth.currentUser?.uid;
   if (!uid) return [];
 
-  const espelho = await getDocs(collection(firestore, USERS, uid, USER_CLUBS));
-  if (espelho.empty) return [];
+  const rows = must(await supabase.from("club_members").select("role, clubs(*)").eq("uid", uid));
 
-  const clubes = await Promise.all(
-    espelho.docs.map(async (item) => {
-      const snapshot = await getDoc(clubRef(item.id)).catch(() => null);
-      if (!snapshot?.exists()) return null;
-      return normalizeClub(snapshot.id, snapshot.data(), {
-        myRole: normalizeMember(uid, item.data()).role,
-      });
-    }),
-  );
-
-  return clubes
-    .filter((club) => club && !club.archived)
+  return rows
+    .filter((item) => item.clubs)
+    .map((item) =>
+      normalizeClub(item.clubs.id, clubFromRow(item.clubs), {
+        myRole: normalizeMember(uid, { role: item.role }).role,
+      }),
+    )
+    .filter((club) => !club.archived)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const clubesPorIds = async (ids) => {
   const unicos = [...new Set(ids.filter(Boolean))];
-  const docs = await Promise.all(unicos.map((id) => getDoc(clubRef(id)).catch(() => null)));
-  return docs
-    .filter((item) => item?.exists())
-    .map((item) => normalizeClub(item.id, item.data()))
-    .filter((club) => !club.archived);
+  if (!unicos.length) return [];
+  const rows = must(await supabase.from("clubs").select("*").in("id", unicos));
+  return rowsParaClubes(rows).filter((club) => !club.archived);
 };
 
 /**
  * Descoberta (contrato §3). Quatro seções, e seção vazia simplesmente não
  * aparece — "Nenhum clube perto de você" ocupando espaço é pior que nada.
- *
- * Limite conhecido e deliberado: só UM eixo vai para o servidor. Estilo e
- * marca são `array-contains`, e o Firestore aceita um por consulta; combinar
- * estilo com estado exigiria um índice por combinação (estado × estilo ×
- * marca), então quando há filtro de estilo/marca o recorte de região é feito
- * aqui, sobre o resultado. Modelo §5.
  */
 export async function discoverClubs(filtros = {}) {
   const {
@@ -532,88 +506,68 @@ export async function discoverClubs(filtros = {}) {
   // Busca é excludente: quem digitou quer o que digitou, não quatro trilhos.
   if (busca) {
     const [porNome, porSigla] = await Promise.all([
-      tentarConsulta("clubs: archived asc, nameLower asc", () =>
-        getDocs(
-          query(
-            collection(firestore, CLUBS),
-            where("archived", "==", false),
-            where("nameLower", ">=", busca),
-            where("nameLower", "<=", `${busca}`),
-            orderBy("nameLower"),
-            limitTo(teto),
-          ),
-        ),
+      tentarConsulta("clubs por nome", () =>
+        supabase
+          .from("clubs")
+          .select("*")
+          .eq("archived", false)
+          .ilike("name_lower", `${busca.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+          .order("name_lower")
+          .limit(teto),
       ),
-      getDocs(
-        query(collection(firestore, CLUBS), where("tag", "==", normalizeTag(busca)), limitTo(5)),
-      ).catch(() => null),
+      tentarConsulta("clubs por sigla", () =>
+        supabase.from("clubs").select("*").eq("tag", normalizeTag(busca)).limit(5),
+      ),
     ]);
 
-    const achados = [
-      ...(porSigla ? docsParaClubes(porSigla) : []),
-      ...(porNome ? docsParaClubes(porNome) : []),
-    ].filter((club) => !club.archived);
+    const achados = [...rowsParaClubes(porSigla || []), ...rowsParaClubes(porNome || [])].filter(
+      (club) => !club.archived,
+    );
     secoes.all = semRepetir(achados);
     return secoes;
   }
 
-  // "Pro seu carro": o gancho mais forte que existe aqui, e nenhum app de crew
-  // pesquisado faz isso — só o Engine tem a garagem com vocabulário FIPE, e aí
-  // é igualdade de string, sem parser. Modelo §2.2.
+  // "Pro seu carro": o gancho mais forte que existe aqui — só o Engine tem a
+  // garagem com vocabulário FIPE. Modelo §2.2.
   if (auth.currentUser) {
     const carros = await engineDB.getCars().catch(() => []);
     const marcas = [
       ...new Set(carros.map((carro) => texto(carro.brand, 40)).filter(Boolean)),
     ].slice(0, 3);
-    const porMarca = await Promise.all(
-      marcas.map((marca) =>
-        tentarConsulta("clubs: archived asc, focus.brands contains, memberCount desc", () =>
-          getDocs(
-            query(
-              collection(firestore, CLUBS),
-              where("archived", "==", false),
-              // Os dois lados: o rótulo cru da FIPE (`VW - VolksWagen`), que é
-              // o que clube antigo e seed podem ter gravado, e a forma
-              // canônica, que é o que o formulário grava agora.
-              // `array-contains-any` usa o MESMO índice do `array-contains`.
-              where(
-                "focus.brands",
-                "array-contains-any",
-                [...new Set([marca, canonicalBrand(marca)].filter(Boolean))],
-              ),
-              orderBy("memberCount", "desc"),
-              limitTo(8),
-            ),
-          ),
-        ),
-      ),
-    );
-    const achados = porMarca.filter(Boolean).flatMap(docsParaClubes);
-    secoes.forYourCar = semRepetir(ordenarPorVitrine(achados)).slice(0, teto);
+    // Os dois lados: o rótulo cru da FIPE (`VW - VolksWagen`), que clube
+    // antigo e seed podem ter gravado, e a forma canônica, que é o que o
+    // formulário grava agora.
+    const procuradas = [...new Set(marcas.flatMap((marca) => [marca, canonicalBrand(marca)]).filter(Boolean))];
+    if (procuradas.length) {
+      const rows = await tentarConsulta("clubs por marca", () =>
+        supabase
+          .from("clubs")
+          .select("*")
+          .eq("archived", false)
+          .overlaps("focus_brands", procuradas)
+          .order("member_count", { ascending: false })
+          .limit(8 * marcas.length),
+      );
+      secoes.forYourCar = semRepetir(ordenarPorVitrine(rowsParaClubes(rows || []))).slice(0, teto);
+    }
   }
 
   // "Em alta" = clube com ENCONTRO MARCADO nos próximos 30 dias. Uma coisa só,
-  // verificável, e que ninguém precisa forjar: o dado vem de `events`. Não é
-  // "engajamento" nem contagem de post — clube com encontro marcado está vivo
-  // por definição.
-  const agenda = await tentarConsulta("events: eventDate (campo único)", () =>
-    getDocs(
-      query(
-        collection(firestore, EVENTS),
-        where("eventDate", ">=", hojeISO()),
-        where("eventDate", "<=", emDias(30)),
-        orderBy("eventDate", "asc"),
-        limitTo(60),
-      ),
-    ),
+  // verificável, e que ninguém precisa forjar: o dado vem de `events`.
+  const agenda = await tentarConsulta("events dos próximos 30 dias", () =>
+    supabase
+      .from("events")
+      .select("club_id, event_date")
+      .neq("club_id", "")
+      .gte("event_date", hojeISO())
+      .lte("event_date", emDias(30))
+      .order("event_date", { ascending: true })
+      .limit(60),
   );
   if (agenda) {
-    const idsComEncontro = agenda.docs
-      .map((item) => texto(item.data().clubId, 64))
-      .filter(Boolean);
+    const idsComEncontro = agenda.map((item) => texto(item.club_id, 64)).filter(Boolean);
     const comEncontro = await clubesPorIds(idsComEncontro.slice(0, 12));
-    // A ordem é a do encontro mais próximo, que é a ordem em que a consulta já
-    // veio; o desempate é a vitrine.
+    // A ordem é a do encontro mais próximo; o desempate é a vitrine.
     const posicao = new Map(idsComEncontro.map((id, i) => [id, i]));
     secoes.trending = semRepetir(
       [...comEncontro].sort((a, b) => {
@@ -627,59 +581,44 @@ export async function discoverClubs(filtros = {}) {
   let resto = [];
 
   if (filtroDeEixo) {
-    const campo = style ? "focus.styles" : "focus.brands";
+    const coluna = style ? "focus_styles" : "focus_brands";
     // Chip de estilo vai como está (vocabulário fechado); marca vai canônica,
     // pelo mesmo motivo do "pro seu carro".
     const valorDoEixo = style ? filtroDeEixo : canonicalBrand(filtroDeEixo);
-    const snapshot = await tentarConsulta(
-      `clubs: archived asc, ${campo} contains, memberCount desc`,
-      () =>
-        getDocs(
-          query(
-            collection(firestore, CLUBS),
-            where("archived", "==", false),
-            where(campo, "array-contains", valorDoEixo),
-            orderBy("memberCount", "desc"),
-            limitTo(teto * 2),
-          ),
-        ),
+    const rows = await tentarConsulta(`clubs por ${coluna}`, () =>
+      supabase
+        .from("clubs")
+        .select("*")
+        .eq("archived", false)
+        .contains(coluna, [valorDoEixo])
+        .order("member_count", { ascending: false })
+        .limit(teto * 2),
     );
-    resto = snapshot ? docsParaClubes(snapshot) : [];
-    // Região vira filtro de cliente aqui. Clube sem estado é NACIONAL e nunca
-    // é escondido — mesma leniência do `matchesRegion` da pílula de região.
+    resto = rowsParaClubes(rows || []);
+    // Clube sem estado é NACIONAL e nunca é escondido — mesma leniência do
+    // `matchesRegion` da pílula de região.
     if (state) resto = resto.filter((club) => !club.state || club.state === state);
     if (country) resto = resto.filter((club) => !club.country || club.country === country);
   } else {
-    const perto =
-      state || country
-        ? await tentarConsulta(
-            "clubs: archived asc, country asc, state asc, memberCount desc",
-            () =>
-              getDocs(
-                query(
-                  collection(firestore, CLUBS),
-                  where("archived", "==", false),
-                  ...(country ? [where("country", "==", country)] : []),
-                  ...(state ? [where("state", "==", state)] : []),
-                  orderBy("memberCount", "desc"),
-                  limitTo(teto),
-                ),
-              ),
-          )
-        : null;
-    if (perto) secoes.nearby = semRepetir(ordenarPorVitrine(docsParaClubes(perto))).slice(0, teto);
+    if (state || country) {
+      const perto = await tentarConsulta("clubs por região", () => {
+        let request = supabase.from("clubs").select("*").eq("archived", false);
+        if (country) request = request.eq("country", country);
+        if (state) request = request.eq("state", state);
+        return request.order("member_count", { ascending: false }).limit(teto);
+      });
+      if (perto) secoes.nearby = semRepetir(ordenarPorVitrine(rowsParaClubes(perto))).slice(0, teto);
+    }
 
-    const todos = await tentarConsulta("clubs: archived asc, memberCount desc", () =>
-      getDocs(
-        query(
-          collection(firestore, CLUBS),
-          where("archived", "==", false),
-          orderBy("memberCount", "desc"),
-          limitTo(teto * 2),
-        ),
-      ),
+    const todos = await tentarConsulta("todos os clubes", () =>
+      supabase
+        .from("clubs")
+        .select("*")
+        .eq("archived", false)
+        .order("member_count", { ascending: false })
+        .limit(teto * 2),
     );
-    resto = todos ? docsParaClubes(todos) : [];
+    resto = rowsParaClubes(todos || []);
   }
 
   secoes.all = semRepetir(ordenarPorVitrine(resto)).slice(0, teto);
@@ -689,105 +628,86 @@ export async function discoverClubs(filtros = {}) {
 /** Membros: fundador primeiro, depois capitães, depois o resto por entrada. */
 export async function getClubMembers(clubId, { limit: teto = 50 } = {}) {
   if (!clubId) return [];
-  const snapshot = await tentarConsulta("members: joinedAt (campo único)", () =>
-    getDocs(query(membersRef(clubId), orderBy("joinedAt", "asc"), limitTo(teto))),
+  const rows = await tentarConsulta("membros do clube", () =>
+    supabase
+      .from("club_members")
+      .select("*")
+      .eq("club_id", String(clubId))
+      .order("joined_at", { ascending: true })
+      .limit(teto),
   );
-  if (!snapshot) return [];
+  if (!rows) return [];
 
   const peso = { founder: 0, captain: 1, member: 2 };
-  return snapshot.docs
-    .map((item) => normalizeMember(item.id, item.data()))
+  return rows
+    .map((row) => normalizeMember(row.uid, memberFromRow(row)))
     .sort((a, b) => (peso[a.role] ?? 2) - (peso[b.role] ?? 2));
 }
 
 /**
- * Mural: é `communityGoals` carimbado com `clubId`, não coleção nova. Ganha de
- * graça card, curtida em subcoleção, comentário, denúncia e bloqueio — e o
- * post aparece no feed geral com o chip `[TAG]`, que é propaganda do clube.
+ * Mural: são as publicações da Comunidade carimbadas com `club_id`. Ganham de
+ * graça card, curtida, comentário, denúncia e bloqueio — e o post aparece no
+ * feed geral com o chip `[TAG]`, que é propaganda do clube.
  */
 export async function getClubPosts(clubId, { limit: teto = 20 } = {}) {
   if (!clubId) return [];
-  const snapshot = await tentarConsulta("communityGoals: clubId asc, createdAt desc", () =>
-    getDocs(
-      query(
-        collection(firestore, COMMUNITY),
-        where("clubId", "==", String(clubId)),
-        orderBy("createdAt", "desc"),
-        limitTo(teto),
-      ),
-    ),
+  const rows = await tentarConsulta("mural do clube", () =>
+    supabase
+      .from("community_goals")
+      .select("*")
+      .eq("club_id", String(clubId))
+      .order("created_at", { ascending: false })
+      .limit(teto),
   );
-  if (!snapshot) return [];
-  return snapshot.docs.map((item) => normalizeCommunityGoal({ id: item.id, ...item.data() }));
+  if (!rows) return [];
+  return rows.map((row) => normalizeCommunityGoal(goalFromRow(row)));
 }
 
 /** Encontros do clube. `past: true` traz os que já foram, do mais recente. */
 export async function getClubEvents(clubId, { past = false, limit: teto = 20 } = {}) {
   if (!clubId) return [];
   const hoje = hojeISO();
-  const snapshot = await tentarConsulta("events: clubId asc, eventDate asc", () =>
-    getDocs(
-      query(
-        collection(firestore, EVENTS),
-        where("clubId", "==", String(clubId)),
-        where("eventDate", past ? "<" : ">=", hoje),
-        orderBy("eventDate", past ? "desc" : "asc"),
-        limitTo(teto),
-      ),
-    ),
-  );
-  if (!snapshot) return [];
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  const rows = await tentarConsulta("encontros do clube", () => {
+    const base = supabase.from("events").select("*").eq("club_id", String(clubId));
+    return (past ? base.lt("event_date", hoje) : base.gte("event_date", hoje))
+      .order("event_date", { ascending: !past })
+      .limit(teto);
+  });
+  if (!rows) return [];
+  return rows.map(eventFromRow);
 }
 
 /**
  * Garagem do clube, fase 1: DERIVADA, sem escrita nova e sem contador.
  *
- * `users/{uid}/cars` é privado por regra — ninguém além do dono lê a garagem
- * de alguém. A única representação pública de um carro é a meta publicada na
- * Comunidade, onde o dono já escolheu o que expor. Então a garagem do clube é
- * a meta publicada de quem é membro.
+ * A garagem de cada pessoa é privada. A única representação pública de um
+ * carro é a meta publicada na Comunidade, onde o dono já escolheu o que expor.
+ * Então a garagem do clube é a meta publicada de quem é membro — até 50
+ * membros, e a tela diz isso.
  *
- * Duas decisões que não são óbvias:
- *
- *   - a consulta NÃO filtra `kind == "goal"` no servidor. Publicação de meta
- *     anterior aos posts livres não tem o campo `kind` — "sem kind é meta" é a
- *     regra do `normalizeCommunityGoal`. Filtrar no servidor apagaria da
- *     garagem justamente os carros mais antigos do app. O post livre sai aqui,
- *     no cliente, e com isso nenhum índice composto é preciso.
- *   - o limite é honesto e a tela deve dizê-lo: varre até 50 membros, em lotes
- *     de 30 (teto do `in`). Não é "todos os carros do clube", é a vitrine.
+ * O post livre sai aqui, no cliente: publicação de meta anterior aos posts não
+ * tem `kind`, e "sem kind é meta" é a regra do `normalizeCommunityGoal`.
  */
 export async function getClubGarage(clubId, { limit: teto = 24 } = {}) {
   if (!clubId) return [];
 
   const membros = await getClubMembers(clubId, { limit: GARAGEM_MAX_MEMBROS });
-  const uids = membros.map((membro) => membro.uid);
+  const uids = membros.map((membro) => membro.uid).filter(isUserId);
   if (!uids.length) return [];
 
-  const lotes = [];
-  for (let i = 0; i < uids.length; i += LOTE_IN) lotes.push(uids.slice(i, i + LOTE_IN));
-
-  const [resultados, snapshotDoClube] = await Promise.all([
-    Promise.all(
-      lotes.map((lote) =>
-        getDocs(query(collection(firestore, COMMUNITY), where("ownerId", "in", lote))).catch(
-          () => null,
-        ),
-      ),
-    ),
-    getDoc(clubRef(clubId)).catch(() => null),
+  const [rows, linhaDoClube] = await Promise.all([
+    supabase.from("community_goals").select("*").in("owner_id", uids).then(must).catch(() => []),
+    supabase.from("clubs").select("*").eq("id", String(clubId)).maybeSingle().then(must).catch(() => null),
   ]);
 
-  const foco = snapshotDoClube?.exists()
-    ? normalizeClub(snapshotDoClube.id, snapshotDoClube.data()).focus
+  const foco = linhaDoClube
+    ? normalizeClub(linhaDoClube.id, clubFromRow(linhaDoClube)).focus
     : { brands: [], models: [], styles: [] };
   const marcas = new Set(foco.brands.map((item) => canonicalBrand(item).toUpperCase()));
   const modelos = foco.models.map((item) => item.toUpperCase());
 
-  const carros = resultados
-    .filter(Boolean)
-    .flatMap((snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
+  const carros = rows
+    .map(goalFromRow)
     .filter((goal) => goal.kind !== POST_KIND_POST)
     .filter((goal) => goal.brand || goal.model)
     .map((goal) => ({
@@ -819,18 +739,27 @@ export async function getClubGarage(clubId, { limit: teto = 24 } = {}) {
     .slice(0, teto);
 }
 
-/** Pedidos pendentes. Só capitão e fundador leem — quem garante é a regra. */
+/** Pedidos pendentes. Só capitão e fundador leem — quem garante é o banco. */
 export async function listRequests(clubId) {
   if (!clubId) return [];
-  const snapshot = await getDocs(requestsRef(clubId)).catch(() => null);
-  if (!snapshot) throw erroDeClube("not-allowed", "Só a direção do clube vê os pedidos.");
-  return snapshot.docs.map((item) => ({
-    uid: item.id,
-    displayName: texto(item.data().displayName, 60) || "Usuário Engine",
-    username: texto(item.data().username, 32),
-    avatar: String(item.data().avatar ?? ""),
-    message: texto(item.data().message, 200),
-    createdAt: paraIso(item.data().createdAt),
+  const papel = await getMembershipStatus(clubId);
+  if (!PAPEIS_DE_CARGO.includes(papel)) {
+    throw erroDeClube("not-allowed", "Só a direção do clube vê os pedidos.");
+  }
+  const rows = must(
+    await supabase
+      .from("club_requests")
+      .select("*")
+      .eq("club_id", String(clubId))
+      .order("created_at", { ascending: true }),
+  );
+  return rows.map((row) => ({
+    uid: row.uid,
+    displayName: texto(row.display_name, 60) || "Usuário Engine",
+    username: texto(row.username, 32),
+    avatar: String(row.avatar ?? ""),
+    message: texto(row.message, 200),
+    createdAt: paraIso(row.created_at),
   }));
 }
 
@@ -838,11 +767,11 @@ export async function getMembershipStatus(clubId) {
   const uid = auth.currentUser?.uid;
   if (!uid || !clubId) return "none";
   const [membro, pedido] = await Promise.all([
-    getDoc(memberRef(clubId, uid)).catch(() => null),
-    getDoc(requestRef(clubId, uid)).catch(() => null),
+    minhaLinha("club_members", clubId, uid),
+    minhaLinha("club_requests", clubId, uid),
   ]);
-  if (membro?.exists()) return normalizeMember(uid, membro.data()).role;
-  if (pedido?.exists()) return "pending";
+  if (membro) return normalizeMember(uid, memberFromRow(membro)).role;
+  if (pedido) return "pending";
   return "none";
 }
 
@@ -851,57 +780,26 @@ export async function getMembershipStatus(clubId) {
 // ---------------------------------------------------------------------------
 
 /**
- * Criação do clube: UM lote, quatro documentos, tudo ou nada.
- *
- *   clubs/{id} + clubTags/{TAG} + clubs/{id}/members/{uid} + users/{uid}/clubs/{id}
- *
- * A unicidade da sigla vem do registro `clubTags/{TAG}`, não de uma consulta:
- * consulta lê um instante, e dois formulários enviados no mesmo segundo
- * passariam os dois. No registro, o segundo lote bate num documento que já
- * existe e a regra (`update: if false`) derruba o lote inteiro — inclusive o
- * clube. É o mesmo mecanismo de `usernames/`.
+ * Criação do clube: clube + fundador num passo só, tudo ou nada, dentro do
+ * banco (`create_club`). A unicidade da sigla é restrição da tabela — dois
+ * formulários enviados no mesmo segundo não passam os dois.
  */
 export async function createClub(form) {
   const uid = exigeLogin();
   const dados = normalizeClubParaEscrita(form);
 
-  // Checagem otimista, só para dar erro bom antes de montar o lote. Quem
-  // decide de verdade é a regra, logo abaixo.
+  // Checagem otimista, só para dar erro bom antes de enviar. Quem decide de
+  // verdade é a restrição única.
   if (!(await checkTagAvailable(dados.tag))) {
     throw erroDeClube("tag-taken", `A sigla ${dados.tag} já está em uso.`);
   }
 
   const perfil = await perfilDoUsuario();
-  const ref = doc(collection(firestore, CLUBS));
-  const agora = serverTimestamp();
-
-  const lote = writeBatch(firestore);
-  lote.set(ref, {
-    ...dados,
-    founderId: uid,
-    memberCount: 1,
-    official: false,
-    archived: false,
-    createdAt: agora,
-    updatedAt: agora,
-  });
-  lote.set(tagRef(dados.tag), { clubId: ref.id, createdBy: uid, createdAt: agora });
-  lote.set(memberRef(ref.id, uid), { uid, role: "founder", joinedAt: agora, ...perfil });
-  lote.set(mirrorRef(uid, ref.id), {
-    clubId: ref.id,
-    role: "founder",
-    joinedAt: agora,
-    tag: dados.tag,
-    name: dados.name,
-  });
-
+  let id;
   try {
-    await lote.commit();
+    id = must(await supabase.rpc("create_club", { p_club: dados, p_member: perfil }));
   } catch (erro) {
-    // Lote atômico falha inteiro: o erro não diz QUAL escrita foi negada. A
-    // sigla é de longe a causa mais provável e é a única que a tela sabe
-    // tratar, então vale reconferir antes de repassar o erro cru.
-    if (erro?.code === "permission-denied" && !(await checkTagAvailable(dados.tag))) {
+    if (erro.code === "tag-taken") {
       throw erroDeClube("tag-taken", `A sigla ${dados.tag} já está em uso.`);
     }
     throw erro;
@@ -912,58 +810,44 @@ export async function createClub(form) {
   grantOwn("club_founder");
   grantOwn("club_joined");
 
-  const criado = await getDoc(ref).catch(() => null);
-  return criado?.exists()
-    ? normalizeClub(ref.id, criado.data(), { myRole: "founder" })
-    : normalizeClub(ref.id, { ...dados, founderId: uid, memberCount: 1 }, { myRole: "founder" });
+  const criado = await supabase.from("clubs").select("*").eq("id", id).maybeSingle().then(must).catch(() => null);
+  return criado
+    ? normalizeClub(id, clubFromRow(criado), { myRole: "founder" })
+    : normalizeClub(id, { ...dados, founderId: uid, memberCount: 1 }, { myRole: "founder" });
 }
 
 /**
- * Entrar. Clube aberto entra na hora (membro + espelho + vitrine, num lote);
- * clube de aprovação cria o pedido e espera.
+ * Entrar. Clube aberto entra na hora; clube de aprovação cria o pedido e
+ * espera. O contador de membros quem soma é o banco.
  */
 export async function joinClub(clubId) {
   const uid = exigeLogin();
-  const snapshot = await getDoc(clubRef(clubId));
-  if (!snapshot.exists()) throw erroDeClube("not-found", "Clube não encontrado.");
+  const row = must(await supabase.from("clubs").select("*").eq("id", String(clubId)).maybeSingle());
+  if (!row) throw erroDeClube("not-found", "Clube não encontrado.");
 
-  const club = normalizeClub(snapshot.id, snapshot.data());
+  const club = normalizeClub(row.id, clubFromRow(row));
   if (club.archived) throw erroDeClube("club-archived", "Este clube foi arquivado.");
 
-  const jaSou = await getDoc(memberRef(clubId, uid)).catch(() => null);
-  if (jaSou?.exists()) return normalizeMember(uid, jaSou.data()).role;
+  const jaSou = await minhaLinha("club_members", clubId, uid);
+  if (jaSou) return normalizeMember(uid, memberFromRow(jaSou)).role;
 
   const perfil = await perfilDoUsuario();
+  const cartao = {
+    display_name: perfil.displayName,
+    username: perfil.username,
+    avatar: perfil.avatar,
+  };
 
   if (club.joinPolicy === "approval") {
-    const pedido = await getDoc(requestRef(clubId, uid)).catch(() => null);
-    if (pedido?.exists()) {
+    const pedido = await minhaLinha("club_requests", clubId, uid);
+    if (pedido) {
       throw erroDeClube("already-requested", "Seu pedido já está na fila.");
     }
-    await setDoc(requestRef(clubId, uid), {
-      uid,
-      message: "",
-      createdAt: serverTimestamp(),
-      ...perfil,
-    });
+    must(await supabase.from("club_requests").insert({ club_id: String(clubId), uid, message: "", ...cartao }));
     return "pending";
   }
 
-  const lote = writeBatch(firestore);
-  const agora = serverTimestamp();
-  lote.set(memberRef(clubId, uid), { uid, role: "member", joinedAt: agora, ...perfil });
-  lote.set(mirrorRef(uid, clubId), {
-    clubId: String(clubId),
-    role: "member",
-    joinedAt: agora,
-    tag: club.tag,
-    name: club.name,
-  });
-  // Vitrine: passo de 1, e a regra confere que quem soma virou membro NESTE
-  // lote (`existsAfter`). `increment` em vez de ler-e-escrever porque duas
-  // pessoas entrando ao mesmo tempo não podem gravar o mesmo número.
-  lote.update(clubRef(clubId), { memberCount: increment(1), updatedAt: agora });
-  await lote.commit();
+  must(await supabase.from("club_members").insert({ club_id: String(clubId), uid, role: "member", ...cartao }));
 
   grantOwn("club_joined");
   concederMembrosAoFundador(clubId, club.founderId);
@@ -973,29 +857,25 @@ export async function joinClub(clubId) {
 /** Sair. Fundador não sai: ele transfere (fase 2) ou arquiva. */
 export async function leaveClub(clubId) {
   const uid = exigeLogin();
-  const meuDoc = await getDoc(memberRef(clubId, uid)).catch(() => null);
-  if (!meuDoc?.exists()) throw erroDeClube("not-member", "Você não é membro deste clube.");
+  const meuDoc = await minhaLinha("club_members", clubId, uid);
+  if (!meuDoc) throw erroDeClube("not-member", "Você não é membro deste clube.");
 
-  if (normalizeMember(uid, meuDoc.data()).role === "founder") {
+  if (normalizeMember(uid, memberFromRow(meuDoc)).role === "founder") {
     throw erroDeClube(
       "founder-cannot-leave",
       "Fundador não sai do clube: transfira a fundação ou arquive o clube.",
     );
   }
 
-  const lote = writeBatch(firestore);
-  lote.delete(memberRef(clubId, uid));
-  lote.delete(mirrorRef(uid, clubId));
-  lote.update(clubRef(clubId), { memberCount: increment(-1), updatedAt: serverTimestamp() });
-  await lote.commit();
+  must(await supabase.from("club_members").delete().eq("club_id", String(clubId)).eq("uid", uid));
   return "none";
 }
 
 const exigeCargo = async (clubId, cargos = PAPEIS_DE_CARGO) => {
   const uid = exigeLogin();
-  const meuDoc = await getDoc(memberRef(clubId, uid)).catch(() => null);
-  if (!meuDoc?.exists()) throw erroDeClube("not-member", "Você não é membro deste clube.");
-  const role = normalizeMember(uid, meuDoc.data()).role;
+  const meuDoc = await minhaLinha("club_members", clubId, uid);
+  if (!meuDoc) throw erroDeClube("not-member", "Você não é membro deste clube.");
+  const role = normalizeMember(uid, memberFromRow(meuDoc)).role;
   if (!cargos.includes(role)) {
     throw erroDeClube("not-allowed", "Esta ação é da direção do clube.");
   }
@@ -1003,51 +883,47 @@ const exigeCargo = async (clubId, cargos = PAPEIS_DE_CARGO) => {
 };
 
 /**
- * Aprovar pedido: o CAPITÃO escreve o doc de membro de outra pessoa — é o
- * único ponto de escrita alheia do modelo, e a regra o prende a dois fatos:
- * existir um pedido daquele uid, e quem escreve ter cargo. O espelho de "meus
- * clubes" do aprovado entra no mesmo lote, senão ele só descobriria que entrou
- * tropeçando no clube de novo.
+ * Aprovar pedido: a direção cria a linha de membro de outra pessoa — o único
+ * ponto de escrita alheia do modelo, e o banco o prende a dois fatos: existir
+ * um pedido daquela pessoa, e quem escreve ter cargo. O pedido some sozinho
+ * quando a pessoa vira membro.
  */
 export async function approveRequest(clubId, alvoUid) {
   await exigeCargo(clubId);
-  const pedido = await getDoc(requestRef(clubId, alvoUid));
-  if (!pedido.exists()) throw erroDeClube("not-found", "Pedido não encontrado.");
+  const pedido = must(
+    await supabase
+      .from("club_requests")
+      .select("*")
+      .eq("club_id", String(clubId))
+      .eq("uid", String(alvoUid))
+      .maybeSingle(),
+  );
+  if (!pedido) throw erroDeClube("not-found", "Pedido não encontrado.");
 
-  const snapshot = await getDoc(clubRef(clubId));
-  const club = normalizeClub(snapshot.id, snapshot.data());
-  const dados = pedido.data();
-  const agora = serverTimestamp();
+  const row = must(await supabase.from("clubs").select("founder_id").eq("id", String(clubId)).single());
 
-  const lote = writeBatch(firestore);
-  lote.set(memberRef(clubId, alvoUid), {
-    uid: String(alvoUid),
-    role: "member",
-    joinedAt: agora,
-    displayName: texto(dados.displayName, 60) || "Usuário Engine",
-    username: texto(dados.username, 32),
-    avatar: String(dados.avatar ?? ""),
-  });
-  lote.set(mirrorRef(alvoUid, clubId), {
-    clubId: String(clubId),
-    role: "member",
-    joinedAt: agora,
-    tag: club.tag,
-    name: club.name,
-  });
-  lote.delete(requestRef(clubId, alvoUid));
-  lote.update(clubRef(clubId), { memberCount: increment(1), updatedAt: agora });
-  await lote.commit();
+  must(
+    await supabase.from("club_members").insert({
+      club_id: String(clubId),
+      uid: String(alvoUid),
+      role: "member",
+      display_name: texto(pedido.display_name, 60) || "Usuário Engine",
+      username: texto(pedido.username, 32),
+      avatar: String(pedido.avatar ?? ""),
+    }),
+  );
 
-  // Quem aprova concede a quem entrou — é escrita no perfil alheio, que a
-  // regra permite só para ids da lista fechada.
+  // Quem aprova concede a quem entrou — escrita no perfil alheio, que o banco
+  // permite só para ids da lista fechada.
   grantAchievement(alvoUid, "club_joined").catch(() => false);
-  concederMembrosAoFundador(clubId, club.founderId);
+  concederMembrosAoFundador(clubId, row.founder_id);
 }
 
 export async function rejectRequest(clubId, alvoUid) {
   await exigeCargo(clubId);
-  await deleteDoc(requestRef(clubId, alvoUid));
+  must(
+    await supabase.from("club_requests").delete().eq("club_id", String(clubId)).eq("uid", String(alvoUid)),
+  );
 }
 
 /**
@@ -1059,37 +935,39 @@ export async function setMemberRole(clubId, alvoUid, role) {
   if (!["captain", "member"].includes(role)) {
     throw erroDeClube("not-allowed", "Cargo inválido.");
   }
-  await updateDoc(memberRef(clubId, alvoUid), { role });
+  must(
+    await supabase
+      .from("club_members")
+      .update({ role })
+      .eq("club_id", String(clubId))
+      .eq("uid", String(alvoUid)),
+  );
 }
 
 export async function removeMember(clubId, alvoUid) {
   const { uid } = await exigeCargo(clubId);
   if (String(alvoUid) === uid) throw erroDeClube("not-allowed", "Use sair do clube.");
 
-  const lote = writeBatch(firestore);
-  lote.delete(memberRef(clubId, alvoUid));
-  lote.delete(mirrorRef(alvoUid, clubId));
-  lote.update(clubRef(clubId), { memberCount: increment(-1), updatedAt: serverTimestamp() });
-  await lote.commit();
+  must(
+    await supabase.from("club_members").delete().eq("club_id", String(clubId)).eq("uid", String(alvoUid)),
+  );
 }
 
 /**
- * Editar. O que cada cargo pode mudar é filtrado AQUI e conferido na regra —
- * filtrar só aqui seria checagem que existe em React, e checagem que só existe
- * em React não é checagem.
+ * Editar. O que cada cargo pode mudar é filtrado AQUI e conferido de novo no
+ * banco (`update_club`) — filtrar só aqui seria checagem que existe em React.
  */
 export async function updateClub(clubId, parcial = {}) {
   const { role } = await exigeCargo(clubId);
-  const atual = await getDoc(clubRef(clubId));
-  if (!atual.exists()) throw erroDeClube("not-found", "Clube não encontrado.");
+  const atual = must(await supabase.from("clubs").select("*").eq("id", String(clubId)).maybeSingle());
+  if (!atual) throw erroDeClube("not-found", "Clube não encontrado.");
 
   const completo = normalizeClubParaEscrita({
-    ...normalizeClub(clubId, atual.data()),
+    ...normalizeClub(clubId, clubFromRow(atual)),
     ...parcial,
   });
 
-  // Sigla não muda na fase 1: o registro em `clubTags` ficaria apontando para
-  // o nada, e mudar sigla é mudar identidade.
+  // Sigla não muda na fase 1: mudar sigla é mudar identidade.
   const permitidos =
     role === "founder" ? Object.keys(completo).filter((campo) => campo !== "tag") : CAMPOS_DO_CAPITAO;
 
@@ -1097,37 +975,32 @@ export async function updateClub(clubId, parcial = {}) {
   for (const campo of permitidos) {
     if (campo in parcial) mudancas[campo] = completo[campo];
   }
-  // Nome e busca por prefixo andam juntos: `nameLower` sem `name` é índice
-  // apontando para um nome que não existe mais.
+  // Nome e busca por prefixo andam juntos.
   if ("name" in mudancas) mudancas.nameLower = completo.nameLower;
 
   if (!Object.keys(mudancas).length) {
     throw erroDeClube("not-allowed", "Nada que você possa editar foi alterado.");
   }
 
-  await updateDoc(clubRef(clubId), { ...mudancas, updatedAt: serverTimestamp() });
+  must(await supabase.rpc("update_club", { p_club_id: String(clubId), p_patch: mudancas }));
   return getClub(clubId);
 }
 
-/**
- * Arquivar em vez de apagar: sem Cloud Function, o delete deixaria membros,
- * pedidos e a sigla registrada órfãos. Mesmo limite já documentado em eventos.
- */
+/** Arquivar em vez de apagar: membros e sigla continuam apontando para algo. */
 export async function archiveClub(clubId) {
   await exigeCargo(clubId, ["founder"]);
-  await updateDoc(clubRef(clubId), { archived: true, updatedAt: serverTimestamp() });
+  must(await supabase.rpc("archive_club", { p_club_id: String(clubId) }));
 }
 
 /**
  * Post no mural. Passa pelo MESMO caminho de escrita do feed
- * (`engineDB.createCommunityPost`), que já trata perfil, teto de 1 MiB do
- * documento e limite de fotos. Um segundo caminho de escrita para a mesma
- * coleção é como se ganham seis bugs num dia.
+ * (`engineDB.createCommunityPost`). Um segundo caminho de escrita para a
+ * mesma tabela é como se ganham seis bugs num dia.
  */
 export async function createClubPost(clubId, { text, images = [], videoUrl = "", car = null }) {
-  const snapshot = await getDoc(clubRef(clubId));
-  if (!snapshot.exists()) throw erroDeClube("not-found", "Clube não encontrado.");
-  const club = normalizeClub(snapshot.id, snapshot.data());
+  const row = must(await supabase.from("clubs").select("*").eq("id", String(clubId)).maybeSingle());
+  if (!row) throw erroDeClube("not-found", "Clube não encontrado.");
+  const club = normalizeClub(row.id, clubFromRow(row));
 
   const status = await getMembershipStatus(clubId);
   if (!["founder", "captain", "member"].includes(status)) {
@@ -1380,8 +1253,8 @@ export const api = {
         images: postData.images || [],
         videoUrl: postData.videoUrl || "",
       }),
-    // O mural é `communityGoals`: curtir e apagar post de clube é curtir e
-    // apagar publicação da Comunidade, pelo caminho que já existe.
+    // O mural são as publicações da Comunidade: curtir e apagar post de clube
+    // é curtir e apagar publicação, pelo caminho que já existe.
     likePost: (_clubId, postId) => engineDB.toggleCommunityLike(postId, true),
     unlikePost: (_clubId, postId) => engineDB.toggleCommunityLike(postId, false),
     deletePost: (_clubId, postId) => engineDB.deleteCommunityGoal({ id: postId }),

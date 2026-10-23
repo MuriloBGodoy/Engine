@@ -2,20 +2,30 @@
  * Cadastro com nome de usuário que já existe — o defeito que prendia o
  * e-mail da pessoa fora do app (achado na auditoria de 24/09/2026).
  *
- *   node scripts/e2e-cadastro.mjs      (com emuladores + vite, ver e2e-emulator.mjs)
+ *   node scripts/e2e-cadastro.mjs      (com o vite no ar, ver e2e-emulator.mjs)
  *
  * O que tem que acontecer: a tela diz que o NOME está em uso, nenhuma conta
  * é criada, e a pessoa troca o nome e entra com o MESMO e-mail. Antes:
  * "Não foi possível criar sua conta agora" → "Este e-mail já está cadastrado".
  */
 import { chromium } from "playwright";
-import { getAuth } from "firebase-admin/auth";
-import { initializeApp } from "firebase-admin/app";
+import { readFileSync } from "node:fs";
+import { createClient } from "@supabase/supabase-js";
 import { novaSessao, etapa, cadastrar, lerErroDaTela, relatorio, USUARIOS } from "./e2e-emulator.mjs";
 
-process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
-initializeApp({ projectId: "engine-garage" });
-const contaExiste = (email) => getAuth().getUserByEmail(email).then(() => true, () => false);
+// Pergunta direto ao Auth do Supabase se a conta nasceu (chave de servidor,
+// em C:\engine-credentials\supabase.env, fora do repo).
+const env = Object.fromEntries(
+  readFileSync(process.env.SUPABASE_ENV_FILE || "C:/engine-credentials/supabase.env", "utf8")
+    .split(/\r?\n/)
+    .filter((line) => line.includes("="))
+    .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+);
+const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const contaExiste = async (email) => {
+  const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  return (data?.users || []).some((user) => user.email === email.toLowerCase());
+};
 
 const browser = await chromium.launch();
 

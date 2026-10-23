@@ -16,22 +16,16 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import {
-  EmailAuthProvider,
-  FacebookAuthProvider,
-  GoogleAuthProvider,
-  reauthenticateWithCredential,
-  reauthenticateWithPopup,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  signOut,
-  updatePassword,
-  verifyBeforeUpdateEmail,
-} from "firebase/auth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { engineDB } from "../services/db";
-import { auth } from "../services/firebase";
+import {
+  sendPasswordReset,
+  setNewPassword,
+  signOut,
+  supabase,
+  verifyCurrentPassword,
+} from "../services/supabase";
 import { getMyClubs } from "../services/clubs";
 import { languageOptions } from "../services/languages";
 import { countries, getStates } from "../services/locations";
@@ -58,8 +52,8 @@ const secondaryButton =
 
 const SECTIONS = ["account", "notifications", "privacy", "app"];
 
-// Mensagem do Firebase vem em inglês e com o código no meio ("Firebase:
-// Error (auth/wrong-password)"). Até 05/10/2026 ela ia crua para a tela.
+// Mensagem do servidor de login vem em inglês. Até 05/10/2026 ela ia crua
+// para a tela; `services/supabase.js` traduz para estes códigos.
 const authErrorKey = (error) => {
   const code = error?.code || "";
   const known = {
@@ -78,11 +72,6 @@ const authErrorKey = (error) => {
     "auth/network-request-failed": "network",
   };
   return `settings.authErrors.${known[code] || "generic"}`;
-};
-
-const socialProviders = {
-  "google.com": () => new GoogleAuthProvider(),
-  "facebook.com": () => new FacebookAuthProvider(),
 };
 
 const providerLabels = {
@@ -320,11 +309,8 @@ function ChangePasswordForm({ t, user, onDone }) {
     if (next !== confirmNext) return setError(t("settings.account.passwordMismatch"));
     setBusy(true);
     try {
-      await reauthenticateWithCredential(
-        user,
-        EmailAuthProvider.credential(user.email, current),
-      );
-      await updatePassword(user, next);
+      await verifyCurrentPassword(current);
+      await setNewPassword(next);
       toast(t("settings.account.passwordChanged"));
       onDone();
     } catch (err) {
@@ -378,9 +364,8 @@ function ChangePasswordForm({ t, user, onDone }) {
   );
 }
 
-// `updateEmail` é recusado em projeto com proteção contra enumeração de
-// e-mail (o padrão do Firebase desde 2023): o caminho é mandar o link para o
-// endereço NOVO e a troca só acontece quando a pessoa confirma lá.
+// A troca de e-mail não é imediata: vai um link para o endereço NOVO (e um
+// aviso para o antigo), e a troca só acontece quando a pessoa confirma.
 function ChangeEmailForm({ t, user, onDone }) {
   const [newEmail, setNewEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -397,11 +382,12 @@ function ChangeEmailForm({ t, user, onDone }) {
     }
     setBusy(true);
     try {
-      await reauthenticateWithCredential(
-        user,
-        EmailAuthProvider.credential(user.email, password),
+      await verifyCurrentPassword(password);
+      const { error } = await supabase.auth.updateUser(
+        { email },
+        { emailRedirectTo: `${window.location.origin}/settings` },
       );
-      await verifyBeforeUpdateEmail(user, email);
+      if (error) throw Object.assign(error, { code: "auth/unknown" });
       toast(t("settings.account.emailLinkSent", { email }), { tone: "info", duration: 7000 });
       onDone();
     } catch (err) {
@@ -448,18 +434,6 @@ function ChangeEmailForm({ t, user, onDone }) {
   );
 }
 
-// Popup de login dentro do app instalado (PWA no iOS, TWA no Android) é o
-// ponto frágil do Firebase Auth: quando falha ali, o caminho é o navegador.
-const isStandalone = () =>
-  window.matchMedia?.("(display-mode: standalone)").matches ||
-  window.navigator.standalone === true;
-
-const POPUP_FAILURES = [
-  "auth/popup-blocked",
-  "auth/popup-closed-by-user",
-  "auth/network-request-failed",
-];
-
 const noop = () => {};
 
 function DeleteAccountDialog({ t, user, open, onClose }) {
@@ -467,6 +441,7 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
   const toast = useToast();
   const { isPremium } = useIsPremium(user?.uid);
   const [password, setPassword] = useState("");
+  const [typedEmail, setTypedEmail] = useState("");
   const [phase, setPhase] = useState("confirm"); // confirm | running | failed
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -474,7 +449,7 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
   const [foundedClubs, setFoundedClubs] = useState([]);
   const providerIds = (user?.providerData || []).map((item) => item.providerId);
   const usesPassword = providerIds.includes("password");
-  const socialId = providerIds.find((id) => socialProviders[id]);
+  const socialId = providerIds.find((id) => providerLabels[id] && id !== "password");
 
   // Enquanto apaga, voltar NÃO fecha: a entrada de histórico continua nossa
   // e o gesto é engolido — senão o Android saía da tela (ou do app, no TWA)
@@ -508,13 +483,15 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
 
   if (!open) return null;
 
-  const reauthWithPassword = () =>
-    reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
-
-  const reauthenticate = () =>
-    usesPassword
-      ? reauthWithPassword()
-      : reauthenticateWithPopup(user, socialProviders[socialId]());
+  // Quem entra com senha confirma com a senha. Quem entra pelo Google
+  // confirma digitando o e-mail da conta: reabrir o login do Google sairia da
+  // página (no Supabase o login social é redirecionamento, não janela).
+  const reauthenticate = async () => {
+    if (usesPassword) return verifyCurrentPassword(password);
+    if (typedEmail.trim().toLowerCase() !== String(user?.email || "").toLowerCase()) {
+      throw Object.assign(new Error("email-mismatch"), { code: "auth/user-mismatch" });
+    }
+  };
 
   const start = async (event) => {
     event?.preventDefault();
@@ -524,11 +501,7 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
     try {
       await reauthenticate();
     } catch (err) {
-      setError(
-        !usesPassword && POPUP_FAILURES.includes(err?.code) && isStandalone()
-          ? t("settings.deletion.openInBrowser")
-          : t(authErrorKey(err)),
-      );
+      setError(t(authErrorKey(err)));
       setBusy(false);
       return;
     }
@@ -538,10 +511,6 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
     try {
       await deleteAccountEverywhere(user, {
         onStep: (id, state) => setSteps((current) => ({ ...current, [id]: state })),
-        // Com senha dá para renovar o "login recente" sem a pessoa; com
-        // Google, se expirar, o erro abaixo pede um novo toque — e as etapas
-        // já feitas passam rápido da segunda vez.
-        reauthenticate: usesPassword ? reauthWithPassword : null,
       });
       toast(t("settings.deletion.done"), { tone: "info", duration: 6000 });
       navigate("/", { replace: true });
@@ -684,11 +653,22 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
                 />
               </label>
             ) : (
-              <p className="text-xs text-[var(--engine-text-muted)]">
-                {t("settings.deletion.socialLabel", {
-                  provider: providerLabels[socialId] || "Google",
-                })}
-              </p>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-[var(--engine-text-muted)]">
+                  {t("settings.deletion.socialLabel", {
+                    provider: providerLabels[socialId] || "Google",
+                  })}
+                </span>
+                <input
+                  type="email"
+                  autoComplete="off"
+                  className={inputClass}
+                  placeholder={user?.email || ""}
+                  value={typedEmail}
+                  onChange={(e) => setTypedEmail(e.target.value)}
+                  required
+                />
+              </label>
             )}
 
             {error && (
@@ -767,7 +747,8 @@ export function Settings({ user, settings, onSettingsUpdate }) {
 
   const handleSendVerification = async () => {
     try {
-      await sendEmailVerification(user);
+      const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
+      if (error) throw error;
       toast(t("settings.account.verificationSent"));
     } catch (error) {
       toast(t(authErrorKey(error)), "error");
@@ -776,8 +757,8 @@ export function Settings({ user, settings, onSettingsUpdate }) {
 
   const handlePasswordReset = async () => {
     try {
-      await sendPasswordResetEmail(auth, user.email);
-      toast(t("settings.account.resetSent", { email: user.email }));
+      await sendPasswordReset(user.email);
+      toast(t("settings.account.resetSent", { email: user.email }), { tone: "info", duration: 7000 });
     } catch (error) {
       toast(t(authErrorKey(error)), "error");
     }
@@ -785,7 +766,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut();
       navigate("/login");
     } catch (error) {
       toast(t(authErrorKey(error)), "error");

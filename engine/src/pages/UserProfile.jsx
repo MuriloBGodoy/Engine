@@ -11,7 +11,7 @@ import {
   Mail,
 } from "lucide-react";
 import { engineDB } from "../services/db";
-import { auth } from "../services/firebase";
+import { auth } from "../services/supabase";
 import { EditProfileModal } from "../components/EditProfileModal";
 import { AchievementsTab } from "../components/achievements/AchievementsTab";
 import { listAchievements } from "../services/achievements";

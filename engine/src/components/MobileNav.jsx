@@ -9,8 +9,7 @@ import {
   MessageCircle,
   Users,
 } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../services/firebase";
+import { auth, signOut } from "../services/supabase";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
@@ -75,7 +74,7 @@ export function MobileNav({
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut();
       navigate("/login");
     } catch (error) {
       console.error("Erro ao deslogar:", error);
