@@ -3,27 +3,55 @@
 Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 `ROADMAP.md`; aqui é só o que fazer.
 
-Última atualização: 20 de outubro de 2026 (próximas atividades).
+Última atualização: 24 de outubro de 2026 (planos, Stripe e direitos).
 
 ---
 
-## Próximas atividades (20/10/2026)
+## Próximas atividades (24/10/2026) — "faremos mais tarde"
 
-- [ ] **Comprar o domínio** (Murilo, esta semana). Sugestão:
-      `enginegarage.com.br`, livre no registro.br em 20/10. Só o domínio, DNS
-      padrão, sem adicionais. Depois disso, numa tacada: Netlify, Resend como
-      SMTP (modelos já prontos em `supabase/templates/`), `site_url` no
-      Supabase, tela de consentimento do Google e os três lugares que usam
-      `enginegarage.netlify.app` (ver "Domínio próprio" mais abaixo).
-- [ ] **Página de contribuição dentro do Engine** — para quem quiser apoiar o
-      projeto (doação avulsa e/ou recorrente). Usa o mesmo gateway da
-      mensalidade.
-- [ ] **Configurar os anúncios no app** — o `AdSlot` já existe e fica
-      desligado sem as variáveis; falta a conta (AdSense) e o consentimento de
-      cookies (ver "Termos e privacidade").
-- [ ] **Gateway de pagamento** para a mensalidade dos prestadores **e** para a
-      página de contribuição. Passo a passo em `SETUP-PAGAMENTOS.md`
-      (Mercado Pago e Stripe, ambos aceitam CPF). Pix entra aqui.
+Código dos planos, do checkout, das telas Planos/Apoie/Anuncie, do aviso de
+cookies e dos Termos já está pronto (commits até `080c8b4`, **sem push**). As
+migrations de 24/10 já estão aplicadas no Supabase. Falta só o que é do Murilo,
+nesta ordem:
+
+- [ ] **Religar o site na Netlify** e me avisar → eu faço o push dos commits.
+- [ ] **Criar um Gmail só do Engine** (ex.: `enginegarage.app@gmail.com`). Ele
+      vira o dono das contas do Engine (Stripe, Supabase, Netlify, Google,
+      Sentry, PostHog), separado dos e-mails pessoais.
+- [ ] **Stripe no CPF** (decidido em 24/10; contador e CNPJ ficam para depois).
+      Com o Gmail novo, pedir: "chama a Quinta-Feira pra configurar o Stripe".
+      O Murilo cria a conta e faz a verificação (CPF, selfie, banco) na janela
+      que ela abrir; ela pega as chaves, liga webhook, portal de cancelamento,
+      e-mails de aviso de teste/renovação, marca e pede o Pix. Passo a passo em
+      `SETUP-PAGAMENTOS.md`.
+      - Quando tiver CNPJ: conta nova no Stripe. Clientes e cartões passam pela
+        cópia do painel; as assinaturas eu recrio por script (sem cobrar duas
+        vezes) e atualizo `user_plans`.
+- [ ] **Colar na Netlify**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+      `VITE_STRIPE_PUBLISHABLE_KEY`, `SUPABASE_URL`,
+      `SUPABASE_SERVICE_ROLE_KEY` (e depois `VITE_SUPPORT_PIX_KEY`).
+- [ ] **Comprar o domínio** `enginegarage.com.br` (registro.br, só o domínio).
+      Depois, numa tacada:
+      - e-mails públicos `contato@`, `suporte@`, `privacidade@` encaminhando
+        para o Gmail do Engine (Cloudflare Email Routing ou similar, grátis);
+      - trocar `muxdtuber@gmail.com` nos Termos, na Privacidade e no rodapé;
+      - chave Pix = `contato@enginegarage.com.br` → `VITE_SUPPORT_PIX_KEY`
+        (a seção de doação em /apoie aparece sozinha);
+      - Netlify, Resend como SMTP, `site_url` no Supabase, tela de
+        consentimento do Google, e o webhook do Stripe no domínio novo (ver
+        "Domínio próprio" mais abaixo).
+- [ ] **AdSense** — o app já pede consentimento de cookies antes de carregar;
+      falta a conta e as variáveis `VITE_ADSENSE_CLIENT` /
+      `VITE_ADSENSE_SLOT_DEFAULT`.
+- [ ] **Contador** (mais tarde): software/portal/publicidade não aparecem na
+      lista do MEI; provável ME no Simples. Antes da primeira cobrança, pôr
+      CNPJ e endereço nos Termos ("Quem oferece o Engine").
+- [ ] **Confirmar**: preço dos passes (R$ 14,90 / R$ 34,90) e preço de fundador
+      valendo enquanto a assinatura estiver ativa.
+
+Depois disso, o produto: construir os benefícios que hoje aparecem como "Em
+breve" em /planos, começando pelas métricas mês a mês do Pro (os dados já estão
+sendo gravados por dia desde 24/10).
 
 ---
 
