@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@sentry/react": "^10.69.0",
+    "@stripe/react-stripe-js": "6.12.0",
+    "@stripe/stripe-js": "9.17.0",
     "@supabase/supabase-js": "^2.118.0",
     "@tailwindcss/postcss": "^4.2.2",
     "axios": "^1.14.0",

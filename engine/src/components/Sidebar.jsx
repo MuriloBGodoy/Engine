@@ -9,6 +9,7 @@ import {
   LogOut,
   MessageCircle,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { auth, signOut } from "../services/supabase";
@@ -154,6 +155,26 @@ export function Sidebar({
             menu, e não na base, porque a dica de visitante (GuestLoginHint)
             ocupa a base da barra e cobria o botão. */}
         <InstallButton variant="sidebar" collapsed={collapsed} />
+
+        {/* Planos fica de fora da lista principal de propósito: é um link
+            discreto, abaixo das áreas do app, e não uma área a mais. */}
+        <div className="mt-3 border-t border-[var(--engine-border)] pt-3">
+          <Link
+            to="/planos"
+            title={collapsed ? t("nav.plans") : undefined}
+            aria-label={collapsed ? t("nav.plans") : undefined}
+            className={`flex h-10 items-center rounded-xl text-[13px] font-medium transition-colors ${
+              collapsed ? "mx-auto w-11 justify-center" : "gap-3 px-3"
+            } ${
+              isActivePath("/planos")
+                ? "text-[var(--engine-accent)]"
+                : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
+            }`}
+          >
+            <Sparkles size={18} className="shrink-0" />
+            {!collapsed && <span className="truncate">{t("nav.plans")}</span>}
+          </Link>
+        </div>
       </nav>
 
       {/* Recolher / expandir — carrinho que acelera no hover */}

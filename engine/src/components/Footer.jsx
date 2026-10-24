@@ -35,6 +35,9 @@ const LINKS = {
   company: {
     about: SEM_DESTINO, // página institucional "Sobre"
     careers: SEM_DESTINO, // trabalhe com a gente / vagas
+    plans: "/planos",
+    support: "/apoie",
+    advertise: "/anuncie",
   },
   legal: {
     terms: "/termos",
@@ -119,6 +122,9 @@ export function Footer() {
       items: [
         { label: t("footer.company.about"), href: LINKS.company.about },
         { label: t("footer.company.careers"), href: LINKS.company.careers },
+        { label: t("footer.company.plans"), href: LINKS.company.plans },
+        { label: t("footer.company.support"), href: LINKS.company.support },
+        { label: t("footer.company.advertise"), href: LINKS.company.advertise },
       ],
     },
     {

@@ -52,6 +52,9 @@ const EventDetails = lazyNamed(() => import("./pages/EventDetails"), "EventDetai
 const UserProfile = lazyNamed(() => import("./pages/UserProfile"), "UserProfile");
 const Services = lazyNamed(() => import("./pages/Services"), "Services");
 const ServiceApprovals = lazyNamed(() => import("./pages/Services"), "ServiceApprovals");
+const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
+const Support = lazyNamed(() => import("./pages/Support"), "Support");
+const Advertise = lazyNamed(() => import("./pages/Advertise"), "Advertise");
 
 /**
  * Numa SPA a troca de tela não recarrega a página, então o pageview não sai
@@ -477,6 +480,12 @@ function App() {
             path="/events/:eventId"
             element={<EventDetails />}
           />
+          {/* Planos, Apoie e Anuncie abrem para visitante: quem chega pelo
+              rodapé ou por link precisa ver preço e avisos antes de criar
+              conta. Só o botão de pagar pede login. */}
+          <Route path="/planos" element={<Plans user={user} />} />
+          <Route path="/apoie" element={<Support />} />
+          <Route path="/anuncie" element={<Advertise user={user} />} />
           <Route
             path="/settings"
             element={
