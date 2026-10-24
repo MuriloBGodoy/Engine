@@ -10,6 +10,7 @@ import {
   FaYoutube,
 } from "react-icons/fa6";
 import { LogoMark } from "./Logo";
+import { ADSENSE_ENABLED, resetAdsConsent } from "../services/consent";
 
 /**
  * Rodapé global do Engine, no espírito dos grandes marketplaces automotivos.
@@ -132,10 +133,13 @@ export function Footer() {
       items: [
         { label: t("footer.legal.terms"), href: LINKS.legal.terms },
         { label: t("footer.legal.privacy"), href: LINKS.legal.privacy },
+        // Volta a perguntar sobre cookies de anúncio; é o único jeito de um
+        // visitante sem conta mudar a escolha.
+        ...(ADSENSE_ENABLED ? [{ label: t("ads.consent.settingLabel"), onClick: resetAdsConsent }] : []),
       ],
     },
   ]
-    .map((column) => ({ ...column, items: column.items.filter((item) => temDestino(item.href)) }))
+    .map((column) => ({ ...column, items: column.items.filter((item) => item.onClick || temDestino(item.href)) }))
     .filter((column) => column.items.length);
 
   const redes = SOCIAL.filter((social) => temDestino(social.href));
@@ -188,7 +192,17 @@ export function Footer() {
             <ul className="space-y-2">
               {column.items.map((item) => (
                 <li key={item.label}>
-                  <FooterLink href={item.href}>{item.label}</FooterLink>
+                  {item.onClick ? (
+                    <button
+                      type="button"
+                      onClick={item.onClick}
+                      className="inline-flex min-h-11 items-center text-left text-[13px] font-medium text-[var(--engine-text-muted)] transition-colors hover:text-[var(--engine-accent)] lg:min-h-0"
+                    >
+                      {item.label}
+                    </button>
+                  ) : (
+                    <FooterLink href={item.href}>{item.label}</FooterLink>
+                  )}
                 </li>
               ))}
             </ul>

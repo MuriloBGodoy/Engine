@@ -7,6 +7,7 @@ import { useThemeMode } from "./hooks/useThemeMode";
 import { captureError, identifyUser, resetUser, trackPageView } from "./services/observability";
 import { AchievementAnnouncer } from "./components/achievements/AchievementAnnouncer";
 import { InstallPrompt } from "./components/InstallPrompt";
+import { ConsentBanner } from "./components/ConsentBanner";
 import { UpdateBanner } from "./components/UpdateBanner";
 import "./index.css";
 
@@ -346,6 +347,7 @@ function App() {
       <RouteTracker />
       <UpdateBanner />
       <InstallPrompt />
+      <ConsentBanner />
       <Routes>
         {/* Páginas de autenticação: tela cheia, sem o shell do app. */}
         <Route path="/login" element={<Login />} />

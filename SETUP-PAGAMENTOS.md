@@ -19,7 +19,7 @@ inclusive publicar serviço.** Os planos só acrescentam.
 | `premium_pass_3m` | Dono do carro | R$ 34,90 | Pagamento único, não renova |
 
 - **Preço de fundador:** os primeiros 30 que assinarem o Pro (`FOUNDER_SLOTS`)
-  pagam R$ 15/mês para sempre, depois do teste.
+  pagam R$ 15/mês depois do teste, enquanto a assinatura continuar ativa.
 - **Teste grátis:** uma vez por pessoa. Sem cartão válido no fim do teste, a
   assinatura cancela sozinha.
 - **Passe:** comprar dois seguidos soma os meses. Não rebaixa quem já tem
