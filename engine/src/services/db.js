@@ -2242,7 +2242,7 @@ export const engineDB = {
    * do cliente a trava é o sessionStorage: recarregar a página não conta de
    * novo. Não é auditoria, é ordem de grandeza.
    */
-  async trackServiceListingMetric(listingId, metric) {
+  async trackServiceListingMetric(listingId, metric, source = "direct") {
     if (!listingId || !["view", "detail", "whatsapp"].includes(metric)) return;
 
     const onceKey = `engine_metric:${listingId}:${metric}`;
@@ -2258,6 +2258,8 @@ export const engineDB = {
         await supabase.rpc("track_listing_metric", {
           p_listing_id: String(listingId),
           p_metric: metric,
+          // De onde veio: o painel mês a mês do Pro separa busca, perfil, link.
+          p_source: source,
         }),
       );
     } catch (error) {

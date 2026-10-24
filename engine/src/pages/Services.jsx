@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from"react";
+import { Fragment, useEffect, useMemo, useRef, useState } from"react";
 import { useNavigate } from"react-router-dom";
 import { useTranslation } from"react-i18next";
 import {
@@ -56,9 +56,7 @@ import {
 import { useConfirm } from"../components/ConfirmProvider";
 import { useToast } from"../components/ToastProvider";
 import { AdSlot } from"../components/AdSlot";
-import { PaywallModal } from"../components/PaywallModal";
 import { useRegion } from"../hooks/RegionProvider";
-import { useIsPremium } from"../hooks/useIsPremium";
 
 // Ícone oficial do WhatsApp (react-icons). Mantém a mesma assinatura
 // (size/className) usada em todo o arquivo, inclusive como `icon={WhatsAppIcon}`.
@@ -75,11 +73,8 @@ function TikTokIcon({ size = 18, className ="" }) {
   return <FaTiktok size={size} className={className} aria-hidden="true" />;
 }
 
-// Portão de cobrança. Ver e buscar serviço é livre pra qualquer um, com ou sem
-// conta; publicar é o que exige Premium. Enquanto isto for `true`, publicar
-// segue liberado pra todo mundo — é assim que os primeiros prestadores entram,
-// antes de existir base pra justificar a mensalidade.
-const SUBSCRIPTION_GATE_OPEN = true;
+// Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
+// vende as ferramentas em volta do anúncio, nunca o anúncio em si.
 const MAX_PHOTOS = 6;
 const PHOTO_UPLOAD_TIMEOUT_MS = 15000;
 const FALLBACK_IMAGE_MAX_SIZE = 1100;
@@ -608,6 +603,25 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
   const showMap = hasMapAddress(listing);
   const stopAction = (event) => event.stopPropagation();
   const activePhoto = photos[activePhotoIndex] || photos[0];
+  const cardRef = useRef(null);
+
+  // "Apareceu na busca": conta quando metade do card fica visível. O dono não
+  // conta pra si mesmo, e o db já trava em uma vez por sessão.
+  useEffect(() => {
+    const node = cardRef.current;
+    if (isMine || !listing.id || !node || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          engineDB.trackServiceListingMetric(listing.id, "view", "search");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isMine, listing.id]);
 
   // Sem efeito para zerar a foto: a lista monta cada card com `key` do
   // anúncio, então anúncio novo já nasce com a primeira foto.
@@ -621,6 +635,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
 
   return (
     <article
+      ref={cardRef}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(listing)}
@@ -1050,7 +1065,7 @@ function ServiceDetailModal({ listing, isMine, onClose, onEdit, onDelete }) {
                 onActivate={
                   isMine
                     ? undefined
-                    : () => engineDB.trackServiceListingMetric(listing.id, "whatsapp")
+                    : () => engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search")
                 }
               />
               <ContactButton
@@ -2135,8 +2150,6 @@ export function Services({ user, settings }) {
   const [detailListing, setDetailListing] = useState(null);
   const [sellerProfileOpen, setSellerProfileOpen] = useState(false);
   const [sellerListingsOpen, setSellerListingsOpen] = useState(false);
-  const [paywallOpen, setPaywallOpen] = useState(false);
-  const { isPremium } = useIsPremium(user?.uid);
   const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email ||"").toLowerCase());
   const sellerProfile = useMemo(
     () => getSellerProfile(settings, user),
@@ -2296,7 +2309,7 @@ export function Services({ user, settings }) {
   const openDetail = (listing) => {
     setDetailListing(listing);
     if (listing?.id && listing.ownerId !== user?.uid) {
-      engineDB.trackServiceListingMetric(listing.id, "detail");
+      engineDB.trackServiceListingMetric(listing.id, "detail", "search");
     }
   };
 
@@ -2393,12 +2406,6 @@ export function Services({ user, settings }) {
 
   const submitListing = async (event) => {
     event.preventDefault();
-    // Com o portão fechado, só assinante publica — e o admin, que precisa
-    // conseguir mexer em anúncio pra moderar.
-    if (!SUBSCRIPTION_GATE_OPEN && !isPremium && !isAdmin) {
-      setPaywallOpen(true);
-      return;
-    }
     // O aviso é um toast no topo, e o formulário é longo: no celular a pessoa
     // está lá embaixo, no botão. Além de avisar, leva até o campo que falta.
     const faltando = (id, mensagem) => {
@@ -2807,12 +2814,6 @@ export function Services({ user, settings }) {
           onCancel={closeEditor}
         />
       )}
-
-      <PaywallModal
-        open={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-        country={sellerProfile.country || region.country}
-      />
 
       {sellerProfileOpen && (
         <SellerProfileModal
