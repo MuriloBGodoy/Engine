@@ -46,7 +46,6 @@ const OVERLAYS = [
   "src/components/ImageCropper.jsx",
   "src/components/ImagePreviewModal.jsx",
   "src/components/NotificationsPanel.jsx",
-  "src/components/PaywallModal.jsx",
   "src/components/RegionPicker.jsx",
   "src/components/ConfirmProvider.jsx",
   // Da Jesse, ligado por ela em 16/09/2026 na variante B; fica na trava

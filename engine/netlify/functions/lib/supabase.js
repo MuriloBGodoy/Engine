@@ -56,7 +56,10 @@ export async function readSettings(userId) {
 }
 
 /** Grava o plano do usuário. Único lugar do sistema que faz isso. */
-export async function setUserPlan(userId, { plan, provider, providerRef, currentPeriodEnd }) {
+export async function setUserPlan(
+  userId,
+  { plan, provider, providerRef, currentPeriodEnd, offer, kind, founder, trialEnd, cancelAtPeriodEnd },
+) {
   const { error } = await db()
     .from("user_plans")
     .upsert({
@@ -66,6 +69,13 @@ export async function setUserPlan(userId, { plan, provider, providerRef, current
         provider,
         providerRef: providerRef || null,
         currentPeriodEnd: currentPeriodEnd || null,
+        // Qual oferta (lib/plans.js), se é assinatura ou passe, se pegou o
+        // preço de fundador e quando acaba o teste grátis.
+        offer: offer || null,
+        kind: kind || null,
+        founder: Boolean(founder),
+        trialEnd: trialEnd || null,
+        cancelAtPeriodEnd: Boolean(cancelAtPeriodEnd),
         updatedAt: new Date().toISOString(),
       },
       updated_at: new Date().toISOString(),
@@ -78,3 +88,24 @@ export const json = (body, status = 200) =>
     status,
     headers: { "content-type": "application/json" },
   });
+
+/** Plano gravado de alguém (ou null). Só o servidor lê o de outra pessoa. */
+export async function readUserPlan(userId) {
+  const { data, error } = await db()
+    .from("user_plans")
+    .select("plan, subscription")
+    .eq("user_id", String(userId))
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Quantos já pegaram o preço de fundador do Pro (ativos ou não: a vaga é de quem chegou primeiro). */
+export async function countFounders() {
+  const { count, error } = await db()
+    .from("user_plans")
+    .select("user_id", { count: "exact", head: true })
+    .eq("subscription->>founder", "true");
+  if (error) throw error;
+  return count || 0;
+}

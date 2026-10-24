@@ -12,10 +12,24 @@ import { must, supabase, watchTable } from "../services/supabase";
  * visitante é derivado no return (não via setState no efeito) para não
  * disparar renders em cascata.
  */
-const GUEST_STATE = { isPremium: false, loading: false };
+const GUEST_STATE = { isPremium: false, isPro: false, plan: "free", subscription: null, loading: false };
+
+/**
+ * O plano gravado, já com o passe vencido tratado como gratuito. Assinatura
+ * quem corta é o webhook do Stripe; passe avulso não tem evento de fim, então
+ * a data é conferida aqui.
+ */
+export function effectivePlan(row) {
+  const plan = row?.plan || "free";
+  const sub = row?.subscription || null;
+  if (plan !== "free" && sub?.kind === "pass" && sub.currentPeriodEnd) {
+    if (new Date(sub.currentPeriodEnd) <= new Date()) return { plan: "free", subscription: sub };
+  }
+  return { plan, subscription: sub };
+}
 
 export function useIsPremium(userId) {
-  const [state, setState] = useState({ isPremium: false, loading: true });
+  const [state, setState] = useState({ ...GUEST_STATE, loading: true });
 
   useEffect(() => {
     if (!userId) return undefined;
@@ -24,13 +38,26 @@ export function useIsPremium(userId) {
     const load = async () => {
       try {
         const row = must(
-          await supabase.from("user_plans").select("plan").eq("user_id", userId).maybeSingle(),
+          await supabase
+            .from("user_plans")
+            .select("plan, subscription")
+            .eq("user_id", userId)
+            .maybeSingle(),
         );
-        const plan = row?.plan;
-        if (active) setState({ isPremium: plan === "premium" || plan === "pro", loading: false });
+        const { plan, subscription } = effectivePlan(row);
+        if (active) {
+          setState({
+            // Pro inclui tudo do Premium.
+            isPremium: plan === "premium" || plan === "pro",
+            isPro: plan === "pro",
+            plan,
+            subscription,
+            loading: false,
+          });
+        }
       } catch {
         // Offline: assume gratuito e segue a vida.
-        if (active) setState({ isPremium: false, loading: false });
+        if (active) setState(GUEST_STATE);
       }
     };
 

@@ -6,12 +6,14 @@ import {
   BellOff,
   Check,
   ChevronRight,
+  CreditCard,
   EyeOff,
   KeyRound,
   Loader2,
   LogOut,
   Mail,
   Palette,
+  Sparkles,
   Trash2,
   UserRound,
   X,
@@ -40,6 +42,7 @@ import { useToast } from "../components/ToastProvider";
 import { useRegion } from "../hooks/RegionProvider";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { useIsPremium } from "../hooks/useIsPremium";
+import { openBillingPortal } from "../services/subscription";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-base text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)] sm:text-sm";
@@ -435,6 +438,63 @@ function ChangeEmailForm({ t, user, onDone }) {
 }
 
 const noop = () => {};
+
+/**
+ * Seu plano: o que a pessoa tem, até quando, e o botão de cancelar.
+ *
+ * Cancelar precisa ser tão fácil quanto assinar, e quem está no teste grátis
+ * precisa ver a data da primeira cobrança sem procurar.
+ */
+function PlanGroup({ t, i18n, user }) {
+  const toast = useToast();
+  const { plan, subscription: sub, loading } = useIsPremium(user?.uid);
+  const [opening, setOpening] = useState(false);
+
+  if (loading) return null;
+
+  const date = (iso) =>
+    iso ? new Date(iso).toLocaleDateString(i18n.language, { day: "numeric", month: "long", year: "numeric" }) : "";
+  const inTrial = sub?.trialEnd && new Date(sub.trialEnd) > new Date();
+
+  let label = t("settings.plan.free");
+  let hint = t("settings.plan.freeHint");
+  if (plan !== "free") {
+    label = plan === "pro" ? "Engine Pro" : "Engine Premium";
+    if (sub?.kind === "pass") hint = t("settings.plan.passUntil", { date: date(sub.currentPeriodEnd) });
+    else if (sub?.cancelAtPeriodEnd) hint = t("settings.plan.cancelledUntil", { date: date(sub.currentPeriodEnd) });
+    else if (inTrial) hint = t("settings.plan.trialUntil", { date: date(sub.trialEnd) });
+    else hint = t("settings.plan.renewsOn", { date: date(sub?.currentPeriodEnd) });
+  }
+
+  const canManage = plan !== "free" && sub?.kind === "subscription" && sub?.provider === "stripe";
+
+  const handleManage = async () => {
+    setOpening(true);
+    try {
+      window.location.href = await openBillingPortal();
+    } catch (error) {
+      toast(error.message);
+      setOpening(false);
+    }
+  };
+
+  return (
+    <Group title={t("settings.plan.title")} footer={canManage ? t("settings.plan.manageFooter") : null}>
+      <Row icon={Sparkles} label={label} hint={hint} />
+      {canManage && (
+        <Row
+          icon={CreditCard}
+          label={t("settings.plan.manage")}
+          hint={t("settings.plan.manageHint")}
+          chevron={!opening}
+          onClick={opening ? undefined : handleManage}
+        >
+          {opening && <Loader2 size={18} className="animate-spin text-[var(--engine-text-muted)]" />}
+        </Row>
+      )}
+    </Group>
+  );
+}
 
 function DeleteAccountDialog({ t, user, open, onClose }) {
   const navigate = useNavigate();
@@ -872,6 +932,8 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   <Row label={t("settings.account.managedByProvider")} />
                 </Group>
               )}
+
+              <PlanGroup t={t} i18n={i18n} user={user} />
 
               <Group>
                 <Row icon={LogOut} label={t("settings.account.logout")} onClick={handleLogout} />

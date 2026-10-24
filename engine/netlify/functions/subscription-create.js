@@ -1,21 +1,23 @@
 /**
- * Inicia a assinatura do plano Premium e devolve o link do checkout.
+ * Inicia a compra de um plano e devolve o que o app precisa para o checkout.
  *
  * POST /.netlify/functions/subscription-create
  * Header: Authorization: Bearer <token de sessão do Supabase>
- * Body:   { country: "BR" }  (opcional; sem isso cai no país do perfil)
+ * Body:   { offer: "pro_monthly" | "premium_yearly" | "premium_pass_1m" | "premium_pass_3m",
+ *           country?: "BR" }
  *
- * Premium libera duas coisas: navegar sem anúncio e publicar serviço.
+ * Resposta:
+ *   Stripe        → { provider: "stripe", clientSecret }  (checkout embutido no app)
+ *   Mercado Pago  → { provider: "mercadopago", url }      (página do Mercado Pago)
+ *
+ * O catálogo e os preços estão em lib/plans.js. Quem ativa o plano é o
+ * webhook; esta função só abre o pagamento.
  */
 import MercadoPagoConfig, { PreApproval } from "mercadopago";
 import Stripe from "stripe";
-import { json, readSettings, requireUser } from "./lib/supabase.js";
-import {
-  MERCADO_PAGO,
-  PLAN_PRICES,
-  currencyForCountry,
-  providerForCountry,
-} from "./lib/providers.js";
+import { countFounders, json, readSettings, readUserPlan, requireUser } from "./lib/supabase.js";
+import { MERCADO_PAGO, currencyForCountry, providerForCountry } from "./lib/providers.js";
+import { FOUNDER_SLOTS, offerFor } from "./lib/plans.js";
 
 /**
  * Endereço para onde o gateway devolve a pessoa no fim do checkout.
@@ -48,52 +50,106 @@ const siteUrl = () => {
   return url.replace(/\/+$/, "");
 };
 
-async function createMercadoPago({ user, country, email }) {
+async function createMercadoPago({ user, country, email, offerId, offer }) {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
   if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN ausente.");
+  // Passe avulso é pagamento único; no Mercado Pago só montamos assinatura.
+  if (offer.kind !== "subscription") {
+    throw Object.assign(new Error("Esta opção não está disponível no seu país."), { status: 400 });
+  }
 
+  const currency = currencyForCountry(country);
   const client = new MercadoPagoConfig({ accessToken: token });
   const preapproval = await new PreApproval(client).create({
     body: {
-      reason: "Engine Premium",
-      // Volta pro app já sabendo de quem é a assinatura.
-      external_reference: user.uid,
+      reason: offer.name,
+      // O webhook lê daqui de quem é a assinatura e qual oferta foi.
+      external_reference: `${user.uid}:${offerId}`,
       payer_email: email,
       back_url: `${siteUrl()}/settings?assinatura=ok`,
       auto_recurring: {
-        frequency: 1,
+        frequency: offer.interval === "year" ? 12 : 1,
         frequency_type: "months",
-        transaction_amount: PLAN_PRICES[currencyForCountry(country)],
-        currency_id: currencyForCountry(country),
+        // Mercado Pago quer o valor em unidades, não em centavos.
+        transaction_amount: offer.amount[currency] / 100,
+        currency_id: currency,
       },
       status: "pending",
     },
   });
 
-  return preapproval.init_point;
+  return { url: preapproval.init_point };
 }
 
-async function createStripe({ user, country, email }) {
+async function createStripe({ user, country, email, offerId, offer }) {
   const key = process.env.STRIPE_SECRET_KEY;
-  const price = process.env.STRIPE_PRICE_ID;
   if (!key) throw new Error("STRIPE_SECRET_KEY ausente.");
-  if (!price) throw new Error("STRIPE_PRICE_ID ausente.");
 
   const stripe = new Stripe(key);
+  const currency = currencyForCountry(country);
+
+  // Preço de fundador: os primeiros do Pro pagam menos para sempre. A vaga é
+  // conferida aqui e gravada pelo webhook; numa corrida de dois no último
+  // lugar, os dois levam, e tudo bem.
+  const founder =
+    offerId === "pro_monthly" && offer.founderAmount && (await countFounders()) < FOUNDER_SLOTS;
+  const unitAmount = founder ? offer.founderAmount[currency] : offer.amount[currency];
+
+  // Quem já usou o teste grátis uma vez não ganha outro.
+  const previous = await readUserPlan(user.uid);
+  const trialDays = offer.trialDays && !previous?.subscription?.trialEnd ? offer.trialDays : 0;
+
+  const metadata = { userId: user.uid, offer: offerId, founder: founder ? "true" : "false", country };
+  const isSubscription = offer.kind === "subscription";
+
   const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price, quantity: 1 }],
+    ui_mode: "embedded_page",
+    mode: isSubscription ? "subscription" : "payment",
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: currency.toLowerCase(),
+          unit_amount: unitAmount,
+          product_data: { name: offer.name, description: offer.description },
+          ...(isSubscription ? { recurring: { interval: offer.interval } } : {}),
+        },
+      },
+    ],
     customer_email: email,
-    // O webhook precisa saber de quem é o pagamento; o uid viaja nos dois
-    // lugares porque a sessão e a assinatura chegam em eventos diferentes.
+    // O webhook precisa saber de quem é o pagamento; o uid viaja na sessão e
+    // na assinatura porque elas chegam em eventos diferentes.
     client_reference_id: user.uid,
-    subscription_data: { metadata: { userId: user.uid, country } },
-    metadata: { userId: user.uid },
-    success_url: `${siteUrl()}/settings?assinatura=ok`,
-    cancel_url: `${siteUrl()}/settings?assinatura=cancelada`,
+    metadata,
+    ...(isSubscription
+      ? {
+          subscription_data: {
+            metadata,
+            ...(trialDays
+              ? {
+                  trial_period_days: trialDays,
+                  // Sem cartão válido no fim do teste, a assinatura cancela
+                  // sozinha em vez de virar cobrança pendente.
+                  trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+                }
+              : {}),
+          },
+        }
+      : { payment_intent_data: { metadata } }),
+    // Texto que aparece junto do botão de pagar: o que a pessoa está aceitando.
+    custom_text: {
+      submit: {
+        message: isSubscription
+          ? trialDays
+            ? `Grátis por ${trialDays} dias. Avisamos antes da primeira cobrança. Cancele quando quiser em Configurações › Seu plano.`
+            : "Renova automaticamente. Cancele quando quiser em Configurações › Seu plano."
+          : "Pagamento único. Não renova sozinho.",
+      },
+    },
+    return_url: `${siteUrl()}/settings?assinatura=ok&session_id={CHECKOUT_SESSION_ID}`,
   });
 
-  return session.url;
+  return { clientSecret: session.client_secret, founder, trialDays };
 }
 
 export default async (request) => {
@@ -103,6 +159,10 @@ export default async (request) => {
     const user = await requireUser(request);
     const body = await request.json().catch(() => ({}));
 
+    const offerId = String(body.offer || "");
+    const offer = offerFor(offerId);
+    if (!offer) return json({ error: "Plano desconhecido." }, 400);
+
     // País vem do perfil salvo; o corpo só serve de fallback pra quem ainda
     // não preencheu o cadastro. Nunca confiar só no que o cliente manda.
     const settings = await readSettings(user.uid);
@@ -111,20 +171,24 @@ export default async (request) => {
 
     const provider = providerForCountry(country);
     const email = user.email || body.email || undefined;
+    const args = { user, country, email, offerId, offer };
 
-    const url =
-      provider === MERCADO_PAGO
-        ? await createMercadoPago({ user, country, email })
-        : await createStripe({ user, country, email });
+    const result =
+      provider === MERCADO_PAGO ? await createMercadoPago(args) : await createStripe(args);
 
-    if (!url) return json({ error: "Checkout não retornou link." }, 502);
+    if (!result.url && !result.clientSecret) {
+      return json({ error: "Checkout não retornou nada." }, 502);
+    }
 
-    return json({ url, provider, country });
+    return json({ ...result, provider, country });
   } catch (error) {
     const status = error.status || 500;
     // A mensagem crua pode conter detalhe do gateway; loga inteiro e devolve
     // só o essencial pro cliente.
     console.error("subscription-create", error);
-    return json({ error: status === 401 ? error.message : "Falha ao iniciar assinatura." }, status);
+    return json(
+      { error: status < 500 ? error.message : "Falha ao iniciar assinatura." },
+      status,
+    );
   }
 };

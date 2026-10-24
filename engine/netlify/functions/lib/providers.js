@@ -1,31 +1,21 @@
 /**
  * Qual gateway atende cada região.
  *
- * O Engine já trata região como conceito de primeira classe (o filtro de
- * serviços mostra o que existe perto de quem olha); pagamento segue a mesma
- * ideia, porque nenhum provedor cobre bem os 12 países suportados:
+ * Desde 24/10/2026 o Brasil vai pelo Stripe (decisão do dono): checkout
+ * embutido no app, assinatura, teste grátis e portal de cancelamento prontos,
+ * e a conta será aberta já como MEI/CNPJ (o tipo da conta no Stripe Brasil não
+ * muda depois de verificado). O Pix do Stripe é só por convite e só em
+ * pagamento único; se ele não for liberado, o Pix do Mercado Pago entra como
+ * complemento, por isso o caminho do Mercado Pago continua aqui.
  *
- *  - Mercado Pago tem Pix e é o checkout que o vendedor da LatAm reconhece,
- *    mas não opera em Portugal, EUA nem na Europa.
- *  - Stripe cobre EUA e Europa, mas no Brasil fica só no cartão (Pix é
- *    invite-only para empresas brasileiras) e a marca não diz nada pro MEI.
- *
- * Quem paga é sempre o prestador, e prestador é local por natureza: lavagem de
- * carro em Araraquara não interessa a ninguém em Lisboa. Então o provedor sai
- * do país dele, não de uma escolha global.
+ * O Mercado Pago segue atendendo a LatAm de língua espanhola, onde é o checkout
+ * que o vendedor reconhece. O resto vai pelo Stripe.
  */
 export const MERCADO_PAGO = "mercadopago";
 export const STRIPE = "stripe";
 
 // Países onde o Mercado Pago opera e que o Engine suporta (locations.js).
-const MERCADO_PAGO_COUNTRIES = ["BR", "AR", "MX", "CL", "CO"];
-
-/** Preço mensal do plano por moeda, na menor unidade quando o provedor pede. */
-export const PLAN_PRICES = {
-  BRL: 25,
-  USD: 6,
-  EUR: 6,
-};
+const MERCADO_PAGO_COUNTRIES = ["AR", "MX", "CL", "CO"];
 
 const COUNTRY_CURRENCY = {
   BR: "BRL",

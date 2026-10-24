@@ -489,6 +489,31 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 value={`${money(result.monthly.licensing * 12)}${t("ownership.lean.perYearShort")}`}
               />
             </div>
+
+            {/* Quanto o financiamento custa a mais, no total. Grátis para todo
+                mundo: é a conta que mais muda a decisão de financiar. */}
+            {isFinance && financing ? (
+              <>
+                <GroupLabel>{t("ownership.lean.financeTotalGroup")}</GroupLabel>
+                <div className="mt-2 border-t border-[var(--engine-slab-line)]">
+                  <Line
+                    label={t("ownership.results.totalInterest")}
+                    source={t("ownership.lean.totalInterestSource", {
+                      months: financing.months,
+                      installment: money(financing.installment),
+                    })}
+                    value={money(financing.totalInterest)}
+                  />
+                  <Line
+                    label={t("ownership.results.totalPaid")}
+                    source={t("ownership.lean.totalPaidSource", {
+                      down: money(financing.downPayment),
+                    })}
+                    value={money(financing.totalPaid)}
+                  />
+                </div>
+              </>
+            ) : null}
           </div>
 
           {/* ============================ o ajuste ============================ */}

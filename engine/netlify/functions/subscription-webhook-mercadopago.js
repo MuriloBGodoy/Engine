@@ -14,6 +14,7 @@ import crypto from "node:crypto";
 import MercadoPagoConfig, { PreApproval } from "mercadopago";
 import { json, setUserPlan } from "./lib/supabase.js";
 import { MERCADO_PAGO } from "./lib/providers.js";
+import { offerFor } from "./lib/plans.js";
 
 /**
  * O manifest é montado num formato fixo do Mercado Pago:
@@ -70,7 +71,9 @@ export default async (request) => {
     const client = new MercadoPagoConfig({ accessToken: token });
     const preapproval = await new PreApproval(client).get({ id: dataId });
 
-    const userId = preapproval.external_reference;
+    // `uid:oferta` (lib/plans.js). Assinaturas antigas só têm o uid.
+    const [userId, offerId] = String(preapproval.external_reference || "").split(":");
+    const offer = offerFor(offerId);
     if (!userId) {
       console.error("mercadopago webhook: preapproval sem external_reference", dataId);
       return json({ received: true });
@@ -81,10 +84,12 @@ export default async (request) => {
     const active = preapproval.status === "authorized";
 
     await setUserPlan(userId, {
-      plan: active ? "premium" : "free",
+      plan: active ? offer?.plan || "premium" : "free",
       provider: MERCADO_PAGO,
       providerRef: dataId,
       currentPeriodEnd: preapproval.next_payment_date || null,
+      offer: offerId || null,
+      kind: "subscription",
     });
 
     return json({ received: true });
