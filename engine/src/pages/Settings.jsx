@@ -43,6 +43,7 @@ import { useRegion } from "../hooks/RegionProvider";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { useIsPremium } from "../hooks/useIsPremium";
 import { openBillingPortal } from "../services/subscription";
+import { ADSENSE_ENABLED, resetAdsConsent, setAdsConsent, useAdsConsent } from "../services/consent";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-base text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)] sm:text-sm";
@@ -439,6 +440,23 @@ function ChangeEmailForm({ t, user, onDone }) {
 
 const noop = () => {};
 
+/** Cookies de anúncio: o que foi escolhido e como mudar (ver services/consent.js). */
+function AdsConsentGroup({ t }) {
+  const consent = useAdsConsent();
+  if (!ADSENSE_ENABLED) return null;
+  return (
+    <Group title={t("ads.consent.settingLabel")}>
+      <SwitchRow
+        label={t("ads.consent.accept")}
+        hint={t(consent ? `ads.consent.${consent}` : "ads.consent.unset")}
+        checked={consent === "granted"}
+        onChange={(value) => setAdsConsent(value ? "granted" : "denied")}
+      />
+      {consent && <Row label={t("ads.consent.change")} onClick={resetAdsConsent} />}
+    </Group>
+  );
+}
+
 /**
  * Seu plano: o que a pessoa tem, até quando, e o botão de cancelar.
  *
@@ -447,6 +465,7 @@ const noop = () => {};
  */
 function PlanGroup({ t, i18n, user }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const { plan, subscription: sub, loading } = useIsPremium(user?.uid);
   const [opening, setOpening] = useState(false);
 
@@ -480,7 +499,13 @@ function PlanGroup({ t, i18n, user }) {
 
   return (
     <Group title={t("settings.plan.title")} footer={canManage ? t("settings.plan.manageFooter") : null}>
-      <Row icon={Sparkles} label={label} hint={hint} />
+      <Row
+        icon={Sparkles}
+        label={label}
+        hint={hint}
+        chevron={plan === "free"}
+        onClick={plan === "free" ? () => navigate("/planos") : undefined}
+      />
       {canManage && (
         <Row
           icon={CreditCard}
@@ -757,6 +782,14 @@ export function Settings({ user, settings, onSettingsUpdate }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("section");
   const activeSection = SECTIONS.includes(requested) ? requested : "account";
+  // Volta do checkout do Stripe (return_url em subscription-create). O plano
+  // em si chega pelo webhook e aparece sozinho em "Seu plano".
+  const checkoutResult = searchParams.get("assinatura");
+  useEffect(() => {
+    if (!checkoutResult) return;
+    toast(t(checkoutResult === "ok" ? "settings.plan.checkoutOk" : "settings.plan.checkoutCancelled"));
+    setSearchParams({}, { replace: true });
+  }, [checkoutResult, setSearchParams, t, toast]);
   const [openForm, setOpenForm] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const saveQueue = useRef(Promise.resolve());
@@ -992,6 +1025,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   onChange={(value) => updateSetting("privacy", "showEmailInSidebar", value)}
                 />
               </Group>
+              <AdsConsentGroup t={t} />
               <BlockedUsers t={t} userId={user?.uid} />
             </>
           )}

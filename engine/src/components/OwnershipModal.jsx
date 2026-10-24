@@ -516,6 +516,12 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
             ) : null}
           </div>
 
+          {/* Aviso de estimativa: boa prática (pesquisa do Han, 24/10/2026) —
+              o simulador planeja, não oferece crédito nem recomenda. */}
+          <p className="px-1 text-[12px] leading-relaxed text-[var(--engine-text-muted)]">
+            {t("ownership.lean.estimateNotice")}
+          </p>
+
           {/* ============================ o ajuste ============================ */}
           <Section title={t("ownership.adjust.qPurchase")}>
             <div className="grid grid-cols-2 gap-2">

@@ -24,6 +24,9 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Engine é 18+ (Termos e Privacidade, 24/10/2026): a idade e o aceite são
+  // confirmados aqui, antes de existir conta.
+  const [adult, setAdult] = useState(false);
   const navigate = useNavigate();
 
   const stateOptions = getStates(country);
@@ -33,6 +36,10 @@ export function Register() {
     setError("");
 
     // Validações antes de criar a conta.
+    if (!adult) {
+      setError(t("auth.adultRequired"));
+      return;
+    }
     if (!isPhoneValueValid(phone)) {
       setError(t("auth.invalidPhone"));
       return;
@@ -233,6 +240,26 @@ export function Register() {
           {confirmPassword && password !== confirmPassword && (
             <span className="auth-field-hint">{t("auth.passwordMismatch")}</span>
           )}
+        </label>
+
+        <label className="auth-span-two flex min-h-11 cursor-pointer items-start gap-2.5 text-[13px] leading-relaxed text-[var(--engine-text-muted)]">
+          <input
+            type="checkbox"
+            checked={adult}
+            onChange={(event) => setAdult(event.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0 accent-[var(--engine-accent)]"
+          />
+          <span>
+            {t("auth.adultConsent")}{" "}
+            <Link to="/termos" target="_blank" className="font-semibold text-[var(--engine-accent)]">
+              {t("auth.terms")}
+            </Link>{" "}
+            {t("auth.and")}{" "}
+            <Link to="/privacidade" target="_blank" className="font-semibold text-[var(--engine-accent)]">
+              {t("auth.privacy")}
+            </Link>
+            .
+          </span>
         </label>
 
         {error && <p className="auth-feedback auth-feedback-error auth-span-two">{error}</p>}

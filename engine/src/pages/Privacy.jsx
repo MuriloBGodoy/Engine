@@ -9,7 +9,7 @@ import { LegalPage, LegalSection } from "../components/LegalPage";
  */
 export function Privacy() {
   return (
-    <LegalPage title="Política de Privacidade" updatedAt="17 de outubro de 2026">
+    <LegalPage title="Política de Privacidade" updatedAt="24 de outubro de 2026">
       <p>
         Esta página explica quais dados o Engine coleta, por que coleta e o que
         você pode fazer a respeito. A linguagem é direta de propósito.
@@ -121,17 +121,49 @@ export function Privacy() {
             hospedagem.
           </li>
           <li>
-            <strong className="text-[var(--engine-text)]">Mercado Pago e
-            Stripe</strong> — pagamento da assinatura. O pagamento acontece no
-            ambiente deles: <strong className="text-[var(--engine-text)]">o
-            Engine nunca recebe nem armazena dados do seu cartão</strong>.
+            <strong className="text-[var(--engine-text)]">Stripe</strong> (e
+            Mercado Pago, em alguns países da América Latina) — pagamento dos
+            planos. Mesmo quando o pagamento aparece dentro do app, os campos do
+            cartão são do Stripe:{" "}
+            <strong className="text-[var(--engine-text)]">o Engine nunca recebe
+            nem armazena dados do seu cartão</strong>. Guardamos só o plano, as
+            datas e o identificador da assinatura.
           </li>
           <li>
             <strong className="text-[var(--engine-text)]">Google AdSense</strong> —
-            anúncios, quando estiverem ativos. Assinantes do plano Premium não
-            veem anúncios.
+            anúncios, quando estiverem ativos, e{" "}
+            <strong className="text-[var(--engine-text)]">só depois que você
+            escolher</strong> no aviso de cookies. Assinantes do Premium e do Pro
+            não veem anúncios.
           </li>
         </ul>
+      </LegalSection>
+
+      <LegalSection title="Cookies e anúncios">
+        <p>
+          O Engine usa armazenamento do navegador para funcionar: manter você
+          conectado, lembrar idioma, tema e região. Isso não depende de
+          consentimento.
+        </p>
+        <p>
+          Os anúncios do Google AdSense usam cookies próprios. Por isso, na
+          primeira visita, perguntamos:{" "}
+          <strong className="text-[var(--engine-text)]">Aceitar</strong> libera
+          anúncios que podem ser personalizados pelo Google;{" "}
+          <strong className="text-[var(--engine-text)]">Rejeitar</strong> faz o
+          Engine não carregar anúncios do Google, e nenhum cookie de publicidade
+          é gravado. Enquanto você não escolhe, também não carregamos. O app
+          funciona igual nos dois casos, e você muda a escolha quando quiser em
+          Configurações › Privacidade.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Métricas dos anúncios de serviço">
+        <p>
+          Quando você vê um anúncio de serviço na busca, abre o anúncio ou toca
+          no WhatsApp dele, contamos isso por dia e por origem (busca, perfil,
+          link). O prestador vê só os números somados, nunca quem foi.
+        </p>
       </LegalSection>
 
       <LegalSection title="Seus direitos">
@@ -151,8 +183,12 @@ export function Privacy() {
 
       <LegalSection title="Idade mínima">
         <p>
-          O Engine não é destinado a menores de 13 anos. Se soubermos que uma
-          conta pertence a alguém abaixo dessa idade, ela será removida.
+          O Engine é destinado a maiores de 18 anos. O app trata de compra,
+          financiamento e custo de carro, e o Estatuto Digital da Criança e do
+          Adolescente (Lei 15.211/2025) exige regras próprias para contas de
+          menores, inclusive a proibição de anúncio personalizado. Se soubermos
+          que uma conta pertence a alguém com menos de 18 anos, ela será
+          removida.
         </p>
       </LegalSection>
 

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Sparkles } from "lucide-react";
 import { auth } from "../services/supabase";
 import { useIsPremium } from "../hooks/useIsPremium";
+import { useAdsConsent } from "../services/consent";
 
 /**
  * Espaço de anúncio do Engine. Discreto por princípio (âncora/rodapé/nativo,
@@ -20,6 +21,9 @@ import { useIsPremium } from "../hooks/useIsPremium";
  *  - Premium não vê anúncio (nem o espaço em branco).
  *  - Sem AdSense configurado (dev/homologação), mostra um "house ad" que
  *    convida ao Premium — assim o layout é validado antes da conta existir.
+ *  - O AdSense só carrega depois do "Aceitar" no aviso de cookies
+ *    (ConsentBanner). Sem escolha, ou com "Rejeitar", o espaço some.
+ *  - Todo espaço leva o rótulo "Anúncio" (CDC art. 36, CONAR, regra do AdSense).
  *
  * Uso: <AdSlot slot="community-feed" format="native" user={user} />
  */
@@ -54,7 +58,7 @@ function HouseAd({ format }) {
   const isRectangle = format === "rectangle";
   return (
     <Link
-      to="/settings"
+      to="/planos"
       className={`engine-card engine-card-hover group flex overflow-hidden p-4 text-left ${
         isRectangle
           ? "min-h-[250px] flex-col items-center justify-center gap-3 text-center"
@@ -83,11 +87,13 @@ export function AdSlot({ slot = "default", format = "horizontal", user, classNam
   const { t } = useTranslation();
   const userId = user?.uid ?? auth.currentUser?.uid ?? null;
   const { isPremium, loading } = useIsPremium(userId);
+  // Sem "Aceitar" no aviso de cookies, nenhum script do Google carrega.
+  const consent = useAdsConsent();
   const insRef = useRef(null);
 
   const spec = FORMAT[format] || FORMAT.horizontal;
   const adSlotId = ADSENSE_SLOT_DEFAULT;
-  const adsenseReady = Boolean(ADSENSE_CLIENT && adSlotId);
+  const adsenseReady = Boolean(ADSENSE_CLIENT && adSlotId) && consent === "granted";
 
   useEffect(() => {
     if (!adsenseReady || isPremium || loading) return;
@@ -109,6 +115,8 @@ export function AdSlot({ slot = "default", format = "horizontal", user, classNam
   // nenhum no app e com os Serviços abertos. Era a primeira coisa que um
   // usuário novo via depois de se cadastrar.
   if (!adsenseReady && !import.meta.env.DEV) return null;
+  // Em DEV com AdSense configurado mas sem aceite, também não mostra nada.
+  if (!adsenseReady && ADSENSE_CLIENT) return null;
 
   return (
     <div className={`w-full ${className}`}>

@@ -10,7 +10,7 @@ import { LegalPage, LegalSection } from "../components/LegalPage";
  */
 export function Terms() {
   return (
-    <LegalPage title="Termos de Uso" updatedAt="6 de agosto de 2026">
+    <LegalPage title="Termos de Uso" updatedAt="24 de outubro de 2026">
       <p>
         Ao usar o Engine você concorda com estes termos. Se não concordar, não
         use a plataforma.
@@ -26,7 +26,7 @@ export function Terms() {
 
       <LegalSection title="Sua conta">
         <p>
-          Você precisa ter pelo menos 13 anos e fornecer informações
+          Você precisa ter pelo menos 18 anos e fornecer informações
           verdadeiras. Você é responsável pelo que acontece na sua conta e por
           manter a senha em segurança.
         </p>
@@ -69,27 +69,67 @@ export function Terms() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Plano Premium">
+      <LegalSection title="O que é grátis">
         <p>
-          O plano Premium é uma assinatura mensal que libera duas coisas: navegar
-          sem anúncios e divulgar serviços na plataforma.
+          Tudo o que existe hoje no Engine é grátis e continua grátis, inclusive
+          publicar serviço. Os planos pagos só acrescentam recursos; nunca
+          trancam o que já era livre.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Planos Pro e Premium">
+        <p>
+          <strong className="text-[var(--engine-text)]">Premium</strong> é para
+          o dono do carro: assinatura anual, ou passe de 1 ou 3 meses.{" "}
+          <strong className="text-[var(--engine-text)]">Pro</strong> é para quem
+          presta serviço, inclui tudo do Premium e é mensal. Os preços e o que
+          cada plano inclui estão na página Planos, e o resumo aparece de novo
+          antes de você pagar.
         </p>
         <p>
-          A cobrança é mensal e se renova automaticamente até você cancelar. O
-          cancelamento pode ser feito a qualquer momento nas configurações, e o
-          acesso continua até o fim do período já pago — sem multa e sem
-          fidelidade.
+          <strong className="text-[var(--engine-text)]">Renovação.</strong> As
+          assinaturas se renovam automaticamente ao fim de cada período até você
+          cancelar. O passe é pagamento único e não renova.
         </p>
         <p>
-          <strong className="text-[var(--engine-text)]">Arrependimento.</strong>{" "}
-          Se você contratou pela internet e se arrepender em até 7 dias, tem
-          direito ao cancelamento com devolução do valor pago, conforme o artigo
-          49 do Código de Defesa do Consumidor.
+          <strong className="text-[var(--engine-text)]">Teste grátis.</strong>{" "}
+          O Pro começa com um teste grátis, uma vez por pessoa. A data da
+          primeira cobrança aparece antes de você confirmar e em Configurações ›
+          Seu plano, e enviamos um aviso por e-mail antes dela. Cancelando antes
+          dessa data, nada é cobrado.
         </p>
         <p>
-          O pagamento é processado por Mercado Pago ou Stripe, conforme a sua
-          região. Preços podem mudar, e mudanças são avisadas com antecedência —
-          nunca valem para um período já pago.
+          <strong className="text-[var(--engine-text)]">Cancelamento.</strong>{" "}
+          Em Configurações › Seu plano › Gerenciar ou cancelar, a qualquer
+          momento, sem multa e sem fidelidade. O plano continua valendo até o fim
+          do período já pago.
+        </p>
+        <p>
+          <strong className="text-[var(--engine-text)]">Arrependimento e
+          reembolso.</strong> Você pode desistir em até 7 dias da contratação e
+          receber de volta todo o valor pago, como prevê o artigo 49 do Código
+          de Defesa do Consumidor — inclusive no passe. Como o teste grátis do
+          Pro dura mais que 7 dias, também devolvemos integralmente a primeira
+          cobrança depois do teste se você pedir em até 7 dias dela. Peça pelo
+          e-mail de contato abaixo; o reembolso volta pelo mesmo meio de
+          pagamento.
+        </p>
+        <p>
+          <strong className="text-[var(--engine-text)]">Pagamento.</strong>{" "}
+          Processado pelo Stripe (ou Mercado Pago, em alguns países da América
+          Latina). Preços podem mudar, com aviso antecipado, e nunca valem para
+          um período já pago. O preço de fundador é mantido enquanto a
+          assinatura continuar ativa.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Anúncios e patrocínios">
+        <p>
+          Todo anúncio, destaque pago ou patrocínio dentro do Engine aparece com
+          o rótulo <strong className="text-[var(--engine-text)]">Anúncio</strong>{" "}
+          ou <strong className="text-[var(--engine-text)]">Patrocinado</strong>.
+          Patrocínio nunca muda a ordem da busca de serviços: o destaque pago
+          fica numa faixa separada.
         </p>
       </LegalSection>
 
@@ -98,8 +138,8 @@ export function Terms() {
           O simulador de custo de posse e as previsões de quando você atinge a
           meta são <strong className="text-[var(--engine-text)]">estimativas
           baseadas em médias públicas e no que você informa</strong>. Servem para
-          planejamento, não são consultoria financeira e não substituem cotação
-          real de seguro, financiamento ou manutenção.
+          planejamento, não são consultoria financeira, não são oferta de crédito
+          e não substituem cotação real de seguro, financiamento ou manutenção.
         </p>
       </LegalSection>
 
@@ -124,6 +164,15 @@ export function Terms() {
           Estes termos seguem a lei brasileira. Eventuais disputas serão
           resolvidas no foro do domicílio do consumidor, como prevê o Código de
           Defesa do Consumidor.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Quem oferece o Engine">
+        <p>
+          O Engine é operado por Murilo Godoy. Antes da primeira cobrança, o
+          CNPJ e o endereço da empresa responsável serão publicados aqui, como
+          exige o Decreto 7.962/2013. Respondemos pedidos de atendimento em até
+          5 dias.
         </p>
       </LegalSection>
 
