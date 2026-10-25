@@ -52,6 +52,7 @@ const ClubDetailPage = lazyNamed(() => import("./pages/ClubDetailPage"), "ClubDe
 const EventDetails = lazyNamed(() => import("./pages/EventDetails"), "EventDetails");
 const UserProfile = lazyNamed(() => import("./pages/UserProfile"), "UserProfile");
 const Services = lazyNamed(() => import("./pages/Services"), "Services");
+const ServicePublicPage = lazyNamed(() => import("./pages/ServicePublicPage"), "ServicePublicPage");
 const ServiceApprovals = lazyNamed(() => import("./pages/Services"), "ServiceApprovals");
 const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
 const Support = lazyNamed(() => import("./pages/Support"), "Support");
@@ -362,6 +363,19 @@ function App() {
         {/* Publicação por link direto, fora do shell: quem chega por um link
             compartilhado cai no conteúdo, não no feed com um modal por cima. */}
         <Route path="/post/:postId" element={<PostPage user={user} />} />
+
+        {/* Página pública de cada anúncio de serviço: o "link da bio" do
+            prestador. Fora do shell pelo mesmo motivo do post — quem toca no
+            link do Instagram cai direto no serviço, sem menu nem abas. */}
+        <Route
+          path="/servicos/:slug"
+          element={
+            <Suspense fallback={<div className="min-h-[100dvh] bg-[var(--engine-bg)]" />}>
+              <ServicePublicPage user={user} />
+            </Suspense>
+          }
+        />
+        <Route path="/servicos" element={<Navigate to="/services" replace />} />
 
         {/* O Engine abre sem login. Início, comunidade e serviços são
             livres para visitantes; as rotas pessoais ficam protegidas por

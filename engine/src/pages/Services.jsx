@@ -2,47 +2,37 @@ import { Fragment, useEffect, useMemo, useRef, useState } from"react";
 import { useNavigate } from"react-router-dom";
 import { useTranslation } from"react-i18next";
 import {
+  BarChart3,
   BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
   Clock,
-  ClipboardCheck,
-  Cog,
-  Droplets,
   Edit3,
   ExternalLink,
-  Filter,
   Gauge,
   Globe,
-  Grid2x2,
   ImagePlus,
   LayoutGrid,
   Mail,
   Map,
   MapPin,
   Maximize2,
-  Music,
   Navigation,
-  PaintBucket,
   Plus,
   RotateCcw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Store,
   Trash2,
-  Truck,
   UserRoundCheck,
   Wrench,
   X,
   XCircle,
-  Zap,
   ZoomIn,
   ZoomOut,
 } from"lucide-react";
-import { FaInstagram, FaTiktok, FaWhatsapp } from"react-icons/fa";
 import { engineDB } from"../services/db";
 import { uploadToStorage } from "../services/photos";
 import {
@@ -57,21 +47,24 @@ import { useConfirm } from"../components/ConfirmProvider";
 import { useToast } from"../components/ToastProvider";
 import { AdSlot } from"../components/AdSlot";
 import { useRegion } from"../hooks/RegionProvider";
-
-// Ícone oficial do WhatsApp (react-icons). Mantém a mesma assinatura
-// (size/className) usada em todo o arquivo, inclusive como `icon={WhatsAppIcon}`.
-function WhatsAppIcon({ size = 18, className ="" }) {
-  return <FaWhatsapp size={size} className={className} aria-hidden="true" />;
-}
-
-// Instagram e TikTok também com o ícone oficial, mesma assinatura.
-function InstagramIcon({ size = 18, className ="" }) {
-  return <FaInstagram size={size} className={className} aria-hidden="true" />;
-}
-
-function TikTokIcon({ size = 18, className ="" }) {
-  return <FaTiktok size={size} className={className} aria-hidden="true" />;
-}
+import {
+  categoryIcons,
+  fallbackPhoto,
+  getDirectionsUrl,
+  getInitials,
+  getServiceCategoryLabel,
+  hasMapAddress,
+  mapQuery,
+  modeIcons,
+  modeLabelKeys,
+  normalizeServiceCategory,
+  normalizeWhatsApp,
+  serviceCategories,
+} from "../services/serviceListingDisplay";
+import { serviceListingPath } from "../services/serviceListingPublic";
+import { MapPreview, PortfolioLinks, WhatsAppIcon } from "../components/services/ListingParts";
+import { BioLinkCard, ShareListingButton } from "../components/services/ShareListing";
+import { ListingMonthPanel } from "../components/services/ListingMonthPanel";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
@@ -85,20 +78,6 @@ const SERVICE_ADMIN_EMAILS = (
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
-
-const serviceCategories = [
-  { value:"automotive-aesthetics", labelKey:"services.categories.automotiveAesthetics" },
-  { value:"car-cleaning", labelKey:"services.categories.carCleaning" },
-  { value:"mechanics", labelKey:"services.categories.mechanics" },
-  { value:"body-paint", labelKey:"services.categories.bodyPaint" },
-  { value:"electrical", labelKey:"services.categories.electrical" },
-  { value:"tires-wheels", labelKey:"services.categories.tiresWheels" },
-  { value:"tow", labelKey:"services.categories.tow" },
-  { value:"sound-accessories", labelKey:"services.categories.soundAccessories" },
-  { value:"inspection", labelKey:"services.categories.inspection" },
-  { value:"consulting", labelKey:"services.categories.consulting" },
-  { value:"other", labelKey:"services.categories.other" },
-];
 
 const emptyForm = {
   id:"",
@@ -127,60 +106,6 @@ const emptyForm = {
   moderationStatus:"pending",
 };
 
-const serviceCategoryByValue = Object.fromEntries(
-  serviceCategories.map((category) => [category.value, category]),
-);
-
-const legacyCategoryMap = {
-  "Estética automotiva":"automotive-aesthetics",
-  "Limpeza de carros":"car-cleaning",
-  Mecânica:"mechanics",
-  "Funilaria e pintura":"body-paint",
-  Elétrica:"electrical",
-  "Pneus e rodas":"tires-wheels",
-  Guincho:"tow",
-  "Som e acessórios":"sound-accessories",
-  Vistoria:"inspection",
-  Consultoria:"consulting",
-  Outro:"other",
-};
-
-const normalizeServiceCategory = (category) =>
-  serviceCategoryByValue[category] ? category : legacyCategoryMap[category] ||"other";
-
-const getServiceCategoryLabel = (category, t) =>
-  t(
-    serviceCategoryByValue[normalizeServiceCategory(category)]?.labelKey ||
-      "services.categories.other",
-  );
-
-const modeLabelKeys = {
-  place:"services.modes.place",
-  mobile:"services.modes.mobile",
-  hybrid:"services.modes.hybrid",
-};
-
-const modeIcons = {
-  place: Store,
-  mobile: Navigation,
-  hybrid: BriefcaseBusiness,
-};
-
-const categoryIcons = {
-  all: LayoutGrid,
-  "automotive-aesthetics": Sparkles,
-  "car-cleaning": Droplets,
-  mechanics: Wrench,
-  "body-paint": PaintBucket,
-  electrical: Zap,
-  "tires-wheels": Cog,
-  tow: Truck,
-  "sound-accessories": Music,
-  inspection: ClipboardCheck,
-  consulting: UserRoundCheck,
-  other: Grid2x2,
-};
-
 const modeFilterIcons = {
   all: LayoutGrid,
   hybrid: BriefcaseBusiness,
@@ -207,19 +132,6 @@ const statusLabelKeys = {
   changes_requested:"services.status.changesRequested",
   rejected:"services.status.rejected",
 };
-
-const fallbackPhoto =
-  "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1100&q=80";
-
-const getInitials = (name ="S") =>
-  name
-    .split("")
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-const normalizeWhatsApp = (value ="") => value.replace(/\D/g,"");
 
 const phoneCountries = [
   { code:"+55", label:"BR" },
@@ -354,17 +266,6 @@ const compressImageFile = (file) =>
     reader.readAsDataURL(file);
   });
 
-const mapQuery = (listing) =>
-  [listing.address, listing.city].filter(Boolean).join(",");
-
-const hasMapAddress = (listing) => Boolean(mapQuery(listing));
-
-const getMapUrl = (listing) =>
-  `https://www.google.com/maps?q=${encodeURIComponent(mapQuery(listing))}&output=embed`;
-
-const getDirectionsUrl = (listing) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery(listing))}`;
-
 const getSellerProfile = (settings, user) => {
   const profile = settings?.profile || {};
   const displayName =
@@ -459,141 +360,6 @@ function StatusBadge({ status }) {
   );
 }
 
-/**
- * Devolve o id do vídeo quando o link é do YouTube.
- *
- * Só o YouTube é embutido: Instagram e TikTok exigem carregar script deles na
- * página, o que traz rastreamento de terceiro e uma dependência externa que
- * pode quebrar o anúncio. Para esses dois o link abre em aba nova.
- */
-const youtubeId = (url = "") => {
-  const match = String(url).match(
-    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/,
-  );
-  return match?.[1] || "";
-};
-
-/** Portfólio do prestador: redes, site e vídeo do serviço. */
-function PortfolioLinks({ listing, t }) {
-  const videoId = youtubeId(listing.videoUrl);
-  const links = [
-    listing.instagram && {
-      key: "instagram",
-      icon: InstagramIcon,
-      label: `@${listing.instagram}`,
-      href: `https://instagram.com/${listing.instagram}`,
-    },
-    listing.tiktok && {
-      key: "tiktok",
-      icon: TikTokIcon,
-      label: `@${listing.tiktok}`,
-      href: `https://tiktok.com/@${listing.tiktok}`,
-    },
-    listing.website && {
-      key: "website",
-      icon: Globe,
-      label: t("services.fields.website"),
-      href: listing.website.startsWith("http")
-        ? listing.website
-        : `https://${listing.website}`,
-    },
-    listing.videoUrl &&
-      !videoId && {
-        key: "video",
-        icon: ExternalLink,
-        label: t("services.watchVideo"),
-        href: listing.videoUrl,
-      },
-  ].filter(Boolean);
-
-  if (!links.length && !videoId) return null;
-
-  return (
-    <div className="grid gap-3">
-      {videoId && (
-        <div className="overflow-hidden rounded-xl border border-[var(--engine-border)]">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${videoId}`}
-            title={t("services.watchVideo")}
-            allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-            className="aspect-video w-full"
-          />
-        </div>
-      )}
-
-      {links.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {links.map((link) => {
-            const Icon = link.icon;
-            return (
-              <a
-                key={link.key}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-              >
-                <Icon size={15} className="shrink-0" />
-                <span className="max-w-40 truncate">{link.label}</span>
-              </a>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Retorno do anúncio, só pro dono.
- *
- * Existe por um motivo comercial, não decorativo: no segundo mês o prestador
- * pergunta "quantos clientes vieram daí?" e, sem resposta, cancela. O número
- * que importa é o de contatos — os outros dois dão o funil até ele.
- */
-function ListingMetrics({ listing, t }) {
-  // Sem "apareceu na lista" de propósito: contar impressão daria uma escrita
-  // por card a cada rolagem, caro e ruidoso. Abertura e contato são o que
-  // sustentam a conversa sobre renovar a assinatura.
-  const opened = listing.detailCount || 0;
-  const contacts = listing.whatsappCount || 0;
-  const metrics = [
-    { key: "details", icon: Maximize2, value: opened },
-    { key: "contacts", icon: WhatsAppIcon, value: contacts },
-  ];
-
-  return (
-    <div className="rounded-xl border border-[var(--engine-border)] p-4">
-      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">
-        {t("services.metrics.title")}
-      </p>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {metrics.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <div key={metric.key} className="text-center">
-              <Icon size={15} className="mx-auto text-[var(--engine-accent)]" />
-              <p className="mt-1.5 text-lg font-black text-[var(--engine-text)]">
-                {metric.value}
-              </p>
-              <p className="text-[10px] font-bold uppercase leading-tight text-[var(--engine-text-muted)]">
-                {t(`services.metrics.${metric.key}`)}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      <p className="mt-3 text-[11px] leading-relaxed text-[var(--engine-text-muted)]">
-        {t("services.metrics.hint")}
-      </p>
-    </div>
-  );
-}
-
 function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
   const { t } = useTranslation();
   const ModeIcon = modeIcons[listing.serviceMode] || BriefcaseBusiness;
@@ -640,7 +406,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
       tabIndex={0}
       onClick={() => onOpen(listing)}
       onKeyDown={(event) => {
-        if (event.key ==="Enter" || event.key ==="") {
+        if (event.key ==="Enter" || event.key ===" ") {
           event.preventDefault();
           onOpen(listing);
         }
@@ -667,6 +433,18 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
         <span className="absolute left-3 top-3 rounded-full bg-[var(--engine-accent)] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
           {getServiceCategoryLabel(listing.category, t)}
         </span>
+        {/* Compartilhar direto do card: é o gesto de quem achou um bom
+            prestador e quer mandar para o amigo. Embaixo à direita, longe das
+            setas e dos pontos das fotos. */}
+        {listing.moderationStatus === "approved" && (
+          <ShareListingButton
+            listing={listing}
+            variant="overlay"
+            asOwner={isMine}
+            source="card"
+            className="absolute bottom-2 right-2 z-10"
+          />
+        )}
         {photos.length > 1 && (
           <>
             <div className="absolute right-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur">
@@ -735,8 +513,9 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
                     stopAction(event);
                     onEdit(listing);
                   }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white sm:h-9 sm:w-9"
                   title={t("services.editListing")}
+                  aria-label={t("services.editListing")}
                 >
                   <Edit3 size={14} />
                 </button>
@@ -746,8 +525,9 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
                     stopAction(event);
                     onDelete(listing);
                   }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white sm:h-9 sm:w-9"
                   title={t("services.deleteListing")}
+                  aria-label={t("services.deleteListing")}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -810,7 +590,10 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
           <div className="grid grid-cols-3 gap-1.5 pt-1 sm:gap-2">
             <a
               href={phone ? `https://wa.me/${phone}` : undefined}
-              onClick={stopAction}
+              onClick={(event) => {
+                stopAction(event);
+                if (phone && !isMine) engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search");
+              }}
               target="_blank"
               rel="noreferrer"
               aria-disabled={!phone}
@@ -823,7 +606,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               title={t("services.whatsapp")}
             >
               <WhatsAppIcon className="shrink-0" size={16} />
-              <span className="hidden sm:inline">Chat</span>
+              <span className="hidden sm:inline">{t("services.cardActions.chat")}</span>
             </a>
             <a
               href={listing.email ? `mailto:${listing.email}?subject=${encodeURIComponent(t("services.emailSubject", { title: listing.title }))}` : undefined}
@@ -838,7 +621,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               title={t("services.sendEmail")}
             >
               <Mail className="shrink-0" size={16} />
-              <span className="hidden sm:inline">Email</span>
+              <span className="hidden sm:inline">{t("services.cardActions.email")}</span>
             </a>
             <a
               href={showMap ? getDirectionsUrl(listing) : undefined}
@@ -855,7 +638,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               title={t("services.viewRouteShort")}
             >
               <Map className="shrink-0" size={16} />
-              <span className="hidden sm:inline">Map</span>
+              <span className="hidden sm:inline">{t("services.cardActions.map")}</span>
             </a>
           </div>
         </div>
@@ -899,14 +682,20 @@ function ServiceDetailModal({ listing, isMine, onClose, onEdit, onDelete }) {
               {listing.title}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white sm:h-10 sm:w-10"
-            title={t("common.cancel")}
-          >
-            <X size={20} />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {listing.moderationStatus === "approved" && (
+              <ShareListingButton listing={listing} variant="icon" asOwner={isMine} source="detalhe" />
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
+              title={t("common.close")}
+              aria-label={t("common.close")}
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-5 p-3 pb-28 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
@@ -1013,7 +802,16 @@ function ServiceDetailModal({ listing, isMine, onClose, onEdit, onDelete }) {
             {showMap && <MapPreview listing={listing} />}
           </div>
 
-          <aside className="space-y-4">
+          <aside className={`min-w-0 space-y-4 ${isMine ? "order-first lg:order-none" : ""}`}>
+            {/* Para o dono, o topo do detalhe é o que ele mais usa: o link da
+                bio e o retorno do mês. O resto é o anúncio como o cliente vê. */}
+            {isMine && (
+              <>
+                <BioLinkCard listing={listing} />
+                <ListingMonthPanel listing={listing} />
+              </>
+            )}
+
             <div className="rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4">
               <div className="flex min-w-0 gap-3">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] font-black italic text-white">
@@ -1086,7 +884,17 @@ function ServiceDetailModal({ listing, isMine, onClose, onEdit, onDelete }) {
 
             <PortfolioLinks listing={listing} t={t} />
 
-            {isMine && <ListingMetrics listing={listing} t={t} />}
+            {!isMine && listing.moderationStatus === "approved" && (
+              <a
+                href={serviceListingPath(listing)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent)]"
+              >
+                <ExternalLink size={15} aria-hidden="true" />
+                {t("services.share.openPage")}
+              </a>
+            )}
 
             {isMine && (
               <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
@@ -1229,29 +1037,6 @@ function PhotoLightbox({
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function MapPreview({ listing, compact = false }) {
-  const { t } = useTranslation();
-  return (
-    <div className="overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
-      <iframe
-        title={t("services.mapTitle", { title: listing.title || t("services.service") })}
-        src={getMapUrl(listing)}
-        loading="lazy"
-        className={`${compact ?"h-44" :"h-64"} w-full border-0`}
-      />
-      <a
-        href={getDirectionsUrl(listing)}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-center gap-2 border-t border-[var(--engine-border)] px-4 py-3 text-xs font-black uppercase tracking-widest text-[var(--engine-accent)] transition hover:bg-[var(--engine-accent)] hover:text-white"
-      >
-        <ExternalLink size={15} />
-        {t("services.openGoogleMaps")}
-      </a>
     </div>
   );
 }
@@ -1777,7 +1562,7 @@ function SellerProfileModal({
   );
 }
 
-function SellerListingsModal({ listings, onClose, onEdit, onDelete, onNewListing }) {
+function SellerListingsModal({ listings, onClose, onOpen, onEdit, onDelete, onNewListing }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const cleanSearch = search.trim().toLowerCase();
@@ -1871,11 +1656,23 @@ function SellerListingsModal({ listings, onClose, onEdit, onDelete, onNewListing
                       </p>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:w-24 sm:grid-cols-1">
+                  <div className="grid grid-cols-2 gap-2 sm:w-36 sm:grid-cols-1">
+                    {/* "Seu mês" e o link moram no detalhe do anúncio: abrir
+                        é o caminho mais curto até os dois. */}
+                    <button
+                      type="button"
+                      onClick={() => onOpen(listing)}
+                      className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--engine-accent)] px-3 text-xs font-black uppercase tracking-widest text-white transition hover:brightness-95 sm:col-span-1"
+                    >
+                      <BarChart3 size={15} aria-hidden="true" />
+                      {listing.moderationStatus === "approved"
+                        ? t("services.month.openShort")
+                        : t("services.share.viewListing")}
+                    </button>
                     <button
                       type="button"
                       onClick={() => onEdit(listing)}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--engine-accent)] px-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[var(--engine-accent)]"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--engine-border)] px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
                     >
                       <Edit3 size={15} />
                       {t("services.edit")}
@@ -1883,7 +1680,7 @@ function SellerListingsModal({ listings, onClose, onEdit, onDelete, onNewListing
                     <button
                       type="button"
                       onClick={() => onDelete(listing)}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--engine-border)] px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--engine-border)] px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
                     >
                       <Trash2 className="shrink-0" size={17} />
                       {t("common.delete")}
@@ -2164,6 +1961,11 @@ export function Services({ user, settings }) {
   const myListings = useMemo(
     () => listings.filter((listing) => listing.ownerId === user?.uid),
     [listings, user?.uid],
+  );
+  // O link da bio fica à mão na vitrine: o anúncio aprovado mais recente.
+  const myBioListing = useMemo(
+    () => myListings.find((listing) => listing.moderationStatus ==="approved") || null,
+    [myListings],
   );
   const pendingApprovalsCount = useMemo(
     () => listings.filter((listing) => listing.moderationStatus ==="pending").length,
@@ -2561,6 +2363,9 @@ export function Services({ user, settings }) {
                 {myListings.length}
               </span>
             </button>
+            {myBioListing && (
+              <BioLinkCard listing={myBioListing} compact className="mt-3" />
+            )}
             {isAdmin && (
               <button
                 type="button"
@@ -2835,6 +2640,10 @@ export function Services({ user, settings }) {
         <SellerListingsModal
           listings={myListings}
           onClose={() => setSellerListingsOpen(false)}
+          onOpen={(listing) => {
+            setSellerListingsOpen(false);
+            openDetail(listing);
+          }}
           onEdit={(listing) => {
             setSellerListingsOpen(false);
             openEditor(listing);
