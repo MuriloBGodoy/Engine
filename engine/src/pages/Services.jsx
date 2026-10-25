@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from"react";
-import { useNavigate } from"react-router-dom";
-import { useTranslation } from"react-i18next";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -32,8 +32,8 @@ import {
   XCircle,
   ZoomIn,
   ZoomOut,
-} from"lucide-react";
-import { engineDB } from"../services/db";
+} from "lucide-react";
+import { engineDB } from "../services/db";
 import { uploadToStorage } from "../services/photos";
 import {
   countries,
@@ -42,12 +42,12 @@ import {
   getCountryName,
   getStateName,
   isCityInCountry,
-} from"../services/locations";
-import { useConfirm } from"../components/ConfirmProvider";
-import { useToast } from"../components/ToastProvider";
-import { AdSlot } from"../components/AdSlot";
+} from "../services/locations";
+import { useConfirm } from "../components/ConfirmProvider";
+import { useToast } from "../components/ToastProvider";
+import { AdSlot } from "../components/AdSlot";
 import { ServiceRatingBadge, ServiceReviews } from "../components/services/ServiceReviews";
-import { useRegion } from"../hooks/RegionProvider";
+import { useRegion } from "../hooks/RegionProvider";
 import {
   categoryIcons,
   fallbackPhoto,
@@ -74,37 +74,37 @@ const PHOTO_UPLOAD_TIMEOUT_MS = 15000;
 const FALLBACK_IMAGE_MAX_SIZE = 1100;
 const FALLBACK_IMAGE_QUALITY = 0.72;
 const SERVICE_ADMIN_EMAILS = (
-  import.meta.env.VITE_SERVICE_ADMIN_EMAILS ||"muxdtuber@gmail.com"
+  import.meta.env.VITE_SERVICE_ADMIN_EMAILS || "muxdtuber@gmail.com"
 )
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
 
 const emptyForm = {
-  id:"",
-  title:"",
-  providerName:"",
-  category:"car-cleaning",
-  description:"",
-  price:"",
-  serviceMode:"hybrid",
-  country:"BR",
-  state:"",
-  city:"",
-  address:"",
-  serviceArea:"",
-  whatsappCountry:"+55",
-  whatsapp:"",
-  email:"",
-  website:"",
-  instagram:"",
-  tiktok:"",
-  videoUrl:"",
-  availability:"",
-  experience:"",
-  tags:"",
+  id: "",
+  title: "",
+  providerName: "",
+  category: "car-cleaning",
+  description: "",
+  price: "",
+  serviceMode: "hybrid",
+  country: "BR",
+  state: "",
+  city: "",
+  address: "",
+  serviceArea: "",
+  whatsappCountry: "+55",
+  whatsapp: "",
+  email: "",
+  website: "",
+  instagram: "",
+  tiktok: "",
+  videoUrl: "",
+  availability: "",
+  experience: "",
+  tags: "",
   photos: [],
-  moderationStatus:"pending",
+  moderationStatus: "pending",
 };
 
 const modeFilterIcons = {
@@ -115,9 +115,9 @@ const modeFilterIcons = {
 };
 
 const modeCopyKeys = {
-  place:"services.modeCopy.place",
-  mobile:"services.modeCopy.mobile",
-  hybrid:"services.modeCopy.hybrid",
+  place: "services.modeCopy.place",
+  mobile: "services.modeCopy.mobile",
+  hybrid: "services.modeCopy.hybrid",
 };
 
 const modeFilters = [
@@ -128,10 +128,10 @@ const modeFilters = [
 ];
 
 const statusLabelKeys = {
-  approved:"services.status.approved",
-  pending:"services.status.pending",
+  approved: "services.status.approved",
+  pending: "services.status.pending",
   changes_requested:"services.status.changesRequested",
-  rejected:"services.status.rejected",
+  rejected: "services.status.rejected",
 };
 
 const phoneCountries = [
@@ -149,13 +149,13 @@ const phoneCountries = [
   { code:"+57", label:"CO" },
 ];
 
-const inferPhoneCountry = (value ="") => {
+const inferPhoneCountry = (value = "") => {
   const cleanValue = String(value).replace(/\s/g,"");
   return (
     phoneCountries
       .map((country) => country.code)
       .sort((a, b) => b.length - a.length)
-      .find((code) => cleanValue.startsWith(code)) ||"+55"
+      .find((code) => cleanValue.startsWith(code)) || "+55"
   );
 };
 
@@ -168,7 +168,7 @@ const stripPhoneCountry = (value ="", countryCode ="+55") => {
 const formatPhoneInput = (value ="", countryCode ="+55") => {
   const digits = String(value).replace(/\D/g,"").slice(0, 14);
 
-  if (countryCode ==="+55") {
+  if (countryCode === "+55") {
     const localDigits = stripPhoneCountry(digits, countryCode).slice(0, 11);
     const areaCode = localDigits.slice(0, 2);
     const firstPart = localDigits.length > 10
@@ -178,35 +178,35 @@ const formatPhoneInput = (value ="", countryCode ="+55") => {
       ? localDigits.slice(7, 11)
       : localDigits.slice(6, 10);
 
-    let formatted ="";
+    let formatted = "";
     if (areaCode) formatted += `(${areaCode}`;
-    if (areaCode.length === 2) formatted +=")";
+    if (areaCode.length === 2) formatted += ") ";
     if (firstPart) formatted += firstPart;
     if (secondPart) formatted += `-${secondPart}`;
     return formatted;
   }
 
-  if (countryCode ==="+1") {
+  if (countryCode === "+1") {
     const localDigits = stripPhoneCountry(digits, countryCode).slice(0, 10);
     const areaCode = localDigits.slice(0, 3);
     const firstPart = localDigits.slice(3, 6);
     const secondPart = localDigits.slice(6, 10);
 
-    let formatted ="";
+    let formatted = "";
     if (areaCode) formatted += `(${areaCode}`;
-    if (areaCode.length === 3) formatted +=")";
+    if (areaCode.length === 3) formatted += ") ";
     if (firstPart) formatted += firstPart;
     if (secondPart) formatted += `-${secondPart}`;
     return formatted;
   }
 
   return stripPhoneCountry(digits, countryCode)
-    .replace(/(\d{3})(?=\d)/g,"$1")
+    .replace(/(\d{3})(?=\d)/g, "$1 ")
     .trim();
 };
 
 const splitStoredPhone = (value ="", fallbackCountry ="+55") => {
-  const cleanValue = String(value ||"").trim();
+  const cleanValue = String(value || "").trim();
   const countryCode = cleanValue.startsWith("+")
     ? inferPhoneCountry(cleanValue)
     : fallbackCountry;
@@ -216,12 +216,12 @@ const splitStoredPhone = (value ="", fallbackCountry ="+55") => {
   };
 };
 
-const formatCurrencyInput = (value ="") => {
+const formatCurrencyInput = (value = "") => {
   const digits = value.replace(/\D/g,"").slice(0, 9);
   if (!digits) return"";
   return Number(digits).toLocaleString("pt-BR", {
-    style:"currency",
-    currency:"BRL",
+    style: "currency",
+    currency: "BRL",
     maximumFractionDigits: 0,
   });
 };
@@ -272,18 +272,18 @@ const getSellerProfile = (settings, user) => {
   const displayName =
     profile.displayName ||
     user?.displayName ||
-    String(user?.email ||"").split("@")[0] ||
+    String(user?.email || "").split("@")[0] ||
     "Usuario Engine";
 
   return {
     displayName,
-    username: profile.username ||"",
-    country: profile.country ||"BR",
-    state: profile.state ||"",
-    city: profile.location ||"",
-    phone: profile.phone ||"",
-    avatar: profile.avatar || user?.photoURL ||"",
-    email: user?.email ||"",
+    username: profile.username || "",
+    country: profile.country || "BR",
+    state: profile.state || "",
+    city: profile.location || "",
+    phone: profile.phone || "",
+    avatar: profile.avatar || user?.photoURL || "",
+    email: user?.email || "",
   };
 };
 
@@ -302,7 +302,7 @@ const makeInitialForm = (settings, user) => {
 
 function Field({ label, children, wide = false }) {
   return (
-    <label className={`grid min-w-0 gap-2 ${wide ?"md:col-span-2" :""}`}>
+    <label className={`grid min-w-0 gap-2 ${wide ? "md:col-span-2" : ""}`}>
       <span className="text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">
         {label}
       </span>
@@ -341,13 +341,13 @@ function Select(props) {
 function StatusBadge({ status }) {
   const { t } = useTranslation();
   const styles = {
-    approved:"border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
-    pending:"border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+    approved: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+    pending: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-300",
     changes_requested:"border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-300",
-    rejected:"border-[var(--engine-accent)]/25 bg-[var(--engine-accent)]/10 text-[var(--engine-accent)]",
+    rejected: "border-[var(--engine-accent)]/25 bg-[var(--engine-accent)]/10 text-[var(--engine-accent)]",
   };
   const Icon =
-    status ==="approved" ? CheckCircle2 : status ==="rejected" ? XCircle : Clock;
+    status === "approved" ? CheckCircle2 : status === "rejected" ? XCircle : Clock;
 
   return (
     <span
@@ -407,7 +407,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
       tabIndex={0}
       onClick={() => onOpen(listing)}
       onKeyDown={(event) => {
-        if (event.key ==="Enter" || event.key ===" ") {
+        if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onOpen(listing);
         }
@@ -602,8 +602,8 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               aria-label={t("services.whatsapp")}
               className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9 ${
                 phone
-                  ?"bg-emerald-600 text-white hover:bg-emerald-700"
-                  :"pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
               }`}
               title={t("services.whatsapp")}
             >
@@ -617,8 +617,8 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               aria-label={t("services.sendEmail")}
               className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9 ${
                 listing.email
-                  ?"bg-[var(--engine-accent)] text-white hover:brightness-95"
-                  :"pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
+                  ? "bg-[var(--engine-accent)] text-white hover:brightness-95"
+                  : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
               }`}
               title={t("services.sendEmail")}
             >
@@ -634,8 +634,8 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               aria-label={t("services.viewRoute")}
               className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9 ${
                 showMap
-                  ?"border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                  :"pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
+                  ? "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                  : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
               }`}
               title={t("services.viewRouteShort")}
             >
@@ -675,7 +675,7 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5">
       <section className="h-[100dvh] w-full max-w-6xl overflow-y-auto rounded-none border-0 border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:border dark:text-white">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-surface)]/95 px-3 py-3 backdrop-blur /95 sm:gap-4 sm:px-6 sm:py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-surface)]/95 px-3 py-3 backdrop-blur sm:gap-4 sm:px-6 sm:py-4">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[var(--engine-accent)]">
               {getServiceCategoryLabel(listing.category, t)}
@@ -764,8 +764,8 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
                     }}
                     className={`relative h-18 w-24 shrink-0 overflow-hidden rounded-lg border transition sm:h-24 sm:w-36 ${
                       index === activePhotoIndex
-                        ?"border-[var(--engine-accent)] ring-2 ring-red-500/25"
-                        :"border-transparent opacity-70 hover:opacity-100"
+                        ? "border-[var(--engine-accent)] ring-2 ring-red-500/25"
+                        : "border-transparent opacity-70 hover:opacity-100"
                     }`}
                     title={t("services.viewPhoto", { value: index + 1 })}
                   >
@@ -1027,9 +1027,9 @@ function PhotoLightbox({
           className="object-contain transition-[width,height] duration-200"
           style={{
             width: `${zoom * 100}%`,
-            height:"auto",
-            maxWidth: zoom === 1 ?"100%" :"none",
-            maxHeight: zoom === 1 ?"100%" :"none",
+            height: "auto",
+            maxWidth: zoom === 1 ? "100%" : "none",
+            maxHeight: zoom === 1 ? "100%" : "none",
           }}
         />
         {photos.length > 1 && (
@@ -1050,10 +1050,10 @@ function PhotoLightbox({
 function InfoPill({ icon, label, value, tone }) {
   const Icon = icon;
   const tones = {
-    red:"text-[var(--engine-accent)]",
-    amber:"text-amber-500",
-    sky:"text-sky-500",
-    emerald:"text-emerald-500",
+    red: "text-[var(--engine-accent)]",
+    amber: "text-amber-500",
+    sky: "text-sky-500",
+    emerald: "text-emerald-500",
   };
 
   return (
@@ -1071,8 +1071,8 @@ function ContactButton({ href, icon, label, value, disabled, onActivate }) {
   const Icon = icon;
   const className = `flex min-h-14 items-center gap-3 rounded-xl px-4 transition ${
     disabled
-      ?"cursor-not-allowed bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
-      :"bg-[var(--engine-accent)] text-white hover:bg-[var(--engine-accent)] dark:text-white hover:brightness-95"
+      ? "cursor-not-allowed bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
+      : "bg-[var(--engine-accent)] text-white hover:brightness-95"
   }`;
   const content = (
     <>
@@ -1115,8 +1115,8 @@ function ListingEditorModal({
   onCancel,
 }) {
   const { t } = useTranslation();
-  const needsAddress = ["place","hybrid"].includes(form.serviceMode);
-  const needsServiceArea = ["mobile","hybrid"].includes(form.serviceMode);
+  const needsAddress = ["place", "hybrid"].includes(form.serviceMode);
+  const needsServiceArea = ["mobile", "hybrid"].includes(form.serviceMode);
   const formStates = getStates(form.country);
   const formCities = getCities(form.country, form.state);
   const cityListId = "listing-city-suggestions";
@@ -1247,7 +1247,7 @@ function ListingEditorModal({
 
           <Field label={t("services.fields.serviceMode")} wide>
             <div className="grid gap-2 min-[520px]:grid-cols-3">
-              {["hybrid","mobile","place"].map((item) => {
+              {["hybrid", "mobile", "place"].map((item) => {
                 const Icon = modeIcons[item];
                 const active = form.serviceMode === item;
                 return (
@@ -1257,8 +1257,8 @@ function ListingEditorModal({
                     onClick={() => onChange("serviceMode", item)}
                     className={`min-h-20 rounded-xl border p-3 text-left transition sm:min-h-24 ${
                       active
-                        ?"border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
-                        :"border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                        ? "border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
+                        : "border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
                     }`}
                   >
                     <Icon size={18} />
@@ -1276,7 +1276,7 @@ function ListingEditorModal({
 
           <Field label={t("services.fields.country")}>
             <Select
-              value={form.country ||"BR"}
+              value={form.country || "BR"}
               onChange={(event) => {
                 onChange("country", event.target.value);
                 onChange("state", "");
@@ -1292,7 +1292,7 @@ function ListingEditorModal({
           </Field>
           <Field label={t("services.fields.state")}>
             <Select
-              value={form.state ||""}
+              value={form.state || ""}
               onChange={(event) => {
                 onChange("state", event.target.value);
                 onChange("city", "");
@@ -1359,7 +1359,7 @@ function ListingEditorModal({
           <Field label={t("services.fields.whatsapp")}>
             <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2 sm:grid-cols-[112px_minmax(0,1fr)]">
               <Select
-                value={form.whatsappCountry ||"+55"}
+                value={form.whatsappCountry || "+55"}
                 onChange={(event) => {
                   onChange("whatsappCountry", event.target.value);
                   onChange("whatsapp", formatPhoneInput(form.whatsapp, event.target.value));
@@ -1380,7 +1380,7 @@ function ListingEditorModal({
                     formatPhoneInput(event.target.value, form.whatsappCountry),
                   )
                 }
-                placeholder={form.whatsappCountry ==="+1" ?"(555) 123-4567" :"(11) 99999-9999"}
+                placeholder={form.whatsappCountry === "+1" ? "(555) 123-4567" : "(11) 99999-9999"}
                 inputMode="tel"
               />
             </div>
@@ -1463,7 +1463,7 @@ function ListingEditorModal({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-5 text-sm font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-5 text-sm font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
           >
             {t("common.cancel")}
           </button>
@@ -1523,7 +1523,7 @@ function SellerProfileModal({
               {t("services.account")}
             </span>
             <span className="min-w-0 truncate text-xs font-bold text-[var(--engine-text-muted)]">
-              {sellerProfile.username || sellerProfile.email ||"Engine"}
+              {sellerProfile.username || sellerProfile.email || "Engine"}
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
@@ -1581,7 +1581,7 @@ function SellerListingsModal({ listings, onClose, onOpen, onEdit, onDelete, onNe
       t(statusLabelKeys[listing.moderationStatus] || statusLabelKeys.pending),
     ]
       .filter(Boolean)
-      .join("")
+      .join(" ")
       .toLowerCase()
       .includes(cleanSearch),
   );
@@ -1725,10 +1725,10 @@ function SellerListingsModal({ listings, onClose, onOpen, onEdit, onDelete, onNe
 
 function ApprovalQueue({ listings, onApprove, onReturn, onReject, onEdit }) {
   const { t } = useTranslation();
-  const pending = listings.filter((listing) => listing.moderationStatus ==="pending");
+  const pending = listings.filter((listing) => listing.moderationStatus === "pending");
   const reviewed = listings
     .filter((listing) =>
-      ["approved","changes_requested","rejected"].includes(listing.moderationStatus),
+      ["approved", "changes_requested", "rejected"].includes(listing.moderationStatus),
     )
     .slice(0, 8);
 
@@ -1773,7 +1773,7 @@ function ApprovalQueue({ listings, onApprove, onReturn, onReject, onEdit }) {
               <button
                 type="button"
                 onClick={() => onEdit(listing)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
               >
                 <Edit3 size={15} />
                 {t("services.review")}
@@ -1789,7 +1789,7 @@ function ApprovalQueue({ listings, onApprove, onReturn, onReject, onEdit }) {
               <button
                 type="button"
                 onClick={() => onReject(listing)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[var(--engine-accent)] hover:brightness-95"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-3 text-xs font-black uppercase tracking-widest text-white transition hover:brightness-95"
               >
                 <XCircle size={15} />
                 {t("services.reject")}
@@ -1857,7 +1857,7 @@ function ApprovalQueue({ listings, onApprove, onReturn, onReject, onEdit }) {
 function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfirm }) {
   const { t } = useTranslation();
   if (!listing) return null;
-  const isReject = action ==="rejected";
+  const isReject = action === "rejected";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
@@ -1907,7 +1907,7 @@ function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfi
             type="button"
             onClick={onConfirm}
             className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold uppercase text-white transition ${
-              isReject ?"bg-[var(--engine-accent)] hover:brightness-95" :"bg-sky-600 hover:bg-sky-700"
+              isReject ? "bg-[var(--engine-accent)] hover:brightness-95" : "bg-sky-600 hover:bg-sky-700"
             }`}
           >
             {isReject ? <XCircle size={18} /> : <RotateCcw size={18} />}
@@ -1916,7 +1916,7 @@ function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfi
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-5 text-sm font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-5 text-sm font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
           >
             {t("common.cancel")}
           </button>
@@ -1953,7 +1953,7 @@ export function Services({ user, settings }) {
   const [detailListing, setDetailListing] = useState(null);
   const [sellerProfileOpen, setSellerProfileOpen] = useState(false);
   const [sellerListingsOpen, setSellerListingsOpen] = useState(false);
-  const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email ||"").toLowerCase());
+  const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email || "").toLowerCase());
   const sellerProfile = useMemo(
     () => getSellerProfile(settings, user),
     [settings, user],
@@ -1970,16 +1970,16 @@ export function Services({ user, settings }) {
   );
   // O link da bio fica à mão na vitrine: o anúncio aprovado mais recente.
   const myBioListing = useMemo(
-    () => myListings.find((listing) => listing.moderationStatus ==="approved") || null,
+    () => myListings.find((listing) => listing.moderationStatus === "approved") || null,
     [myListings],
   );
   const pendingApprovalsCount = useMemo(
-    () => listings.filter((listing) => listing.moderationStatus ==="pending").length,
+    () => listings.filter((listing) => listing.moderationStatus === "pending").length,
     [listings],
   );
 
   const approvedListings = useMemo(
-    () => listings.filter((listing) => listing.moderationStatus ==="approved"),
+    () => listings.filter((listing) => listing.moderationStatus === "approved"),
     [listings],
   );
 
@@ -1999,7 +1999,7 @@ export function Services({ user, settings }) {
       approvedListings
         .filter(
           (listing) =>
-            countryFilter ==="all" ||
+            countryFilter === "all" ||
             !listing.country ||
             listing.country === countryFilter,
         )
@@ -2010,7 +2010,7 @@ export function Services({ user, settings }) {
       .map((code) => ({
         code,
         name:
-          getStateName(countryFilter ==="all" ?"" : countryFilter, code) || code,
+          getStateName(countryFilter === "all" ? "" : countryFilter, code) || code,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [approvedListings, countryFilter]);
@@ -2021,10 +2021,10 @@ export function Services({ user, settings }) {
       approvedListings
         .filter(
           (listing) =>
-            (countryFilter ==="all" ||
+            (countryFilter === "all" ||
               !listing.country ||
               listing.country === countryFilter) &&
-            (stateFilter ==="all" ||
+            (stateFilter === "all" ||
               !listing.state ||
               listing.state === stateFilter),
         )
@@ -2036,7 +2036,7 @@ export function Services({ user, settings }) {
 
   const stats = useMemo(() => {
     const mobileCount = approvedListings.filter((listing) =>
-      ["mobile","hybrid"].includes(listing.serviceMode),
+      ["mobile", "hybrid"].includes(listing.serviceMode),
     ).length;
     const cities = new Set(
       approvedListings.map((listing) => listing.city?.trim()).filter(Boolean),
@@ -2052,16 +2052,16 @@ export function Services({ user, settings }) {
     const cleanQuery = query.trim().toLowerCase();
     return approvedListings.filter((listing) => {
       const normalizedCategory = normalizeServiceCategory(listing.category);
-      const matchesCategory = category ==="all" || normalizedCategory === category;
-      const matchesMode = mode ==="all" || listing.serviceMode === mode;
+      const matchesCategory = category === "all" || normalizedCategory === category;
+      const matchesMode = mode === "all" || listing.serviceMode === mode;
       const matchesCountry =
-        countryFilter ==="all" ||
+        countryFilter === "all" ||
         !listing.country ||
         listing.country === countryFilter;
       const matchesState =
-        stateFilter ==="all" || !listing.state || listing.state === stateFilter;
+        stateFilter === "all" || !listing.state || listing.state === stateFilter;
       const matchesCity =
-        cityFilter ==="all" || (listing.city?.trim() ||"") === cityFilter;
+        cityFilter === "all" || (listing.city?.trim() || "") === cityFilter;
       const text = [
         listing.title,
         listing.providerName,
@@ -2071,7 +2071,7 @@ export function Services({ user, settings }) {
         listing.serviceArea,
         ...(listing.tags || []),
       ]
-        .join("")
+        .join(" ")
         .toLowerCase();
       return (
         matchesCategory &&
@@ -2085,11 +2085,11 @@ export function Services({ user, settings }) {
   }, [approvedListings, category, mode, countryFilter, stateFilter, cityFilter, query, t]);
 
   const activeFilterCount =
-    (category !=="all" ? 1 : 0) +
-    (mode !=="all" ? 1 : 0) +
-    (countryFilter !=="all" ? 1 : 0) +
-    (stateFilter !=="all" ? 1 : 0) +
-    (cityFilter !=="all" ? 1 : 0);
+    (category !== "all" ? 1 : 0) +
+    (mode !== "all" ? 1 : 0) +
+    (countryFilter !== "all" ? 1 : 0) +
+    (stateFilter !== "all" ? 1 : 0) +
+    (cityFilter !== "all" ? 1 : 0);
 
   const clearFilters = () => {
     setCategory("all");
@@ -2130,7 +2130,7 @@ export function Services({ user, settings }) {
         country: listing.country || sellerProfile.country || "BR",
         state: listing.state || sellerProfile.state || "",
         ...splitStoredPhone(listing.whatsapp, listing.whatsappCountry),
-        tags: (listing.tags || []).join(","),
+        tags: (listing.tags || []).join(", "),
         photos: listing.photos || [],
       });
     } else {
@@ -2146,7 +2146,7 @@ export function Services({ user, settings }) {
 
   const uploadPhotos = async (event) => {
     const files = Array.from(event.target.files || []);
-    event.target.value ="";
+    event.target.value = "";
     if (!files.length) return;
     if (!user?.uid) {
       flash(t("services.flash.signInAgain"));
@@ -2170,7 +2170,7 @@ export function Services({ user, settings }) {
           if (file.size > 6 * 1024 * 1024) {
             throw new Error(t("services.flash.maxPhotoSize"));
           }
-          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,"-");
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
           const path = `users/${user.uid}/services/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
           try {
             const url = await withUploadTimeout(
@@ -2226,11 +2226,11 @@ export function Services({ user, settings }) {
       faltando(form.title.trim() ? "svc-description" : "svc-title", t("services.flash.titleDescriptionRequired"));
       return;
     }
-    if (["place","hybrid"].includes(form.serviceMode) && !form.address.trim()) {
+    if (["place", "hybrid"].includes(form.serviceMode) && !form.address.trim()) {
       faltando("svc-address", t("services.flash.addressRequired"));
       return;
     }
-    if (["mobile","hybrid"].includes(form.serviceMode) && !form.serviceArea.trim()) {
+    if (["mobile", "hybrid"].includes(form.serviceMode) && !form.serviceArea.trim()) {
       faltando("svc-service-area", t("services.flash.areaRequired"));
       return;
     }
@@ -2289,7 +2289,7 @@ export function Services({ user, settings }) {
         user?.uid,
       );
       flash(
-        moderationAction ==="changes_requested"
+        moderationAction === "changes_requested"
           ? t("services.flash.returned")
           : t("services.flash.rejected"),
       );
@@ -2697,7 +2697,7 @@ export function ServiceApprovals({ user }) {
   const [rejectionTarget, setRejectionTarget] = useState(null);
   const [rejectionNote, setRejectionNote] = useState("");
   const [moderationAction, setModerationAction] = useState("changes_requested");
-  const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email ||"").toLowerCase());
+  const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email || "").toLowerCase());
 
   useEffect(() => {
     if (!isAdmin) return undefined;
@@ -2711,7 +2711,7 @@ export function ServiceApprovals({ user }) {
 
   const approveListing = async (listing) => {
     try {
-      await engineDB.moderateServiceListing(listing.id,"approved","", user?.uid);
+      await engineDB.moderateServiceListing(listing.id, "approved", "", user?.uid);
       flash(t("services.flash.approved"));
     } catch (error) {
       console.error(error);
@@ -2722,13 +2722,13 @@ export function ServiceApprovals({ user }) {
   const openReturnListing = (listing) => {
     setModerationAction("changes_requested");
     setRejectionTarget(listing);
-    setRejectionNote(listing.moderationNote ||"");
+    setRejectionNote(listing.moderationNote || "");
   };
 
   const openRejectListing = (listing) => {
     setModerationAction("rejected");
     setRejectionTarget(listing);
-    setRejectionNote(listing.moderationNote ||"");
+    setRejectionNote(listing.moderationNote || "");
   };
 
   const closeFeedback = () => {
@@ -2752,7 +2752,7 @@ export function ServiceApprovals({ user }) {
         user?.uid,
       );
       flash(
-        moderationAction ==="changes_requested"
+        moderationAction === "changes_requested"
           ? t("services.flash.returned")
           : t("services.flash.rejected"),
       );
@@ -2833,9 +2833,9 @@ export function ServiceApprovals({ user }) {
 function HeroStat({ icon, value, label, tone }) {
   const Icon = icon;
   const tones = {
-    red:"text-[var(--engine-accent)]",
-    sky:"text-sky-500",
-    emerald:"text-emerald-500",
+    red: "text-[var(--engine-accent)]",
+    sky: "text-sky-500",
+    emerald: "text-emerald-500",
   };
 
   return (
