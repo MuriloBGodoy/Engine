@@ -15,7 +15,7 @@ migrations de 24/10 já estão aplicadas no Supabase. Falta só o que é do Muri
 nesta ordem:
 
 - [ ] **Religar o site na Netlify** e me avisar → eu faço o push dos commits.
-- [ ] **Criar um Gmail só do Engine** (ex.: `enginegarage.app@gmail.com`). Ele
+- [x] **Gmail só do Engine**: `enginegarage.app@gmail.com` (criado 25/10/2026). Ele
       vira o dono das contas do Engine (Stripe, Supabase, Netlify, Google,
       Sentry, PostHog), separado dos e-mails pessoais.
 - [ ] **Stripe no CPF** (decidido em 24/10; contador e CNPJ ficam para depois).
