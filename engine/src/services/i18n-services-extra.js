@@ -15,6 +15,26 @@ import i18n from "./i18n";
 
 const ptBR = {
   services: {
+    moderation: {
+      panelTitle: "Moderação",
+      sent: "Enviado {{value}}",
+      overdue: "passou do prazo de {{hours}} h",
+      oldestFirst: "Do mais antigo para o mais novo",
+      pageCopy: "Fila do mais antigo para o mais novo. Prazo prometido ao prestador: {{hours}} horas.",
+      takedown: "Tirar do ar",
+      takedownTitle: "Tirar anúncio do ar",
+      takedownCopy:
+        "O anúncio sai da busca e do link na hora. O prestador vê o motivo e pode corrigir e reenviar para análise.",
+      takedownPlaceholder: "Ex.: fotos de outro prestador; preço enganoso; golpe confirmado por denúncia.",
+      takedownDone: "Anúncio tirado do ar.",
+      restore: "Recolocar no ar",
+      reportsTitle: "Denúncias abertas",
+      reportCount_one: "1 denúncia",
+      reportCount_other: "{{count}} denúncias",
+      dismissReports: "Dispensar denúncias (não procede)",
+      reportsError: "Não deu para atualizar as denúncias agora.",
+      historyHint: "Decisões recentes. Anúncio no ar pode ser tirado daqui.",
+    },
     region: {
       widened: "Ainda não há serviços em {{place}} — mostrando de {{wider}}.",
       widenedAll: "Ainda não há serviços em {{place}} — mostrando de todos os lugares.",
@@ -214,6 +234,26 @@ const ptBR = {
 
 const enUS = {
   services: {
+    moderation: {
+      panelTitle: "Moderation",
+      sent: "Sent {{value}}",
+      overdue: "past the {{hours}} h target",
+      oldestFirst: "Oldest first",
+      pageCopy: "Queue from oldest to newest. Review time promised to providers: {{hours}} hours.",
+      takedown: "Take down",
+      takedownTitle: "Take listing down",
+      takedownCopy:
+        "The listing leaves search and its link right away. The provider sees the reason and can fix it and resubmit.",
+      takedownPlaceholder: "E.g.: another provider's photos; misleading price; scam confirmed by reports.",
+      takedownDone: "Listing taken down.",
+      restore: "Put back live",
+      reportsTitle: "Open reports",
+      reportCount_one: "1 report",
+      reportCount_other: "{{count}} reports",
+      dismissReports: "Dismiss reports (unfounded)",
+      reportsError: "Couldn't update the reports right now.",
+      historyHint: "Recent decisions. A live listing can be taken down from here.",
+    },
     region: {
       widened: "No services in {{place}} yet — showing {{wider}}.",
       widenedAll: "No services in {{place}} yet — showing everywhere.",
@@ -409,6 +449,26 @@ const enUS = {
 
 const esES = {
   services: {
+    moderation: {
+      panelTitle: "Moderación",
+      sent: "Enviado {{value}}",
+      overdue: "pasó el plazo de {{hours}} h",
+      oldestFirst: "Del más antiguo al más nuevo",
+      pageCopy: "Cola del más antiguo al más nuevo. Plazo prometido al proveedor: {{hours}} horas.",
+      takedown: "Retirar",
+      takedownTitle: "Retirar anuncio",
+      takedownCopy:
+        "El anuncio sale de la búsqueda y del enlace al momento. El proveedor ve el motivo y puede corregirlo y reenviarlo.",
+      takedownPlaceholder: "Ej.: fotos de otro proveedor; precio engañoso; estafa confirmada por denuncias.",
+      takedownDone: "Anuncio retirado.",
+      restore: "Volver a publicar",
+      reportsTitle: "Denuncias abiertas",
+      reportCount_one: "1 denuncia",
+      reportCount_other: "{{count}} denuncias",
+      dismissReports: "Descartar denuncias (no proceden)",
+      reportsError: "No se pudieron actualizar las denuncias ahora.",
+      historyHint: "Decisiones recientes. Un anuncio publicado se puede retirar desde aquí.",
+    },
     region: {
       widened: "Todavía no hay servicios en {{place}} — mostrando {{wider}}.",
       widenedAll: "Todavía no hay servicios en {{place}} — mostrando todos los lugares.",

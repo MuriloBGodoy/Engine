@@ -11,6 +11,8 @@ import {
   Clock,
   Edit3,
   ExternalLink,
+  EyeOff,
+  Flag,
   Gauge,
   Globe,
   ImagePlus,
@@ -74,6 +76,8 @@ import {
 } from "../components/services/ListingParts";
 import { PublishSignInGate } from "../components/services/PublishSignInGate";
 import { InviteProviderCard } from "../components/services/InviteProvider";
+import { ReportListingButton } from "../components/services/ReportListing";
+import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import {
   APPROVAL_SLA_HOURS,
@@ -667,7 +671,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
   );
 }
 
-function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }) {
+function ServiceDetailModal({ listing, isMine, user, moderation = null, onClose, onEdit, onDelete }) {
   const { t } = useTranslation();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -831,7 +835,9 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
             {showMap && <MapPreview listing={listing} />}
           </div>
 
-          <aside className={`min-w-0 space-y-4 ${isMine ? "order-first lg:order-none" : ""}`}>
+          <aside className={`min-w-0 space-y-4 ${isMine || moderation ? "order-first lg:order-none" : ""}`}>
+            {/* Moderação decide daqui mesmo, sem voltar para a fila. */}
+            {moderation && <ModerationPanel listing={listing} actions={moderation} />}
             {/* Para o dono, o topo do detalhe é o que ele mais usa: o link da
                 bio e o retorno do mês. O resto é o anúncio como o cliente vê. */}
             {isMine && (
@@ -927,6 +933,12 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
                 <ExternalLink size={15} aria-hidden="true" />
                 {t("services.share.openPage")}
               </a>
+            )}
+
+            {!isMine && listing.moderationStatus === "approved" && (
+              <div className="flex justify-center">
+                <ReportListingButton listing={listing} user={user} />
+              </div>
             )}
 
             {isMine && (
@@ -1893,159 +1905,353 @@ function SellerListingsModal({ listings, onClose, onOpen, onEdit, onDelete, onNe
   );
 }
 
-function ApprovalQueue({ listings, onApprove, onReturn, onReject, onEdit }) {
+// Há quanto tempo o anúncio espera ("há 3 horas"), no idioma da tela.
+const timeOf = (listing) => {
+  const value = new Date(listing?.submittedAt || listing?.createdAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+};
+
+const waitingInfo = (listing, language) => {
+  const sent = timeOf(listing);
+  if (!sent) return { label: "", overdue: false };
+  const ms = Math.max(0, Date.now() - sent);
+  const hours = ms / 3_600_000;
+  let label;
+  try {
+    const rtf = new Intl.RelativeTimeFormat(language, { numeric: "auto" });
+    if (hours < 1) label = rtf.format(-Math.max(1, Math.round(ms / 60_000)), "minute");
+    else if (hours < 48) label = rtf.format(-Math.round(hours), "hour");
+    else label = rtf.format(-Math.round(hours / 24), "day");
+  } catch {
+    label = "";
+  }
+  return { label, overdue: hours > APPROVAL_SLA_HOURS };
+};
+
+function QueueButton({ tone, icon, children, onClick }) {
+  const Icon = icon;
+  const tones = {
+    neutral:
+      "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]",
+    sky: "bg-sky-700 text-white hover:bg-sky-800",
+    red: "bg-[var(--engine-accent)] text-white hover:brightness-95",
+    green: "bg-emerald-700 text-white hover:bg-emerald-800",
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-widest transition ${tones[tone]}`}
+    >
+      <Icon size={15} aria-hidden="true" />
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Ações da moderação para um anúncio, conforme o status: na fila decide;
+ * no ar tira do ar; fora do ar (recusado, ajustes, tirado) pode reaprovar.
+ */
+function ModerationActions({ listing, actions, compact = false }) {
   const { t } = useTranslation();
-  const pending = listings.filter((listing) => listing.moderationStatus === "pending");
+  const status = listing.moderationStatus;
+  return (
+    <div className={`grid gap-2 ${compact ? "grid-cols-2 sm:flex sm:flex-wrap sm:justify-end" : "grid-cols-2"}`}>
+      {status === "pending" && (
+        <>
+          <QueueButton tone="green" icon={CheckCircle2} onClick={() => actions.approve(listing)}>
+            {t("services.approve")}
+          </QueueButton>
+          <QueueButton tone="sky" icon={RotateCcw} onClick={() => actions.open(listing, "changes_requested")}>
+            {t("services.return")}
+          </QueueButton>
+          <QueueButton tone="red" icon={XCircle} onClick={() => actions.open(listing, "rejected")}>
+            {t("services.reject")}
+          </QueueButton>
+        </>
+      )}
+      {status === "approved" && (
+        <QueueButton tone="red" icon={EyeOff} onClick={() => actions.open(listing, "suspended")}>
+          {t("services.moderation.takedown")}
+        </QueueButton>
+      )}
+      {["changes_requested", "rejected", "suspended"].includes(status) && (
+        <QueueButton tone="green" icon={CheckCircle2} onClick={() => actions.approve(listing)}>
+          {status === "suspended" ? t("services.moderation.restore") : t("services.approve")}
+        </QueueButton>
+      )}
+    </div>
+  );
+}
+
+/** O bloco de moderação dentro do detalhe do anúncio. */
+function ModerationPanel({ listing, actions }) {
+  const { t, i18n } = useTranslation();
+  const waiting = listing.moderationStatus === "pending" ? waitingInfo(listing, i18n.language) : null;
+  return (
+    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+      <p className="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-300">
+        {t("services.moderation.panelTitle")}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <StatusBadge status={listing.moderationStatus} />
+        {waiting?.label && (
+          <span
+            className={`text-xs font-bold ${waiting.overdue ? "text-[var(--engine-accent)]" : "text-[var(--engine-text-muted)]"}`}
+          >
+            {t("services.moderation.sent", { value: waiting.label })}
+          </span>
+        )}
+      </div>
+      {listing.moderationNote && (
+        <p className="mt-3 rounded-lg bg-[var(--engine-surface)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--engine-text)]">
+          {listing.moderationNote}
+        </p>
+      )}
+      <div className="mt-3">
+        <ModerationActions listing={listing} actions={actions} />
+      </div>
+    </div>
+  );
+}
+
+function QueueRow({ listing, actions, onOpen, extra = null }) {
+  const { t, i18n } = useTranslation();
+  const waiting = listing.moderationStatus === "pending" ? waitingInfo(listing, i18n.language) : null;
+  return (
+    <article className="grid gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 sm:grid-cols-[88px_minmax(0,1fr)] sm:p-4 lg:grid-cols-[88px_minmax(0,1fr)_auto] lg:items-center">
+      <button
+        type="button"
+        onClick={() => onOpen(listing)}
+        className="overflow-hidden rounded-lg"
+        aria-label={t("services.review")}
+      >
+        <ListingPhoto
+          src={listing.photos?.[0]}
+          listing={listing}
+          placeholderSize="sm"
+          className="h-28 w-full object-cover sm:h-[66px] sm:w-[88px]"
+        />
+      </button>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={listing.moderationStatus} />
+          {waiting?.label && (
+            <span
+              className={`text-xs font-bold ${waiting.overdue ? "text-[var(--engine-accent)]" : "text-[var(--engine-text-muted)]"}`}
+            >
+              {t("services.moderation.sent", { value: waiting.label })}
+              {waiting.overdue && ` · ${t("services.moderation.overdue", { hours: APPROVAL_SLA_HOURS })}`}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onOpen(listing)}
+          className="mt-2 block max-w-full text-left text-sm font-bold italic text-[var(--engine-text)] hover:text-[var(--engine-accent)] dark:text-white"
+        >
+          <span className="line-clamp-2">{listing.title || t("services.untitledListing")}</span>
+        </button>
+        <p className="mt-1 text-xs font-semibold text-[var(--engine-text-muted)]">
+          {[listing.providerName, getServiceCategoryLabel(listing.category, t), listing.city || t("services.noCity")]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        <p className="mt-1 text-xs font-semibold text-[var(--engine-text-muted)]">
+          {[listing.whatsapp, listing.instagram && `@${listing.instagram}`].filter(Boolean).join(" · ") ||
+            t("services.noPhone")}
+        </p>
+        {listing.moderationNote && listing.moderationStatus !== "pending" && (
+          <p className="mt-2 line-clamp-2 rounded-lg bg-[var(--engine-surface-2)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--engine-text-muted)]">
+            {listing.moderationNote}
+          </p>
+        )}
+        {extra}
+      </div>
+      <div className="sm:col-span-2 lg:col-span-1">
+        <ModerationActions listing={listing} actions={actions} compact />
+      </div>
+    </article>
+  );
+}
+
+function ApprovalQueue({ listings, reports, actions, onOpen, onDismissReports }) {
+  const { t } = useTranslation();
+  // Do mais antigo para o mais novo: quem espera há mais tempo vem primeiro.
+  const pending = listings
+    .filter((listing) => listing.moderationStatus === "pending")
+    .sort((a, b) => timeOf(a) - timeOf(b));
+  const byId = Object.fromEntries(listings.map((listing) => [listing.id, listing]));
+  const reportGroups = Object.values(
+    reports.reduce((groups, report) => {
+      const group = groups[report.listingId] || { listingId: report.listingId, items: [] };
+      group.items.push(report);
+      return { ...groups, [report.listingId]: group };
+    }, {}),
+  )
+    .map((group) => ({ ...group, listing: byId[group.listingId] }))
+    .filter((group) => group.listing);
   const reviewed = listings
     .filter((listing) =>
-      ["approved", "changes_requested", "rejected"].includes(listing.moderationStatus),
+      ["approved", "changes_requested", "rejected", "suspended"].includes(listing.moderationStatus),
     )
-    .slice(0, 8);
-
-  if (!pending.length && !reviewed.length) {
-    return (
-      <section className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-5">
-        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
-          <ShieldCheck size={18} className="text-emerald-500" />
-          {t("services.approvalTitle")}
-        </h2>
-        <p className="mt-3 text-sm font-medium text-[var(--engine-text-muted)]">
-          {t("services.noPendingApprovals")}
-        </p>
-      </section>
-    );
-  }
+    .sort((a, b) =>
+      String(b.reviewedAt || b.updatedAt || "").localeCompare(String(a.reviewedAt || a.updatedAt || "")),
+    )
+    .slice(0, 12);
 
   return (
-    <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 dark:bg-amber-500/5 sm:p-5">
-      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
-        <ShieldCheck size={18} className="text-amber-500" />
-        {t("services.approvalTitle")}
-      </h2>
-      <div className="mt-4 grid gap-3">
-        {pending.map((listing) => (
-          <div
-            key={listing.id}
-            className="grid gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 sm:p-4 md:grid-cols-[1fr_auto]"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
-                {listing.title}
-              </p>
-              <p className="mt-1 line-clamp-2 text-xs font-medium text-[var(--engine-text-subtle)] sm:truncate">
-                {listing.providerName} · {getServiceCategoryLabel(listing.category, t)} · {listing.city || t("services.noCity")}
-              </p>
-              <p className="mt-2 line-clamp-2 text-sm font-medium text-[var(--engine-text-muted)]">
-                {listing.description}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap md:justify-end">
-              <button
-                type="button"
-                onClick={() => onEdit(listing)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-              >
-                <Edit3 size={15} />
-                {t("services.review")}
-              </button>
-              <button
-                type="button"
-                onClick={() => onReturn(listing)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-600 px-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-sky-700"
-              >
-                <RotateCcw size={15} />
-                {t("services.return")}
-              </button>
-              <button
-                type="button"
-                onClick={() => onReject(listing)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-3 text-xs font-black uppercase tracking-widest text-white transition hover:brightness-95"
-              >
-                <XCircle size={15} />
-                {t("services.reject")}
-              </button>
-              <button
-                type="button"
-                onClick={() => onApprove(listing)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-emerald-700"
-              >
-                <CheckCircle2 size={15} />
-                {t("services.approve")}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-5 border-t border-amber-500/20 pt-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--engine-text-muted)]">
-            {t("services.approvalHistory")}
-          </p>
-          <span className="rounded-full bg-[var(--engine-accent)]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-muted)] dark:bg-[var(--engine-surface)]/10">
-            {t("services.recordCount", { count: reviewed.length })}
-          </span>
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 dark:bg-amber-500/5 sm:p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
+            <ShieldCheck size={18} className="text-amber-500" />
+            {t("services.approvalTitle")}
+            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px]">{pending.length}</span>
+          </h2>
+          {pending.length > 1 && (
+            <p className="text-xs font-semibold text-[var(--engine-text-muted)]">
+              {t("services.moderation.oldestFirst")}
+            </p>
+          )}
         </div>
-        {reviewed.length ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {reviewed.map((listing) => (
-              <article
-                key={listing.id}
-                className="rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={listing.moderationStatus} />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                    {getServiceCategoryLabel(listing.category, t)}
-                  </span>
-                </div>
-                <h3 className="mt-2 line-clamp-2 text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
-                  {listing.title || t("services.untitledListing")}
-                </h3>
-                <p className="mt-1 truncate text-xs font-medium text-[var(--engine-text-muted)]">
-                  {listing.providerName} · {listing.city || t("services.noCity")}
-                </p>
-                {listing.moderationNote && (
-                  <p className="mt-3 rounded-lg bg-[var(--engine-surface-2)] px-3 py-2 text-xs font-bold leading-5 text-[var(--engine-text-muted)]">
-                    {listing.moderationNote}
-                  </p>
-                )}
-              </article>
+        {pending.length ? (
+          <div className="mt-4 grid gap-3">
+            {pending.map((listing) => (
+              <QueueRow key={listing.id} listing={listing} actions={actions} onOpen={onOpen} />
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
-            <p className="text-sm font-bold text-[var(--engine-text-muted)]">
-              {t("services.approvalHistoryEmpty")}
-            </p>
-          </div>
+          <p className="mt-3 text-sm font-medium text-[var(--engine-text-muted)]">
+            {t("services.noPendingApprovals")}
+          </p>
         )}
-      </div>
-    </section>
+      </section>
+
+      {reportGroups.length > 0 && (
+        <section className="rounded-2xl border border-[var(--engine-accent)]/30 bg-[var(--engine-accent-soft)] p-3 sm:p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
+            <Flag size={17} className="text-[var(--engine-accent)]" />
+            {t("services.moderation.reportsTitle")}
+            <span className="rounded-full bg-[var(--engine-accent)]/15 px-2 py-0.5 text-[11px]">
+              {reportGroups.length}
+            </span>
+          </h2>
+          <div className="mt-4 grid gap-3">
+            {reportGroups.map((group) => (
+              <QueueRow
+                key={group.listingId}
+                listing={group.listing}
+                actions={actions}
+                onOpen={onOpen}
+                extra={
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-xs font-black uppercase tracking-widest text-[var(--engine-accent)]">
+                      {t("services.moderation.reportCount", { count: group.items.length })}
+                    </p>
+                    <ul className="space-y-1">
+                      {group.items.slice(0, 3).map((report) => {
+                        const [code, ...rest] = String(report.reason || "").split(":");
+                        const known = ["scam", "fake", "offensive", "wrong", "other"].includes(code);
+                        return (
+                          <li key={report.id} className="text-xs font-semibold leading-5 text-[var(--engine-text)] dark:text-white">
+                            {known ? t(`services.report.reasons.${code}`) : report.reason}
+                            {known && rest.join(":").trim() && (
+                              <span className="text-[var(--engine-text-muted)]">: {rest.join(":").trim()}</span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => onDismissReports(group.listingId)}
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-xs font-bold text-[var(--engine-text-muted)] underline-offset-2 transition hover:text-[var(--engine-text)] hover:underline"
+                    >
+                      {t("services.moderation.dismissReports")}
+                    </button>
+                  </div>
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 sm:p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
+            {t("services.approvalHistory")}
+          </h2>
+          <p className="text-xs font-semibold text-[var(--engine-text-muted)]">
+            {t("services.moderation.historyHint")}
+          </p>
+        </div>
+        {reviewed.length ? (
+          <div className="grid gap-3">
+            {reviewed.map((listing) => (
+              <QueueRow key={listing.id} listing={listing} actions={actions} onOpen={onOpen} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm font-bold text-[var(--engine-text-muted)]">
+            {t("services.approvalHistoryEmpty")}
+          </p>
+        )}
+      </section>
+    </div>
   );
 }
 
 function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfirm }) {
   const { t } = useTranslation();
+  useHistoryDismiss(Boolean(listing), onCancel);
   if (!listing) return null;
-  const isReject = action === "rejected";
+  const copy = {
+    rejected: {
+      title: t("services.rejectListing"),
+      confirm: t("services.rejectListing"),
+      icon: XCircle,
+      tone: "bg-[var(--engine-accent)] hover:brightness-95",
+    },
+    suspended: {
+      title: t("services.moderation.takedownTitle"),
+      confirm: t("services.moderation.takedown"),
+      icon: EyeOff,
+      tone: "bg-[var(--engine-accent)] hover:brightness-95",
+    },
+    changes_requested: {
+      title: t("services.returnAdjustments"),
+      confirm: t("services.returnWithChanges"),
+      icon: RotateCcw,
+      tone: "bg-sky-700 hover:bg-sky-800",
+    },
+  }[action] || {};
+  const ConfirmIcon = copy.icon || RotateCcw;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <section className="max-h-[100dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-5 pb-8 shadow-2xl sm:max-h-[92vh] sm:rounded-2xl sm:p-6">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        className="engine-safe-bottom max-h-[100dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-5 shadow-2xl sm:max-h-[92vh] sm:rounded-2xl sm:p-6"
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--engine-accent)]">
               {t("services.feedbackTitle")}
             </p>
             <h2 className="mt-1 text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
-              {isReject ? t("services.rejectListing") : t("services.returnAdjustments")}
+              {copy.title}
             </h2>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
             title={t("common.cancel")}
+            aria-label={t("common.cancel")}
           >
             <X size={18} />
           </button>
@@ -2060,6 +2266,12 @@ function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfi
           </p>
         </div>
 
+        {action === "suspended" && (
+          <p className="mt-4 text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+            {t("services.moderation.takedownCopy")}
+          </p>
+        )}
+
         <label className="mt-5 grid gap-2">
           <span className="text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">
             {t("services.feedbackReason")}
@@ -2067,7 +2279,11 @@ function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfi
           <textarea
             value={note}
             onChange={(event) => onChangeNote(event.target.value)}
-            placeholder={t("services.feedbackPlaceholder")}
+            placeholder={
+              action === "suspended"
+                ? t("services.moderation.takedownPlaceholder")
+                : t("services.feedbackPlaceholder")
+            }
             className="min-h-36 w-full resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-sm font-bold leading-6 text-[var(--engine-text)] outline-none transition placeholder:text-[var(--engine-text-subtle)] focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:placeholder:text-[var(--engine-text-muted)] dark:focus:bg-[var(--engine-elevated)]"
           />
         </label>
@@ -2076,12 +2292,10 @@ function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfi
           <button
             type="button"
             onClick={onConfirm}
-            className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold uppercase text-white transition ${
-              isReject ? "bg-[var(--engine-accent)] hover:brightness-95" : "bg-sky-600 hover:bg-sky-700"
-            }`}
+            className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold uppercase text-white transition ${copy.tone}`}
           >
-            {isReject ? <XCircle size={18} /> : <RotateCcw size={18} />}
-            {isReject ? t("services.rejectListing") : t("services.returnWithChanges")}
+            <ConfirmIcon size={18} />
+            {copy.confirm}
           </button>
           <button
             type="button"
@@ -2094,6 +2308,79 @@ function RejectionModal({ listing, note, action, onChangeNote, onCancel, onConfi
       </section>
     </div>
   );
+}
+
+/**
+ * Decidir sobre um anúncio (aprovar, devolver, recusar, tirar do ar), igual
+ * na fila de /services/approvals e no detalhe aberto da vitrine.
+ */
+function useListingModeration(user, { onDecided } = {}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [target, setTarget] = useState(null);
+  const [note, setNote] = useState("");
+  const [action, setAction] = useState("changes_requested");
+
+  const done = {
+    approved: "services.flash.approved",
+    changes_requested: "services.flash.returned",
+    rejected: "services.flash.rejected",
+    suspended: "services.moderation.takedownDone",
+  };
+
+  const approve = async (listing) => {
+    try {
+      await engineDB.moderateServiceListing(listing.id, "approved", "", user?.uid);
+      toast(t(done.approved));
+      onDecided?.(listing, "approved");
+    } catch (error) {
+      console.error(error);
+      toast(t("services.flash.approveError"), "error");
+    }
+  };
+
+  const open = (listing, nextAction) => {
+    setAction(nextAction);
+    setTarget(listing);
+    // Tirar do ar pede um motivo novo; devolver/recusar parte do anterior.
+    setNote(nextAction === "suspended" ? "" : listing.moderationNote || "");
+  };
+
+  const close = () => {
+    setTarget(null);
+    setNote("");
+    setAction("changes_requested");
+  };
+
+  const confirmDecision = async () => {
+    if (!target) return;
+    if (!note.trim()) {
+      toast(t("services.flash.feedbackRequired"));
+      return;
+    }
+    try {
+      await engineDB.moderateServiceListing(target.id, action, note, user?.uid);
+      toast(t(done[action]));
+      onDecided?.(target, action);
+      close();
+    } catch (error) {
+      console.error(error);
+      toast(t("services.flash.feedbackError"), "error");
+    }
+  };
+
+  const modal = (
+    <RejectionModal
+      listing={target}
+      note={note}
+      action={action}
+      onChangeNote={setNote}
+      onCancel={close}
+      onConfirm={confirmDecision}
+    />
+  );
+
+  return { approve, open, modal };
 }
 
 export function Services({ user, settings }) {
@@ -2134,13 +2421,15 @@ export function Services({ user, settings }) {
   const [submitted, setSubmitted] = useState(null);
   const [saving, setSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
-  const [rejectionTarget, setRejectionTarget] = useState(null);
-  const [rejectionNote, setRejectionNote] = useState("");
-  const [moderationAction, setModerationAction] = useState("changes_requested");
   const [detailListing, setDetailListing] = useState(null);
   const [sellerProfileOpen, setSellerProfileOpen] = useState(false);
   const [sellerListingsOpen, setSellerListingsOpen] = useState(false);
   const { isAdmin } = useServiceAdmin(user);
+  // A moderação também age do detalhe aberto na vitrine (ex.: tirar do ar
+  // um anúncio aprovado que alguém denunciou).
+  const moderation = useListingModeration(user, {
+    onDecided: () => setDetailListing(null),
+  });
   const sellerProfile = useMemo(
     () => getSellerProfile(settings, user),
     [settings, user],
@@ -2502,7 +2791,7 @@ export function Services({ user, settings }) {
     // O aviso é um toast no topo, e o formulário é longo: no celular a pessoa
     // está lá embaixo, no botão. Além de avisar, leva até o campo que falta.
     const faltando = (id, mensagem) => {
-      flash(mensagem);
+      toast(mensagem, "error");
       const campo = document.getElementById(id);
       campo?.scrollIntoView({ block: "center", behavior: "smooth" });
       campo?.focus({ preventScroll: true });
@@ -2596,33 +2885,6 @@ export function Services({ user, settings }) {
     } catch (error) {
       console.error(error);
       flash(t("services.flash.removeError"));
-    }
-  };
-
-  const confirmRejectListing = async () => {
-    if (!rejectionTarget) return;
-    if (!rejectionNote.trim()) {
-      flash(t("services.flash.feedbackRequired"));
-      return;
-    }
-    try {
-      await engineDB.moderateServiceListing(
-        rejectionTarget.id,
-        moderationAction,
-        rejectionNote,
-        user?.uid,
-      );
-      flash(
-        moderationAction === "changes_requested"
-          ? t("services.flash.returned")
-          : t("services.flash.rejected"),
-      );
-      setRejectionTarget(null);
-      setRejectionNote("");
-      setModerationAction("changes_requested");
-    } catch (error) {
-      console.error(error);
-      flash(t("services.flash.rejectError"));
     }
   };
 
@@ -3042,23 +3304,13 @@ export function Services({ user, settings }) {
         listing={detailListing}
         isMine={detailListing?.ownerId === user?.uid}
         user={user}
+        moderation={isAdmin && detailListing?.ownerId !== user?.uid ? moderation : null}
         onClose={() => setDetailListing(null)}
         onEdit={openEditor}
         onDelete={deleteListing}
       />
 
-      <RejectionModal
-        listing={rejectionTarget}
-        note={rejectionNote}
-        action={moderationAction}
-        onChangeNote={setRejectionNote}
-        onCancel={() => {
-          setRejectionTarget(null);
-          setRejectionNote("");
-          setModerationAction("changes_requested");
-        }}
-        onConfirm={confirmRejectListing}
-      />
+      {moderation.modal}
     </section>
   );
 }
@@ -3068,10 +3320,9 @@ export function ServiceApprovals({ user }) {
   const toast = useToast();
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [reportsVersion, setReportsVersion] = useState(0);
   const [detailListing, setDetailListing] = useState(null);
-  const [rejectionTarget, setRejectionTarget] = useState(null);
-  const [rejectionNote, setRejectionNote] = useState("");
-  const [moderationAction, setModerationAction] = useState("changes_requested");
   const { isAdmin, checked } = useServiceAdmin(user);
 
   useEffect(() => {
@@ -3082,61 +3333,35 @@ export function ServiceApprovals({ user }) {
     });
   }, [isAdmin, user?.uid]);
 
-  const flash = (message) => toast(message);
+  // Denúncias abertas de anúncio. Relê depois de cada decisão.
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    let alive = true;
+    engineDB.fetchServiceListingReports().then((rows) => {
+      if (alive) setReports(rows);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, reportsVersion]);
 
-  const approveListing = async (listing) => {
+  const closeReports = async (listingId, status) => {
     try {
-      await engineDB.moderateServiceListing(listing.id, "approved", "", user?.uid);
-      flash(t("services.flash.approved"));
+      await engineDB.resolveServiceListingReports(listingId, status);
     } catch (error) {
       console.error(error);
-      flash(t("services.flash.approveError"));
+      toast(t("services.moderation.reportsError"), "error");
     }
+    setReportsVersion((value) => value + 1);
   };
 
-  const openReturnListing = (listing) => {
-    setModerationAction("changes_requested");
-    setRejectionTarget(listing);
-    setRejectionNote(listing.moderationNote || "");
-  };
-
-  const openRejectListing = (listing) => {
-    setModerationAction("rejected");
-    setRejectionTarget(listing);
-    setRejectionNote(listing.moderationNote || "");
-  };
-
-  const closeFeedback = () => {
-    setRejectionTarget(null);
-    setRejectionNote("");
-    setModerationAction("changes_requested");
-  };
-
-  const confirmFeedback = async () => {
-    if (!rejectionTarget) return;
-    if (!rejectionNote.trim()) {
-      flash(t("services.flash.feedbackRequired"));
-      return;
-    }
-
-    try {
-      await engineDB.moderateServiceListing(
-        rejectionTarget.id,
-        moderationAction,
-        rejectionNote,
-        user?.uid,
-      );
-      flash(
-        moderationAction === "changes_requested"
-          ? t("services.flash.returned")
-          : t("services.flash.rejected"),
-      );
-      closeFeedback();
-    } catch (error) {
-      console.error(error);
-      flash(t("services.flash.feedbackError"));
-    }
-  };
+  const moderation = useListingModeration(user, {
+    onDecided: (listing, action) => {
+      setDetailListing(null);
+      // Tirou do ar: as denúncias daquele anúncio foram atendidas.
+      if (action === "suspended") closeReports(listing.id, "resolved");
+    },
+  });
 
   if (!checked) {
     return <div className="min-h-[40vh]" aria-busy="true" />;
@@ -3160,51 +3385,45 @@ export function ServiceApprovals({ user }) {
 
   return (
     <section className="space-y-5 pb-10">
-
       <header className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-5 sm:p-6">
         <button
           type="button"
           onClick={() => navigate("/services")}
-          className="mb-5 inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--engine-border)] px-4 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+          className="mb-5 inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--engine-border)] px-4 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
         >
           {t("services.backToServices")}
         </button>
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-500">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-700 dark:text-amber-400">
           {t("services.adminKicker")}
         </p>
         <h1 className="mt-2 text-xl font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white sm:text-2xl">
           {t("services.approvals")}
         </h1>
         <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
-          {t("services.approvalsCopy")}
+          {t("services.moderation.pageCopy", { hours: APPROVAL_SLA_HOURS })}
         </p>
       </header>
 
       <ApprovalQueue
         listings={listings}
-        onApprove={approveListing}
-        onReturn={openReturnListing}
-        onReject={openRejectListing}
-        onEdit={setDetailListing}
+        reports={reports}
+        actions={moderation}
+        onOpen={setDetailListing}
+        onDismissReports={(listingId) => closeReports(listingId, "dismissed")}
       />
 
       <ServiceDetailModal
         key={detailListing?.id || "nenhum"}
         listing={detailListing}
         isMine={false}
+        user={user}
+        moderation={moderation}
         onClose={() => setDetailListing(null)}
         onEdit={() => {}}
         onDelete={() => {}}
       />
 
-      <RejectionModal
-        listing={rejectionTarget}
-        note={rejectionNote}
-        action={moderationAction}
-        onChangeNote={setRejectionNote}
-        onCancel={closeFeedback}
-        onConfirm={confirmFeedback}
-      />
+      {moderation.modal}
     </section>
   );
 }

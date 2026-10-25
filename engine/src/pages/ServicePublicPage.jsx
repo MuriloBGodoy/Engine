@@ -34,6 +34,7 @@ import { MapPreview, PortfolioLinks, WhatsAppIcon } from "../components/services
 import { ShareListingButton } from "../components/services/ShareListing";
 import { ServiceReviews } from "../components/services/ServiceReviews";
 import { useToast } from "../components/ToastProvider";
+import { ReportListingButton } from "../components/services/ReportListing";
 
 /**
  * Página pública de um anúncio: /servicos/<slug>. O "link da bio".
@@ -441,6 +442,12 @@ export function ServicePublicPage({ user }) {
               <section id="service-reviews" className="mt-7">
                 <ServiceReviews listing={listing} user={user} />
               </section>
+
+              {approved && !isOwner && (
+                <div className="mt-6 flex justify-center">
+                  <ReportListingButton listing={listing} user={user} />
+                </div>
+              )}
 
               <footer className="mt-10 border-t border-[var(--engine-border)] pt-6 text-center">
                 <p className="text-xs font-medium leading-5 text-[var(--engine-text-muted)]">
