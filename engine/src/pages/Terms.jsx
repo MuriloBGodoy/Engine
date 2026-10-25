@@ -69,6 +69,31 @@ export function Terms() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Avaliações">
+        <p>
+          Quem tem conta pode avaliar um serviço anunciado com uma nota de 1 a
+          5 e um comentário. São opiniões de clientes:{" "}
+          <strong className="text-[var(--engine-text)]">
+            o Engine não verifica se o serviço foi de fato prestado
+          </strong>{" "}
+          e não recomenda nem garante o prestador por causa da nota.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>uma avaliação por pessoa em cada anúncio, que você pode editar ou apagar;</li>
+          <li>só avalie serviço que você contratou; o prestador não avalia o próprio anúncio;</li>
+          <li>contas criadas há menos de 24 horas ainda não avaliam, e há um limite diário de avaliações;</li>
+          <li>valem as mesmas regras de conteúdo acima — sem ofensa, golpe, informação falsa ou dado pessoal de terceiros.</li>
+        </ul>
+        <p>
+          O prestador pode responder publicamente, uma vez por avaliação, mas
+          não pode apagá-la, e o Engine não remove nem esconde avaliação a
+          pedido ou mediante pagamento do prestador. Nota baixa, sozinha, não é
+          motivo de remoção. Qualquer pessoa pode denunciar uma avaliação; a
+          moderação analisa e oculta a que violar estas regras. A média
+          exibida considera apenas as avaliações publicadas.
+        </p>
+      </LegalSection>
+
       <LegalSection title="O que é grátis">
         <p>
           Tudo o que existe hoje no Engine é grátis e continua grátis, inclusive

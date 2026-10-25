@@ -8,6 +8,7 @@ import { initObservability } from "./services/observability";
 import "./index.css";
 import "./services/i18n";
 import "./services/i18n-billing";
+import "./services/i18n-reviews";
 
 // Antes do render: erro que acontece na montagem também precisa ser visto.
 initObservability();

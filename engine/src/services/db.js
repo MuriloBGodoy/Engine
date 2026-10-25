@@ -130,7 +130,7 @@ const profileFromRow = (row) => ({
 
 const LISTING_COLUMN_KEYS = [
   "id", "ownerId", "moderationStatus", "viewCount", "detailCount", "whatsappCount",
-  "createdAt", "updatedAt",
+  "ratingCount", "ratingAvg", "createdAt", "updatedAt",
 ];
 
 const listingFromRow = (row) => ({
@@ -141,6 +141,9 @@ const listingFromRow = (row) => ({
   viewCount: row.view_count,
   detailCount: row.detail_count,
   whatsappCount: row.whatsapp_count,
+  // Nota das avaliações (services/serviceReviews.js), mantida por trigger.
+  ratingCount: row.rating_count || 0,
+  ratingAvg: row.rating_avg == null ? null : Number(row.rating_avg),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -904,6 +907,9 @@ const normalizeServiceListing = (listing = {}) => {
     viewCount: Number(listing.viewCount) || 0,
     detailCount: Number(listing.detailCount) || 0,
     whatsappCount: Number(listing.whatsappCount) || 0,
+    // Nota das avaliações: só leitura, o trigger do banco mantém.
+    ratingCount: Number(listing.ratingCount) || 0,
+    ratingAvg: listing.ratingAvg == null ? null : Number(listing.ratingAvg) || null,
     availability: String(listing.availability || "").trim().slice(0, 180),
     experience: String(listing.experience || "").trim().slice(0, 180),
     photos: Array.isArray(listing.photos)

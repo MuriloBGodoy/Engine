@@ -240,6 +240,58 @@ try {
   await anon.rpc("track_listing_metric", { p_listing_id: `s-${run}`, p_metric: "view" });
   check("visitante conta visita em aprovado (de um em um)", (await admin.from("service_listings").select("view_count").eq("id", `s-${run}`).single()).data?.view_count === 1);
 
+  console.log("\navaliações de serviço");
+  const sid = `s-${run}`;
+  const nota = async () => (await admin.from("service_listings").select("rating_count, rating_avg").eq("id", sid).single()).data;
+  check("visitante não avalia", denied(await anon.from("service_reviews").insert({ listing_id: sid, rating: 5 })));
+  const propria = await a.client.from("service_reviews").insert({ listing_id: sid, rating: 5 });
+  check("dono não avalia o próprio anúncio", propria.error?.message === "own-listing", why(propria));
+  const fantasma = await b.client.from("service_reviews").insert({ listing_id: `nada-${run}`, rating: 5 });
+  check("anúncio inexistente ou não aprovado dá listing-unavailable", fantasma.error?.message === "listing-unavailable", why(fantasma));
+  const novata = await b.client.from("service_reviews").insert({ listing_id: sid, rating: 5 });
+  check("conta com menos de 24 h não avalia", novata.error?.message === "account-too-new", why(novata));
+  // As contas do teste nasceram agora; a avaliação de B entra como escrita de
+  // servidor (service_role), e daqui para frente é B quem mexe nela.
+  const plantada = await admin.from("service_reviews").insert({ listing_id: sid, author_id: b.id, rating: 4, comment: "bom" }).select("id").single();
+  check("servidor planta avaliação", passed(plantada), why(plantada));
+  const reviewId = plantada.data?.id;
+  const repetida2 = await admin.from("service_reviews").insert({ listing_id: sid, author_id: b.id, rating: 1 });
+  check("uma avaliação por pessoa por anúncio", repetida2.error?.code === "23505", why(repetida2));
+  check("visitante lê avaliação publicada", (await anon.from("service_reviews").select("id").eq("id", reviewId)).data?.length === 1);
+  let media = await nota();
+  check("média e contagem mantidas pelo banco", media?.rating_count === 1 && Number(media?.rating_avg) === 4, JSON.stringify(media));
+  const dist = (await anon.rpc("service_review_distribution", { p_listing_id: sid })).data;
+  check("visitante lê a distribuição", dist?.["4"] === 1 && dist?.["5"] === 0, JSON.stringify(dist));
+  await b.client.from("service_reviews")
+    .update({ rating: 2, comment: "mudei", status: "hidden", owner_reply: "eu mesmo", listing_id: `nada-${run}` })
+    .eq("id", reviewId);
+  let rev = (await admin.from("service_reviews").select("*").eq("id", reviewId).single()).data;
+  check("autor edita nota e texto, mas não status, resposta nem anúncio",
+    rev?.rating === 2 && rev?.comment === "mudei" && rev?.status === "published" && rev?.owner_reply === null && rev?.listing_id === sid,
+    JSON.stringify(rev));
+  media = await nota();
+  check("média recontada depois da edição", Number(media?.rating_avg) === 2, JSON.stringify(media));
+  await a.client.from("service_reviews").update({ owner_reply: "Obrigado", rating: 5, comment: "ótimo" }).eq("id", reviewId);
+  rev = (await admin.from("service_reviews").select("*").eq("id", reviewId).single()).data;
+  check("dono do anúncio responde, mas não mexe na nota nem no texto",
+    rev?.owner_reply === "Obrigado" && Boolean(rev?.owner_reply_at) && rev?.rating === 2 && rev?.comment === "mudei",
+    JSON.stringify(rev));
+  check("terceiro não responde no lugar do dono", denied(await c.client.from("service_reviews").update({ owner_reply: "hack" }).eq("id", reviewId).select()));
+  check("dono do anúncio não apaga avaliação", denied(await a.client.from("service_reviews").delete().eq("id", reviewId).select()));
+  await a.client.from("service_reviews").update({ status: "hidden" }).eq("id", reviewId);
+  check("dono do anúncio não oculta avaliação", (await admin.from("service_reviews").select("status").eq("id", reviewId).single()).data?.status === "published");
+  check("logado denuncia avaliação", passed(await c.client.from("reports").insert({ reporter_id: c.id, target_type: "service_review", target_id: reviewId, reported_user_id: b.id })));
+  await admin.from("service_reviews").update({ status: "hidden" }).eq("id", reviewId);
+  check("oculta some para o público", (await anon.from("service_reviews").select("id").eq("id", reviewId)).data?.length === 0);
+  check("autor ainda vê a própria oculta", (await b.client.from("service_reviews").select("id").eq("id", reviewId)).data?.length === 1);
+  check("oculta sai da média", (await nota())?.rating_count === 0);
+  await admin.from("service_reviews").update({ status: "published" }).eq("id", reviewId);
+  await a.client.from("service_listings").update({ rating_count: 99, rating_sum: 999, moderation_status: "pending" }).eq("id", sid);
+  check("dono não escreve a nota do anúncio", (await nota())?.rating_count === 1);
+  await admin.from("service_listings").update({ moderation_status: "approved" }).eq("id", sid);
+  check("autor apaga a própria", passed(await b.client.from("service_reviews").delete().eq("id", reviewId)));
+  check("apagar desconta da média", (await nota())?.rating_count === 0);
+
   console.log("\ndenúncias");
   check("logado denuncia", passed(await a.client.from("reports").insert({ reporter_id: a.id, target_id: post, reason: "teste" })));
   check("denúncia em nome de outro é recusada", denied(await a.client.from("reports").insert({ reporter_id: b.id, target_id: post })));
@@ -256,6 +308,7 @@ try {
   await c.client.rpc("rate_goal", { p_post_id: post, p_rating: 4 });
   const fundadoPorC = (await c.client.rpc("create_club", { p_club: { name: "Clube do C", tag: tag("C") }, p_member: {} })).data;
   const conversaC = (await c.client.rpc("start_conversation", { p_other: a.id, p_my_card: { author: "C" }, p_other_card: { author: "A" } })).data;
+  await admin.from("service_reviews").insert({ listing_id: `s-${run}`, author_id: c.id, rating: 1 });
   const excluiu = await c.client.rpc("delete_my_account");
   check("excluir a própria conta passa", passed(excluiu), why(excluiu));
   created.splice(created.indexOf(c.id), 1);
@@ -264,6 +317,9 @@ try {
   check("clube fundado é arquivado", (await admin.from("clubs").select("archived").eq("id", fundadoPorC).single()).data?.archived === true);
   const cartao = (await admin.from("conversations").select("members").eq("id", conversaC).single()).data;
   check("na conversa vira 'Conta excluída'", cartao?.members?.[c.id]?.author === "Conta excluída");
+  const notaDepois = (await admin.from("service_listings").select("rating_count").eq("id", `s-${run}`).single()).data;
+  check("avaliação de serviço sai e a média é recontada",
+    (await admin.from("service_reviews").select("id").eq("author_id", c.id)).data?.length === 0 && notaDepois?.rating_count === 0);
   check("presença, filiação e @ saem em cascata",
     (await admin.from("club_members").select("*").eq("uid", c.id)).data?.length === 0 &&
     (await admin.from("achievements").select("*").eq("user_id", c.id)).data?.length === 0);
