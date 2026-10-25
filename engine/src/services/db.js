@@ -131,6 +131,7 @@ const profileFromRow = (row) => ({
 const LISTING_COLUMN_KEYS = [
   "id", "ownerId", "moderationStatus", "viewCount", "detailCount", "whatsappCount",
   "ratingCount", "ratingAvg", "createdAt", "updatedAt",
+  "slug",
 ];
 
 const listingFromRow = (row) => ({
@@ -138,6 +139,9 @@ const listingFromRow = (row) => ({
   id: row.id,
   ownerId: row.owner_id,
   moderationStatus: row.moderation_status,
+  // Endereço público (/servicos/<slug>): o banco gera e guarda, o app só lê.
+  // Antes da migração de 25/10/2026 a coluna não existe e vem vazio.
+  slug: row.slug || "",
   viewCount: row.view_count,
   detailCount: row.detail_count,
   whatsappCount: row.whatsapp_count,
@@ -877,6 +881,7 @@ const normalizeServiceListing = (listing = {}) => {
   return {
     id: String(listing.id || crypto.randomUUID()),
     ownerId: String(listing.ownerId || currentUserId || ""),
+    slug: String(listing.slug || "").trim().slice(0, 80),
     title,
     providerName,
     category: String(listing.category || "").trim().slice(0, 60),
@@ -1011,6 +1016,9 @@ const fetchListings = async ({ isAdmin, userId }) => {
     .filter((listing) => listing.active)
     .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
 };
+
+/** Linha crua de `service_listings` -> anúncio no formato das telas. */
+export const serviceListingFromRow = (row) => normalizeServiceListing(listingFromRow(row));
 
 export const engineDB = {
   setCurrentUser(userId) {
