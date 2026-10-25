@@ -88,6 +88,18 @@ export const compressImageFile = (file) =>
     output: "dataURL",
   });
 
+/**
+ * A foto como ela deve subir para o Storage: no máximo 1600px, JPEG 0.82
+ * (~150–300 KB). Sempre, mesmo quando o arquivo já é pequeno — foto crua de
+ * celular (3–6 MB) no 4G é o que fazia o envio estourar o tempo.
+ */
+export const compressPhotoForUpload = (file) =>
+  renderCompressed(file, {
+    maxSize: UPLOAD_MAX_SIZE,
+    quality: UPLOAD_QUALITY,
+    output: "blob",
+  });
+
 export const isImageFile = (file) => Boolean(file?.type?.startsWith("image/"));
 export const isFileTooBig = (file) => (file?.size || 0) > MAX_FILE_BYTES;
 

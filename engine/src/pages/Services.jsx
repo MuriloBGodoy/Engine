@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   BarChart3,
   BriefcaseBusiness,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -13,6 +14,7 @@ import {
   Gauge,
   Globe,
   ImagePlus,
+  Info,
   LayoutGrid,
   Mail,
   Map,
@@ -33,8 +35,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { engineDB } from "../services/db";
-import { uploadToStorage } from "../services/photos";
+import { engineDB, normalizeServiceListing } from "../services/db";
+import { compressPhotoForUpload, isImageFile, uploadToStorage } from "../services/photos";
 import {
   countries,
   getStates,
@@ -50,7 +52,6 @@ import { ServiceRatingBadge, ServiceReviews } from "../components/services/Servi
 import { useRegion } from "../hooks/RegionProvider";
 import {
   categoryIcons,
-  fallbackPhoto,
   getDirectionsUrl,
   getInitials,
   getServiceCategoryLabel,
@@ -64,31 +65,52 @@ import {
   serviceCategories,
 } from "../services/serviceListingDisplay";
 import { serviceListingPath } from "../services/serviceListingPublic";
-import { MapPreview, PortfolioLinks, WhatsAppIcon } from "../components/services/ListingParts";
+import {
+  ListingPhoto,
+  ListingPhotoPlaceholder,
+  MapPreview,
+  PortfolioLinks,
+  WhatsAppIcon,
+} from "../components/services/ListingParts";
+import { PublishSignInGate } from "../components/services/PublishSignInGate";
+import { useServiceAdmin } from "../hooks/useServiceAdmin";
+import {
+  APPROVAL_SLA_HOURS,
+  PRICE_MAX_LENGTH,
+  changedReviewKeys,
+  listingEditNeedsReview,
+} from "../services/serviceListingRules";
+import {
+  clearListingDraft,
+  readListingDraft,
+  writeListingDraft,
+} from "../services/serviceListingDraft";
+import { authPath } from "../services/authRedirect";
 import { BioLinkCard, ShareListingButton } from "../components/services/ShareListing";
 import { ListingMonthPanel } from "../components/services/ListingMonthPanel";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
 const MAX_PHOTOS = 6;
-const PHOTO_UPLOAD_TIMEOUT_MS = 15000;
-const FALLBACK_IMAGE_MAX_SIZE = 1100;
-const FALLBACK_IMAGE_QUALITY = 0.72;
-const SERVICE_ADMIN_EMAILS = (
-  import.meta.env.VITE_SERVICE_ADMIN_EMAILS || "muxdtuber@gmail.com"
-)
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
+const PHOTO_UPLOAD_TIMEOUT_MS = 20000;
+// Arquivo cru aceito antes de comprimir: foto de celular novo chega a 12 MB.
+// O que sobe é sempre a versão comprimida (~150–300 KB).
+const MAX_RAW_PHOTO_BYTES = 20 * 1024 * 1024;
+// Para onde o login devolve quem tocou em "Cadastrar" sem conta.
+const PUBLISH_PATH = "/services?publish=1";
 
 const emptyForm = {
   id: "",
   title: "",
   providerName: "",
-  category: "car-cleaning",
+  // Sem categoria escolhida: é obrigatória, e um padrão pré-marcado vira
+  // anúncio na categoria errada.
+  category: "",
   description: "",
   price: "",
-  serviceMode: "hybrid",
+  // "Vou até você" é o caso mais comum de quem chega pelo Instagram
+  // (detailer, lavador, martelinho) e não exige publicar endereço.
+  serviceMode: "mobile",
   country: "BR",
   state: "",
   city: "",
@@ -133,6 +155,7 @@ const statusLabelKeys = {
   pending: "services.status.pending",
   changes_requested:"services.status.changesRequested",
   rejected: "services.status.rejected",
+  suspended: "services.status.suspended",
 };
 
 const phoneCountries = [
@@ -160,13 +183,13 @@ const inferPhoneCountry = (value = "") => {
   );
 };
 
-const stripPhoneCountry = (value ="", countryCode ="+55") => {
+const stripPhoneCountry = (value = "", countryCode = "+55") => {
   const cleanCountry = countryCode.replace(/\D/g,"");
   const digits = String(value).replace(/\D/g,"");
   return digits.startsWith(cleanCountry) ? digits.slice(cleanCountry.length) : digits;
 };
 
-const formatPhoneInput = (value ="", countryCode ="+55") => {
+const formatPhoneInput = (value = "", countryCode = "+55") => {
   const digits = String(value).replace(/\D/g,"").slice(0, 14);
 
   if (countryCode === "+55") {
@@ -206,7 +229,7 @@ const formatPhoneInput = (value ="", countryCode ="+55") => {
     .trim();
 };
 
-const splitStoredPhone = (value ="", fallbackCountry ="+55") => {
+const splitStoredPhone = (value = "", fallbackCountry = "+55") => {
   const cleanValue = String(value || "").trim();
   const countryCode = cleanValue.startsWith("+")
     ? inferPhoneCountry(cleanValue)
@@ -217,56 +240,21 @@ const splitStoredPhone = (value ="", fallbackCountry ="+55") => {
   };
 };
 
-const formatCurrencyInput = (value = "") => {
-  const digits = value.replace(/\D/g,"").slice(0, 9);
-  if (!digits) return"";
-  return Number(digits).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  });
-};
-
-const withUploadTimeout = (promise, label) =>
+const withUploadTimeout = (promise, message) =>
   Promise.race([
     promise,
     new Promise((_, reject) => {
-      window.setTimeout(
-        () => reject(new Error(`${label} demorou demais para responder.`)),
-        PHOTO_UPLOAD_TIMEOUT_MS,
-      );
+      window.setTimeout(() => reject(new Error(message)), PHOTO_UPLOAD_TIMEOUT_MS);
     }),
   ]);
 
-const compressImageFile = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
-    reader.onload = () => {
-      const image = new Image();
-      image.onerror = () => reject(new Error("Imagem inválida."));
-      image.onload = () => {
-        const scale = Math.min(
-          1,
-          FALLBACK_IMAGE_MAX_SIZE / Math.max(image.width, image.height),
-        );
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
-
-        const context = canvas.getContext("2d");
-        if (!context) {
-          reject(new Error("Não foi possível preparar a imagem."));
-          return;
-        }
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", FALLBACK_IMAGE_QUALITY));
-      };
-      image.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
+// Dígitos do número sem o código do país: Brasil pede DDD + 8 ou 9 dígitos.
+const isWhatsAppComplete = (value = "", countryCode = "+55") => {
+  const digits = stripPhoneCountry(value, countryCode);
+  if (countryCode === "+55") return digits.length >= 10;
+  if (countryCode === "+1") return digits.length === 10;
+  return digits.length >= 6;
+};
 
 const getSellerProfile = (settings, user) => {
   const profile = settings?.profile || {};
@@ -297,18 +285,35 @@ const makeInitialForm = (settings, user) => {
     state: seller.state,
     city: seller.city,
     ...splitStoredPhone(seller.phone),
-    email: seller.email,
+    // E-mail público começa vazio: o de login é pessoal e não vira contato
+    // do anúncio sem a pessoa digitar.
+    email: "",
   };
 };
 
-function Field({ label, children, wide = false }) {
+function Field({ label, children, wide = false, required = false, optional = false, hint = "", as = "label" }) {
+  const { t } = useTranslation();
+  // Grupo de botões (fotos, tipo de atendimento) não pode morar dentro de
+  // <label>: o toque no rótulo dispararia o primeiro botão do grupo.
+  const Wrapper = as;
   return (
-    <label className={`grid min-w-0 gap-2 ${wide ? "md:col-span-2" : ""}`}>
+    <Wrapper className={`grid min-w-0 content-start gap-2 ${wide ? "md:col-span-2" : ""}`}>
       <span className="text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">
         {label}
+        {required && (
+          <span className="ml-1 text-[var(--engine-accent)]" aria-hidden="true">*</span>
+        )}
+        {optional && (
+          <span className="ml-1.5 font-bold normal-case tracking-normal text-[var(--engine-text-subtle)]">
+            ({t("services.form.optional")})
+          </span>
+        )}
       </span>
       {children}
-    </label>
+      {hint && (
+        <span className="text-xs font-medium leading-5 text-[var(--engine-text-muted)]">{hint}</span>
+      )}
+    </Wrapper>
   );
 }
 
@@ -346,9 +351,14 @@ function StatusBadge({ status }) {
     pending: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-300",
     changes_requested:"border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-300",
     rejected: "border-[var(--engine-accent)]/25 bg-[var(--engine-accent)]/10 text-[var(--engine-accent)]",
+    suspended: "border-[var(--engine-accent)]/25 bg-[var(--engine-accent)]/10 text-[var(--engine-accent)]",
   };
   const Icon =
-    status === "approved" ? CheckCircle2 : status === "rejected" ? XCircle : Clock;
+    status === "approved"
+      ? CheckCircle2
+      : status === "rejected" || status === "suspended"
+        ? XCircle
+        : Clock;
 
   return (
     <span
@@ -366,7 +376,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
   const { t } = useTranslation();
   const ModeIcon = modeIcons[listing.serviceMode] || BriefcaseBusiness;
   const phone = normalizeWhatsApp(listing.whatsapp);
-  const photos = listing.photos?.length ? listing.photos : [fallbackPhoto];
+  const photos = listing.photos || [];
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const showMap = hasMapAddress(listing);
   const stopAction = (event) => event.stopPropagation();
@@ -423,12 +433,11 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
           outro, conforme o texto de cada anuncio. Foto de tamanho diferente em
           cada card e o que fazia a grade parecer torta. */}
       <div className="relative h-[160px] shrink-0 overflow-hidden bg-[var(--engine-surface-2)] sm:h-[180px]">
-        <img
+        <ListingPhoto
+          key={activePhoto || "sem-foto"}
           src={activePhoto}
+          listing={listing}
           alt={listing.title}
-          onError={(event) => {
-            event.currentTarget.src = fallbackPhoto;
-          }}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -663,7 +672,7 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
 
   const ModeIcon = modeIcons[listing.serviceMode] || BriefcaseBusiness;
   const phone = normalizeWhatsApp(listing.whatsapp);
-  const photos = listing.photos?.length ? listing.photos : [fallbackPhoto];
+  const photos = listing.photos || [];
   const activePhoto = photos[activePhotoIndex] || photos[0];
   const showMap = hasMapAddress(listing);
   const movePhoto = (direction) => {
@@ -703,6 +712,14 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
 
         <div className="grid gap-5 p-3 pb-28 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
           <div className="min-w-0 space-y-5">
+            {!photos.length && (
+              <ListingPhotoPlaceholder
+                listing={listing}
+                size="lg"
+                className="aspect-[4/3] w-full rounded-xl sm:aspect-[16/9]"
+              />
+            )}
+            {photos.length > 0 && (
             <div className="relative overflow-hidden rounded-xl bg-[var(--engine-surface-2)]">
               <button
                 type="button"
@@ -710,12 +727,12 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
                 className="block w-full cursor-zoom-in"
                 title={t("services.enlargePhoto")}
               >
-                <img
+                <ListingPhoto
+                  key={activePhoto}
                   src={activePhoto}
+                  listing={listing}
                   alt={listing.title}
-                  onError={(event) => {
-                    event.currentTarget.src = fallbackPhoto;
-                  }}
+                  placeholderSize="lg"
                   className="aspect-[4/3] w-full object-cover sm:aspect-[16/9]"
                 />
               </button>
@@ -752,6 +769,7 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
                 </>
               )}
             </div>
+            )}
 
             {photos.length > 1 && (
               <div className="engine-chip-scroll -mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
@@ -927,7 +945,7 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
         </div>
       </section>
 
-      {lightboxOpen && (
+      {lightboxOpen && photos.length > 0 && (
         <PhotoLightbox
           listing={listing}
           photos={photos}
@@ -959,7 +977,7 @@ function PhotoLightbox({
   onResetZoom,
 }) {
   const { t } = useTranslation();
-  const activePhoto = photos[activePhotoIndex] || photos[0] || fallbackPhoto;
+  const activePhoto = photos[activePhotoIndex] || photos[0];
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black/95 text-white">
@@ -1104,28 +1122,87 @@ function ContactButton({ href, icon, label, value, disabled, onActivate }) {
   );
 }
 
+function FormSection({ title, copy, children }) {
+  return (
+    <div className="grid gap-5 md:col-span-2 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <h3 className="text-sm font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">{title}</h3>
+        {copy && (
+          <p className="mt-1 text-xs font-medium leading-5 text-[var(--engine-text-muted)]">{copy}</p>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SubmittedPanel({ isNew, onOpenMyListings, onClose }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col items-center px-5 py-10 text-center sm:px-10 sm:py-14">
+      <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+        <CheckCircle2 size={32} aria-hidden="true" />
+      </span>
+      <h2 className="mt-5 text-xl font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
+        {isNew ? t("services.submitted.title") : t("services.submitted.titleEdit")}
+      </h2>
+      <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-[var(--engine-text)]">
+        {t("services.submitted.sla", { hours: APPROVAL_SLA_HOURS })}
+      </p>
+      <p className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+        {t("services.submitted.copy")}
+      </p>
+      <div className="mt-7 grid w-full max-w-sm gap-2.5">
+        <button
+          type="button"
+          onClick={onOpenMyListings}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-4 text-sm font-bold text-white transition hover:brightness-95"
+        >
+          <BriefcaseBusiness size={17} aria-hidden="true" />
+          {t("services.submitted.myListings")}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-4 text-sm font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white"
+        >
+          {t("services.submitted.done")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ListingEditorModal({
   form,
   sellerProfile,
   saving,
   photoUploading,
+  draftRestored,
+  editingLive,
+  submitted,
   onSubmit,
   onChange,
   onPhotoUpload,
   onPhotoRemove,
+  onDiscardDraft,
+  onOpenMyListings,
   onCancel,
 }) {
   const { t } = useTranslation();
-  const needsAddress = ["place", "hybrid"].includes(form.serviceMode);
-  const needsServiceArea = ["mobile", "hybrid"].includes(form.serviceMode);
+  const addressRequired = form.serviceMode === "place";
+  const showAddress = ["place", "hybrid"].includes(form.serviceMode);
+  const showServiceArea = ["mobile", "hybrid"].includes(form.serviceMode);
   const formStates = getStates(form.country);
   const formCities = getCities(form.country, form.state);
   const cityListId = "listing-city-suggestions";
+  const photos = form.photos || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-0 backdrop-blur-sm sm:p-6">
       <form
         onSubmit={onSubmit}
+        noValidate
         className="min-h-[100dvh] w-full max-w-5xl rounded-none border-0 border-[var(--engine-border)] bg-[var(--engine-surface)] shadow-2xl sm:my-4 sm:min-h-0 sm:rounded-2xl sm:border"
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-surface)] p-4 sm:gap-4 sm:p-6">
@@ -1136,339 +1213,418 @@ function ListingEditorModal({
             <h2 className="mt-1 text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white sm:text-xl">
               {t("services.myShowcase")}
             </h2>
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
-              {t("services.editorCopy")}
-            </p>
-            <div className="mt-4 flex max-w-xl items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-sm font-bold uppercase text-white">
-                {sellerProfile?.avatar ? (
-                  <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  getInitials(sellerProfile?.displayName)
-                )}
+            {!submitted && (
+              <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+                {t("services.editorCopy")}
+              </p>
+            )}
+            {!submitted && (
+              <div className="mt-4 flex max-w-xl items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-sm font-bold uppercase text-white">
+                  {sellerProfile?.avatar ? (
+                    <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    getInitials(sellerProfile?.displayName)
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
+                    {t("services.publishedAs")}
+                  </p>
+                  <p className="truncate text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
+                    {sellerProfile?.displayName || t("services.engineUser")}
+                  </p>
+                  <p className="truncate text-xs font-bold text-[var(--engine-text-muted)]">
+                    {sellerProfile?.username || t("services.engineAccount")}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                  {t("services.publishedAs")}
-                </p>
-                <p className="truncate text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
-                  {sellerProfile?.displayName || t("services.engineUser")}
-                </p>
-                <p className="truncate text-xs font-bold text-[var(--engine-text-muted)]">
-                  {sellerProfile?.username || sellerProfile?.email || t("services.engineAccount")}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
             title={t("services.closeEditor")}
+            aria-label={t("services.closeEditor")}
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="grid gap-5 p-4 pb-28 sm:p-6 md:grid-cols-2">
-          <Field label={t("services.fields.photos")} wide>
-            <div className="grid gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3">
-              {(form.photos || []).map((photo) => (
-                <div key={photo} className="relative overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
-                  <img src={photo} alt="" className="h-36 w-full object-cover sm:h-32" />
+        {submitted ? (
+          <SubmittedPanel isNew={submitted.isNew} onOpenMyListings={onOpenMyListings} onClose={onCancel} />
+        ) : (
+          <>
+            <div className="grid gap-8 p-4 pb-28 sm:p-6 md:grid-cols-2">
+              {draftRestored && (
+                <div className="flex flex-col gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3 text-sm font-semibold text-[var(--engine-text)] sm:flex-row sm:items-center sm:justify-between md:col-span-2 dark:text-white">
+                  <span className="flex items-start gap-2">
+                    <RotateCcw size={16} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" aria-hidden="true" />
+                    {t("services.form.draftRestored")}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => onPhotoRemove(photo)}
-                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-[var(--engine-accent)]"
-                    title={t("services.removePhoto")}
+                    onClick={onDiscardDraft}
+                    className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-bold text-[var(--engine-text-muted)] underline-offset-2 transition hover:text-[var(--engine-accent)] hover:underline"
                   >
-                    <X size={15} />
+                    {t("services.form.discardDraft")}
                   </button>
                 </div>
-              ))}
-              {(form.photos || []).length < MAX_PHOTOS && (
-                <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-center transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]">
-                  {photoUploading ? (
-                    <Wrench className="mb-2 animate-spin text-[var(--engine-accent)]" size={24} />
-                  ) : (
-                    <ImagePlus className="mb-2 text-[var(--engine-accent)]" size={24} />
-                  )}
-                  <span className="text-xs font-black uppercase tracking-widest">
-                    {photoUploading ? t("services.uploadingPhoto") : t("services.addPhoto")}
-                  </span>
-                  <span className="mt-1 text-[11px] font-bold text-[var(--engine-text-subtle)]">
-                    {t("services.maxImages", { value: MAX_PHOTOS })}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    disabled={photoUploading}
-                    onChange={onPhotoUpload}
-                  />
-                </label>
               )}
-            </div>
-          </Field>
+              {editingLive && (
+                <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold leading-6 text-[var(--engine-text)] md:col-span-2 dark:text-white">
+                  <Info size={16} className="mt-1 shrink-0 text-emerald-600 dark:text-emerald-300" aria-hidden="true" />
+                  {t("services.form.editLiveHint", { hours: APPROVAL_SLA_HOURS })}
+                </div>
+              )}
 
-          <Field label={t("services.fields.title")} wide>
-            <TextInput
-              value={form.title}
-              onChange={(event) => onChange("title", event.target.value)}
-              id="svc-title"
-              placeholder={t("services.placeholders.title")}
-            />
-          </Field>
-          <Field label={t("services.fields.providerName")}>
-            <TextInput
-              value={form.providerName}
-              onChange={(event) => onChange("providerName", event.target.value)}
-              placeholder={t("services.placeholders.providerName")}
-            />
-          </Field>
-          <Field label={t("services.fields.category")}>
-            <Select
-              value={normalizeServiceCategory(form.category)}
-              onChange={(event) => onChange("category", event.target.value)}
-            >
-              {serviceCategories.map((item) => (
-                <option key={item.value} value={item.value}>{t(item.labelKey)}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("services.fields.description")} wide>
-            <TextArea
-              value={form.description}
-              onChange={(event) => onChange("description", event.target.value)}
-              id="svc-description"
-              placeholder={t("services.placeholders.description")}
-            />
-          </Field>
+              <FormSection title={t("services.form.essentials")} copy={t("services.form.requiredHint")}>
+                <Field as="div" label={t("services.fields.photos")} wide required hint={t("services.form.photoHint")}>
+                  <div id="svc-photos" tabIndex={-1} className="grid gap-3 outline-none min-[420px]:grid-cols-2 sm:grid-cols-3">
+                    {photos.map((photo, index) => (
+                      <div key={photo} className="relative overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
+                        <img src={photo} alt="" className="h-36 w-full object-cover sm:h-32" />
+                        {index === 0 && (
+                          <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                            {t("services.form.cover")}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onPhotoRemove(photo)}
+                          className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-[var(--engine-accent)]"
+                          title={t("services.removePhoto")}
+                          aria-label={t("services.removePhoto")}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {photos.length < MAX_PHOTOS && (
+                      <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-center text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white">
+                        {photoUploading ? (
+                          <Wrench className="mb-2 animate-spin text-[var(--engine-accent)]" size={24} />
+                        ) : (
+                          <ImagePlus className="mb-2 text-[var(--engine-accent)]" size={24} />
+                        )}
+                        <span className="text-xs font-black uppercase tracking-widest">
+                          {photoUploading ? t("services.uploadingPhoto") : t("services.addPhoto")}
+                        </span>
+                        <span className="mt-1 text-[11px] font-bold text-[var(--engine-text-muted)]">
+                          {t("services.maxImages", { value: MAX_PHOTOS })}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="sr-only"
+                          disabled={photoUploading}
+                          onChange={onPhotoUpload}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </Field>
 
-          <Field label={t("services.fields.serviceMode")} wide>
-            <div className="grid gap-2 min-[520px]:grid-cols-3">
-              {["hybrid", "mobile", "place"].map((item) => {
-                const Icon = modeIcons[item];
-                const active = form.serviceMode === item;
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => onChange("serviceMode", item)}
-                    className={`min-h-20 rounded-xl border p-3 text-left transition sm:min-h-24 ${
-                      active
-                        ? "border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
-                        : "border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                    }`}
+                <Field label={t("services.fields.title")} wide required>
+                  <TextInput
+                    value={form.title}
+                    onChange={(event) => onChange("title", event.target.value)}
+                    id="svc-title"
+                    maxLength={90}
+                    aria-required="true"
+                    placeholder={t("services.placeholders.title")}
+                  />
+                </Field>
+                <Field label={t("services.fields.category")} required>
+                  <Select
+                    id="svc-category"
+                    value={form.category ? normalizeServiceCategory(form.category) : ""}
+                    onChange={(event) => onChange("category", event.target.value)}
+                    aria-required="true"
                   >
-                    <Icon size={18} />
-                    <span className="mt-2 block text-xs font-black uppercase tracking-widest">
-                      {t(modeLabelKeys[item])}
-                    </span>
-                    <span className="mt-1 block text-[11px] font-bold leading-4 opacity-75">
-                      {t(modeCopyKeys[item])}
-                    </span>
-                  </button>
-                );
-              })}
+                    <option value="" disabled>
+                      {t("services.form.categoryPlaceholder")}
+                    </option>
+                    {serviceCategories.map((item) => (
+                      <option key={item.value} value={item.value}>{t(item.labelKey)}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label={t("services.fields.whatsapp")} required>
+                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2 sm:grid-cols-[112px_minmax(0,1fr)]">
+                    <Select
+                      value={form.whatsappCountry || "+55"}
+                      onChange={(event) => {
+                        onChange("whatsappCountry", event.target.value);
+                        onChange("whatsapp", formatPhoneInput(form.whatsapp, event.target.value));
+                      }}
+                      aria-label={t("services.countryCode")}
+                    >
+                      {phoneCountries.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.label} {country.code}
+                        </option>
+                      ))}
+                    </Select>
+                    <TextInput
+                      id="svc-whatsapp"
+                      value={form.whatsapp}
+                      onChange={(event) =>
+                        onChange("whatsapp", formatPhoneInput(event.target.value, form.whatsappCountry))
+                      }
+                      placeholder={form.whatsappCountry === "+1" ? "(555) 123-4567" : "(11) 99999-9999"}
+                      inputMode="tel"
+                      autoComplete="tel-national"
+                      aria-required="true"
+                    />
+                  </div>
+                </Field>
+
+                <Field as="div" label={t("services.fields.serviceMode")} wide required>
+                  <div className="grid gap-2 min-[520px]:grid-cols-3">
+                    {["mobile", "place", "hybrid"].map((item) => {
+                      const Icon = modeIcons[item];
+                      const active = form.serviceMode === item;
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => onChange("serviceMode", item)}
+                          className={`min-h-20 rounded-xl border p-3 text-left transition sm:min-h-24 ${
+                            active
+                              ? "border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
+                              : "border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                          }`}
+                        >
+                          <Icon size={18} />
+                          <span className="mt-2 block text-xs font-black uppercase tracking-widest">
+                            {t(modeLabelKeys[item])}
+                          </span>
+                          <span className="mt-1 block text-[11px] font-bold leading-4 opacity-80">
+                            {t(modeCopyKeys[item])}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+
+                <Field label={t("services.fields.country")}>
+                  <Select
+                    value={form.country || "BR"}
+                    onChange={(event) => {
+                      onChange("country", event.target.value);
+                      onChange("state", "");
+                      onChange("city", "");
+                    }}
+                  >
+                    {countries.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.flag} {item.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label={t("services.fields.state")} required={formStates.length > 0}>
+                  <Select
+                    id="svc-state"
+                    value={form.state || ""}
+                    onChange={(event) => {
+                      onChange("state", event.target.value);
+                      onChange("city", "");
+                    }}
+                    disabled={!formStates.length}
+                    aria-required={formStates.length > 0}
+                  >
+                    <option value="">
+                      {formStates.length
+                        ? t("services.placeholders.state")
+                        : t("services.placeholders.stateUnavailable")}
+                    </option>
+                    {formStates.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label={t("services.fields.city")} required>
+                  <TextInput
+                    id="svc-city"
+                    value={form.city}
+                    onChange={(event) => onChange("city", event.target.value)}
+                    placeholder={t("services.placeholders.city")}
+                    list={formCities.length ? cityListId : undefined}
+                    autoComplete="address-level2"
+                    aria-required="true"
+                  />
+                  {formCities.length > 0 && (
+                    <datalist id={cityListId}>
+                      {formCities.map((city) => (
+                        <option key={city} value={city} />
+                      ))}
+                    </datalist>
+                  )}
+                </Field>
+                {showAddress && (
+                  <Field
+                    label={t("services.fields.address")}
+                    required={addressRequired}
+                    optional={!addressRequired}
+                    hint={addressRequired ? "" : t("services.form.addressHybridHint")}
+                  >
+                    <TextInput
+                      value={form.address}
+                      onChange={(event) => onChange("address", event.target.value)}
+                      id="svc-address"
+                      autoComplete="street-address"
+                      aria-required={addressRequired}
+                      placeholder={t("services.placeholders.address")}
+                    />
+                  </Field>
+                )}
+                {showAddress && hasMapAddress(form) && (
+                  <div className="md:col-span-2">
+                    <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">
+                      {t("services.mapPreview")}
+                    </p>
+                    <MapPreview listing={form} />
+                  </div>
+                )}
+              </FormSection>
+
+              <FormSection title={t("services.form.optionalTitle")} copy={t("services.form.optionalCopy")}>
+                <Field label={t("services.fields.description")} wide optional>
+                  <TextArea
+                    value={form.description}
+                    onChange={(event) => onChange("description", event.target.value)}
+                    id="svc-description"
+                    maxLength={900}
+                    placeholder={t("services.placeholders.description")}
+                  />
+                </Field>
+                <Field label={t("services.fields.price")} optional hint={t("services.form.priceHint")}>
+                  <TextInput
+                    value={form.price}
+                    onChange={(event) => onChange("price", event.target.value.slice(0, PRICE_MAX_LENGTH))}
+                    maxLength={PRICE_MAX_LENGTH}
+                    placeholder={t("services.placeholders.price")}
+                  />
+                </Field>
+                <Field label={t("services.fields.availability")} optional>
+                  <TextInput
+                    value={form.availability}
+                    onChange={(event) => onChange("availability", event.target.value)}
+                    maxLength={180}
+                    placeholder={t("services.placeholders.availability")}
+                  />
+                </Field>
+                {showServiceArea && (
+                  <Field label={t("services.fields.serviceArea")} wide optional>
+                    <TextInput
+                      value={form.serviceArea}
+                      onChange={(event) => onChange("serviceArea", event.target.value)}
+                      id="svc-service-area"
+                      maxLength={160}
+                      placeholder={t("services.placeholders.serviceArea")}
+                    />
+                  </Field>
+                )}
+              </FormSection>
+
+              <details className="group md:col-span-2" open={Boolean(form.id) || undefined}>
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 text-sm font-extrabold text-[var(--engine-text)] transition hover:border-[var(--engine-border-strong)] dark:text-white [&::-webkit-details-marker]:hidden">
+                  {t("services.form.moreTitle")}
+                  <ChevronDown size={18} className="shrink-0 text-[var(--engine-text-muted)] transition group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div className="mt-5 grid gap-5 md:grid-cols-2">
+                  <Field label={t("services.fields.providerName")} optional>
+                    <TextInput
+                      value={form.providerName}
+                      onChange={(event) => onChange("providerName", event.target.value)}
+                      maxLength={80}
+                      placeholder={t("services.placeholders.providerName")}
+                    />
+                  </Field>
+                  <Field label={t("common.email")} optional hint={t("services.form.emailHint")}>
+                    <TextInput
+                      type="email"
+                      value={form.email}
+                      onChange={(event) => onChange("email", event.target.value)}
+                      autoComplete="off"
+                      placeholder={t("services.form.emailPlaceholder")}
+                    />
+                  </Field>
+                  <Field label={t("services.fields.instagram")} optional>
+                    <TextInput
+                      value={form.instagram}
+                      onChange={(event) => onChange("instagram", event.target.value)}
+                      autoCapitalize="none"
+                      placeholder={t("services.placeholders.instagram")}
+                    />
+                  </Field>
+                  <Field label={t("services.fields.tiktok")} optional>
+                    <TextInput
+                      value={form.tiktok}
+                      onChange={(event) => onChange("tiktok", event.target.value)}
+                      autoCapitalize="none"
+                      placeholder={t("services.placeholders.tiktok")}
+                    />
+                  </Field>
+                  <Field label={t("services.fields.experience")} wide optional>
+                    <TextInput
+                      value={form.experience}
+                      onChange={(event) => onChange("experience", event.target.value)}
+                      maxLength={180}
+                      placeholder={t("services.placeholders.experience")}
+                    />
+                  </Field>
+                  <Field label={t("services.fields.videoUrl")} wide optional hint={t("services.hints.videoUrl")}>
+                    <TextInput
+                      value={form.videoUrl}
+                      onChange={(event) => onChange("videoUrl", event.target.value)}
+                      inputMode="url"
+                      autoCapitalize="none"
+                      placeholder={t("services.placeholders.videoUrl")}
+                    />
+                  </Field>
+                  <Field label={t("services.fields.tags")} wide optional>
+                    <TextInput
+                      value={form.tags}
+                      onChange={(event) => onChange("tags", event.target.value)}
+                      placeholder={t("services.placeholders.tags")}
+                    />
+                  </Field>
+                </div>
+              </details>
             </div>
-          </Field>
 
-          <Field label={t("services.fields.country")}>
-            <Select
-              value={form.country || "BR"}
-              onChange={(event) => {
-                onChange("country", event.target.value);
-                onChange("state", "");
-                onChange("city", "");
-              }}
-            >
-              {countries.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.flag} {item.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("services.fields.state")}>
-            <Select
-              value={form.state || ""}
-              onChange={(event) => {
-                onChange("state", event.target.value);
-                onChange("city", "");
-              }}
-              disabled={!formStates.length}
-            >
-              <option value="">
-                {formStates.length
-                  ? t("services.placeholders.state")
-                  : t("services.placeholders.stateUnavailable")}
-              </option>
-              {formStates.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("services.fields.city")}>
-            <TextInput
-              value={form.city}
-              onChange={(event) => onChange("city", event.target.value)}
-              placeholder={t("services.placeholders.city")}
-              list={formCities.length ? cityListId : undefined}
-            />
-            {formCities.length > 0 && (
-              <datalist id={cityListId}>
-                {formCities.map((city) => (
-                  <option key={city} value={city} />
-                ))}
-              </datalist>
-            )}
-          </Field>
-          {needsAddress && (
-            <Field label={t("services.fields.address")}>
-              <TextInput
-                value={form.address}
-                onChange={(event) => onChange("address", event.target.value)}
-                id="svc-address"
-              placeholder={t("services.placeholders.address")}
-              />
-            </Field>
-          )}
-          {needsServiceArea && (
-            <Field label={t("services.fields.serviceArea")} wide={!needsAddress}>
-              <TextInput
-                value={form.serviceArea}
-                onChange={(event) => onChange("serviceArea", event.target.value)}
-                id="svc-service-area"
-              placeholder={t("services.placeholders.serviceArea")}
-              />
-            </Field>
-          )}
-
-          {needsAddress && hasMapAddress(form) && (
-            <div className="md:col-span-2">
-              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">
-                {t("services.mapPreview")}
-              </p>
-              <MapPreview listing={form} />
-            </div>
-          )}
-
-          <Field label={t("services.fields.whatsapp")}>
-            <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2 sm:grid-cols-[112px_minmax(0,1fr)]">
-              <Select
-                value={form.whatsappCountry || "+55"}
-                onChange={(event) => {
-                  onChange("whatsappCountry", event.target.value);
-                  onChange("whatsapp", formatPhoneInput(form.whatsapp, event.target.value));
-                }}
-                aria-label={t("services.countryCode")}
+            <div className="engine-safe-bottom flex flex-col gap-3 border-t border-[var(--engine-border)] p-5 sm:flex-row sm:p-6">
+              <button
+                type="submit"
+                disabled={saving || photoUploading}
+                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-sm font-bold uppercase text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {phoneCountries.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.label} {country.code}
-                  </option>
-                ))}
-              </Select>
-              <TextInput
-                value={form.whatsapp}
-                onChange={(event) =>
-                  onChange(
-                    "whatsapp",
-                    formatPhoneInput(event.target.value, form.whatsappCountry),
-                  )
-                }
-                placeholder={form.whatsappCountry === "+1" ? "(555) 123-4567" : "(11) 99999-9999"}
-                inputMode="tel"
-              />
+                {saving ? <Wrench className="animate-spin" size={18} /> : <Plus size={18} />}
+                {saving
+                  ? t("services.sending")
+                  : editingLive
+                    ? t("services.form.saveChanges")
+                    : t("services.submitForApproval")}
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-5 text-sm font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+              >
+                {t("common.cancel")}
+              </button>
             </div>
-          </Field>
-          <Field label={t("common.email")}>
-            <TextInput
-              type="email"
-              value={form.email}
-              onChange={(event) => onChange("email", event.target.value)}
-              placeholder="contato@email.com"
-            />
-          </Field>
-          <Field label={t("services.fields.price")}>
-            <TextInput
-              value={form.price}
-              onChange={(event) => onChange("price", formatCurrencyInput(event.target.value))}
-              placeholder={t("services.placeholders.price")}
-              inputMode="numeric"
-            />
-          </Field>
-          <Field label={t("services.fields.availability")}>
-            <TextInput
-              value={form.availability}
-              onChange={(event) => onChange("availability", event.target.value)}
-              placeholder={t("services.placeholders.availability")}
-            />
-          </Field>
-          <Field label={t("services.fields.experience")} wide>
-            <TextInput
-              value={form.experience}
-              onChange={(event) => onChange("experience", event.target.value)}
-              placeholder={t("services.placeholders.experience")}
-            />
-          </Field>
-
-          {/* Portfólio: pra quem se divulga em rede social, o perfil é o site.
-              O campo aceita colar a URL inteira e guarda só o @. */}
-          <Field label={t("services.fields.instagram")}>
-            <TextInput
-              value={form.instagram}
-              onChange={(event) => onChange("instagram", event.target.value)}
-              placeholder={t("services.placeholders.instagram")}
-            />
-          </Field>
-          <Field label={t("services.fields.tiktok")}>
-            <TextInput
-              value={form.tiktok}
-              onChange={(event) => onChange("tiktok", event.target.value)}
-              placeholder={t("services.placeholders.tiktok")}
-            />
-          </Field>
-          <Field label={t("services.fields.videoUrl")} wide>
-            <TextInput
-              value={form.videoUrl}
-              onChange={(event) => onChange("videoUrl", event.target.value)}
-              placeholder={t("services.placeholders.videoUrl")}
-            />
-            <p className="mt-1.5 text-[11px] text-[var(--engine-text-muted)]">
-              {t("services.hints.videoUrl")}
-            </p>
-          </Field>
-          <Field label={t("services.fields.tags")} wide>
-            <TextInput
-              value={form.tags}
-              onChange={(event) => onChange("tags", event.target.value)}
-              placeholder={t("services.placeholders.tags")}
-            />
-          </Field>
-        </div>
-
-        <div className="engine-safe-bottom flex flex-col gap-3 border-t border-[var(--engine-border)] p-5 sm:flex-row sm:p-6">
-          <button
-            type="submit"
-            disabled={saving || photoUploading}
-            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-sm font-bold uppercase text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? <Wrench className="animate-spin" size={18} /> : <Plus size={18} />}
-            {saving ? t("services.sending") : t("services.submitForApproval")}
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--engine-border)] px-5 text-sm font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-          >
-            {t("common.cancel")}
-          </button>
-        </div>
+          </>
+        )}
       </form>
     </div>
   );
@@ -1636,13 +1792,11 @@ function SellerListingsModal({ listings, onClose, onOpen, onEdit, onDelete, onNe
                   key={listing.id}
                   className="grid gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center"
                 >
-                  <img
-                    src={listing.photos?.[0] || fallbackPhoto}
-                    alt=""
+                  <ListingPhoto
+                    src={listing.photos?.[0]}
+                    listing={listing}
+                    placeholderSize="sm"
                     className="h-24 w-full rounded-lg object-cover sm:h-16 sm:w-[72px]"
-                    onError={(event) => {
-                      event.currentTarget.src = fallbackPhoto;
-                    }}
                   />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -1657,7 +1811,14 @@ function SellerListingsModal({ listings, onClose, onOpen, onEdit, onDelete, onNe
                     <p className="mt-1 truncate text-xs font-bold text-[var(--engine-text-muted)]">
                       {listing.price || t("services.priceFallback")} / {listing.city || t("services.locationFallback")}
                     </p>
-                    {listing.moderationNote && (
+                    {/* O status em palavras, não só a etiqueta: o que está
+                        acontecendo e o que a pessoa pode fazer. */}
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[var(--engine-text)] dark:text-white">
+                      {t(`services.statusHint.${listing.moderationStatus || "pending"}`, {
+                        hours: APPROVAL_SLA_HOURS,
+                      })}
+                    </p>
+                    {listing.moderationNote && listing.moderationStatus !== "approved" && (
                       <p className="mt-2 line-clamp-2 rounded-lg bg-[var(--engine-accent)]/10 px-3 py-2 text-xs font-bold leading-5 text-[var(--engine-accent)]">
                         {listing.moderationNote}
                       </p>
@@ -1944,8 +2105,25 @@ export function Services({ user, settings }) {
   const [stateFilter, setStateFilter] = useState(() => region.state);
   const [cityFilter, setCityFilter] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [form, setForm] = useState(() => makeInitialForm(settings, user));
-  const [editorOpen, setEditorOpen] = useState(false);
+  // `?publish=1`: quem tocou em "Cadastrar" sem conta e acabou de entrar
+  // volta direto para o formulário, com o rascunho que tiver.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wantsPublish = searchParams.get("publish") === "1";
+  const [initialDraft] = useState(() =>
+    wantsPublish && user?.uid ? readListingDraft(user.uid) : null,
+  );
+  const [form, setForm] = useState(() =>
+    initialDraft
+      ? { ...makeInitialForm(settings, user), ...initialDraft, id: "" }
+      : makeInitialForm(settings, user),
+  );
+  const [editorOpen, setEditorOpen] = useState(() => wantsPublish && Boolean(user?.uid));
+  const [gateOpen, setGateOpen] = useState(() => wantsPublish && !user?.uid);
+  const [draftRestored, setDraftRestored] = useState(() => Boolean(initialDraft));
+  // O anúncio como estava ao abrir o editor (null = anúncio novo).
+  const [editingOriginal, setEditingOriginal] = useState(null);
+  // Depois de enviar para a fila, o editor mostra o "recebido" com o prazo.
+  const [submitted, setSubmitted] = useState(null);
   const [saving, setSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [rejectionTarget, setRejectionTarget] = useState(null);
@@ -1954,7 +2132,7 @@ export function Services({ user, settings }) {
   const [detailListing, setDetailListing] = useState(null);
   const [sellerProfileOpen, setSellerProfileOpen] = useState(false);
   const [sellerListingsOpen, setSellerListingsOpen] = useState(false);
-  const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email || "").toLowerCase());
+  const { isAdmin } = useServiceAdmin(user);
   const sellerProfile = useMemo(
     () => getSellerProfile(settings, user),
     [settings, user],
@@ -1964,6 +2142,28 @@ export function Services({ user, settings }) {
     () => engineDB.subscribeServiceListings(setListings, { userId: user?.uid, isAdmin }),
     [isAdmin, user?.uid],
   );
+
+  // O `publish=1` já foi lido na montagem; sai da barra de endereço para um
+  // recarregar não reabrir o formulário.
+  useEffect(() => {
+    if (!wantsPublish) return;
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("publish");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [wantsPublish, setSearchParams]);
+
+  // Rascunho do anúncio NOVO enquanto o editor está aberto. Editar um
+  // anúncio que já existe não gera rascunho: o original está no banco.
+  useEffect(() => {
+    if (editorOpen && !form.id && !submitted && user?.uid) {
+      writeListingDraft(user.uid, form);
+    }
+  }, [editorOpen, form, submitted, user?.uid]);
 
   const myListings = useMemo(
     () => listings.filter((listing) => listing.ownerId === user?.uid),
@@ -2123,11 +2323,20 @@ export function Services({ user, settings }) {
   };
 
   const openEditor = (listing = null) => {
+    // Sem conta, a conta vem ANTES do formulário (e o login devolve para cá).
+    if (!user?.uid) {
+      setGateOpen(true);
+      return;
+    }
     setDetailListing(null);
+    setSubmitted(null);
     if (listing) {
+      setEditingOriginal(listing);
+      setDraftRestored(false);
       setForm({
         ...emptyForm,
         ...listing,
+        category: listing.category ? normalizeServiceCategory(listing.category) : "",
         country: listing.country || sellerProfile.country || "BR",
         state: listing.state || sellerProfile.state || "",
         ...splitStoredPhone(listing.whatsapp, listing.whatsappCountry),
@@ -2135,13 +2344,25 @@ export function Services({ user, settings }) {
         photos: listing.photos || [],
       });
     } else {
-      resetForm();
+      const draft = readListingDraft(user.uid);
+      setEditingOriginal(null);
+      setDraftRestored(Boolean(draft));
+      setForm(draft ? { ...makeInitialForm(settings, user), ...draft, id: "" } : makeInitialForm(settings, user));
     }
     setEditorOpen(true);
   };
 
   const closeEditor = () => {
     setEditorOpen(false);
+    setSubmitted(null);
+    setEditingOriginal(null);
+    setDraftRestored(false);
+    resetForm();
+  };
+
+  const discardDraft = () => {
+    clearListingDraft();
+    setDraftRestored(false);
     resetForm();
   };
 
@@ -2150,7 +2371,9 @@ export function Services({ user, settings }) {
     event.target.value = "";
     if (!files.length) return;
     if (!user?.uid) {
-      flash(t("services.flash.signInAgain"));
+      // Só chega aqui quem entrou e teve a sessão encerrada no meio: o
+      // rascunho fica salvo e o login devolve ao formulário.
+      flash(t("services.flash.sessionEnded"));
       return;
     }
 
@@ -2163,44 +2386,38 @@ export function Services({ user, settings }) {
 
     setPhotoUploading(true);
     try {
-      const uploads = await Promise.all(
+      const urls = await Promise.all(
         selectedFiles.map(async (file) => {
-          if (!file.type.startsWith("image/")) {
+          if (!isImageFile(file)) {
             throw new Error(t("services.flash.invalidFile"));
           }
-          if (file.size > 6 * 1024 * 1024) {
+          if (file.size > MAX_RAW_PHOTO_BYTES) {
             throw new Error(t("services.flash.maxPhotoSize"));
           }
-          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-          const path = `users/${user.uid}/services/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+          // Sempre comprimida no aparelho antes de subir: 1600px, JPEG.
+          // Sem a cópia em base64 dentro do anúncio que existia antes — ela
+          // pesava para todo visitante da vitrine.
+          let blob;
           try {
-            const url = await withUploadTimeout(
-              uploadToStorage(path, file, file.type),
-              t("services.flash.photoUpload"),
-            );
-            return { url, fallback: false };
-          } catch (error) {
-            console.warn("Storage indisponível. Usando fallback comprimido.", error);
-            return {
-              url: await compressImageFile(file),
-              fallback: true,
-            };
+            blob = await compressPhotoForUpload(file);
+          } catch {
+            throw new Error(t("services.flash.photoUnreadable"));
           }
+          const path = `users/${user.uid}/services/${Date.now()}-${crypto.randomUUID()}.jpg`;
+          return withUploadTimeout(
+            uploadToStorage(path, blob, "image/jpeg"),
+            t("services.flash.photoTimeout"),
+          );
         }),
       );
-      const urls = uploads.map((item) => item.url);
       setForm((current) => ({
         ...current,
         photos: [...(current.photos || []), ...urls].slice(0, MAX_PHOTOS),
       }));
-      flash(
-        uploads.some((item) => item.fallback)
-          ? t("services.flash.compressedPhoto")
-          : t("services.flash.photoAdded"),
-      );
+      flash(t("services.flash.photoAdded"));
     } catch (error) {
       console.error(error);
-      flash(error.message || t("services.flash.photoUploadError"));
+      flash(error?.message || t("services.flash.photoUploadError"));
     } finally {
       setPhotoUploading(false);
     }
@@ -2213,8 +2430,32 @@ export function Services({ user, settings }) {
     }));
   };
 
+  // Nome legível dos campos que mandam a edição de volta para a fila.
+  const fieldLabel = (key) =>
+    ({
+      photos: t("services.fields.photos"),
+      title: t("services.fields.title"),
+      category: t("services.fields.category"),
+      description: t("services.fields.description"),
+      providerName: t("services.fields.providerName"),
+      serviceMode: t("services.fields.serviceMode"),
+      country: t("services.fields.country"),
+      state: t("services.fields.state"),
+      city: t("services.fields.city"),
+      address: t("services.fields.address"),
+      experience: t("services.fields.experience"),
+      tags: t("services.form.tagsShort"),
+      website: t("services.fields.website"),
+      videoUrl: t("services.fields.videoUrl"),
+    })[key] || key;
+
   const submitListing = async (event) => {
     event.preventDefault();
+    if (!user?.uid) {
+      // Sessão caiu com o formulário aberto: o rascunho já está salvo.
+      navigate(authPath("/login", PUBLISH_PATH));
+      return;
+    }
     // O aviso é um toast no topo, e o formulário é longo: no celular a pessoa
     // está lá embaixo, no botão. Além de avisar, leva até o campo que falta.
     const faltando = (id, mensagem) => {
@@ -2223,33 +2464,72 @@ export function Services({ user, settings }) {
       campo?.scrollIntoView({ block: "center", behavior: "smooth" });
       campo?.focus({ preventScroll: true });
     };
-    if (!form.title.trim() || !form.description.trim()) {
-      faltando(form.title.trim() ? "svc-description" : "svc-title", t("services.flash.titleDescriptionRequired"));
+    const hasStates = getStates(form.country).length > 0;
+    if (!(form.photos || []).length) {
+      faltando("svc-photos", t("services.flash.photoRequired"));
       return;
     }
-    if (["place", "hybrid"].includes(form.serviceMode) && !form.address.trim()) {
+    if (!form.title.trim()) {
+      faltando("svc-title", t("services.flash.titleRequired"));
+      return;
+    }
+    if (!form.category) {
+      faltando("svc-category", t("services.flash.categoryRequired"));
+      return;
+    }
+    if (!isWhatsAppComplete(form.whatsapp, form.whatsappCountry)) {
+      faltando("svc-whatsapp", t("services.flash.whatsappRequired"));
+      return;
+    }
+    if (hasStates && !form.state) {
+      faltando("svc-state", t("services.flash.stateRequired"));
+      return;
+    }
+    if (!form.city.trim()) {
+      faltando("svc-city", t("services.flash.cityRequired"));
+      return;
+    }
+    if (form.serviceMode === "place" && !form.address.trim()) {
       faltando("svc-address", t("services.flash.addressRequired"));
       return;
     }
-    if (["mobile", "hybrid"].includes(form.serviceMode) && !form.serviceArea.trim()) {
-      faltando("svc-service-area", t("services.flash.areaRequired"));
+    if (!isCityInCountry(form.country, form.city)) {
+      faltando("svc-city", t("services.flash.cityCountryMismatch"));
       return;
     }
-    if (form.city.trim() && !isCityInCountry(form.country, form.city)) {
-      flash(t("services.flash.cityCountryMismatch"));
-      return;
+
+    const candidate = { ...form, category: normalizeServiceCategory(form.category) };
+    const original = editingOriginal;
+
+    // Anúncio no ar: avisa ANTES se a edição tira ele do ar até a revisão.
+    if (original?.moderationStatus === "approved" && !isAdmin) {
+      const before = normalizeServiceListing(original);
+      const after = normalizeServiceListing({ ...original, ...candidate });
+      if (listingEditNeedsReview(before, after)) {
+        const fields = changedReviewKeys(before, after).map(fieldLabel).join(", ");
+        const ok = await confirm({
+          title: t("services.editWarning.title"),
+          message: t("services.editWarning.message", { fields, hours: APPROVAL_SLA_HOURS }),
+          confirmLabel: t("services.editWarning.confirm"),
+          tone: "neutral",
+        });
+        if (!ok) return;
+      }
     }
 
     setSaving(true);
     try {
-      await engineDB.saveServiceListing(
-        { ...form, category: normalizeServiceCategory(form.category) },
-        settings,
-        user?.uid,
-        { isAdmin },
-      );
-      flash(t("services.flash.sentForApproval"));
-      closeEditor();
+      const { queued } = await engineDB.saveServiceListing(candidate, settings, user.uid, {
+        isAdmin,
+        original,
+      });
+      if (!form.id) clearListingDraft();
+      if (queued) {
+        setSubmitted({ isNew: !form.id });
+      } else {
+        flash(t("services.flash.liveUpdated"));
+        closeEditor();
+      }
     } catch (error) {
       console.error(error);
       flash(error?.message || t("settings.status.saveError"));
@@ -2619,13 +2899,23 @@ export function Services({ user, settings }) {
           sellerProfile={sellerProfile}
           saving={saving}
           photoUploading={photoUploading}
+          draftRestored={draftRestored}
+          editingLive={editingOriginal?.moderationStatus === "approved"}
+          submitted={submitted}
           onSubmit={submitListing}
           onChange={updateForm}
           onPhotoUpload={uploadPhotos}
           onPhotoRemove={removePhoto}
+          onDiscardDraft={discardDraft}
+          onOpenMyListings={() => {
+            closeEditor();
+            setSellerListingsOpen(true);
+          }}
           onCancel={closeEditor}
         />
       )}
+
+      <PublishSignInGate open={gateOpen} onClose={() => setGateOpen(false)} next={PUBLISH_PATH} />
 
       {sellerProfileOpen && (
         <SellerProfileModal
@@ -2698,7 +2988,7 @@ export function ServiceApprovals({ user }) {
   const [rejectionTarget, setRejectionTarget] = useState(null);
   const [rejectionNote, setRejectionNote] = useState("");
   const [moderationAction, setModerationAction] = useState("changes_requested");
-  const isAdmin = SERVICE_ADMIN_EMAILS.includes(String(user?.email || "").toLowerCase());
+  const { isAdmin, checked } = useServiceAdmin(user);
 
   useEffect(() => {
     if (!isAdmin) return undefined;
@@ -2763,6 +3053,10 @@ export function ServiceApprovals({ user }) {
       flash(t("services.flash.feedbackError"));
     }
   };
+
+  if (!checked) {
+    return <div className="min-h-[40vh]" aria-busy="true" />;
+  }
 
   if (!isAdmin) {
     return (

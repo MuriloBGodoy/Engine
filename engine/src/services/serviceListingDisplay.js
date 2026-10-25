@@ -123,8 +123,6 @@ export const categoryIcons = {
   other: Grid2x2,
 };
 
-export const fallbackPhoto =
-  "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=1100&q=80";
 
 /** Iniciais do nome ("Estética do João" -> "ED"). */
 export const getInitials = (name = "S") =>

@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ExternalLink, Globe } from "lucide-react";
+import { ExternalLink, Globe, Store } from "lucide-react";
 import { FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
 import {
+  categoryIcons,
   getDirectionsUrl,
   getMapUrl,
+  getServiceCategoryLabel,
+  normalizeServiceCategory,
   youtubeId,
 } from "../../services/serviceListingDisplay";
 
@@ -120,4 +124,44 @@ export function MapPreview({ listing, compact = false }) {
       </a>
     </div>
   );
+}
+
+/**
+ * Anúncio sem foto (ou com a foto quebrada): o ícone da categoria num bloco
+ * do próprio Engine. Nunca uma foto de banco de imagem — ela passaria por
+ * trabalho do prestador, e o cliente contrata pelo que vê.
+ */
+export function ListingPhotoPlaceholder({ listing, className = "", size = "md" }) {
+  const { t } = useTranslation();
+  const Icon = categoryIcons[normalizeServiceCategory(listing?.category)] || Store;
+  const large = size === "lg";
+  return (
+    <div
+      role="img"
+      aria-label={listing?.title || getServiceCategoryLabel(listing?.category, t)}
+      className={`flex flex-col items-center justify-center gap-2 bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] ${className}`}
+    >
+      <span
+        className={`flex items-center justify-center rounded-2xl bg-[var(--engine-accent-soft)] text-[var(--engine-accent)] ${
+          large ? "h-16 w-16" : size === "sm" ? "h-9 w-9 rounded-xl" : "h-12 w-12"
+        }`}
+      >
+        <Icon size={large ? 30 : size === "sm" ? 18 : 24} aria-hidden="true" />
+      </span>
+      {large && (
+        <span className="px-3 text-center text-[11px] font-bold uppercase tracking-widest">
+          {getServiceCategoryLabel(listing?.category, t)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Foto do anúncio que vira o placeholder se não carregar. */
+export function ListingPhoto({ src, listing, alt = "", className = "", placeholderSize = "md" }) {
+  const [broken, setBroken] = useState(false);
+  if (!src || broken) {
+    return <ListingPhotoPlaceholder listing={listing} className={className} size={placeholderSize} />;
+  }
+  return <img src={src} alt={alt} onError={() => setBroken(true)} className={className} />;
 }

@@ -91,6 +91,15 @@ export const listingEditNeedsReview = (original, next) => {
   return stable(reviewFields(original)) !== stable(reviewFields(next));
 };
 
+/** Quais campos que passam pela moderação mudaram (para dizer na tela). */
+export const changedReviewKeys = (original, next) => {
+  const before = reviewFields(original);
+  const after = reviewFields(next);
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+    (key) => stable(before[key]) !== stable(after[key]),
+  );
+};
+
 /** Todos os status de moderação; "suspended" = tirado do ar pela moderação. */
 export const MODERATION_STATUSES = [
   "pending",

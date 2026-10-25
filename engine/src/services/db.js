@@ -2283,7 +2283,6 @@ export const engineDB = {
    * a única fonte. Visitante, erro ou rede fora: false.
    */
   async isServiceAdmin() {
-    if (!currentUserId) return false;
     try {
       return must(await supabase.rpc("is_service_admin")) === true;
     } catch (error) {
