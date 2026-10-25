@@ -31,6 +31,7 @@ import {
 } from "../services/serviceListingPublic";
 import { MapPreview, PortfolioLinks, WhatsAppIcon } from "../components/services/ListingParts";
 import { ShareListingButton } from "../components/services/ShareListing";
+import { ServiceReviews } from "../components/services/ServiceReviews";
 import { useToast } from "../components/ToastProvider";
 
 /**
@@ -438,10 +439,9 @@ export function ServicePublicPage({ user }) {
 
               <PortfolioSection listing={listing} t={t} />
 
-              {/* reviews mount — o ServiceReviews (Han) entra aqui:
-                  <ServiceReviews listing={listing} user={user} />
-                  O anúncio já está carregado e aprovado (ou é o dono olhando). */}
-              <section id="service-reviews" className="mt-7" />
+              <section id="service-reviews" className="mt-7">
+                <ServiceReviews listing={listing} user={user} />
+              </section>
 
               <footer className="mt-10 border-t border-[var(--engine-border)] pt-6 text-center">
                 <p className="text-xs font-medium leading-5 text-[var(--engine-text-muted)]">

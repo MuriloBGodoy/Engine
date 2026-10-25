@@ -46,6 +46,7 @@ import {
 import { useConfirm } from"../components/ConfirmProvider";
 import { useToast } from"../components/ToastProvider";
 import { AdSlot } from"../components/AdSlot";
+import { ServiceRatingBadge, ServiceReviews } from "../components/services/ServiceReviews";
 import { useRegion } from"../hooks/RegionProvider";
 import {
   categoryIcons,
@@ -504,6 +505,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               <p className="mt-1 truncate text-xs font-semibold text-[var(--engine-text-subtle)]">
                 {listing.providerName || t("services.engineProfessional")}
               </p>
+              <ServiceRatingBadge listing={listing} />
             </div>
             {isMine && (
               <div className="flex shrink-0 gap-1">
@@ -647,7 +649,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
   );
 }
 
-function ServiceDetailModal({ listing, isMine, onClose, onEdit, onDelete }) {
+function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }) {
   const { t } = useTranslation();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -883,6 +885,10 @@ function ServiceDetailModal({ listing, isMine, onClose, onEdit, onDelete }) {
             </div>
 
             <PortfolioLinks listing={listing} t={t} />
+
+            {listing.moderationStatus === "approved" && (
+              <ServiceReviews listing={listing} user={user} />
+            )}
 
             {!isMine && listing.moderationStatus === "approved" && (
               <a
@@ -2660,6 +2666,7 @@ export function Services({ user, settings }) {
         key={detailListing?.id || "nenhum"}
         listing={detailListing}
         isMine={detailListing?.ownerId === user?.uid}
+        user={user}
         onClose={() => setDetailListing(null)}
         onEdit={openEditor}
         onDelete={deleteListing}
