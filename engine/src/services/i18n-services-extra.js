@@ -15,6 +15,21 @@ import i18n from "./i18n";
 
 const ptBR = {
   services: {
+    region: {
+      widened: "Ainda não há serviços em {{place}} — mostrando de {{wider}}.",
+      widenedAll: "Ainda não há serviços em {{place}} — mostrando de todos os lugares.",
+      inviteTitle: "Conhece um bom prestador em {{place}}?",
+      inviteTitleGeneric: "Conhece um bom prestador?",
+      inviteCopy: "Indique o Engine: publicar é grátis e o cliente chama direto no WhatsApp dele.",
+      inviteAction: "Indicar o Engine",
+      inviteText:
+        "Anuncie seu serviço automotivo de graça no Engine: os clientes chamam direto no seu WhatsApp.",
+      inviteCopied: "Link copiado. Agora é só mandar para o prestador.",
+      emptyAllTitle: "Os primeiros prestadores estão chegando",
+      emptyAllCopy:
+        "Ainda não há serviços publicados. Se você presta serviço automotivo, publique o seu: é grátis.",
+      emptyFiltered: "Nenhum serviço com essa busca ou categoria. Tente outro termo ou limpe os filtros.",
+    },
     // Formulário curto, edição sem sair do ar e prazo de aprovação
     // (25/10/2026). O prazo vem de APPROVAL_SLA_HOURS por {{hours}}.
     editorCopy: "Publicar é grátis. Preencha o essencial agora; o resto pode vir depois.",
@@ -199,6 +214,20 @@ const ptBR = {
 
 const enUS = {
   services: {
+    region: {
+      widened: "No services in {{place}} yet — showing {{wider}}.",
+      widenedAll: "No services in {{place}} yet — showing everywhere.",
+      inviteTitle: "Know a good provider in {{place}}?",
+      inviteTitleGeneric: "Know a good provider?",
+      inviteCopy: "Recommend Engine: publishing is free and customers message them straight on WhatsApp.",
+      inviteAction: "Recommend Engine",
+      inviteText:
+        "List your car service for free on Engine: customers message you straight on WhatsApp.",
+      inviteCopied: "Link copied. Now just send it to the provider.",
+      emptyAllTitle: "The first providers are on their way",
+      emptyAllCopy: "No services published yet. If you offer a car service, publish yours: it's free.",
+      emptyFiltered: "No services match that search or category. Try another term or clear the filters.",
+    },
     editorCopy: "Publishing is free. Fill in the essentials now; the rest can come later.",
     modeCopy: {
       place: "I have an address where I work. The map shows on the listing.",
@@ -380,6 +409,21 @@ const enUS = {
 
 const esES = {
   services: {
+    region: {
+      widened: "Todavía no hay servicios en {{place}} — mostrando {{wider}}.",
+      widenedAll: "Todavía no hay servicios en {{place}} — mostrando todos los lugares.",
+      inviteTitle: "¿Conoces un buen proveedor en {{place}}?",
+      inviteTitleGeneric: "¿Conoces un buen proveedor?",
+      inviteCopy: "Recomienda Engine: publicar es gratis y el cliente le escribe directo por WhatsApp.",
+      inviteAction: "Recomendar Engine",
+      inviteText:
+        "Anuncia gratis tu servicio automotriz en Engine: los clientes te escriben directo por WhatsApp.",
+      inviteCopied: "Enlace copiado. Ahora solo envíalo al proveedor.",
+      emptyAllTitle: "Los primeros proveedores están llegando",
+      emptyAllCopy:
+        "Todavía no hay servicios publicados. Si ofreces un servicio automotriz, publica el tuyo: es gratis.",
+      emptyFiltered: "Ningún servicio con esa búsqueda o categoría. Prueba otro término o limpia los filtros.",
+    },
     editorCopy: "Publicar es gratis. Completa lo esencial ahora; el resto puede venir después.",
     modeCopy: {
       place: "Tengo una dirección donde atiendo. El mapa aparece en el anuncio.",

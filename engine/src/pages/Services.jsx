@@ -73,6 +73,7 @@ import {
   WhatsAppIcon,
 } from "../components/services/ListingParts";
 import { PublishSignInGate } from "../components/services/PublishSignInGate";
+import { InviteProviderCard } from "../components/services/InviteProvider";
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import {
   APPROVAL_SLA_HOURS,
@@ -247,6 +248,13 @@ const withUploadTimeout = (promise, message) =>
       window.setTimeout(() => reject(new Error(message)), PHOTO_UPLOAD_TIMEOUT_MS);
     }),
   ]);
+
+// Minúsculas e sem acento, para a busca não depender de como foi digitado.
+const foldText = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 // Dígitos do número sem o código do país: Brasil pede DDD + 8 ou 9 dígitos.
 const isWhatsAppComplete = (value = "", countryCode = "+55") => {
@@ -2185,16 +2193,20 @@ export function Services({ user, settings }) {
   );
 
   // Opções de país presentes nos anúncios aprovados (rótulos via dataset).
+  // O país escolhido entra mesmo sem anúncio: o select nunca pode mostrar
+  // "Todos" enquanto filtra por outra coisa (era o que acontecia com a
+  // região do header numa cidade ainda vazia).
   const countryOptions = useMemo(() => {
     const codes = new Set(
       approvedListings.map((listing) => listing.country?.trim()).filter(Boolean),
     );
+    if (countryFilter !== "all") codes.add(countryFilter);
     return Array.from(codes)
       .map((code) => ({ code, name: getCountryName(code) || code }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [approvedListings]);
+  }, [approvedListings, countryFilter]);
 
-  // Estados presentes, respeitando o país selecionado.
+  // Estados presentes, respeitando o país selecionado (+ o escolhido).
   const stateOptions = useMemo(() => {
     const codes = new Set(
       approvedListings
@@ -2207,6 +2219,7 @@ export function Services({ user, settings }) {
         .map((listing) => listing.state?.trim())
         .filter(Boolean),
     );
+    if (stateFilter !== "all") codes.add(stateFilter);
     return Array.from(codes)
       .map((code) => ({
         code,
@@ -2214,9 +2227,9 @@ export function Services({ user, settings }) {
           getStateName(countryFilter === "all" ? "" : countryFilter, code) || code,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [approvedListings, countryFilter]);
+  }, [approvedListings, countryFilter, stateFilter]);
 
-  // Cidades presentes, respeitando país + estado selecionados.
+  // Cidades presentes, respeitando país + estado selecionados (+ a escolhida).
   const cityOptions = useMemo(() => {
     const cities = new Set(
       approvedListings
@@ -2232,8 +2245,9 @@ export function Services({ user, settings }) {
         .map((listing) => listing.city?.trim())
         .filter(Boolean),
     );
+    if (cityFilter !== "all") cities.add(cityFilter);
     return Array.from(cities).sort((a, b) => a.localeCompare(b));
-  }, [approvedListings, countryFilter, stateFilter]);
+  }, [approvedListings, countryFilter, stateFilter, cityFilter]);
 
   const stats = useMemo(() => {
     const mobileCount = approvedListings.filter((listing) =>
@@ -2249,41 +2263,70 @@ export function Services({ user, settings }) {
     };
   }, [approvedListings]);
 
-  const filteredListings = useMemo(() => {
-    const cleanQuery = query.trim().toLowerCase();
-    return approvedListings.filter((listing) => {
+  // Nome legível de um recorte de lugar ("Araraquara", "São Paulo", "Brasil").
+  const scopeLabel = (scope) => {
+    if (scope.city !== "all") return scope.city;
+    if (scope.state !== "all") {
+      return getStateName(scope.country === "all" ? "" : scope.country, scope.state) || scope.state;
+    }
+    if (scope.country !== "all") return getCountryName(scope.country) || scope.country;
+    return "";
+  };
+
+  /**
+   * Busca + categoria + modo filtram sempre. O lugar é honesto e alarga
+   * sozinho: cidade sem serviço -> mostra o estado; estado vazio -> o país;
+   * país vazio -> tudo. A tela diz que alargou e de onde para onde, em vez
+   * de uma grade vazia com "ajuste os filtros".
+   */
+  const regionResult = useMemo(() => {
+    const cleanQuery = foldText(query.trim());
+    const base = approvedListings.filter((listing) => {
       const normalizedCategory = normalizeServiceCategory(listing.category);
       const matchesCategory = category === "all" || normalizedCategory === category;
       const matchesMode = mode === "all" || listing.serviceMode === mode;
-      const matchesCountry =
-        countryFilter === "all" ||
-        !listing.country ||
-        listing.country === countryFilter;
-      const matchesState =
-        stateFilter === "all" || !listing.state || listing.state === stateFilter;
-      const matchesCity =
-        cityFilter === "all" || (listing.city?.trim() || "") === cityFilter;
-      const text = [
-        listing.title,
-        listing.providerName,
-        getServiceCategoryLabel(listing.category, t),
-        listing.description,
-        listing.city,
-        listing.serviceArea,
-        ...(listing.tags || []),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return (
-        matchesCategory &&
-        matchesMode &&
-        matchesCountry &&
-        matchesState &&
-        matchesCity &&
-        (!cleanQuery || text.includes(cleanQuery))
+      if (!matchesCategory || !matchesMode) return false;
+      if (!cleanQuery) return true;
+      // Sem acento dos dois lados: "estetica" acha "Estética".
+      const text = foldText(
+        [
+          listing.title,
+          listing.providerName,
+          getServiceCategoryLabel(listing.category, t),
+          listing.description,
+          listing.city,
+          listing.serviceArea,
+          ...(listing.tags || []),
+        ].join(" "),
       );
+      return text.includes(cleanQuery);
     });
+
+    const inScope = (listing, scope) =>
+      (scope.country === "all" || !listing.country || listing.country === scope.country) &&
+      (scope.state === "all" || !listing.state || listing.state === scope.state) &&
+      (scope.city === "all" || (listing.city?.trim() || "") === scope.city);
+
+    const requested = { country: countryFilter, state: stateFilter, city: cityFilter };
+    const scopes = [requested];
+    if (requested.city !== "all") scopes.push({ ...requested, city: "all" });
+    if (requested.state !== "all") scopes.push({ country: requested.country, state: "all", city: "all" });
+    if (requested.country !== "all") scopes.push({ country: "all", state: "all", city: "all" });
+
+    for (const scope of scopes) {
+      const items = base.filter((listing) => inScope(listing, scope));
+      if (items.length) {
+        return {
+          items,
+          widened: scope !== requested,
+          requestedLabel: scopeLabel(requested),
+          shownLabel: scopeLabel(scope),
+        };
+      }
+    }
+    return { items: [], widened: false, requestedLabel: scopeLabel(requested), shownLabel: "" };
   }, [approvedListings, category, mode, countryFilter, stateFilter, cityFilter, query, t]);
+  const filteredListings = regionResult.items;
 
   const activeFilterCount =
     (category !== "all" ? 1 : 0) +
@@ -2598,11 +2641,19 @@ export function Services({ user, settings }) {
               </p>
             </div>
 
-            <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
-              <HeroStat icon={BriefcaseBusiness} label={t("services.stats.active")} value={stats.total} tone="red" />
-              <HeroStat icon={Navigation} label={t("services.stats.mobile")} value={stats.mobileCount} tone="sky" />
-              <HeroStat icon={MapPin} label={t("services.stats.cities")} value={stats.cities} tone="emerald" />
-            </div>
+            {/* Contador zerado não aparece: "0 serviços ativos" no primeiro
+                dia é prova social contra. */}
+            {stats.total > 0 && (
+              <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
+                <HeroStat icon={BriefcaseBusiness} label={t("services.stats.active")} value={stats.total} tone="red" />
+                {stats.mobileCount > 0 && (
+                  <HeroStat icon={Navigation} label={t("services.stats.mobile")} value={stats.mobileCount} tone="sky" />
+                )}
+                {stats.cities > 0 && (
+                  <HeroStat icon={MapPin} label={t("services.stats.cities")} value={stats.cities} tone="emerald" />
+                )}
+              </div>
+            )}
           </div>
 
           <aside className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 sm:p-5">
@@ -2862,6 +2913,23 @@ export function Services({ user, settings }) {
         </div>
       </div>
 
+      {regionResult.widened && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-sm font-semibold leading-6 text-[var(--engine-text)]"
+        >
+          <MapPin size={18} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" aria-hidden="true" />
+          <span>
+            {regionResult.shownLabel
+              ? t("services.region.widened", {
+                  place: regionResult.requestedLabel,
+                  wider: regionResult.shownLabel,
+                })
+              : t("services.region.widenedAll", { place: regionResult.requestedLabel })}
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {filteredListings.length ? (
           filteredListings.map((listing, index) => (
@@ -2881,17 +2949,33 @@ export function Services({ user, settings }) {
             </Fragment>
           ))
         ) : (
-          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface)] p-8 text-center sm:col-span-2 xl:col-span-3 2xl:col-span-4">
+          <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface)] p-8 text-center sm:col-span-2 xl:col-span-3 2xl:col-span-4">
             <BriefcaseBusiness className="mb-4 text-[var(--engine-accent)]" size={42} />
             <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
-              {t("services.emptyTitle")}
+              {approvedListings.length ? t("services.emptyTitle") : t("services.region.emptyAllTitle")}
             </h2>
             <p className="mt-3 max-w-sm text-sm font-medium text-[var(--engine-text-muted)]">
-              {t("services.emptyCopy")}
+              {approvedListings.length ? t("services.region.emptyFiltered") : t("services.region.emptyAllCopy")}
             </p>
+            {activeFilterCount > 0 && approvedListings.length > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-4 text-sm font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white"
+              >
+                <RotateCcw size={15} aria-hidden="true" />
+                {t("services.clearFilters")}
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Cidade vazia, alargou, ou ainda é pouca gente: convite para indicar
+          o Engine a um prestador que a pessoa já conhece. */}
+      {(regionResult.widened || filteredListings.length < 3) && (
+        <InviteProviderCard place={regionResult.requestedLabel} />
+      )}
 
       {editorOpen && (
         <ListingEditorModal
