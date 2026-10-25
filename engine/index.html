@@ -58,6 +58,12 @@
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..800;1,14..32,400..800&family=Sora:wght@600;700;800&display=swap"
     />
 
+    <!-- Endereço e chave PÚBLICA do Supabase, gravados pelo Vite no build. Quem
+         lê é a edge function service-og (cartão de link de /servicos/*), que
+         roda antes do JavaScript existir. A chave já vai no bundle; quem
+         protege os dados é a RLS. -->
+    <meta name="engine:supabase-url" content="%VITE_SUPABASE_URL%" />
+    <meta name="engine:supabase-key" content="%VITE_SUPABASE_PUBLISHABLE_KEY%" />
     <title>Engine</title>
   </head>
   <body>

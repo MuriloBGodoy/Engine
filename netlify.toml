@@ -15,3 +15,10 @@
 [[edge_functions]]
   path = "/api/geo"
   function = "geo"
+
+# Cartão de pré-visualização (WhatsApp, Instagram, Facebook, Google) da página
+# pública de cada anúncio. Só robô de pré-visualização paga a consulta ao
+# banco; gente de verdade passa direto. Ver service-og.js.
+[[edge_functions]]
+  path = "/servicos/*"
+  function = "service-og"
