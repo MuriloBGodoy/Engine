@@ -16,6 +16,18 @@ import i18n from "./i18n";
 const ptBR = {
   services: {
     cardActions: { chat: "WhatsApp", email: "E-mail", map: "Mapa" },
+    categories: {
+      vehicleWrap: "Envelopamento e adesivagem",
+      windowFilmPpf: "Insulfilm e película (PPF)",
+      polishingDetailing: "Polimento, vitrificação e detailing",
+      paintlessDentRepair: "Martelinho de ouro",
+      performanceTuning: "Preparação, remap e tuning",
+      suspensionLowering: "Suspensão e rebaixamento",
+      airConditioning: "Ar-condicionado automotivo",
+      carLocksmith: "Chaveiro automotivo",
+      vehiclePaperwork: "Despachante e documentação",
+      automotivePhotoVideo: "Fotografia e vídeo automotivo",
+    },
     share: {
       action: "Compartilhar",
       ownerText: "Conheça meu trabalho: {{title}}",
@@ -98,6 +110,18 @@ const ptBR = {
 const enUS = {
   services: {
     cardActions: { chat: "Chat", email: "Email", map: "Map" },
+    categories: {
+      vehicleWrap: "Vehicle wraps and decals",
+      windowFilmPpf: "Window tint and paint protection film (PPF)",
+      polishingDetailing: "Polishing, ceramic coating and detailing",
+      paintlessDentRepair: "Paintless dent repair",
+      performanceTuning: "Performance tuning and remaps",
+      suspensionLowering: "Suspension and lowering",
+      airConditioning: "Car air conditioning",
+      carLocksmith: "Car locksmith",
+      vehiclePaperwork: "Vehicle paperwork and registration",
+      automotivePhotoVideo: "Automotive photo and video",
+    },
     share: {
       action: "Share",
       ownerText: "Check out my work: {{title}}",
@@ -179,6 +203,18 @@ const enUS = {
 const esES = {
   services: {
     cardActions: { chat: "WhatsApp", email: "Correo", map: "Mapa" },
+    categories: {
+      vehicleWrap: "Vinilado y rotulación",
+      windowFilmPpf: "Polarizado y film de protección (PPF)",
+      polishingDetailing: "Pulido, cerámico y detailing",
+      paintlessDentRepair: "Desabollado sin pintura",
+      performanceTuning: "Preparación, remap y tuning",
+      suspensionLowering: "Suspensión y rebajado",
+      airConditioning: "Aire acondicionado automotriz",
+      carLocksmith: "Cerrajería automotriz",
+      vehiclePaperwork: "Gestoría y trámites del vehículo",
+      automotivePhotoVideo: "Fotografía y video automotriz",
+    },
     share: {
       action: "Compartir",
       ownerText: "Conoce mi trabajo: {{title}}",
