@@ -36,8 +36,8 @@ const ptBR = {
       historyHint: "Decisões recentes. Anúncio no ar pode ser tirado daqui.",
     },
     region: {
-      widened: "Ainda não há serviços em {{place}} — mostrando de {{wider}}.",
-      widenedAll: "Ainda não há serviços em {{place}} — mostrando de todos os lugares.",
+      widened: "Ainda não há serviços na região escolhida ({{place}}). Mostrando: {{wider}}.",
+      widenedAll: "Ainda não há serviços na região escolhida ({{place}}). Mostrando todos os lugares.",
       inviteTitle: "Conhece um bom prestador em {{place}}?",
       inviteTitleGeneric: "Conhece um bom prestador?",
       inviteCopy: "Indique o Engine: publicar é grátis e o cliente chama direto no WhatsApp dele.",
@@ -255,8 +255,8 @@ const enUS = {
       historyHint: "Recent decisions. A live listing can be taken down from here.",
     },
     region: {
-      widened: "No services in {{place}} yet — showing {{wider}}.",
-      widenedAll: "No services in {{place}} yet — showing everywhere.",
+      widened: "No services in your selected area ({{place}}) yet. Showing: {{wider}}.",
+      widenedAll: "No services in your selected area ({{place}}) yet. Showing everywhere.",
       inviteTitle: "Know a good provider in {{place}}?",
       inviteTitleGeneric: "Know a good provider?",
       inviteCopy: "Recommend Engine: publishing is free and customers message them straight on WhatsApp.",
@@ -470,8 +470,8 @@ const esES = {
       historyHint: "Decisiones recientes. Un anuncio publicado se puede retirar desde aquí.",
     },
     region: {
-      widened: "Todavía no hay servicios en {{place}} — mostrando {{wider}}.",
-      widenedAll: "Todavía no hay servicios en {{place}} — mostrando todos los lugares.",
+      widened: "Todavía no hay servicios en la zona elegida ({{place}}). Mostrando: {{wider}}.",
+      widenedAll: "Todavía no hay servicios en la zona elegida ({{place}}). Mostrando todos los lugares.",
       inviteTitle: "¿Conoces un buen proveedor en {{place}}?",
       inviteTitleGeneric: "¿Conoces un buen proveedor?",
       inviteCopy: "Recomienda Engine: publicar es gratis y el cliente le escribe directo por WhatsApp.",
