@@ -139,6 +139,19 @@ export const getInitials = (name = "S") =>
 
 export const normalizeWhatsApp = (value = "") => String(value || "").replace(/\D/g, "");
 
+/**
+ * Link do WhatsApp com a mensagem pronta ("Vi seu serviço X no Engine").
+ * Todo botão de WhatsApp de anúncio passa por aqui: o texto é o que prova
+ * para o prestador, no próprio celular dele, que o cliente veio do Engine.
+ * `t` resolve `services.whatsappMessage` no idioma de quem está chamando.
+ */
+export const getWhatsAppHref = (listing, t) => {
+  const phone = normalizeWhatsApp(listing?.whatsapp);
+  if (!phone) return undefined;
+  const message = t("services.whatsappMessage", { title: listing.title || "" });
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+};
+
 export const mapQuery = (listing) =>
   [listing.address, listing.city].filter(Boolean).join(", ");
 

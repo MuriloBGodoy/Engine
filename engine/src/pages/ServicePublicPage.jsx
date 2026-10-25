@@ -16,6 +16,7 @@ import {
   categoryIcons,
   getInitials,
   getServiceCategoryLabel,
+  getWhatsAppHref,
   hasMapAddress,
   mapQuery,
   modeIcons,
@@ -300,9 +301,7 @@ export function ServicePublicPage({ user }) {
   const ModeIcon = modeIcons[listing.serviceMode] || BriefcaseBusiness;
   const place = [listing.city, listing.state].filter(Boolean).join(" · ");
   const showMap = hasMapAddress(listing) && listing.serviceMode !== "mobile";
-  const whatsappHref = phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(t("services.publicPage.whatsappMessage", { title: listing.title }))}`
-    : undefined;
+  const whatsappHref = getWhatsAppHref(listing, t);
   const onWhatsApp = () => {
     if (!isOwner && approved) engineDB.trackServiceListingMetric(listing.id, "whatsapp", "link");
   };

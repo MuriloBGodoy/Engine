@@ -54,6 +54,7 @@ import {
   getDirectionsUrl,
   getInitials,
   getServiceCategoryLabel,
+  getWhatsAppHref,
   hasMapAddress,
   mapQuery,
   modeIcons,
@@ -591,7 +592,7 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
 
           <div className="grid grid-cols-3 gap-1.5 pt-1 sm:gap-2">
             <a
-              href={phone ? `https://wa.me/${phone}` : undefined}
+              href={getWhatsAppHref(listing, t)}
               onClick={(event) => {
                 stopAction(event);
                 if (phone && !isMine) engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search");
@@ -858,7 +859,7 @@ function ServiceDetailModal({ listing, isMine, user, onClose, onEdit, onDelete }
             <div className="grid gap-3">
               <ContactButton
                 disabled={!phone}
-                href={phone ? `https://wa.me/${phone}` : undefined}
+                href={getWhatsAppHref(listing, t)}
                 icon={WhatsAppIcon}
                 label={t("services.whatsapp")}
                 value={listing.whatsapp || t("services.noPhone")}

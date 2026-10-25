@@ -16,6 +16,7 @@ import i18n from "./i18n";
 const ptBR = {
   services: {
     cardActions: { chat: "WhatsApp", email: "E-mail", map: "Mapa" },
+    whatsappMessage: "Olá! Vi seu serviço \"{{title}}\" no Engine.",
     categories: {
       vehicleWrap: "Envelopamento e adesivagem",
       windowFilmPpf: "Insulfilm e película (PPF)",
@@ -96,7 +97,6 @@ const ptBR = {
       errorCopy: "Confira sua conexão e tente de novo em instantes.",
       seeServices: "Ver serviços no Engine",
       advertiseFree: "Anuncie seu serviço grátis",
-      whatsappMessage: "Olá! Vi seu anúncio \"{{title}}\" no Engine e queria um orçamento.",
       noContact: "O prestador não deixou contato direto neste anúncio.",
       about: "Sobre o serviço",
       serviceArea: "Área de atendimento",
@@ -110,6 +110,7 @@ const ptBR = {
 const enUS = {
   services: {
     cardActions: { chat: "Chat", email: "Email", map: "Map" },
+    whatsappMessage: "Hi! I saw your service \"{{title}}\" on Engine.",
     categories: {
       vehicleWrap: "Vehicle wraps and decals",
       windowFilmPpf: "Window tint and paint protection film (PPF)",
@@ -189,7 +190,6 @@ const enUS = {
       errorCopy: "Check your connection and try again in a moment.",
       seeServices: "See services on Engine",
       advertiseFree: "List your service for free",
-      whatsappMessage: "Hi! I saw your listing \"{{title}}\" on Engine and would like a quote.",
       noContact: "The provider didn't leave direct contact details on this listing.",
       about: "About the service",
       serviceArea: "Service area",
@@ -203,6 +203,7 @@ const enUS = {
 const esES = {
   services: {
     cardActions: { chat: "WhatsApp", email: "Correo", map: "Mapa" },
+    whatsappMessage: "¡Hola! Vi tu servicio \"{{title}}\" en Engine.",
     categories: {
       vehicleWrap: "Vinilado y rotulación",
       windowFilmPpf: "Polarizado y film de protección (PPF)",
@@ -282,7 +283,6 @@ const esES = {
       errorCopy: "Revisa tu conexión e inténtalo de nuevo en un momento.",
       seeServices: "Ver servicios en Engine",
       advertiseFree: "Anuncia tu servicio gratis",
-      whatsappMessage: "¡Hola! Vi tu anuncio \"{{title}}\" en Engine y quería un presupuesto.",
       noContact: "El proveedor no dejó un contacto directo en este anuncio.",
       about: "Sobre el servicio",
       serviceArea: "Zona de atención",
