@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebookF } from "react-icons/fa6";
 import { signInWithProvider } from "../services/supabase";
+import { safeNextPath } from "../services/authRedirect";
 
 /**
  * Botões de login social (Google, Facebook). Compartilhado por Login e
@@ -36,7 +37,7 @@ const loadEnabledProviders = async () => {
   return enabledProviders;
 };
 
-export function SocialAuthButtons() {
+export function SocialAuthButtons({ redirectPath = "/" }) {
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
@@ -56,9 +57,10 @@ export function SocialAuthButtons() {
     setError("");
     setPending(key);
     try {
-      // Volta para a home logado; quem acabou de criar a conta pelo Google
-      // cai no mesmo lugar que quem já tinha.
-      await signInWithProvider(key, "/");
+      // Volta logado para onde a pessoa ia (o `?next=` já validado pela
+      // tela) ou para a home. Quem acabou de criar a conta pelo Google cai no
+      // mesmo lugar que quem já tinha.
+      await signInWithProvider(key, safeNextPath(redirectPath) || "/");
     } catch (err) {
       console.error("Social sign-in falhou:", err?.code, err?.message);
       setError(t("auth.social.error"));

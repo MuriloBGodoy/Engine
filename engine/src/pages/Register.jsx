@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Loader2, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { signUpWithEmail, supabase } from "../services/supabase";
 import { engineDB } from "../services/db";
 import { AuthShell } from "../components/AuthShell";
 import { SocialAuthButtons } from "../components/SocialAuthButtons";
+import { authPath, readNextPath } from "../services/authRedirect";
 import { PhoneField } from "../components/PhoneField";
 import { PasswordStrength } from "../components/PasswordStrength";
 import { passwordLevel } from "../services/passwordStrength";
@@ -28,6 +29,8 @@ export function Register() {
   // confirmados aqui, antes de existir conta.
   const [adult, setAdult] = useState(false);
   const navigate = useNavigate();
+  // Veio de um ponto que pede conta (ex.: publicar serviço): volta para lá.
+  const next = readNextPath(useLocation().search);
 
   const stateOptions = getStates(country);
 
@@ -107,7 +110,7 @@ export function Register() {
       // Conta nova vai para a Garagem, cujo estado vazio convida a cadastrar
       // o primeiro carro — o primeiro passo de tudo no app. A home genérica,
       // que era o destino, não conduzia a nada.
-      navigate("/garagem");
+      navigate(next || "/garagem", { replace: Boolean(next) });
     } catch (err) {
       await engineDB.releasePendingUsername(username);
       if (err.code === "auth/email-already-in-use") {
@@ -131,7 +134,7 @@ export function Register() {
       title={t("auth.registerTitle")}
       subtitle={t("auth.registerSubtitle")}
     >
-      <SocialAuthButtons />
+      <SocialAuthButtons redirectPath={next || "/"} />
 
       <form onSubmit={handleRegister} className="auth-form auth-register-form">
         <label className="auth-field auth-span-two">
@@ -272,7 +275,7 @@ export function Register() {
 
       <p className="auth-switch-copy">
         {t("auth.hasAccount")}{" "}
-        <Link to="/login">{t("auth.signIn")}</Link>
+        <Link to={authPath("/login", next)}>{t("auth.signIn")}</Link>
       </p>
     </AuthShell>
   );

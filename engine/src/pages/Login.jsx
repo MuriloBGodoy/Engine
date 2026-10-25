@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { sendPasswordReset, signInWithEmail } from "../services/supabase";
 import { AuthShell } from "../components/AuthShell";
 import { SocialAuthButtons } from "../components/SocialAuthButtons";
+import { authPath, readNextPath } from "../services/authRedirect";
 
 export function Login() {
   const { t } = useTranslation();
@@ -15,6 +16,9 @@ export function Login() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+  // Quem veio de "publicar serviço" (ou outro ponto que pede conta) volta
+  // para lá depois de entrar. Só caminho interno: ver authRedirect.js.
+  const next = readNextPath(useLocation().search);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -24,7 +28,7 @@ export function Login() {
 
     try {
       await signInWithEmail(email.trim(), password);
-      navigate("/");
+      navigate(next || "/", { replace: Boolean(next) });
     } catch {
       setError(t("auth.loginError"));
     } finally {
@@ -60,7 +64,7 @@ export function Login() {
       title={t("auth.loginTitle")}
       subtitle={t("auth.loginSubtitle")}
     >
-      <SocialAuthButtons />
+      <SocialAuthButtons redirectPath={next || "/"} />
 
       <form onSubmit={handleLogin} className="auth-form">
         <label className="auth-field">
@@ -107,7 +111,7 @@ export function Login() {
 
       <p className="auth-switch-copy">
         {t("auth.noAccount")}{" "}
-        <Link to="/register">{t("auth.createAccount")}</Link>
+        <Link to={authPath("/register", next)}>{t("auth.createAccount")}</Link>
       </p>
 
       {/* O Engine é aberto: quem só quer explorar entra sem criar conta. */}
