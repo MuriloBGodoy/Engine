@@ -23,6 +23,7 @@ const notificationLabels = {
   service_approved: "Anúncio aprovado",
   service_changes_requested: "Anúncio retornado",
   service_rejected: "Anúncio recusado",
+  service_suspended: "Anúncio tirado do ar",
   message: "Nova mensagem",
 };
 
@@ -34,6 +35,7 @@ export const notificationStyles = {
   service_approved: { icon: CheckCircle2, iconClass: "text-emerald-500" },
   service_changes_requested: { icon: RotateCcw, iconClass: "text-sky-500" },
   service_rejected: { icon: XCircle, iconClass: "text-red-500" },
+  service_suspended: { icon: XCircle, iconClass: "text-red-500" },
   message: { icon: Send, iconClass: "text-[var(--engine-accent)]" },
   achievement: { icon: Trophy, iconClass: "text-[var(--engine-accent)]" },
 };
@@ -104,6 +106,10 @@ export const getNotificationCopy = (notification) => {
     service_rejected: {
       title: "Anúncio recusado",
       body: "Confira o motivo enviado.",
+    },
+    service_suspended: {
+      title: "Anúncio tirado do ar",
+      body: "Confira o motivo. Você pode corrigir e reenviar.",
     },
     like: { title: "Nova curtida", body: `${actor} curtiu sua publicação.` },
     comment: {

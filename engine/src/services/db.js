@@ -8,6 +8,7 @@ import {
   syncOwnMilestones,
 } from "./achievements";
 import { inferLocation } from "./locations";
+import { listingEditNeedsReview, PRICE_MAX_LENGTH } from "./serviceListingRules";
 import { normalizeOwnershipInputs, LIFE_SITUATION_TYPES } from "./ownership";
 import { normalizeExpense, normalizeExpenses, realConsumption } from "./expenses";
 import { normalizeSpecSheet, publicSpecSheet } from "./carSpecSheet";
@@ -74,6 +75,8 @@ const SERVICE_STATUS_APPROVED = "approved";
 const SERVICE_STATUS_PENDING = "pending";
 const SERVICE_STATUS_CHANGES_REQUESTED = "changes_requested";
 const SERVICE_STATUS_REJECTED = "rejected";
+// Tirado do ar pela moderação depois de aprovado (denúncia, golpe, foto alheia).
+const SERVICE_STATUS_SUSPENDED = "suspended";
 const FIRESTORE_TIMEOUT_MS = 7000;
 // Carro antigo ainda pode trazer foto em base64 guardada neste aparelho; a
 // leitura do servidor já vem com URL do Storage desde a migração.
@@ -848,7 +851,7 @@ const normalizeSocialHandle = (value) => {
   return withoutUrl.replace(/^@/, "").slice(0, 40);
 };
 
-const normalizeServiceListing = (listing = {}) => {
+export const normalizeServiceListing = (listing = {}) => {
   const title = String(listing.title || "").trim().slice(0, 90);
   const providerName = String(listing.providerName || "").trim().slice(0, 80);
   let country = String(listing.country || "").trim().slice(0, 4).toUpperCase();
@@ -886,7 +889,7 @@ const normalizeServiceListing = (listing = {}) => {
     providerName,
     category: String(listing.category || "").trim().slice(0, 60),
     description: String(listing.description || "").trim().slice(0, 900),
-    price: String(listing.price || "").trim().slice(0, 80),
+    price: String(listing.price || "").trim().slice(0, PRICE_MAX_LENGTH),
     serviceMode: ["place", "mobile", "hybrid"].includes(listing.serviceMode)
       ? listing.serviceMode
       : "hybrid",
@@ -928,6 +931,7 @@ const normalizeServiceListing = (listing = {}) => {
       SERVICE_STATUS_PENDING,
       SERVICE_STATUS_CHANGES_REQUESTED,
       SERVICE_STATUS_REJECTED,
+      SERVICE_STATUS_SUSPENDED,
     ].includes(
       listing.moderationStatus,
     )
@@ -1592,29 +1596,44 @@ export const engineDB = {
     };
   },
 
+  /**
+   * Cria ou edita um anúncio. `options.original` é o anúncio como estava ao
+   * abrir o editor: com ele dá para saber se a edição só mexeu em campo leve
+   * (preço, contato, agenda) e o anúncio aprovado continua no ar. Quem decide
+   * de verdade é o guard do banco; o status que volta dele é o que vale.
+   *
+   * Devolve `{ listing, queued }` — `queued` = foi para a fila de aprovação.
+   */
   async saveServiceListing(listing, settings = {}, userId = currentUserId, options = {}) {
-    if (!userId) throw new Error("Usuario nao identificado.");
+    if (!userId) throw new Error("Entre na sua conta para publicar o anúncio.");
 
     const isAdmin = Boolean(options.isAdmin);
+    const original = options.original ? normalizeServiceListing(options.original) : null;
     const profile = getProfileSnapshot(settings, userId);
-    const existingStatus = listing.moderationStatus || SERVICE_STATUS_PENDING;
-    const moderationStatus =
-      isAdmin && existingStatus === SERVICE_STATUS_APPROVED
-        ? SERVICE_STATUS_APPROVED
-        : SERVICE_STATUS_PENDING;
-    const normalized = normalizeServiceListing({
+    const draft = normalizeServiceListing({
       ...listing,
       ownerId: isAdmin && listing.ownerId ? listing.ownerId : userId,
       providerName: listing.providerName || profile.author,
       country: listing.country || settings?.profile?.country || "",
       state: listing.state || settings?.profile?.state || "",
       city: listing.city || profile.city,
-      email: listing.email || auth.currentUser?.email || "",
+      // E-mail público é opcional: vazio fica vazio. Antes o e-mail de login
+      // era recolocado aqui e virava contato público sem a pessoa querer.
+      email: listing.email || "",
+    });
+    const staysLive =
+      (isAdmin && original?.moderationStatus === SERVICE_STATUS_APPROVED) ||
+      !listingEditNeedsReview(original, draft);
+    const moderationStatus = staysLive ? SERVICE_STATUS_APPROVED : SERVICE_STATUS_PENDING;
+    const normalized = normalizeServiceListing({
+      ...draft,
       moderationStatus,
-      moderationNote: moderationStatus === SERVICE_STATUS_PENDING ? "" : listing.moderationNote,
-      reviewedAt: moderationStatus === SERVICE_STATUS_PENDING ? "" : listing.reviewedAt,
-      reviewedBy: moderationStatus === SERVICE_STATUS_PENDING ? "" : listing.reviewedBy,
-      submittedAt: new Date().toISOString(),
+      moderationNote: staysLive ? original?.moderationNote : "",
+      reviewedAt: staysLive ? original?.reviewedAt : "",
+      reviewedBy: staysLive ? original?.reviewedBy : "",
+      moderationHistory: original?.moderationHistory || [],
+      // O banco carimba a data de envio; esta é só a da cópia local.
+      submittedAt: staysLive ? original?.submittedAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
@@ -1629,15 +1648,29 @@ export const engineDB = {
       // Atualiza se existe, cria se não. Não é `upsert` porque a regra de
       // CRIAR exige status pendente e dono = quem grava — e o admin editando
       // um anúncio aprovado de outra pessoa cairia nela mesmo sendo edição.
-      const updated = await withTimeout(
-        supabase.from("service_listings").update(row).eq("id", normalized.id).select("id").then(must),
+      let saved = await withTimeout(
+        supabase
+          .from("service_listings")
+          .update(row)
+          .eq("id", normalized.id)
+          .select("id, moderation_status")
+          .then(must),
         "salvar anuncio de servico",
       );
-      if (!updated.length) {
-        await withTimeout(
-          supabase.from("service_listings").insert({ ...row, id: normalized.id }).then(must),
+      if (!saved.length) {
+        saved = await withTimeout(
+          supabase
+            .from("service_listings")
+            .insert({ ...row, id: normalized.id })
+            .select("id, moderation_status")
+            .then(must),
           "salvar anuncio de servico",
         );
+      }
+      // O guard pode discordar da previsão (campo legado que mudou de
+      // formato, por exemplo): vale o que o banco gravou.
+      if (saved[0]?.moderation_status) {
+        normalized.moderationStatus = saved[0].moderation_status;
       }
     } catch (error) {
       warnFirestoreFallback("saveServiceListing", error);
@@ -1657,7 +1690,10 @@ export const engineDB = {
     if (!sentToServer) {
       throw new Error(LISTING_NOT_SENT_MESSAGE);
     }
-    return normalized;
+    return {
+      listing: normalized,
+      queued: normalized.moderationStatus !== SERVICE_STATUS_APPROVED,
+    };
   },
 
   async moderateServiceListing(listingId, status, note = "", reviewerId = currentUserId) {
@@ -1667,6 +1703,7 @@ export const engineDB = {
         SERVICE_STATUS_APPROVED,
         SERVICE_STATUS_CHANGES_REQUESTED,
         SERVICE_STATUS_REJECTED,
+        SERVICE_STATUS_SUSPENDED,
       ].includes(status)
     ) {
       throw new Error("Status de moderacao invalido.");
@@ -1744,40 +1781,50 @@ export const engineDB = {
     }
 
     if (listing?.ownerId) {
-      const notificationType =
-        status === SERVICE_STATUS_APPROVED
-          ? "service_approved"
-          : status === SERVICE_STATUS_CHANGES_REQUESTED
-            ? "service_changes_requested"
-            : "service_rejected";
-      const notificationText =
-        status === SERVICE_STATUS_APPROVED
-          ? `Seu anuncio ${listing.title} foi aprovado e publicado.`
-          : status === SERVICE_STATUS_CHANGES_REQUESTED
-            ? `Seu anuncio ${listing.title} voltou para ajustes.`
-            : `Seu anuncio ${listing.title} foi recusado.`;
+      const copy = {
+        [SERVICE_STATUS_APPROVED]: {
+          type: "service_approved",
+          title: "Anúncio aprovado",
+          body: "Seu anúncio foi publicado.",
+          text: `Seu anúncio ${listing.title} foi aprovado e publicado.`,
+        },
+        [SERVICE_STATUS_CHANGES_REQUESTED]: {
+          type: "service_changes_requested",
+          title: "Alterações solicitadas",
+          body: "Revise os comentários da moderação.",
+          text: `Seu anúncio ${listing.title} voltou para ajustes.`,
+        },
+        [SERVICE_STATUS_REJECTED]: {
+          type: "service_rejected",
+          title: "Anúncio recusado",
+          body: "Confira o motivo enviado pela moderação.",
+          text: `Seu anúncio ${listing.title} foi recusado.`,
+        },
+        [SERVICE_STATUS_SUSPENDED]: {
+          type: "service_suspended",
+          title: "Anúncio tirado do ar",
+          body: "Confira o motivo. Você pode corrigir e reenviar.",
+          text: `Seu anúncio ${listing.title} foi tirado do ar pela moderação.`,
+        },
+      }[status];
 
-      await this.notifyUser(listing.ownerId, {
-        type: notificationType,
-        actorId: reviewerId,
-        serviceId: String(listingId),
-        serviceTitle: listing.title,
-        moderationNote: patch.moderationNote,
-        targetPath: "/services",
-        notificationTitle:
-          status === SERVICE_STATUS_APPROVED
-            ? "Anúncio aprovado"
-            : status === SERVICE_STATUS_CHANGES_REQUESTED
-              ? "Alterações solicitadas"
-              : "Anúncio recusado",
-        notificationBody:
-          status === SERVICE_STATUS_APPROVED
-            ? "Seu anúncio foi publicado."
-            : status === SERVICE_STATUS_CHANGES_REQUESTED
-              ? "Revise os comentários do admin."
-              : "Confira o motivo enviado pelo admin.",
-        text: notificationText,
-      });
+      // A decisão já está gravada. Se o aviso falhar, a moderação não pode
+      // ver "não foi possível aprovar" com o anúncio já aprovado.
+      try {
+        await this.notifyUser(listing.ownerId, {
+          type: copy.type,
+          actorId: reviewerId,
+          serviceId: String(listingId),
+          serviceTitle: listing.title,
+          moderationNote: patch.moderationNote,
+          targetPath: "/services",
+          notificationTitle: copy.title,
+          notificationBody: copy.body,
+          text: copy.text,
+        });
+      } catch (error) {
+        warnFirestoreFallback("moderateServiceListing.notify", error);
+      }
     }
   },
 
@@ -2229,6 +2276,55 @@ export const engineDB = {
       console.error("Error fetching user following:", error);
       return [];
     }
+  },
+
+  /**
+   * "Sou moderação de serviços?" — pergunta ao banco (public.is_service_admin),
+   * a única fonte. Visitante, erro ou rede fora: false.
+   */
+  async isServiceAdmin() {
+    if (!currentUserId) return false;
+    try {
+      return must(await supabase.rpc("is_service_admin")) === true;
+    } catch (error) {
+      warnFirestoreFallback("isServiceAdmin", error);
+      return false;
+    }
+  },
+
+  /** Denúncias de anúncio ainda abertas, da mais antiga para a mais nova. */
+  async fetchServiceListingReports() {
+    try {
+      return must(
+        await supabase
+          .from("reports")
+          .select("id, target_id, reason, created_at")
+          .eq("target_type", "service_listing")
+          .eq("status", "pending")
+          .order("created_at", { ascending: true })
+          .limit(200),
+      ).map((row) => ({
+        id: row.id,
+        listingId: row.target_id,
+        reason: row.reason || "",
+        createdAt: row.created_at,
+      }));
+    } catch (error) {
+      warnFirestoreFallback("fetchServiceListingReports", error);
+      return [];
+    }
+  },
+
+  /** Fecha as denúncias de um anúncio (a moderação já agiu ou dispensou). */
+  async resolveServiceListingReports(listingId, status = "resolved") {
+    must(
+      await supabase
+        .from("reports")
+        .update({ status })
+        .eq("target_type", "service_listing")
+        .eq("target_id", String(listingId))
+        .eq("status", "pending"),
+    );
   },
 
   /**
