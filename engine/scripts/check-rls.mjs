@@ -333,6 +333,61 @@ try {
   check("subir na pasta alheia é recusado", Boolean((await a.client.storage.from("photos").upload(`users/${b.id}/rls/${run}.png`, png, { contentType: "image/png" })).error));
   await admin.storage.from("photos").remove([`users/${a.id}/rls/${run}.png`]);
 
+  // Suspensão (migration 20261028120000). A moderação real é o e-mail do
+  // admin; aqui não há sessão dele, então a suspensão entra pelo service role
+  // (o mesmo efeito de moderation_suspend) e o resto é testado como B, a
+  // suspensa, e como A e C, os outros.
+  console.log("\nsuspensão de conta");
+  check("não-admin não suspende",
+    (await a.client.rpc("moderation_suspend", { p_user: b.id, p_reason: "minor" })).error?.message === "not-allowed");
+  check("ninguém escreve direto na tabela de suspensões",
+    denied(await a.client.from("account_suspensions").insert({ user_id: b.id, reason: "minor" }).select()));
+  await b.client.from("public_profiles").upsert({ user_id: b.id, username: `@rlsb${run}`, author: "RLS B" });
+  const postB = `post-${b.id}-${run}`;
+  await b.client.from("community_goals").insert({ id: postB, owner_id: b.id, data: { title: "post de B" } });
+  check("antes: visitante vê o post de B", (await anon.from("community_goals").select("id").eq("id", postB)).data?.length === 1);
+  const suspendeu = await admin.from("account_suspensions").insert({ user_id: b.id, reason: "minor", note: "rls" });
+  check("suspender pelo service role passa", passed(suspendeu), why(suspendeu));
+  const minha = (await b.client.rpc("my_suspension")).data;
+  check("a suspensa lê motivo e data, sem a anotação", minha?.reason === "minor" && !("note" in (minha || {})), JSON.stringify(minha));
+  check("a suspensa não lê a tabela", (await b.client.from("account_suspensions").select("*")).data?.length === 0);
+  check("outra conta não está suspensa", (await a.client.rpc("i_am_suspended")).data === false);
+  const suspensa = (res) => res.error?.message === "account-suspended";
+  const naoAchou = (res) => res.error?.message === "not-found";
+  let res = await b.client.from("community_goals").insert({ id: `${postB}-2`, owner_id: b.id, data: {} });
+  check("suspensa não publica", suspensa(res), why(res));
+  res = await b.client.rpc("add_comment", { p_post_id: post, p_comment: { text: "oi" } });
+  check("suspensa não comenta", suspensa(res), why(res));
+  res = await b.client.from("post_likes").insert({ post_id: post, liker_id: b.id });
+  check("suspensa não curte", suspensa(res), why(res));
+  res = await b.client.from("follows").insert({ follower_id: b.id, target_id: c.id });
+  check("suspensa não segue", suspensa(res), why(res));
+  res = await b.client.rpc("start_conversation", { p_other: c.id, p_my_card: {}, p_other_card: {} });
+  check("suspensa não abre conversa", suspensa(res), why(res));
+  res = await b.client.from("events").insert({ created_by: b.id, event_date: "2099-01-01", data: { title: "x" } });
+  check("suspensa não cria evento", suspensa(res), why(res));
+  res = await b.client.rpc("create_club", { p_club: { name: "Clube B", tag: tag("B") }, p_member: {} });
+  check("suspensa não cria clube", suspensa(res), why(res));
+  res = await b.client.from("service_listings").insert({ owner_id: b.id, data: { title: "x" } });
+  check("suspensa não anuncia", suspensa(res), why(res));
+  res = await b.client.from("service_reviews").insert({ listing_id: sid, author_id: b.id, rating: 5 });
+  check("suspensa não avalia serviço", Boolean(res.error), why(res));
+  const pngB = new Blob([Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
+  check("suspensa não sobe foto",
+    Boolean((await b.client.storage.from("photos").upload(`users/${b.id}/rls/${run}.png`, pngB, { contentType: "image/png" })).error));
+  res = await c.client.from("follows").insert({ follower_id: c.id, target_id: b.id });
+  check("ninguém segue a suspensa", naoAchou(res), why(res));
+  res = await c.client.rpc("start_conversation", { p_other: b.id, p_my_card: {}, p_other_card: {} });
+  check("ninguém abre conversa com a suspensa", naoAchou(res), why(res));
+  check("post da suspensa some para visitante", (await anon.from("community_goals").select("id").eq("id", postB)).data?.length === 0);
+  check("post da suspensa some para logado", (await c.client.from("community_goals").select("id").eq("id", postB)).data?.length === 0);
+  check("perfil da suspensa some", (await anon.from("public_profiles").select("user_id").eq("user_id", b.id)).data?.length === 0);
+  check("a suspensa ainda lê os próprios dados", (await b.client.from("community_goals").select("id").eq("id", postB)).data?.length === 1);
+  check("desfazer seguir continua liberado", passed(await b.client.from("follows").delete().eq("follower_id", b.id)));
+  await admin.from("account_suspensions").update({ lifted_at: new Date().toISOString() }).eq("user_id", b.id).is("lifted_at", null);
+  check("levantada, o post volta", (await anon.from("community_goals").select("id").eq("id", postB)).data?.length === 1);
+  check("levantada, volta a curtir", passed(await b.client.from("post_likes").insert({ post_id: postB, liker_id: b.id })));
+
   console.log("\nexcluir a conta");
   await c.client.rpc("add_comment", { p_post_id: post, p_comment: { text: "tchau" } });
   await c.client.rpc("rate_goal", { p_post_id: post, p_rating: 4 });
