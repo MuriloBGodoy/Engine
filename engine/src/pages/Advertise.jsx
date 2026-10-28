@@ -35,6 +35,11 @@ const EMPTY_FORM = {
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// Número pequeno é prova contra para quem pensa em anunciar ("7 perfis
+// públicos", 25/10/2026). Cada contagem só aparece a partir daqui; abaixo
+// disso, some, e com as três abaixo some a seção inteira.
+const MIN_PUBLIC_STAT = 500;
+
 const FORMAT_CARDS = [
   { key: "city", icon: MapPin },
   { key: "event", icon: CalendarDays },
@@ -134,7 +139,7 @@ export function Advertise({ user }) {
         { key: "profiles", value: stats.profiles },
         { key: "services", value: stats.services },
         { key: "events", value: stats.events },
-      ].filter((item) => typeof item.value === "number" && item.value > 0)
+      ].filter((item) => typeof item.value === "number" && item.value >= MIN_PUBLIC_STAT)
     : [];
 
   const numberFormat = new Intl.NumberFormat(i18n.language);

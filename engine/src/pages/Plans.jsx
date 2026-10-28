@@ -24,6 +24,8 @@ import {
   formatLongDate,
   formatPrice,
 } from "../services/billing";
+import { ADSENSE_ENABLED } from "../services/consent";
+import { authPath } from "../services/authRedirect";
 
 const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
 const CheckoutSheet = lazyNamed(() => import("../components/billing/CheckoutSheet"), "CheckoutSheet");
@@ -33,8 +35,12 @@ const FREE_FEATURES = ["garage", "specs", "simulator", "community", "clubsEvents
 
 // Benefícios do mapa do Premium (23/10/2026). Só "sem anúncios" existe hoje;
 // o resto aparece marcado como "Em breve" até existir de verdade no app.
+// "Sem anúncios" só é benefício quando o site TEM anúncio. Sem AdSense
+// configurado, a produção não mostra nenhum (AdSlot não desenha), e vender o
+// Premium por isso seria cobrar para tirar o que não existe (auditoria geral,
+// 25/10/2026). Decisão do plano: a venda do Premium não abre agora.
 const PREMIUM_FEATURES = [
-  { key: "noAds", available: true },
+  { key: "noAds", available: ADSENSE_ENABLED },
   { key: "fipeAlert", available: false },
   { key: "maintenance", available: false },
   { key: "totalCost", available: false },
@@ -44,7 +50,7 @@ const PREMIUM_FEATURES = [
 ];
 
 const PRO_FEATURES = [
-  { key: "allPremium", available: true },
+  { key: "allPremium", available: ADSENSE_ENABLED },
   { key: "monthlyMetrics", available: false },
   { key: "monthlyReport", available: false },
   { key: "quotes", available: false },
@@ -145,7 +151,8 @@ export function Plans({ user }) {
   const [checkoutOffer, setCheckoutOffer] = useState(null);
 
   const isGuest = !user;
-  const billingOpen = Boolean(STRIPE_PUBLISHABLE_KEY);
+  // À venda só quando houver chave do Stripe E algo a entregar (anúncio).
+  const billingOpen = Boolean(STRIPE_PUBLISHABLE_KEY) && ADSENSE_ENABLED;
   const hasSubscription = plan !== "free" && subscription?.kind === "subscription";
   const hasPass = plan === "premium" && subscription?.kind === "pass";
   const trialUsed = Boolean(subscription?.trialEnd);
@@ -172,7 +179,7 @@ export function Plans({ user }) {
     if (isGuest) {
       return (
         <Link
-          to="/login"
+          to={authPath("/login", "/planos")}
           className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--engine-accent)] text-[13px] font-semibold text-white transition hover:brightness-95 sm:h-10"
         >
           <LogIn size={16} />
@@ -204,7 +211,7 @@ export function Plans({ user }) {
   if (isGuest) {
     freeFooter = (
       <Link
-        to="/register"
+        to={authPath("/register", "/planos")}
         className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-[var(--engine-border-strong)] text-[13px] font-semibold text-[var(--engine-text-muted)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:h-10"
       >
         {t("billing.plans.cta.register")}
@@ -305,7 +312,7 @@ export function Plans({ user }) {
       {!billingOpen && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--engine-border-strong)] px-4 py-3.5 text-[13px] leading-relaxed text-[var(--engine-text-muted)]">
           <Info size={17} className="mt-0.5 shrink-0" />
-          <p>{t("billing.plans.notOpen")}</p>
+          <p>{t(ADSENSE_ENABLED ? "billing.plans.notOpen" : "billing.plans.notOpenNoAds")}</p>
         </div>
       )}
 
@@ -389,7 +396,7 @@ export function Plans({ user }) {
             </div>
           </fieldset>
           <p className="mb-4 text-xs leading-relaxed text-[var(--engine-text-muted)]">
-            {t("billing.plans.premium.honest")}
+            {t(ADSENSE_ENABLED ? "billing.plans.premium.honest" : "billing.plans.premium.honestNoAds")}
           </p>
           <FeatureList t={t} base="billing.features.premium" items={PREMIUM_FEATURES} />
         </PlanCard>
@@ -418,7 +425,7 @@ export function Plans({ user }) {
             </p>
           </div>
           <p className="mb-4 text-xs leading-relaxed text-[var(--engine-text-muted)]">
-            {t("billing.plans.pro.honest")}
+            {t(ADSENSE_ENABLED ? "billing.plans.pro.honest" : "billing.plans.pro.honestNoAds")}
           </p>
           <FeatureList t={t} base="billing.features.pro" items={PRO_FEATURES} />
         </PlanCard>
