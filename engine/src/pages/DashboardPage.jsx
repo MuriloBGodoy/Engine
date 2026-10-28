@@ -5,7 +5,7 @@ import { Calculator, Check, ChevronRight, Trophy } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
 import { useIsDark } from "../hooks/useIsDark";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { estimateOwnership, isSimulatorAvailable } from "../services/ownership";
+import { simulateCar, isSimulatorAvailable } from "../services/ownership";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarName } from "../services/carDisplay";
 
@@ -18,36 +18,43 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
   const isCompact = useMediaQuery("(max-width: 639px)");
   const hideValues = Boolean(settings?.privacy?.lockSensitiveValues);
 
-  // Comparador de custo real: para carros já simulados usa os inputs salvos;
-  // para os demais, estima com os padrões e a localização do perfil.
-  const comparison = useMemo(
-    () =>
-      cars
-        .filter((car) => Number(car.targetValue) > 0)
-        .map((car) => {
-          const hasSim = Boolean(car.ownership);
-          const location = hasSim
-            ? car.ownership
-            : {
-                country: settings?.profile?.country,
-                state: settings?.profile?.state,
-              };
-          // Fora do Brasil o simulador não responde — sem linha no comparador.
-          if (!isSimulatorAvailable(location.country)) return null;
-          const result = estimateOwnership(car, car.ownership || {}, location);
-          return {
-            car,
-            hasSim,
-            monthlyTotal: result.totals.monthlyTotal,
-            requiredIncome: result.recommendations.requiredIncomeTotal,
-            idealDown: result.recommendations.recommendedDownPayment,
-            downGap: result.recommendations.downPaymentGap,
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.monthlyTotal - b.monthlyTotal),
-    [cars, settings],
-  );
+  // Comparador de custo real. A conta é a de `simulateCar`, a mesma do modal e
+  // do card: carro próprio à vista, combustível da FIPE, consumo do INMETRO e o
+  // recorte "todo mês + boletos do ano". Até 25/10/2026 o Painel chamava o
+  // motor cru e um Onix quitado aparecia a R$ 3.448/mês, com parcela inventada.
+  const comparison = useMemo(() => {
+    const rows = cars
+      .filter((car) => Number(car.targetValue) > 0)
+      .map((car) => {
+        const hasSim = Boolean(car.ownership);
+        const country = car.ownership?.country || settings?.profile?.country;
+        // Fora do Brasil o simulador não responde — sem linha no comparador.
+        if (!isSimulatorAvailable(country)) return null;
+        const result = simulateCar(car, { profile: settings?.profile });
+        return {
+          car,
+          hasSim,
+          monthly: result.headline.monthly,
+          yearly: result.headline.yearly,
+          needsState: result.headline.needsState,
+          // Ordena com os anuais diluídos, senão um carro de IPVA alto
+          // passaria na frente de um barato só por esconder o boleto.
+          sortKey: result.comparableMonthly,
+          // Regra de bolso (20%), não veredito: a tela rotula assim.
+          requiredIncome: result.recommendations.requiredIncomeTotal,
+          idealDown: result.recommendations.recommendedDownPayment,
+          downGap: result.recommendations.downPaymentGap,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.sortKey - b.sortKey);
+    // O troféu só disputa entre iguais: linhas que a pessoa simulou e com
+    // estado escolhido. Estimativa padrão (1.000 km, sem seguro) contra
+    // simulação com seguro informado não é comparação.
+    const contenders = rows.filter((row) => row.hasSim && !row.needsState);
+    const winnerId = contenders.length > 1 ? contenders[0].car.id : null;
+    return rows.map((row) => ({ ...row, cheapest: row.car.id === winnerId }));
+  }, [cars, settings]);
 
   const money = (value) =>
     hideValues
@@ -200,7 +207,7 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
           {/* Mobile: cartões. Uma tabela de 5 colunas viraria rolagem lateral
               dentro da página, que é o pior padrão possível no celular. */}
           <ul className="space-y-3 sm:hidden">
-            {comparison.map((row, index) => (
+            {comparison.map((row) => (
               <li key={row.car.id}>
                 <button
                   type="button"
@@ -220,10 +227,10 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      {index === 0 && comparison.length > 1 && (
+                      {row.cheapest && (
                         <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                           <Trophy size={11} />
-                          {t("dashboard.mostAffordable")}
+                          {t("ownership.lean.dashCheapest")}
                         </span>
                       )}
                       <ChevronRight
@@ -236,15 +243,20 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[var(--engine-border)] pt-3">
                     <div>
                       <dt className="text-[10px] font-bold uppercase tracking-wider text-[var(--engine-text-subtle)]">
-                        {t("dashboard.colMonthly")}
+                        {t("ownership.lean.dashMonthly")}
                       </dt>
                       <dd className="text-sm font-extrabold tabular-nums text-[var(--engine-text)]">
-                        {money(row.monthlyTotal)}
+                        {money(row.monthly)}
+                        <span className="block text-[10px] font-semibold text-[var(--engine-text-subtle)]">
+                          {row.needsState
+                            ? t("ownership.lean.dashYearlyNoState")
+                            : t("ownership.lean.dashYearly", { value: money(row.yearly) })}
+                        </span>
                       </dd>
                     </div>
                     <div>
                       <dt className="text-[10px] font-bold uppercase tracking-wider text-[var(--engine-text-subtle)]">
-                        {t("dashboard.colIncome")}
+                        {t("ownership.lean.dashIncome")}
                       </dt>
                       <dd className="text-sm font-semibold tabular-nums text-[var(--engine-text-muted)]">
                         {money(row.requiredIncome)}
@@ -298,14 +310,14 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
               <thead>
                 <tr className="border-b border-[var(--engine-border)] text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
                   <th className="py-2.5 pr-4">{t("dashboard.colCar")}</th>
-                  <th className="py-2.5 pr-4 text-right">{t("dashboard.colMonthly")}</th>
-                  <th className="py-2.5 pr-4 text-right">{t("dashboard.colIncome")}</th>
+                  <th className="py-2.5 pr-4 text-right">{t("ownership.lean.dashMonthly")}</th>
+                  <th className="py-2.5 pr-4 text-right">{t("ownership.lean.dashIncome")}</th>
                   <th className="py-2.5 pr-4 text-right">{t("dashboard.colIdealDown")}</th>
                   <th className="py-2.5 text-right">{t("dashboard.colDownGap")}</th>
                 </tr>
               </thead>
               <tbody>
-                {comparison.map((row, index) => (
+                {comparison.map((row) => (
                   <tr
                     key={row.car.id}
                     onClick={() => onOpenOwnership?.(row.car)}
@@ -317,10 +329,10 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
                         <span className="font-bold text-[var(--engine-text)]">
                           {formatCarName(row.car)}
                         </span>
-                        {index === 0 && comparison.length > 1 && (
+                        {row.cheapest && (
                           <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                             <Trophy size={11} />
-                            {t("dashboard.mostAffordable")}
+                            {t("ownership.lean.dashCheapest")}
                           </span>
                         )}
                       </div>
@@ -332,7 +344,12 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
                       </span>
                     </td>
                     <td className="py-3 pr-4 text-right font-extrabold tabular-nums text-[var(--engine-text)]">
-                      {money(row.monthlyTotal)}
+                      {money(row.monthly)}
+                      <span className="block text-[11px] font-semibold text-[var(--engine-text-subtle)]">
+                        {row.needsState
+                          ? t("ownership.lean.dashYearlyNoState")
+                          : t("ownership.lean.dashYearly", { value: money(row.yearly) })}
+                      </span>
                     </td>
                     <td className="py-3 pr-4 text-right font-semibold tabular-nums text-[var(--engine-text-muted)]">
                       {money(row.requiredIncome)}
@@ -371,6 +388,9 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
 
           <p className="mt-3 text-[11px] text-[var(--engine-text-subtle)]">
             {t("dashboard.compareNote")}
+          </p>
+          <p className="mt-1.5 text-[11px] text-[var(--engine-text-subtle)]">
+            {t("ownership.lean.dashIncomeNote")} {t("ownership.lean.dashTrophyNote")}
           </p>
         </div>
       )}

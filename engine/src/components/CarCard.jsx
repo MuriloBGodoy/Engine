@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { resolveVehicleSpecSheet } from "../services/carSpecSheet";
 import { summaryTokens } from "./specsheet/labels";
-import { estimateOwnership, isSimulatorAvailable } from "../services/ownership";
+import { simulateCar, isSimulatorAvailable } from "../services/ownership";
 import { forecastCompletion } from "../services/forecast";
 import { expenseInsights } from "../services/expenses";
 import { CAR_TYPE_OWNED } from "../services/db";
@@ -184,10 +184,12 @@ export function CarCard({
 }) {
   const { i18n, t } = useTranslation();
   // Fora do Brasil o simulador não responde: o botão vira só a porta para o
-  // "estamos trabalhando nisso", sem número.
+  // "estamos trabalhando nisso", sem número. O número é a manchete do modal
+  // (`simulateCar`): o que sai todo mês, sem os boletos anuais — a mesma
+  // conta, para o valor não "mudar" ao fechar o simulador.
   const ownershipTotal =
     car.ownership && isSimulatorAvailable(car.ownership.country)
-      ? estimateOwnership(car, car.ownership, car.ownership).totals.monthlyTotal
+      ? simulateCar(car).headline.monthly
       : null;
   const isOwned = car.type === CAR_TYPE_OWNED;
   // Meta batida mas ainda não confirmada: não faz sentido anunciar "falta
