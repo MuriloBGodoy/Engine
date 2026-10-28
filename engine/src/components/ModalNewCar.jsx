@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { X, Save, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { X, Save, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 import { auth } from "../services/supabase";
@@ -8,6 +8,28 @@ import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
 import { ImageCropper } from "./ImageCropper";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatFipeYear } from "../services/carDisplay";
+import { localISODate } from "../services/garageInput";
+import { useConfirm } from "./ConfirmProvider";
+
+const FIPE_BRANDS_URL = "https://parallelum.com.br/fipe/api/v1/carros/marcas";
+
+// Busca por palavras soltas, sem acento e sem caixa: "onix 1.0 aut" acha
+// "ONIX HATCH LTZ 1.0 12V TB Flex 5p Aut.". A GM tem 557 versões na lista e o
+// select nativo não filtra nada (auditoria de 25/10/2026).
+const foldText = (text) =>
+  String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const filterModels = (models, query) => {
+  const tokens = foldText(query).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return models;
+  return models.filter((model) => {
+    const name = foldText(model.nome);
+    return tokens.every((token) => name.includes(token));
+  });
+};
 
 const fieldClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)] disabled:opacity-40";
@@ -26,7 +48,21 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
   // Vinha e ia embora junto com o resto do payload.
   const [fipeCode, setFipeCode] = useState("");
   const [targetValue, setTargetValue] = useState(0);
+  // "fipe" quando o alvo veio da consulta, "manual" quando a pessoa digitou o
+  // preço que achou. `pricedAt` é o dia da consulta: "Preço FIPE" sem data
+  // dava a entender que era o de hoje.
+  const [priceSource, setPriceSource] = useState(null);
+  const [pricedAt, setPricedAt] = useState(null);
   const [savedValue, setSavedValue] = useState(0);
+  // Qual chamada da FIPE falhou ("brands" | "models" | "years" | "price").
+  // Antes as quatro engoliam o erro: lista vazia e muda, sem "tentar de novo".
+  const [fipeError, setFipeError] = useState(null);
+  const [modelQuery, setModelQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  // Resposta velha não sobrescreve seleção nova: quem troca de versão rápido
+  // recebia o preço da anterior.
+  const requestRef = useRef(0);
+  const confirm = useConfirm();
   const [carType, setCarType] = useState(carToEdit?.type || CAR_TYPE_GOAL);
   const isOwned = carType === CAR_TYPE_OWNED;
   const [loading, setLoading] = useState(false);
@@ -57,21 +93,44 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
     setSavedValue(Number(rawValue) / 100);
   };
 
+  // O alvo é editável: "o preço que eu achei" vale mais que a FIPE para quem
+  // está negociando, e é o único conserto quando a FIPE não respondeu.
+  const handleTargetChange = (e) => {
+    const rawValue = e.target.value.replace(/\D/g, "");
+    setTargetValue(Number(rawValue) / 100);
+    setPriceSource("manual");
+    setPricedAt(null);
+  };
+
+  const loadBrands = () => {
+    setFipeError(null);
+    axios
+      .get(FIPE_BRANDS_URL)
+      .then((res) => setBrands(res.data))
+      .catch(() => setFipeError("brands"));
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
     axios
-      .get("https://parallelum.com.br/fipe/api/v1/carros/marcas")
+      .get(FIPE_BRANDS_URL)
       .then((res) => setBrands(res.data))
-      .catch(() => {});
+      .catch(() => setFipeError("brands"));
 
     const timer = setTimeout(() => {
+      setFipeError(null);
+      setModelQuery("");
       if (carToEdit) {
         setSavedValue(carToEdit.savedValue || 0);
         setTargetValue(carToEdit.targetValue || 0);
+        setPriceSource(carToEdit.priceSource || null);
+        setPricedAt(carToEdit.pricedAt || null);
       } else {
         setSavedValue(0);
         setTargetValue(0);
+        setPriceSource(null);
+        setPricedAt(null);
         setSelectedBrand("");
         setSelectedModel("");
         setSelectedYear("");
@@ -135,68 +194,122 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
   const removePhoto = (index) =>
     setPhotos((current) => current.filter((_, position) => position !== index));
 
+  // Toda troca na cascata zera o preço: antes, se a consulta da versão nova
+  // falhasse, o carro era salvo com o preço da versão ANTERIOR.
+  const clearPrice = () => {
+    setTargetValue(0);
+    setPriceSource(null);
+    setPricedAt(null);
+    setFipeCode("");
+  };
+
+  const loadModels = (brandId) => {
+    const request = ++requestRef.current;
+    setFipeError(null);
+    setLoading(true);
+    axios
+      .get(`${FIPE_BRANDS_URL}/${brandId}/modelos`)
+      .then((res) => {
+        if (request !== requestRef.current) return;
+        setModels(res.data.modelos || []);
+      })
+      .catch(() => request === requestRef.current && setFipeError("models"))
+      .finally(() => request === requestRef.current && setLoading(false));
+  };
+
+  const loadYears = (brandId, modelId) => {
+    const request = ++requestRef.current;
+    setFipeError(null);
+    setLoading(true);
+    axios
+      .get(`${FIPE_BRANDS_URL}/${brandId}/modelos/${modelId}/anos`)
+      .then((res) => {
+        if (request !== requestRef.current) return;
+        setYears(res.data || []);
+      })
+      .catch(() => request === requestRef.current && setFipeError("years"))
+      .finally(() => request === requestRef.current && setLoading(false));
+  };
+
+  const loadPrice = (brandId, modelId, yearId) => {
+    const request = ++requestRef.current;
+    setFipeError(null);
+    setLoading(true);
+    return axios
+      .get(`${FIPE_BRANDS_URL}/${brandId}/modelos/${modelId}/anos/${yearId}`)
+      .then((res) => {
+        if (request !== requestRef.current) return;
+        const valorLimpo = Number(String(res.data.Valor || "").replace(/\D/g, "")) / 100;
+        if (!valorLimpo) throw new Error("FIPE sem preço");
+        setTargetValue(valorLimpo);
+        setPriceSource("fipe");
+        setPricedAt(localISODate());
+        // `CodigoFipe` só existe nesta resposta e é a chave canônica do
+        // veículo no Brasil. Vinha sendo descartada junto com o resto.
+        setFipeCode(res.data.CodigoFipe || "");
+      })
+      .catch(() => request === requestRef.current && setFipeError("price"))
+      .finally(() => request === requestRef.current && setLoading(false));
+  };
+
   const handleBrandChange = (brandId) => {
     setSelectedBrand(brandId);
     setModels([]);
+    setModelQuery("");
     // Limpa o que estava abaixo na cascata: um código de modelo da marca
     // anterior emparelhado com a marca nova aponta para outro carro.
     setSelectedModel("");
     setSelectedYear("");
     setYears([]);
-    setFipeCode("");
-    if (brandId) {
-      setLoading(true);
-      axios
-        .get(
-          `https://parallelum.com.br/fipe/api/v1/carros/marcas/${brandId}/modelos`,
-        )
-        .then((res) => {
-          setModels(res.data.modelos);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    }
+    clearPrice();
+    if (brandId) loadModels(brandId);
+    else requestRef.current += 1;
   };
 
   const handleModelChange = (modelId) => {
     setSelectedModel(modelId);
     setYears([]);
     setSelectedYear("");
-    setFipeCode("");
-    if (modelId) {
-      setLoading(true);
-      axios
-        .get(
-          `https://parallelum.com.br/fipe/api/v1/carros/marcas/${selectedBrand}/modelos/${modelId}/anos`,
-        )
-        .then((res) => {
-          setYears(res.data);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    }
+    clearPrice();
+    if (modelId) loadYears(selectedBrand, modelId);
+    else requestRef.current += 1;
   };
 
   const handleYearSelection = (yearId) => {
     setSelectedYear(yearId);
-    setFipeCode("");
-    if (yearId) {
-      setLoading(true);
-      axios
-        .get(
-          `https://parallelum.com.br/fipe/api/v1/carros/marcas/${selectedBrand}/modelos/${selectedModel}/anos/${yearId}`,
-        )
-        .then((res) => {
-          const valorLimpo = Number(res.data.Valor.replace(/\D/g, "")) / 100;
-          setTargetValue(valorLimpo);
-          // `CodigoFipe` só existe nesta resposta e é a chave canônica do
-          // veículo no Brasil. Vinha sendo descartada junto com o resto.
-          setFipeCode(res.data.CodigoFipe || "");
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    }
+    clearPrice();
+    if (yearId) loadPrice(selectedBrand, selectedModel, yearId);
+    else requestRef.current += 1;
   };
+
+  const retryFipe = () => {
+    if (fipeError === "brands") loadBrands();
+    else if (fipeError === "models" && selectedBrand) loadModels(selectedBrand);
+    else if (fipeError === "years" && selectedModel) loadYears(selectedBrand, selectedModel);
+    else if (fipeError === "price" && selectedYear) loadPrice(selectedBrand, selectedModel, selectedYear);
+    else if (fipeError === "price" && carToEdit?.fipe) refreshFipePrice();
+  };
+
+  // Reconsulta pelo trio de códigos já gravado: a meta congelava no preço do
+  // dia do cadastro. Carro antigo sem `fipe` refaz a cascata.
+  const refreshFipePrice = async () => {
+    const codes = carToEdit?.fipe;
+    if (!codes) return;
+    setRefreshing(true);
+    await loadPrice(codes.brandCode, codes.modelCode, codes.yearCode);
+    setRefreshing(false);
+  };
+
+  const filteredModels = useMemo(() => {
+    const list = filterModels(models, modelQuery);
+    // A versão escolhida continua na lista mesmo fora do filtro, senão o
+    // select nativo mostra vazio com um valor selecionado.
+    if (selectedModel && !list.some((m) => String(m.codigo) === String(selectedModel))) {
+      const picked = models.find((m) => String(m.codigo) === String(selectedModel));
+      if (picked) return [picked, ...list];
+    }
+    return list;
+  }, [models, modelQuery, selectedModel]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -224,6 +337,26 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
       setError(t("modalCar.missingVehicle"));
       setLoading(false);
       return;
+    }
+
+    // Meta com alvo 0 vira "Falta 100% · R$ 0" e uma previsão sem sentido.
+    // Carro próprio pode entrar sem valor, mas só se a pessoa disser que sim.
+    if (!(targetValue > 0)) {
+      if (!isOwned) {
+        setError(t("garageFixes.fipe.targetRequired"));
+        setLoading(false);
+        return;
+      }
+      const ok = await confirm({
+        title: t("garageFixes.fipe.zeroOwnedTitle"),
+        message: t("garageFixes.fipe.zeroOwnedBody"),
+        confirmLabel: t("garageFixes.fipe.zeroOwnedConfirm"),
+        tone: "neutral",
+      });
+      if (!ok) {
+        setLoading(false);
+        return;
+      }
     }
 
     // Foto é opcional na garagem desde 25/09/2026. Exigir foto antes de
@@ -263,6 +396,8 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
       fipe: resolvedFipe || keptFipe,
       type: carType,
       targetValue: targetValue,
+      priceSource,
+      pricedAt: priceSource === "fipe" ? pricedAt : null,
       // Carro que a pessoa já tem não está sendo poupado: o progresso é total,
       // e é isso que faz o card mostrar custo em vez de barra.
       savedValue: isOwned ? targetValue : savedValue,
@@ -306,8 +441,8 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
           onSubmit={handleSubmit}
           className="engine-modal-body engine-scroll engine-safe-bottom space-y-5 px-5 pt-5 sm:px-7 sm:pt-6"
         >
-          {/* Galeria: a primeira foto é a capa. Foto é obrigatória — nada de
-              imagem genérica quando a pessoa não envia nada. */}
+          {/* Galeria: a primeira foto é a capa. Foto é opcional desde
+              25/09/2026; quem não envia vê o placeholder, nunca foto de banco. */}
           <div className="space-y-2">
             {photos.length > 0 && (
               <div className="grid grid-cols-2 gap-2">
@@ -369,7 +504,6 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
               ref={fileInputRef}
               className="hidden"
               accept="image/*"
-              multiple
               onChange={handleFileUpload}
             />
           </div>
@@ -430,6 +564,34 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
                 ))}
               </select>
 
+              {/* Filtro digitável: a lista da marca tem até ~560 versões e o
+                  select nativo não busca. A busca filtra a lista que já veio
+                  da FIPE, sem chamada nova. */}
+              {models.length > 0 && (
+                <label className="block space-y-1">
+                  <span className={`${fieldLabelClass} text-[var(--engine-text-subtle)]`}>
+                    {t("garageFixes.fipe.filterLabel")}
+                  </span>
+                  <input
+                    type="search"
+                    value={modelQuery}
+                    onChange={(e) => setModelQuery(e.target.value)}
+                    placeholder={t("garageFixes.fipe.filterPlaceholder")}
+                    autoComplete="off"
+                    enterKeyHint="search"
+                    className={`${fieldClass} min-h-11`}
+                  />
+                  <span className="ml-1 block text-[11px] text-[var(--engine-text-muted)]">
+                    {modelQuery.trim() && filteredModels.length === 0
+                      ? t("garageFixes.fipe.filterEmpty")
+                      : t("garageFixes.fipe.filterCount", {
+                          count: filteredModels.length,
+                          total: models.length,
+                        })}
+                  </span>
+                </label>
+              )}
+
               <select
                 onChange={(e) => handleModelChange(e.target.value)}
                 disabled={!models.length && !carToEdit}
@@ -442,7 +604,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
                     ? t("modalCar.modelCurrent", { model: carToEdit.model })
                     : t("modalCar.model")}
                 </option>
-                {models.map((m) => (
+                {filteredModels.map((m) => (
                   <option key={m.codigo} value={m.codigo}>
                     {m.nome}
                   </option>
@@ -467,18 +629,67 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
                   </option>
                 ))}
               </select>
+
+              {fipeError && (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--engine-accent)]/30 bg-[var(--engine-accent-soft)] px-3.5 py-2"
+                >
+                  <span className="text-xs font-semibold text-[var(--engine-text)]">
+                    {t(`garageFixes.fipe.${fipeError}Error`)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={retryFipe}
+                    className="flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-black uppercase tracking-wider text-[var(--engine-accent)] transition hover:bg-[var(--engine-surface-2)]"
+                  >
+                    <RefreshCw size={14} />
+                    {t("garageFixes.fipe.retry")}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className={`${fieldLabelClass} text-[var(--engine-accent)]`}>
-                  {isOwned ? t("modalCar.fipePriceOwned") : t("modalCar.fipePrice")}
+                <label
+                  htmlFor="engine-car-target"
+                  className={`${fieldLabelClass} text-[var(--engine-accent)]`}
+                >
+                  {priceSource === "manual"
+                    ? t("garageFixes.fipe.manualPrice")
+                    : isOwned
+                      ? t("modalCar.fipePriceOwned")
+                      : t("modalCar.fipePrice")}
                 </label>
                 <input
+                  id="engine-car-target"
+                  type="text"
+                  inputMode="numeric"
                   value={formatDisplayValue(targetValue)}
-                  readOnly
-                  className="w-full cursor-not-allowed rounded-xl border border-[var(--engine-accent)]/20 bg-[var(--engine-accent-soft)] px-4 py-3 font-bold text-[var(--engine-text)] outline-none"
+                  onChange={handleTargetChange}
+                  className="w-full rounded-xl border border-[var(--engine-accent)]/20 bg-[var(--engine-accent-soft)] px-4 py-3 font-bold text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]"
                 />
+                <p className="ml-1 text-[11px] text-[var(--engine-text-muted)]">
+                  {priceSource === "fipe" && pricedAt
+                    ? t("garageFixes.fipe.pricedAt", {
+                        date: new Date(`${pricedAt}T12:00:00`).toLocaleDateString(i18n.language),
+                      })
+                    : priceSource !== "manual" && carToEdit && targetValue > 0
+                      ? t("garageFixes.fipe.pricedAtUnknown")
+                      : t("garageFixes.fipe.editPriceHint")}
+                </p>
+                {carToEdit?.fipe && !selectedYear && (
+                  <button
+                    type="button"
+                    onClick={refreshFipePrice}
+                    disabled={refreshing || loading}
+                    className="flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-xs font-bold text-[var(--engine-accent)] transition hover:underline disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                    {refreshing ? t("garageFixes.fipe.refreshing") : t("garageFixes.fipe.refreshPrice")}
+                  </button>
+                )}
               </div>
               {/* Quanto já guardou só faz sentido pra carro que ainda é meta:
                   quem já tem o carro não está juntando pra comprá-lo. */}
@@ -489,6 +700,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     value={formatDisplayValue(savedValue)}
                     onChange={handleMoneyChange}
                     className={fieldClass}
@@ -499,7 +711,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
           </div>
 
           {error && (
-            <p className="text-center text-sm font-semibold text-red-500">
+            <p className="text-center text-sm font-semibold text-[var(--engine-accent)]">
               {error}
             </p>
           )}

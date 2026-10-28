@@ -443,6 +443,11 @@ const normalizeCar = (car) => ({
         }
       : null,
   targetValue: Math.max(Number(car.targetValue) || 0, 0),
+  // De onde veio o alvo: "fipe" (consulta automática) ou "manual" (o preço que
+  // a pessoa achou). `null` é o legado, anterior a 25/10/2026. `pricedAt` é o
+  // dia da consulta FIPE: sem ele, "Preço FIPE" parecia ser o de hoje.
+  priceSource: ["fipe", "manual"].includes(car.priceSource) ? car.priceSource : null,
+  pricedAt: /^\d{4}-\d{2}-\d{2}$/.test(String(car.pricedAt || "")) ? car.pricedAt : null,
   savedValue: Math.max(Number(car.savedValue) || 0, 0),
   images: normalizeCarImages(car),
   // `image` continua sendo a capa, para tudo que já lê esse campo.

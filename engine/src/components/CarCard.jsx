@@ -107,11 +107,15 @@ function CardActions({
         Icon: PiggyBank,
         label: t("contribution.cardActionShort"),
         title: t("contribution.cardAction"),
+        // Sem o rótulo, a data solta embaixo de "APORTE" não dizia que era
+        // previsão (auditoria de 25/10/2026).
         value:
           forecast &&
-          forecast.date.toLocaleDateString(i18n.language, {
-            month: "short",
-            year: "numeric",
+          t("garageFixes.forecastShort", {
+            date: forecast.date.toLocaleDateString(i18n.language, {
+              month: "short",
+              year: "numeric",
+            }),
           }),
       };
 
