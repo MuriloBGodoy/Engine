@@ -1,5 +1,6 @@
 import { auth, must, nowIso, supabase } from "./supabase";
-import { grantOwn, grantSeries } from "./achievements";
+import { grantOwn } from "./achievements";
+import { upcomingCutoffIso } from "./eventTime";
 
 /**
  * Quem vai ao evento é uma linha por pessoa em `event_participants` (evento +
@@ -12,20 +13,24 @@ import { grantOwn, grantSeries } from "./achievements";
  * estouram mais o teto (no Firestore estouravam por um).
  */
 
-/** Conta quem confirmou. */
-const contarParticipantes = async (eventId) => {
+/**
+ * Quantos confirmaram, para vários eventos numa ida só. Vem de uma função do
+ * banco porque a LISTA de presença (nome e carro) é só para quem tem conta —
+ * o visitante vê o total, não quem vai estar onde.
+ */
+const contarVarios = async (eventIds) => {
+  const ids = [...new Set(eventIds.map(String))].filter(Boolean);
+  if (!ids.length) return new Map();
   try {
-    const { count, error } = await supabase
-      .from("event_participants")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", String(eventId));
-    if (error) throw error;
-    return count || 0;
+    const rows = must(await supabase.rpc("event_participant_counts", { p_event_ids: ids }));
+    return new Map(rows.map((row) => [String(row.event_id), Number(row.total) || 0]));
   } catch {
     // Contagem é enfeite: se falhar, a tela mostra zero em vez de quebrar.
-    return 0;
+    return new Map();
   }
 };
+
+const contarParticipantes = async (eventId) => (await contarVarios([eventId])).get(String(eventId)) || 0;
 
 const EVENT_COLUMN_KEYS = ["id", "createdBy", "clubId", "eventDate", "type", "state", "createdAt", "updatedAt"];
 
@@ -61,6 +66,8 @@ const normalizeEvent = (event) => ({
   eventDate: String(event.eventDate || ""),
   endDate: String(event.endDate || "").trim(), // opcional
   startTime: String(event.startTime || "").trim(), // HH:mm
+  // Fuso em que data e hora foram digitadas (ver services/eventTime.js).
+  timeZone: String(event.timeZone || "").trim().slice(0, 64),
   endTime: String(event.endTime || "").trim(), // HH:mm (opcional)
   location: String(event.location || "").trim().slice(0, 120),
   state: String(event.state || "").trim().slice(0, 8),
@@ -127,7 +134,7 @@ export const engineEvents = {
     let request = supabase
       .from("events")
       .select("*")
-      .gte("event_date", new Date().toISOString())
+      .gte("event_date", upcomingCutoffIso())
       .order("event_date", { ascending: true })
       .limit(resultLimit);
 
@@ -138,8 +145,8 @@ export const engineEvents = {
 
     // O contador nao mora no evento; vem da contagem. Uma por evento, em
     // paralelo — nao le linha nenhuma, so conta.
-    const contagens = await Promise.all(eventos.map((e) => contarParticipantes(e.id)));
-    return eventos.map((evento, i) => ({ ...evento, participantCount: contagens[i] }));
+    const contagens = await contarVarios(eventos.map((e) => e.id));
+    return eventos.map((evento) => ({ ...evento, participantCount: contagens.get(String(evento.id)) || 0 }));
   },
 
   /**
@@ -150,7 +157,7 @@ export const engineEvents = {
   async getMyEvents({ limit: resultLimit = 50 } = {}) {
     if (!auth.currentUser) return [];
     const uid = auth.currentUser.uid;
-    const agora = new Date().toISOString();
+    const agora = upcomingCutoffIso();
 
     const [criados, presencas] = await Promise.all([
       supabase.from("events").select("*").eq("created_by", uid).gte("event_date", agora).then(must),
@@ -167,8 +174,8 @@ export const engineEvents = {
     const lista = [...porId.values()]
       .sort((a, b) => String(a.eventDate).localeCompare(String(b.eventDate)))
       .slice(0, resultLimit);
-    const contagens = await Promise.all(lista.map((e) => contarParticipantes(e.id)));
-    return lista.map((e, i) => ({ ...e, participantCount: contagens[i] }));
+    const contagens = await contarVarios(lista.map((e) => e.id));
+    return lista.map((e) => ({ ...e, participantCount: contagens.get(String(e.id)) || 0 }));
   },
 
   async updateEvent(eventId, updates) {
@@ -212,7 +219,8 @@ export const engineEvents = {
       rsvpDate: nowIso(),
     };
 
-    const event = await this.getEventById(eventId);
+    // Evento inexistente: erro claro antes de tentar confirmar.
+    await this.getEventById(eventId);
 
     const { error } = await supabase.from("event_participants").insert({
       event_id: String(eventId),
@@ -226,14 +234,7 @@ export const engineEvents = {
     }
 
     grantOwn("event_rsvp");
-    // "Seu evento com N confirmados", para quem organizou. Conta as linhas de
-    // presença — o mesmo número que decide a lotação.
-    const organizer = event.createdBy;
-    if (organizer) {
-      contarParticipantes(eventId)
-        .then((total) => grantSeries(String(organizer), "event_attendees", total))
-        .catch(() => {});
-    }
+    // "Seu evento com N confirmados" (para quem organizou) sai do banco.
     return participantData;
   },
 

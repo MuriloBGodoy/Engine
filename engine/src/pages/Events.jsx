@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, Loader2, CalendarCheck } from "lucide-react";
 import { SubTabsHeader } from "../components/community/SubTabsHeader";
@@ -8,6 +9,8 @@ import { CreateEventForm } from "../components/CreateEventForm";
 import { useToast } from "../components/ToastProvider";
 import { getStates } from "../services/locations";
 import { eventTypeOptions } from "../services/eventTypes";
+import { getClub } from "../services/clubs";
+import { authPath } from "../services/authRedirect";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -47,6 +50,51 @@ export function Events({ embedded = false, user = null }) {
   });
 
   const activeTab = signedIn ? subTab : "discover";
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Clube que marcou o encontro (`/events?create=1&club=<id>`, vindo da
+  // página do clube). Buscado pelo id: a sigla não pode vir da URL.
+  const [createClub, setCreateClub] = useState(null);
+
+  // Visitante: criar evento leva ao login e volta para cá (antes ele
+  // preenchia tudo e só no envio recebia "Usuário não autenticado").
+  const openCreate = useCallback(() => {
+    if (!signedIn) {
+      navigate(authPath("/login", "/events?create=1"));
+      return;
+    }
+    setShowCreateForm(true);
+  }, [navigate, signedIn]);
+
+  const wantsCreate = searchParams.get("create") === "1";
+  const createClubId = wantsCreate ? searchParams.get("club") || "" : "";
+  useEffect(() => {
+    if (!wantsCreate) return undefined;
+    let alive = true;
+    (async () => {
+      let club = null;
+      if (createClubId && signedIn) {
+        try {
+          const found = await getClub(createClubId);
+          if (found && ["founder", "captain"].includes(found.myRole)) {
+            club = { id: found.id, tag: found.tag, name: found.name };
+          }
+        } catch {
+          club = null;
+        }
+      }
+      if (!alive) return;
+      const params = new URLSearchParams(searchParams);
+      params.delete("create");
+      params.delete("club");
+      setSearchParams(params, { replace: true });
+      setCreateClub(club);
+      openCreate();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [wantsCreate, createClubId, signedIn, searchParams, setSearchParams, openCreate]);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -74,10 +122,11 @@ export function Events({ embedded = false, user = null }) {
     loadEvents();
   }, [loadEvents]);
 
+  // O toast de "criado" já sai do formulário: aqui saía o segundo.
   const handleCreateSuccess = () => {
     setShowCreateForm(false);
+    setCreateClub(null);
     loadEvents();
-    showToast(t("events.toast.created"), "success");
   };
 
   return (
@@ -102,7 +151,7 @@ export function Events({ embedded = false, user = null }) {
         onChange={setSubTab}
         createLabel={t("events.create")}
         createShortLabel={t("events.createShort")}
-        onCreate={() => setShowCreateForm(true)}
+        onCreate={openCreate}
       />
 
       {/* Filtros: só em Descobrir, e como linha, não como cartão. */}
@@ -183,7 +232,7 @@ export function Events({ embedded = false, user = null }) {
             {t("events.emptyCopy")}
           </p>
           <button
-            onClick={() => setShowCreateForm(true)}
+            onClick={openCreate}
             className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--engine-accent)] text-white rounded-xl font-semibold hover:opacity-90 transition"
           >
             <Plus size={20} />
@@ -200,8 +249,12 @@ export function Events({ embedded = false, user = null }) {
 
       {showCreateForm && (
         <CreateEventForm
+          club={createClub}
           onSuccess={handleCreateSuccess}
-          onCancel={() => setShowCreateForm(false)}
+          onCancel={() => {
+            setShowCreateForm(false);
+            setCreateClub(null);
+          }}
         />
       )}
     </div>

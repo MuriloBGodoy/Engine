@@ -8,6 +8,7 @@ import { eventTypeOptions } from "../services/eventTypes";
 import { engineEvents } from "../services/events";
 import { countries, getStates, getCities } from "../services/locations";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
+import { deviceTimeZone, eventInstantFromLocal } from "../services/eventTime";
 
 const mapQuery = (event) =>
   [event.address, event.city].filter(Boolean).join(",");
@@ -94,7 +95,13 @@ function MapPreview({ event, compact = false }) {
 
 
 
-export function CreateEventForm({ onSuccess, onCancel }) {
+/**
+ * `club` ({ id, tag, name }): encontro marcado a partir da página de um clube.
+ * O evento nasce com `clubId` — sem isso a aba Encontros do clube e o trilho
+ * "Em alta" ficavam vazios. Quem pode criar evento de clube (capitão e
+ * fundador) é o banco que decide.
+ */
+export function CreateEventForm({ onSuccess, onCancel, club = null }) {
   const { t } = useTranslation();
   const showToast = useToast();
   // Só existe montado quando aberto. Voltar no Android (e Esc no desktop)
@@ -207,7 +214,9 @@ export function CreateEventForm({ onSuccess, onCancel }) {
     setSaving(true);
 
     try {
-      const eventDateTime = `${form.eventDate}T${form.startTime}:00Z`;
+      // Data e hora no fuso de quem cria (antes iam como UTC: o 20:00 de
+      // Brasília virava 17:00). Ver services/eventTime.js.
+      const eventInstant = eventInstantFromLocal(form.eventDate, form.startTime);
 
       const location = form.address
         ? `${form.address}, ${form.city}`
@@ -217,7 +226,8 @@ export function CreateEventForm({ onSuccess, onCancel }) {
         title: form.title,
         description: form.description,
         type: form.type,
-        eventDate: new Date(eventDateTime).toISOString(),
+        eventDate: eventInstant,
+        timeZone: deviceTimeZone(),
         endDate: form.endDate || "",
         startTime: form.startTime,
         endTime: form.endTime,
@@ -232,6 +242,9 @@ export function CreateEventForm({ onSuccess, onCancel }) {
           whatsappGroup: form.communityLinks.whatsappGroup,
           facebookGroup: form.communityLinks.facebookGroup,
         },
+        clubId: club?.id || "",
+        clubTag: club?.tag || "",
+        clubName: club?.name || "",
       };
 
       await engineEvents.createEvent(eventData);
@@ -262,6 +275,11 @@ export function CreateEventForm({ onSuccess, onCancel }) {
             <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
               {t("events.form.subtitle")}
             </p>
+            {club?.tag && (
+              <p className="mt-2 text-xs font-black uppercase tracking-widest text-[var(--engine-accent)]">
+                {t("socialFixes.events.clubMeetup", { tag: club.tag, name: club.name || "" })}
+              </p>
+            )}
             <div className="mt-4 flex max-w-xl items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-sm font-bold uppercase text-white">
                 {sellerProfile?.avatar ? (

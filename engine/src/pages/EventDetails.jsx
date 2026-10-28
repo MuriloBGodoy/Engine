@@ -14,11 +14,15 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  Flag,
 } from "lucide-react";
 import { auth } from "../services/supabase";
 import { engineEvents } from "../services/events";
 import { useToast } from "../components/ToastProvider";
 import { eventTypeLabel } from "../services/eventTypes";
+import { formatEventDay, formatEventEndDay } from "../services/eventTime";
+import { useSocialReport } from "../hooks/useSocialReport";
+import { authPath } from "../services/authRedirect";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -33,6 +37,7 @@ export function EventDetails() {
   const { t, i18n } = useTranslation();
   // A data seguia cravada em pt-BR, independente do idioma escolhido.
   const locale = i18n.language || "pt-BR";
+  const { openReport, reportDialog } = useSocialReport();
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -149,21 +154,30 @@ export function EventDetails() {
     );
   }
 
-  const eventDate = new Date(event.eventDate);
-  const startDateStr = eventDate.toLocaleDateString(locale, {
+  // Dia no fuso do evento; a hora é a que foi digitada (services/eventTime.js).
+  const startDateStr = formatEventDay(event, locale, {
     day: "numeric",
     month: "long",
     weekday: "long",
   });
-  const endDate = event.endDate ? new Date(event.endDate) : null;
-  const endDateStr = endDate
-    ? endDate.toLocaleDateString(locale, { day: "numeric", month: "long", weekday: "long" })
+  const endDateStr = event.endDate
+    ? formatEventEndDay(event.endDate, locale, { day: "numeric", month: "long", weekday: "long" })
     : null;
   const dateRangeStr =
-    endDateStr && endDateStr !== startDateStr ? `${startDateStr} até ${endDateStr}` : startDateStr;
-  const timeStr = event.startTime ? ` às ${event.startTime}` : "";
-  const endTimeStr = event.endTime ? ` até ${event.endTime}` : "";
+    endDateStr && endDateStr !== startDateStr
+      ? t("socialFixes.events.dateRange", { start: startDateStr, end: endDateStr })
+      : startDateStr;
+  const timeStr = event.startTime ? t("socialFixes.events.atTime", { time: event.startTime }) : "";
+  const endTimeStr = event.endTime ? t("socialFixes.events.untilTime", { time: event.endTime }) : "";
   const formattedDate = `${dateRangeStr}${timeStr}${endTimeStr}`;
+
+  const handleReportEvent = () => {
+    if (!auth.currentUser) {
+      navigate(authPath("/login", `/events/${eventId}`));
+      return;
+    }
+    openReport({ targetType: "event", targetId: event.id, reportedUserId: event.createdBy });
+  };
 
   const spotsLeft = event.maxParticipants
     ? Math.max(0, event.maxParticipants - (event.participantCount || 0))
@@ -184,6 +198,17 @@ export function EventDetails() {
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-3xl font-bold text-[var(--engine-text)] flex-1 truncate">{event.title}</h1>
+        {!isOwner && (
+          <button
+            type="button"
+            onClick={handleReportEvent}
+            title={t("socialFixes.events.report")}
+            aria-label={t("socialFixes.events.report")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+          >
+            <Flag size={20} />
+          </button>
+        )}
       </div>
 
       {/* Imagem */}
@@ -444,7 +469,7 @@ export function EventDetails() {
                 </button>
               ) : (
                 <button
-                  onClick={() => navigate("/login")}
+                  onClick={() => navigate(authPath("/login", `/events/${eventId}`))}
                   className="w-full px-4 py-3 bg-[var(--engine-accent)] text-white rounded-xl font-bold text-lg hover:opacity-90 transition"
                 >
                   {t("events.details.loginToConfirm")}
@@ -454,6 +479,7 @@ export function EventDetails() {
           )}
         </div>
       </div>
+      {reportDialog}
     </div>
   );
 }

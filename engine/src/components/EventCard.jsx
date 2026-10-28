@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { eventTypeLabel as typeLabel } from "../services/eventTypes";
 import { ClubTag } from "./clubs/ClubEmblem";
+import { formatEventDay, formatEventEndDay } from "../services/eventTime";
 import {
   MapPin,
   Users,
@@ -20,14 +21,11 @@ export function EventCard({ event }) {
   // A data seguia cravada em pt-BR: quem lia em ingles via "3 de set.".
   const locale = i18n.language || "pt-BR";
 
-  const eventDate = new Date(event.eventDate);
-  const startDateStr = eventDate.toLocaleDateString(locale, {
-    day: "numeric",
-    month: "short",
-  });
-  const endDate = event.endDate ? new Date(event.endDate) : null;
-  const endDateStr = endDate
-    ? endDate.toLocaleDateString(locale, { day: "numeric", month: "short" })
+  // No fuso do evento (services/eventTime.js): antes o encontro das 00:30
+  // aparecia com a data do dia anterior.
+  const startDateStr = formatEventDay(event, locale, { day: "numeric", month: "short" });
+  const endDateStr = event.endDate
+    ? formatEventEndDay(event.endDate, locale, { day: "numeric", month: "short" })
     : null;
   const dateDisplay =
     endDateStr && endDateStr !== startDateStr ? `${startDateStr} - ${endDateStr}` : startDateStr;
