@@ -9,6 +9,8 @@ import i18n from "./i18n";
  * editado por várias frentes ao mesmo tempo. Entra por `addResourceBundle`
  * com deep merge; `community.blockMessage` é sobrescrito de propósito (o
  * bloqueio agora vale no servidor, e o texto antigo dizia só "deixa de ver").
+ *
+ * Também mora aqui a suspensão de conta (28/10/2026), no fim do arquivo.
  */
 
 const ptBR = {
@@ -392,5 +394,186 @@ const esES = {
 i18n.addResourceBundle("pt-BR", "translation", ptBR, true, true);
 i18n.addResourceBundle("en-US", "translation", enUS, true, true);
 i18n.addResourceBundle("es-ES", "translation", esES, true, true);
+
+// Suspensão de conta (28/10/2026): tela da conta suspensa, controles da
+// /moderacao e o item de menu. Bundles à parte, com o mesmo deep merge.
+const suspensionPtBR = {
+  nav: {
+    moderation: "Moderação",
+  },
+  suspension: {
+    kicker: "Conta suspensa",
+    title: "Sua conta está suspensa",
+    since: "Suspensa pela moderação do Engine em {{date}}.",
+    sinceUnknown: "Suspensa pela moderação do Engine.",
+    reasonLabel: "Motivo",
+    reasons: {
+      minor: "Menor de idade",
+      spam: "Spam ou propaganda",
+      scam: "Golpe ou fraude",
+      offensive: "Conteúdo ofensivo ou de ódio",
+      harassment: "Assédio ou ameaça",
+      nudity: "Nudez ou conteúdo sexual",
+      other: "Violação dos Termos de Uso",
+    },
+    minorExplain:
+      "O Engine é só para maiores de 18 anos, como dizem os Termos de Uso. Se você já tem 18 anos, peça a revisão pelo e-mail abaixo.",
+    effects:
+      "Enquanto a suspensão durar, seu perfil, suas publicações, seus anúncios e seus eventos ficam ocultos, e a conta não publica, comenta, curte, segue nem manda mensagem. Seus dados continuam guardados e você pode baixar uma cópia.",
+    appealTitle: "Acha que foi um engano?",
+    appealCopy:
+      "Escreva para {{email}} a partir do e-mail desta conta, explicando o que aconteceu. A moderação revisa e responde em até 5 dias úteis.",
+    appealAction: "Pedir revisão por e-mail",
+    appealSubject: "Revisão de suspensão de conta",
+    optionsLabel: "O que você ainda pode fazer",
+    terms: "Termos de Uso",
+    privacy: "Política de Privacidade",
+  },
+  moderation: {
+    suspend: {
+      action: "Suspender conta",
+      reason: "Motivo da suspensão",
+      note: "Anotação interna (opcional)",
+      notePlaceholder: "Só a moderação lê. Ex.: idade na bio.",
+      effects:
+        "A conta deixa de publicar, comentar, curtir, seguir e mandar mensagem, e o perfil, os posts e os anúncios somem para os outros. As denúncias abertas contra ela são fechadas. Dá para levantar depois.",
+      confirm: "Suspender",
+      done: "Conta suspensa.",
+      already: "Esta conta já está suspensa.",
+      listTitle: "Contas suspensas",
+      listCopy: "Suspenda pelo @ ou pelo cartão da denúncia. Levantar a suspensão devolve tudo como estava.",
+      byHandle: "@usuário",
+      find: "Buscar",
+      notFound: "Nenhuma conta com esse @.",
+      self: "Você não pode suspender a própria conta.",
+      none: "Nenhuma conta suspensa.",
+      noName: "Sem nome",
+      lift: "Levantar suspensão",
+      liftTitle: "Levantar a suspensão?",
+      liftMessage: "{{name}} volta a usar o Engine normalmente, e o perfil e as publicações voltam a aparecer.",
+      lifted: "Suspensão levantada.",
+    },
+  },
+};
+const suspensionEnUS = {
+  nav: {
+    moderation: "Moderation",
+  },
+  suspension: {
+    kicker: "Account suspended",
+    title: "Your account is suspended",
+    since: "Suspended by Engine moderation on {{date}}.",
+    sinceUnknown: "Suspended by Engine moderation.",
+    reasonLabel: "Reason",
+    reasons: {
+      minor: "Under 18",
+      spam: "Spam or advertising",
+      scam: "Scam or fraud",
+      offensive: "Offensive or hateful content",
+      harassment: "Harassment or threats",
+      nudity: "Nudity or sexual content",
+      other: "Terms of Use violation",
+    },
+    minorExplain:
+      "Engine is for people aged 18 and over, as stated in the Terms of Use. If you are already 18, ask for a review using the email below.",
+    effects:
+      "While the suspension lasts, your profile, posts, listings and events are hidden, and the account cannot post, comment, like, follow or send messages. Your data is kept and you can download a copy.",
+    appealTitle: "Think this was a mistake?",
+    appealCopy:
+      "Write to {{email}} from this account's email address and explain what happened. Moderation reviews it and replies within 5 business days.",
+    appealAction: "Request a review by email",
+    appealSubject: "Account suspension review",
+    optionsLabel: "What you can still do",
+    terms: "Terms of Use",
+    privacy: "Privacy Policy",
+  },
+  moderation: {
+    suspend: {
+      action: "Suspend account",
+      reason: "Suspension reason",
+      note: "Internal note (optional)",
+      notePlaceholder: "Only moderation reads this. E.g. age in bio.",
+      effects:
+        "The account can no longer post, comment, like, follow or send messages, and its profile, posts and listings disappear for everyone else. Open reports against it are closed. You can lift it later.",
+      confirm: "Suspend",
+      done: "Account suspended.",
+      already: "This account is already suspended.",
+      listTitle: "Suspended accounts",
+      listCopy: "Suspend by @ or from a report card. Lifting the suspension restores everything as it was.",
+      byHandle: "@username",
+      find: "Find",
+      notFound: "No account with that @.",
+      self: "You cannot suspend your own account.",
+      none: "No suspended accounts.",
+      noName: "No name",
+      lift: "Lift suspension",
+      liftTitle: "Lift the suspension?",
+      liftMessage: "{{name}} can use Engine normally again, and the profile and posts show up again.",
+      lifted: "Suspension lifted.",
+    },
+  },
+};
+const suspensionEsES = {
+  nav: {
+    moderation: "Moderación",
+  },
+  suspension: {
+    kicker: "Cuenta suspendida",
+    title: "Tu cuenta está suspendida",
+    since: "Suspendida por la moderación de Engine el {{date}}.",
+    sinceUnknown: "Suspendida por la moderación de Engine.",
+    reasonLabel: "Motivo",
+    reasons: {
+      minor: "Menor de edad",
+      spam: "Spam o publicidad",
+      scam: "Estafa o fraude",
+      offensive: "Contenido ofensivo o de odio",
+      harassment: "Acoso o amenaza",
+      nudity: "Desnudez o contenido sexual",
+      other: "Infracción de los Términos de Uso",
+    },
+    minorExplain:
+      "Engine es solo para mayores de 18 años, como indican los Términos de Uso. Si ya tienes 18 años, pide la revisión por el correo de abajo.",
+    effects:
+      "Mientras dure la suspensión, tu perfil, tus publicaciones, tus anuncios y tus eventos quedan ocultos, y la cuenta no puede publicar, comentar, dar me gusta, seguir ni enviar mensajes. Tus datos se conservan y puedes descargar una copia.",
+    appealTitle: "¿Crees que fue un error?",
+    appealCopy:
+      "Escribe a {{email}} desde el correo de esta cuenta explicando lo que pasó. La moderación lo revisa y responde en un plazo de 5 días hábiles.",
+    appealAction: "Pedir revisión por correo",
+    appealSubject: "Revisión de suspensión de cuenta",
+    optionsLabel: "Lo que todavía puedes hacer",
+    terms: "Términos de Uso",
+    privacy: "Política de Privacidad",
+  },
+  moderation: {
+    suspend: {
+      action: "Suspender cuenta",
+      reason: "Motivo de la suspensión",
+      note: "Nota interna (opcional)",
+      notePlaceholder: "Solo la moderación la lee. Ej.: edad en la bio.",
+      effects:
+        "La cuenta deja de publicar, comentar, dar me gusta, seguir y enviar mensajes, y su perfil, sus publicaciones y sus anuncios desaparecen para los demás. Las denuncias abiertas contra ella se cierran. Se puede levantar después.",
+      confirm: "Suspender",
+      done: "Cuenta suspendida.",
+      already: "Esta cuenta ya está suspendida.",
+      listTitle: "Cuentas suspendidas",
+      listCopy: "Suspende por @ o desde la tarjeta de la denuncia. Levantar la suspensión deja todo como estaba.",
+      byHandle: "@usuario",
+      find: "Buscar",
+      notFound: "Ninguna cuenta con ese @.",
+      self: "No puedes suspender tu propia cuenta.",
+      none: "Ninguna cuenta suspendida.",
+      noName: "Sin nombre",
+      lift: "Levantar suspensión",
+      liftTitle: "¿Levantar la suspensión?",
+      liftMessage: "{{name}} vuelve a usar Engine con normalidad, y el perfil y las publicaciones vuelven a aparecer.",
+      lifted: "Suspensión levantada.",
+    },
+  },
+};
+
+i18n.addResourceBundle("pt-BR", "translation", suspensionPtBR, true, true);
+i18n.addResourceBundle("en-US", "translation", suspensionEnUS, true, true);
+i18n.addResourceBundle("es-ES", "translation", suspensionEsES, true, true);
 
 export default i18n;

@@ -27,6 +27,7 @@ import { Register } from "./pages/Register";
 import { useToast } from "./components/ToastProvider";
 import { applySavedLanguage } from "./services/languageChoice";
 import { getConsentStatus } from "./services/onboarding";
+import { getMySuspension } from "./services/suspension";
 
 // Carregamento sob demanda. Até 25/09/2026 o app inteiro era UM arquivo de
 // 2,9 MB (870 KB gzip) — nada pintava antes dele baixar e ser lido, e a Mia
@@ -61,6 +62,7 @@ const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
 const Support = lazyNamed(() => import("./pages/Support"), "Support");
 const Advertise = lazyNamed(() => import("./pages/Advertise"), "Advertise");
 const Onboarding = lazyNamed(() => import("./pages/Onboarding"), "Onboarding");
+const AccountSuspended = lazyNamed(() => import("./pages/AccountSuspended"), "AccountSuspended");
 
 // "Já vi a apresentação da Garagem", por conta e por aparelho.
 const introKey = (uid) => `engine.garageIntroSeen:${uid}`;
@@ -225,6 +227,21 @@ function App() {
     };
   }, [userId]);
 
+  // Conta suspensa pela moderação: lida por conta, antes de qualquer outra
+  // tela. "unknown" (sem rede) não bloqueia — o banco recusa as escritas de
+  // qualquer jeito; a tela só explica.
+  const [suspension, setSuspension] = useState({ userId: null, status: "unknown" });
+  useEffect(() => {
+    if (!userId) return undefined;
+    let alive = true;
+    getMySuspension().then((result) => {
+      if (alive) setSuspension({ userId, ...result });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
   /**
    * Re-leitura da garagem depois de uma escrita, e o botao de tentar de novo.
    *
@@ -383,6 +400,23 @@ function App() {
     return <div className="min-h-screen bg-[var(--engine-bg)]" />;
   }
 
+  const suspensionLoaded = Boolean(userId) && suspension.userId === userId;
+  if (suspensionLoaded && suspension.status === "suspended") {
+    // Só Termos, Privacidade, baixar os dados e sair. Nada do app é montado.
+    return (
+      <BrowserRouter>
+        <RouteTracker />
+        <Suspense fallback={<div className="min-h-[100dvh] bg-[var(--engine-bg)]" />}>
+          <Routes>
+            <Route path="/termos" element={<Terms />} />
+            <Route path="/privacidade" element={<Privacy />} />
+            <Route path="*" element={<AccountSuspended user={user} suspension={suspension} />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    );
+  }
+
   // O que falta para a conta usar o app. Enquanto o aceite desta conta não foi
   // lido, segura a tela (sem isso o app pisca antes do bloqueio).
   const consentLoaded = Boolean(userId) && consent.userId === userId;
@@ -400,10 +434,11 @@ function App() {
     setIntroDone((current) => ({ ...current, [userId]: true }));
   };
   const gateActive =
-    Boolean(userId) && (!consentLoaded || dbLoading || needsConsent || needsUsername || showIntro);
+    Boolean(userId) &&
+    (!suspensionLoaded || !consentLoaded || dbLoading || needsConsent || needsUsername || showIntro);
 
   if (gateActive) {
-    const waiting = !consentLoaded || dbLoading;
+    const waiting = !suspensionLoaded || !consentLoaded || dbLoading;
     return (
       <BrowserRouter>
         <RouteTracker />

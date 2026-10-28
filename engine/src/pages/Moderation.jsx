@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ExternalLink, Flag, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import { Ban, ExternalLink, Flag, ShieldAlert, Trash2, Undo2, XCircle } from "lucide-react";
 import { engineDB } from "../services/db";
+import {
+  SUSPENSION_REASONS,
+  findUserIdByUsername,
+  liftSuspension,
+  listSuspensions,
+  suspendAccount,
+} from "../services/suspension";
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -21,7 +28,70 @@ import { useConfirm } from "../components/ConfirmProvider";
  *
  * O que aparece no cartão é o retrato que o BANCO guardou na hora da
  * denúncia (reports.context) — o autor pode ter apagado depois.
+ *
+ * Suspender conta (28/10/2026): pelo cartão da denúncia ou pelo @, com motivo
+ * (inclui "menor de idade", ECA Digital). Quem barra é o banco
+ * (moderation_suspend): a conta para de escrever e some para os outros, e as
+ * denúncias abertas contra ela são fechadas. A lista "Contas suspensas"
+ * levanta a suspensão.
  */
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const inputClass =
+  "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 text-sm text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]";
+const quietButton =
+  "inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-4 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50";
+const dangerButton =
+  "inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--engine-accent)] px-4 text-xs font-bold text-white transition hover:brightness-95 disabled:opacity-50";
+
+/** Motivo + anotação interna. A pessoa suspensa vê o motivo, nunca a anotação. */
+function SuspendForm({ defaultReason = "other", busy, onSubmit, onCancel }) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState(SUSPENSION_REASONS.includes(defaultReason) ? defaultReason : "other");
+  const [note, setNote] = useState("");
+  return (
+    <form
+      className="mt-3 space-y-3 rounded-xl border border-[var(--engine-border)] p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({ reason, note });
+      }}
+    >
+      <label className="block">
+        <span className="mb-1 block text-xs font-bold text-[var(--engine-text)]">{t("moderation.suspend.reason")}</span>
+        <select value={reason} onChange={(event) => setReason(event.target.value)} className={`${inputClass} h-11`}>
+          {SUSPENSION_REASONS.map((code) => (
+            <option key={code} value={code}>
+              {t(`suspension.reasons.${code}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-bold text-[var(--engine-text)]">{t("moderation.suspend.note")}</span>
+        <textarea
+          value={note}
+          maxLength={500}
+          rows={2}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={t("moderation.suspend.notePlaceholder")}
+          className={`${inputClass} py-2`}
+        />
+      </label>
+      <p className="text-xs leading-relaxed text-[var(--engine-text-muted)]">{t("moderation.suspend.effects")}</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={busy} className={dangerButton}>
+          <Ban size={14} aria-hidden="true" />
+          {t("moderation.suspend.confirm")}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy} className={quietButton}>
+          {t("common.cancel")}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 const targetLink = (group) => {
   const { targetType, targetId, context } = group;
@@ -47,6 +117,10 @@ export function Moderation({ user }) {
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState("");
+  const [suspendingKey, setSuspendingKey] = useState("");
+  const [suspensions, setSuspensions] = useState([]);
+  const [handle, setHandle] = useState("");
+  const [handleTarget, setHandleTarget] = useState(null);
 
   useEffect(() => {
     if (!isAdmin) return undefined;
@@ -67,6 +141,84 @@ export function Moderation({ user }) {
       alive = false;
     };
   }, [isAdmin, version, t, toast]);
+
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    let alive = true;
+    listSuspensions()
+      .then((rows) => {
+        if (alive) setSuspensions(rows);
+      })
+      .catch((error) => {
+        // Migration ainda não aplicada, ou rede: a fila de denúncias segue.
+        console.warn("[moderation] suspensões indisponíveis", error);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, version]);
+
+  const suspend = async (key, { userId, reason, note, reportId = null }) => {
+    if (busy) return;
+    setBusy(key);
+    try {
+      await suspendAccount({ userId, reason, note, reportId });
+      toast(t("moderation.suspend.done"));
+      setSuspendingKey("");
+      setHandle("");
+      setHandleTarget(null);
+      setVersion((value) => value + 1);
+    } catch (error) {
+      console.error(error);
+      toast(
+        error?.message === "already-suspended" ? t("moderation.suspend.already") : t("moderation.actionError"),
+        "error",
+      );
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const lift = async (item) => {
+    if (busy) return;
+    const ok = await confirm({
+      title: t("moderation.suspend.liftTitle"),
+      message: t("moderation.suspend.liftMessage", { name: item.author || item.username || item.userId }),
+      confirmLabel: t("moderation.suspend.lift"),
+    });
+    if (!ok) return;
+    setBusy(`lift:${item.userId}`);
+    try {
+      await liftSuspension(item.userId);
+      toast(t("moderation.suspend.lifted"));
+      setVersion((value) => value + 1);
+    } catch (error) {
+      console.error(error);
+      toast(t("moderation.actionError"), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const findHandle = async (event) => {
+    event.preventDefault();
+    if (busy || !handle.trim()) return;
+    setBusy("handle");
+    try {
+      const userId = await findUserIdByUsername(handle);
+      if (!userId) {
+        toast(t("moderation.suspend.notFound"), "error");
+        setHandleTarget(null);
+      } else {
+        setHandleTarget({ userId, handle: `@${handle.trim().replace(/^@+/, "")}` });
+      }
+    } catch (error) {
+      console.error(error);
+      toast(t("moderation.actionError"), "error");
+    } finally {
+      setBusy("");
+    }
+  };
 
   // Um cartão por alvo, mais denunciado primeiro; empate, o mais antigo.
   const groups = useMemo(() => {
@@ -264,12 +416,105 @@ export function Moderation({ user }) {
                     <XCircle size={14} aria-hidden="true" />
                     {t("moderation.dismiss")}
                   </button>
+                  {UUID.test(group.reportedUserId || "") && group.reportedUserId !== user?.uid && (
+                    <button
+                      type="button"
+                      disabled={Boolean(busy)}
+                      onClick={() => setSuspendingKey(suspendingKey === group.key ? "" : group.key)}
+                      aria-expanded={suspendingKey === group.key}
+                      className={quietButton}
+                    >
+                      <Ban size={14} aria-hidden="true" />
+                      {t("moderation.suspend.action")}
+                    </button>
+                  )}
                 </div>
+                {suspendingKey === group.key && (
+                  <SuspendForm
+                    defaultReason={minor ? "minor" : reasonCode(group.reports[0].reason)}
+                    busy={Boolean(busy)}
+                    onCancel={() => setSuspendingKey("")}
+                    onSubmit={(values) =>
+                      suspend(group.key, { userId: group.reportedUserId, reportId: group.reports[0].id, ...values })
+                    }
+                  />
+                )}
               </li>
             );
           })}
         </ul>
       )}
+
+      <section
+        aria-labelledby="moderation-suspensions"
+        className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4 sm:p-5"
+      >
+        <h2 id="moderation-suspensions" className="flex items-center gap-2 text-base font-extrabold text-[var(--engine-text)]">
+          <Ban size={18} className="text-[var(--engine-accent)]" aria-hidden="true" />
+          {t("moderation.suspend.listTitle")}
+        </h2>
+        <p className="mt-1 text-sm text-[var(--engine-text-muted)]">{t("moderation.suspend.listCopy")}</p>
+
+        <form onSubmit={findHandle} className="mt-4 flex flex-wrap gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">{t("moderation.suspend.byHandle")}</span>
+            <input
+              value={handle}
+              onChange={(event) => {
+                setHandle(event.target.value);
+                setHandleTarget(null);
+              }}
+              placeholder={t("moderation.suspend.byHandle")}
+              autoCapitalize="none"
+              autoCorrect="off"
+              className={`${inputClass} h-11`}
+            />
+          </label>
+          <button type="submit" disabled={Boolean(busy) || !handle.trim()} className={quietButton}>
+            {t("moderation.suspend.find")}
+          </button>
+        </form>
+        {handleTarget && (
+          <div className="mt-2">
+            <p className="text-sm font-bold text-[var(--engine-text)]">{handleTarget.handle}</p>
+            {handleTarget.userId === user?.uid ? (
+              <p className="mt-1 text-xs text-[var(--engine-text-muted)]">{t("moderation.suspend.self")}</p>
+            ) : (
+              <SuspendForm
+                busy={Boolean(busy)}
+                onCancel={() => setHandleTarget(null)}
+                onSubmit={(values) => suspend("handle", { userId: handleTarget.userId, ...values })}
+              />
+            )}
+          </div>
+        )}
+
+        {suspensions.length === 0 ? (
+          <p className="mt-4 text-sm italic text-[var(--engine-text-subtle)]">{t("moderation.suspend.none")}</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-[var(--engine-border)]">
+            {suspensions.map((item) => (
+              <li key={item.userId} className="flex flex-wrap items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-[var(--engine-text)]">
+                    {item.author || t("moderation.suspend.noName")}{" "}
+                    <span className="font-semibold text-[var(--engine-text-subtle)]">{item.username}</span>
+                  </p>
+                  <p className="text-xs text-[var(--engine-text-muted)]">
+                    {t(`suspension.reasons.${item.reason}`, { defaultValue: item.reason })} ·{" "}
+                    {dateFormat.format(new Date(item.createdAt))}
+                    {item.note ? ` — ${item.note}` : ""}
+                  </p>
+                </div>
+                <button type="button" disabled={Boolean(busy)} onClick={() => lift(item)} className={quietButton}>
+                  <Undo2 size={14} aria-hidden="true" />
+                  {t("moderation.suspend.lift")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </section>
   );
 }
