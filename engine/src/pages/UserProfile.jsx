@@ -9,6 +9,8 @@ import {
   UserPlus,
   UserCheck,
   Mail,
+  Flag,
+  UserX,
 } from "lucide-react";
 import { engineDB } from "../services/db";
 import { auth } from "../services/supabase";
@@ -16,6 +18,10 @@ import { EditProfileModal } from "../components/EditProfileModal";
 import { AchievementsTab } from "../components/achievements/AchievementsTab";
 import { listAchievements } from "../services/achievements";
 import { profileCardFromSettings, startConversation } from "../services/chat";
+import { useConfirm } from "../components/ConfirmProvider";
+import { useToast } from "../components/ToastProvider";
+import { useRequireAccount } from "../hooks/useRequireAccount";
+import { useSocialReport } from "../hooks/useSocialReport";
 
 // Banner will be solid color gradient - no default image
 const DEFAULT_BANNER_GRADIENT = "from-[var(--engine-accent)] to-[var(--engine-accent)]/70";
@@ -78,6 +84,13 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const currentUserId = user?.uid || auth.currentUser?.uid;
+  const confirm = useConfirm();
+  const toast = useToast();
+  const requireAccount = useRequireAccount(user?.uid ? user : currentUserId ? { uid: currentUserId } : null);
+  const { openReport, reportDialog } = useSocialReport();
+  // Números de seguidores/seguindo vêm de uma função pública do banco: a
+  // lista é só para quem tem conta, e o visitante via "0".
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
 
   const [profile, setProfile] = useState(null);
   const [userGoals, setUserGoals] = useState([]);
@@ -156,6 +169,10 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       setUnlockedAchievements(new Set());
       setLikesReceived(0);
       setIsFollowing(false);
+      setFollowCounts({ followers: 0, following: 0 });
+      engineDB.getFollowCounts(userProfile.userId).then((counts) => {
+        if (vivo) setFollowCounts(counts);
+      });
 
       // O perfil é a vitrine pública: mesmo no próprio perfil mostramos só
       // as metas publicadas na comunidade, nunca a garagem inteira — quem
@@ -208,7 +225,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   }, [identifier, currentUserId, navigate, reloadKey]);
 
   const handleFollow = async () => {
-    if (!currentUserId || !profile) return;
+    if (!profile || requireAccount()) return;
     try {
       if (isFollowing) {
         await engineDB.unfollowUser(currentUserId, profile.userId);
@@ -216,6 +233,10 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         await engineDB.followUser(currentUserId, profile.userId);
       }
       setIsFollowing(!isFollowing);
+      setFollowCounts((current) => ({
+        ...current,
+        followers: Math.max(0, current.followers + (isFollowing ? -1 : 1)),
+      }));
       // O contador é o tamanho da lista de seguidores, lida uma vez ao abrir
       // o perfil: sem mexer nela aqui, seguir mudava o botão e o número
       // continuava 0 (conferido no emulador com o vínculo já gravado).
@@ -226,11 +247,36 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       );
     } catch (error) {
       console.error("Error updating follow status:", error);
+      toast(t("socialFixes.writeError"), "error");
+    }
+  };
+
+  const handleReportProfile = () => {
+    if (!profile || requireAccount()) return;
+    openReport({ targetType: "profile", targetId: profile.userId, reportedUserId: profile.userId });
+  };
+
+  const handleBlockProfile = async () => {
+    if (!profile || requireAccount()) return;
+    const ok = await confirm({
+      title: t("community.blockTitle"),
+      message: t("community.blockMessage", { user: profile.username || profile.author }),
+      confirmLabel: t("community.block"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    try {
+      await engineDB.setUserBlocked(profile.userId, true, currentUserId);
+      toast(t("community.blockedNotice"));
+      navigate("/community", { replace: true });
+    } catch (error) {
+      console.error(error);
+      toast(t("community.blockError"), "error");
     }
   };
 
   const handleMessage = async () => {
-    if (!currentUserId || !profile) return;
+    if (!profile || requireAccount()) return;
     try {
       // Abre (ou reabre) a conversa e vai direto para ela. Antes navegava
       // para `/messages?user=<id>`, mas Mensagens nunca leu esse parâmetro:
@@ -245,6 +291,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       navigate(`/messages/${id}`);
     } catch (error) {
       console.error("Error starting conversation:", error);
+      toast(t("messages.startError"), "error");
     }
   };
 
@@ -281,12 +328,12 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   if (!profile) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center">
-        <p className="mb-4 text-[var(--engine-text)]">Usuário não encontrado</p>
+        <p className="mb-4 text-[var(--engine-text)]">{t("socialFixes.profile.notFound")}</p>
         <button
           onClick={() => navigate("/community")}
           className="text-[var(--engine-accent)] hover:underline"
         >
-          Voltar para Comunidade
+          {t("community.backToFeed")}
         </button>
       </div>
     );
@@ -343,23 +390,23 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                     {userGoals.length}
                   </p>
                   <p className="text-[10px] font-bold uppercase text-[var(--engine-text-muted)] sm:text-[11px]">
-                    Metas
+                    {t("socialFixes.profile.goals")}
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
-                    {followers.length}
+                    {followCounts.followers}
                   </p>
                   <p className="text-[10px] font-bold uppercase text-[var(--engine-text-muted)] sm:text-[11px]">
-                    Seguidores
+                    {t("socialFixes.profile.followers")}
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
-                    {following.length}
+                    {followCounts.following}
                   </p>
                   <p className="text-[10px] font-bold uppercase text-[var(--engine-text-muted)] sm:text-[11px]">
-                    Seguindo
+                    {t("socialFixes.profile.following")}
                   </p>
                 </div>
               </div>
@@ -376,10 +423,11 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             </p>
           </div>
 
-          {/* Bio */}
-          {profile.bio && (
-            <p className="mb-4 text-sm text-[var(--engine-text)] leading-relaxed">
-              {profile.bio}
+          {/* Bio. O perfil público grava a bio como `note` (db.js,
+              getProfileSnapshot); a tela lia `bio` e ela nunca aparecia. */}
+          {(profile.note || profile.bio) && (
+            <p className="mb-4 whitespace-pre-line text-sm text-[var(--engine-text)] leading-relaxed">
+              {profile.note || profile.bio}
             </p>
           )}
 
@@ -397,9 +445,9 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 onClick={() => setIsEditing(true)}
                 className="flex-1 rounded-lg bg-[var(--engine-accent)] py-2 text-xs font-black uppercase tracking-wide text-white transition hover:brightness-95 sm:py-2.5"
               >
-                Editar Perfil
+                {t("socialFixes.profile.edit")}
               </button>
-            ) : currentUserId && currentUserId !== profile?.userId && (
+            ) : (
               <>
                 <button
                   onClick={handleFollow}
@@ -409,14 +457,34 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                       : "bg-[var(--engine-accent)] text-white hover:brightness-95"
                   }`}
                 >
-                  {isFollowing ? "Seguindo" : "Seguir"}
+                  {isFollowing ? t("community.following") : t("community.follow")}
                 </button>
                 <button
                   onClick={handleMessage}
                   className="flex-1 rounded-lg border border-[var(--engine-border)] py-2 text-xs font-black uppercase tracking-wide text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:py-2.5"
                 >
-                  Mensagem
+                  {t("socialFixes.profile.message")}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleReportProfile}
+                  title={t("socialFixes.profile.report")}
+                  aria-label={t("socialFixes.profile.report")}
+                  className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                >
+                  <Flag size={16} />
+                </button>
+                {currentUserId && (
+                  <button
+                    type="button"
+                    onClick={handleBlockProfile}
+                    title={t("community.block")}
+                    aria-label={t("community.block")}
+                    className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                  >
+                    <UserX size={16} />
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -459,7 +527,10 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               {userGoals.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {userGoals.map((goal) => {
-                    const progress = goal.targetValue ? (goal.savedValue / goal.targetValue) * 100 : 0;
+                    // Post dos outros traz só a porcentagem (sem dinheiro).
+                    const progress = goal.targetValue
+                      ? (goal.savedValue / goal.targetValue) * 100
+                      : Number(goal.progress) || 0;
                     return (
                       <div
                         key={goal.id}
@@ -497,19 +568,19 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               ) : (
                 <div className="flex min-h-64 flex-col items-center justify-center text-center">
                   <p className="text-sm font-bold text-[var(--engine-text)]">
-                    Nenhuma meta compartilhada
+                    {t("socialFixes.profile.noGoals")}
                   </p>
                   <p className="mt-1 text-xs text-[var(--engine-text-muted)]">
                     {isOwnProfile
-                      ? "Só aparece aqui o que você publicar na comunidade"
-                      : "Este usuário não compartilhou metas"}
+                      ? t("socialFixes.profile.noGoalsMine")
+                      : t("socialFixes.profile.noGoalsOther")}
                   </p>
                   {isOwnProfile && (
                     <button
                       onClick={() => navigate("/garagem")}
                       className="mt-4 rounded-lg border border-[var(--engine-border)] px-4 py-2 text-xs font-black uppercase tracking-wide text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
                     >
-                      Ir para a Garagem
+                      {t("socialFixes.profile.goGarage")}
                     </button>
                   )}
                 </div>
@@ -532,7 +603,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 <div className="flex min-h-64 flex-col items-center justify-center text-center">
                   <Users size={48} className="mb-3 text-[var(--engine-text-subtle)]" />
                   <p className="text-sm font-bold text-[var(--engine-text)]">
-                    Sem seguidores ainda
+                    {currentUserId ? t("socialFixes.profile.noFollowers") : t("socialFixes.profile.signInToSeeList")}
                   </p>
                 </div>
               )}
@@ -549,7 +620,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 <div className="flex min-h-64 flex-col items-center justify-center text-center">
                   <Users size={48} className="mb-3 text-[var(--engine-text-subtle)]" />
                   <p className="text-sm font-bold text-[var(--engine-text)]">
-                    Não segue ninguém ainda
+                    {currentUserId ? t("socialFixes.profile.noFollowing") : t("socialFixes.profile.signInToSeeList")}
                   </p>
                 </div>
               )}
@@ -590,6 +661,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           }}
         />
       )}
+      {reportDialog}
     </div>
   );
 }

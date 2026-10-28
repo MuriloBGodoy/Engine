@@ -46,6 +46,8 @@ import { AchievementBadge } from "../components/achievements/AchievementBadge";
 import { InfoTip } from "../components/InfoTip";
 import { SpecSheetModal } from "../components/specsheet/SpecSheetModal";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useRequireAccount } from "../hooks/useRequireAccount";
+import { useSocialReport } from "../hooks/useSocialReport";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { ShareToChatModal } from "../components/ShareToChatModal";
@@ -68,8 +70,12 @@ const emptyInteraction = {
   rating: 0,
 };
 
+// Post de outra pessoa não traz dinheiro (só `progress`, 0–100); o próprio
+// post é mesclado com o carro da garagem e ainda tem os valores.
 const getProgress = (goal) =>
-  Math.min(goal.targetValue ? (goal.savedValue / goal.targetValue) * 100 : 0, 100);
+  Number(goal.targetValue) > 0
+    ? Math.min((Number(goal.savedValue) / Number(goal.targetValue)) * 100, 100)
+    : Math.min(Math.max(Number(goal.progress) || 0, 0), 100);
 
 const isGoalCompleted = (goal) => getProgress(goal) >= 100;
 
@@ -594,6 +600,7 @@ export function GoalCard({
   onSendToChat,
   onEditCaption,
   onReport,
+  onReportComment,
   onBlock,
   onCommentClick,
   currentUserId,
@@ -946,6 +953,7 @@ export function GoalCard({
             setEditingDraft("");
           }}
           onDeleteComment={onDeleteComment}
+          onReportComment={onReportComment}
           onCommentMenuChange={setCommentMenuId}
         />
       )}
@@ -975,6 +983,7 @@ function CommentsPanel({
   onSubmitEditComment,
   onCancelEdit,
   onDeleteComment,
+  onReportComment,
   onCommentMenuChange,
   inline = false,
 }) {
@@ -1007,6 +1016,7 @@ function CommentsPanel({
                 onSubmitEditComment={onSubmitEditComment}
                 onCancelEdit={onCancelEdit}
                 onDeleteComment={onDeleteComment}
+                onReportComment={onReportComment}
                 onCommentMenuChange={onCommentMenuChange}
               />
             ))}
@@ -1102,6 +1112,7 @@ function CommentRow({
   onSubmitEditComment,
   onCancelEdit,
   onDeleteComment,
+  onReportComment,
   onCommentMenuChange,
 }) {
   const { i18n } = useTranslation();
@@ -1132,6 +1143,12 @@ function CommentRow({
     typeof comment !== "string" &&
     comment.id &&
     (comment.userId === currentUserId || goal.ownerId === currentUserId);
+  // Comentário de outra pessoa: denunciar (o visitante vai para o login).
+  const canReport =
+    typeof comment !== "string" &&
+    Boolean(comment.id) &&
+    Boolean(onReportComment) &&
+    comment.userId !== currentUserId;
   const isEditing = canEdit && editingCommentId === comment.id;
 
   return (
@@ -1150,7 +1167,7 @@ function CommentRow({
           >
             {commentAuthor} <span className="text-[var(--engine-text-subtle)]">{commentUsername}</span>
           </button>
-          {(canEdit || canDelete) && !isEditing && (
+          {(canEdit || canDelete || canReport) && !isEditing && (
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -1160,7 +1177,8 @@ function CommentRow({
                   )
                 }
                 className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--engine-text-subtle)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] hover:bg-[var(--engine-surface-2)] dark:hover:text-white"
-                title="Opções"
+                title={t("socialFixes.commentOptions")}
+                aria-label={t("socialFixes.commentOptions")}
               >
                 <MoreHorizontal size={16} />
               </button>
@@ -1176,7 +1194,7 @@ function CommentRow({
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]  hover:bg-[var(--engine-surface-2)]"
                     >
                       <Edit3 size={14} />
-                      Editar
+                      {t("socialFixes.editComment")}
                     </button>
                   )}
                   {canDelete && (
@@ -1189,7 +1207,20 @@ function CommentRow({
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]  hover:bg-[var(--engine-surface-2)]"
                     >
                       <Trash2 size={14} />
-                      Excluir
+                      {t("common.delete")}
+                    </button>
+                  )}
+                  {canReport && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onReportComment(goal, comment);
+                        onCommentMenuChange("");
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+                    >
+                      <Flag size={14} />
+                      {t("socialFixes.reportComment")}
                     </button>
                   )}
                 </div>
@@ -1212,14 +1243,14 @@ function CommentRow({
                 type="submit"
                 className="rounded-lg bg-[var(--engine-accent)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white"
               >
-                Salvar
+                {t("common.save")}
               </button>
               <button
                 type="button"
                 onClick={onCancelEdit}
                 className="rounded-lg border border-[var(--engine-border)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-muted)] "
               >
-                Cancelar
+                {t("common.cancel")}
               </button>
             </div>
           </form>
@@ -2064,6 +2095,7 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
                   onSubmitEditComment={submitEditComment}
                   onCancelEdit={cancelEdit}
                   onDeleteComment={cardProps.onDeleteComment}
+                  onReportComment={cardProps.onReportComment}
                   onCommentMenuChange={setCommentMenuId}
                 />
               )}
@@ -2089,6 +2121,7 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
                   onSubmitEditComment={submitEditComment}
                   onCancelEdit={cancelEdit}
                   onDeleteComment={cardProps.onDeleteComment}
+                  onReportComment={cardProps.onReportComment}
                   onCommentMenuChange={setCommentMenuId}
                 />
               </div>
@@ -2399,6 +2432,8 @@ export function Community({ cars = [], settings, user }) {
   };
 
   const flash = (message, tone) => toast(message, tone ? { tone } : undefined);
+  const requireAccount = useRequireAccount(user);
+  const { openReport, reportDialog } = useSocialReport();
 
   // A busca do feed alcança também o texto do post, que num post livre é o
   // conteúdo — procurar só por autor e veículo deixaria ele inalcançável.
@@ -2459,26 +2494,41 @@ export function Community({ cars = [], settings, user }) {
     });
   };
 
+  // Recusa do banco por bloqueio vira frase, não erro cru.
+  const flashWriteError = (error) => {
+    console.error(error);
+    const blocked = /blocked/.test(String(error?.message || error?.code || ""));
+    flash(t(blocked ? "socialFixes.blockedAction" : "socialFixes.writeError"), "error");
+  };
+
+  // Visitante: login e volta para o post (em vez de um toast de sucesso que
+  // não gravou nada).
+  const goalPath = (goalId) => (goalId ? `/community?goal=${encodeURIComponent(goalId)}` : "/community");
+
   const handleLike = (goalId) => {
+    if (requireAccount(goalPath(goalId))) return;
     const goal = goals.find((item) => item.id === goalId);
     const liked = Boolean(goal?.likesBy?.[user?.uid]);
-    engineDB.toggleCommunityLike(goalId, !liked, user?.uid).catch((error) =>
-      console.error(error),
-    );
+    engineDB.toggleCommunityLike(goalId, !liked, user?.uid).catch(flashWriteError);
   };
 
-  const handleComment = (goalId, comment) => {
-    engineDB.addCommunityComment(goalId, comment, user?.uid).catch((error) =>
-      console.error(error),
-    );
-    flash(t("community.commentSaved"));
+  const handleComment = async (goalId, comment) => {
+    if (requireAccount(`${goalPath(goalId)}&comments=1`)) return;
+    try {
+      await engineDB.addCommunityComment(goalId, comment, user?.uid);
+      flash(t("community.commentSaved"));
+    } catch (error) {
+      flashWriteError(error);
+    }
   };
 
-  const handleEditComment = (goalId, commentId, text) => {
-    engineDB.updateCommunityComment(goalId, commentId, text, user?.uid).catch((error) =>
-      console.error(error),
-    );
-    flash("Comentário atualizado.");
+  const handleEditComment = async (goalId, commentId, text) => {
+    try {
+      await engineDB.updateCommunityComment(goalId, commentId, text, user?.uid);
+      flash(t("socialFixes.commentUpdated"));
+    } catch (error) {
+      flashWriteError(error);
+    }
   };
 
   const handleDeleteComment = async (goalId, commentId) => {
@@ -2488,20 +2538,26 @@ export function Community({ cars = [], settings, user }) {
       confirmLabel: t("common.delete"),
     });
     if (!ok) return;
-    engineDB.deleteCommunityComment(goalId, commentId, user?.uid).catch((error) =>
-      console.error(error),
-    );
-    flash(t("community.commentDeleted"));
+    try {
+      await engineDB.deleteCommunityComment(goalId, commentId, user?.uid);
+      flash(t("community.commentDeleted"));
+    } catch (error) {
+      flashWriteError(error);
+    }
   };
 
-  const handleRate = (goalId, rating) => {
-    engineDB.rateCommunityGoal(goalId, rating, user?.uid).catch((error) =>
-      console.error(error),
-    );
-    flash(t("community.ratingSaved"));
+  const handleRate = async (goalId, rating) => {
+    if (requireAccount(goalPath(goalId))) return;
+    try {
+      await engineDB.rateCommunityGoal(goalId, rating, user?.uid);
+      flash(t("community.ratingSaved"));
+    } catch (error) {
+      flashWriteError(error);
+    }
   };
 
   const handleFollow = (target) => {
+    if (requireAccount()) return;
     // Aceita tanto uma meta do feed (ownerId) quanto um perfil (userId).
     const ownerId = target.ownerId || target.userId || "";
     const followId = ownerId || target.username;
@@ -2700,30 +2756,24 @@ export function Community({ cars = [], settings, user }) {
     }
   };
 
-  const handleReportGoal = async (goal) => {
-    const ok = await confirm({
-      title: t("community.reportTitle"),
-      message: t("community.reportMessage"),
-      confirmLabel: t("community.report"),
-      cancelLabel: t("common.cancel"),
-    });
-    if (!ok) return;
+  const handleReportGoal = (goal) => {
+    if (requireAccount(goalPath(goal.id))) return;
+    openReport({ targetType: "goal", targetId: goal.id, reportedUserId: goal.ownerId });
+  };
 
-    try {
-      await engineDB.reportContent({
-        targetType: "goal",
-        targetId: goal.id,
-        reportedUserId: goal.ownerId,
-      });
-      flash(t("community.reportSent"));
-    } catch (error) {
-      console.error(error);
-      flash(t("community.reportError"), "error");
-    }
+  // Comentário: o alvo é "<post>#<comentário>" (o banco lê o texto dali).
+  const handleReportComment = (goal, comment) => {
+    if (requireAccount(`${goalPath(goal.id)}&comments=1`)) return;
+    openReport({
+      targetType: "comment",
+      targetId: `${goal.id}#${comment.id}`,
+      reportedUserId: comment.userId || "",
+    });
   };
 
   const handleBlockUser = async (goal) => {
     if (!goal.ownerId) return;
+    if (requireAccount()) return;
     const ok = await confirm({
       title: t("community.blockTitle"),
       message: t("community.blockMessage", { user: goal.username || goal.author }),
@@ -2849,6 +2899,24 @@ export function Community({ cars = [], settings, user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composeClubId, user?.uid]);
 
+  // `?compose=1` (sem clube) abre o compositor; `?share=1` abre "publicar meu
+  // carro" — é para onde o "Publicar meu carro" da garagem do clube leva.
+  // Visitante que chegou aqui pelo login volta com o parâmetro e cai no modal.
+  const composeFree = searchParams.get("compose") === "1" && !searchParams.get("club");
+  const shareRequested = searchParams.get("share") === "1";
+  useEffect(() => {
+    if (!user?.uid || (!composeFree && !shareRequested)) return undefined;
+    const timer = window.setTimeout(() => {
+      if (composeFree) setPostModalOpen(true);
+      if (shareRequested) setShareModalOpen(true);
+      const params = new URLSearchParams(searchParams);
+      params.delete("compose");
+      params.delete("share");
+      setSearchParams(params, { replace: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [composeFree, shareRequested, user?.uid, searchParams, setSearchParams]);
+
   return (
     <section className="pb-4 sm:pb-8">
       {/* Coluna única centrada + trilho à direita, como as redes que servem
@@ -2904,6 +2972,24 @@ export function Community({ cars = [], settings, user }) {
                 }`}
               >
                 <Search size={18} />
+              </button>
+            )}
+
+            {/* Publicar em qualquer largura: abaixo de 1280px o trilho lateral
+                (onde moram "Publicar" e "Compartilhar meta") não aparece, e o
+                celular ficava sem caminho para publicar. */}
+            {topLevelTab === "goals" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (requireAccount("/community?compose=1")) return;
+                  setPostModalOpen(true);
+                }}
+                title={t("feedPost.action")}
+                aria-label={t("feedPost.action")}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--engine-accent)] text-white transition hover:brightness-95 xl:hidden"
+              >
+                <Plus size={18} />
               </button>
             )}
 
@@ -2994,6 +3080,7 @@ export function Community({ cars = [], settings, user }) {
                             onSendToChat={setPostToShare}
                             onEditCaption={setCaptionGoal}
                             onReport={handleReportGoal}
+                            onReportComment={handleReportComment}
                             onBlock={handleBlockUser}
                             currentUserId={user?.uid}
                           />
@@ -3205,6 +3292,7 @@ export function Community({ cars = [], settings, user }) {
             onSendToChat: setPostToShare,
             onEditCaption: setCaptionGoal,
             onReport: handleReportGoal,
+            onReportComment: handleReportComment,
             onBlock: handleBlockUser,
             currentUserId: user?.uid,
           }}
@@ -3219,6 +3307,8 @@ export function Community({ cars = [], settings, user }) {
           onSave={handleSaveCaption}
         />
       )}
+
+      {reportDialog}
 
       <ShareToChatModal
         open={Boolean(postToShare)}

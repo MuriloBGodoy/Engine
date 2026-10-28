@@ -13,6 +13,8 @@ import {
   Image,
   Check,
   CheckCheck,
+  Flag,
+  UserX,
 } from "lucide-react";
 import {
   attachmentSummary,
@@ -31,6 +33,8 @@ import {
   subscribeMessages,
 } from "../services/chat";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useSocialReport } from "../hooks/useSocialReport";
+import { engineDB } from "../services/db";
 import { useProfileSearch } from "../hooks/useProfileSearch";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -54,6 +58,7 @@ const matchesQuery = (person, term) =>
  */
 export function Messages({ user, settings }) {
   const { t, i18n } = useTranslation();
+  const { openReport, reportDialog } = useSocialReport();
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
@@ -176,9 +181,35 @@ export function Messages({ user, settings }) {
     } catch (error) {
       console.error(error);
       setDraft(text);
-      toast(t("messages.sendError"));
+      // Bloqueio (de qualquer um dos lados) é recusado pelo banco.
+      toast(t(/blocked/.test(String(error?.message || error?.code || "")) ? "socialFixes.blockedAction" : "messages.sendError"));
     } finally {
       setSending(false);
+    }
+  };
+
+  // Denunciar uma mensagem recebida: o banco confere que quem denuncia está
+  // na conversa e guarda o texto para a moderação.
+  const handleReportMessage = (message) => {
+    openReport({ targetType: "message", targetId: message.id, reportedUserId: message.senderId || "" });
+  };
+
+  const handleBlockPartner = async () => {
+    if (!partner?.userId) return;
+    const ok = await confirm({
+      title: t("community.blockTitle"),
+      message: t("community.blockMessage", { user: partner.username || partner.author }),
+      confirmLabel: t("community.block"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    try {
+      await engineDB.setUserBlocked(partner.userId, true, userId);
+      toast(t("community.blockedNotice"));
+      navigate("/messages");
+    } catch (error) {
+      console.error(error);
+      toast(t("community.blockError"));
     }
   };
 
@@ -415,6 +446,17 @@ export function Messages({ user, settings }) {
                   <UserRound size={19} />
                 </button>
               )}
+              {partner?.userId && !partner?.deleted && (
+                <button
+                  type="button"
+                  onClick={handleBlockPartner}
+                  title={t("community.block")}
+                  aria-label={t("community.block")}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+                >
+                  <UserX size={19} />
+                </button>
+              )}
             </header>
 
             <MessageList
@@ -425,6 +467,7 @@ export function Messages({ user, settings }) {
               t={t}
               onOpenPost={(goalId) => navigate(`/community?goal=${encodeURIComponent(goalId)}`)}
               onDelete={handleDeleteMessage}
+              onReport={handleReportMessage}
             />
 
             {partner?.deleted ? (
@@ -526,6 +569,7 @@ export function Messages({ user, settings }) {
           </div>
         )}
       </div>
+      {reportDialog}
     </section>
   );
 }
@@ -589,7 +633,7 @@ function ConversationRow({
   );
 }
 
-function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDelete }) {
+function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDelete, onReport }) {
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -638,6 +682,7 @@ function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDel
               t={t}
               onOpenPost={onOpenPost}
               onDelete={onDelete}
+              onReport={onReport}
             />
         </div>
       ))}
@@ -645,7 +690,7 @@ function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDel
   );
 }
 
-function MessageBubble({ message, mine, locale, t, onOpenPost, onDelete }) {
+function MessageBubble({ message, mine, locale, t, onOpenPost, onDelete, onReport }) {
   const attachment = message.attachment;
   const imageData = message.imageData;
   const gifData = message.gifData;
@@ -741,6 +786,18 @@ function MessageBubble({ message, mine, locale, t, onOpenPost, onDelete }) {
           )}
         </div>
       </div>
+
+      {!mine && onReport && (
+        <button
+          type="button"
+          onClick={() => onReport(message)}
+          title={t("socialFixes.reportMessage")}
+          aria-label={t("socialFixes.reportMessage")}
+          className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-subtle)] opacity-60 transition hover:text-[var(--engine-accent)] focus:opacity-100 group-hover:opacity-100 sm:opacity-0"
+        >
+          <Flag size={13} />
+        </button>
+      )}
     </div>
   );
 }

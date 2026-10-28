@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "lucide-react";
+import { Flag, Loader2 } from "lucide-react";
 import { ClubHeader, ClubTabs } from "./ClubHeader";
 import { ClubWall, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./ClubPanels";
 import { ClubCaptainPanel } from "./ClubCaptainPanel";
@@ -19,6 +19,8 @@ import { useToast } from "../ToastProvider";
 import { clubColorVars, clubMatchesCar } from "../../services/clubStyles";
 import { useIsDark } from "../../hooks/useIsDark";
 import { auth } from "../../services/supabase";
+import { useSocialReport } from "../../hooks/useSocialReport";
+import { authPath } from "../../services/authRedirect";
 
 /**
  * O corpo da página do clube — cabeçalho, as 5 abas e o painel do capitão.
@@ -31,6 +33,7 @@ import { auth } from "../../services/supabase";
 export function ClubDetail({ clubId, onClose }) {
   const isDark = useIsDark();
   const { t } = useTranslation();
+  const { openReport, reportDialog } = useSocialReport();
   const navigate = useNavigate();
   const showToast = useToast();
 
@@ -184,7 +187,9 @@ export function ClubDetail({ clubId, onClose }) {
           loading={loadingGarage}
           isMember={isMember}
           hasOwnCar={hasOwnCar}
-          onPublish={() => navigate("/garagem")}
+          // A Garagem não tem ação de publicar: o botão levava a um beco sem
+          // saída. Agora abre o "publicar meu carro" da Comunidade.
+          onPublish={() => navigate("/community?share=1")}
         />
       ) : null}
 
@@ -215,7 +220,28 @@ export function ClubDetail({ clubId, onClose }) {
         </div>
       ) : null}
 
-      {tab === "about" ? <ClubAbout club={club} isMember={isMember} /> : null}
+      {tab === "about" ? (
+        <div className="space-y-3">
+          <ClubAbout club={club} isMember={isMember} />
+          {role !== "founder" && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!uid) {
+                  navigate(authPath("/login", `/clubs/${clubId}`));
+                  return;
+                }
+                openReport({ targetType: "club", targetId: String(clubId), reportedUserId: club.founderId || "" });
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent)]"
+            >
+              <Flag size={14} aria-hidden="true" />
+              {t("socialFixes.reportClub")}
+            </button>
+          )}
+        </div>
+      ) : null}
+      {reportDialog}
     </div>
   );
 }
