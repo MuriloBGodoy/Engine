@@ -17,6 +17,7 @@
  * Aqui a imagem é redesenhada num canvas no tamanho que a tela realmente usa e
  * re-codificada em JPEG, caindo de megabytes para dezenas de KB.
  */
+import { blobToDataUrl, decodeImage, drawToCanvas, encodeCanvas } from "./cleanImage.js";
 
 /** Avatar aparece no máximo a ~120px; 2x cobre tela retina. */
 // Teto de 48 KB (era 200 KB): o avatar é copiado para o perfil público E
@@ -53,41 +54,29 @@ export const bytesDoDataUri = (dataUri = "") => {
   return Math.floor((base64.length * 3) / 4) - enchimento;
 };
 
-const carregarImagem = (file) =>
-  new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("imagem ilegível"));
-    };
-    img.src = url;
-  });
-
 /**
  * Devolve um data URI JPEG dentro do teto, ou lança.
  *
  * Se mesmo no tamanho alvo o arquivo passar do teto, baixa a qualidade em
  * degraus antes de desistir — desistir calado foi exatamente o problema.
+ *
+ * Decodificação e codificação são as de services/cleanImage.js: a foto sai
+ * girada como foi tirada e sem EXIF (GPS, aparelho).
  */
 export const reduzirImagem = async (file, opcoes = AVATAR) => {
   const { largura: maxL, altura: maxA, qualidade, tetoBytes } = opcoes;
-  const img = await carregarImagem(file);
-  const destino = calcularDestino(img.naturalWidth, img.naturalHeight, maxL, maxA);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = destino.largura;
-  canvas.height = destino.altura;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, destino.largura, destino.altura);
+  const decodificada = await decodeImage(file);
+  let canvas;
+  try {
+    const destino = calcularDestino(decodificada.width, decodificada.height, maxL, maxA);
+    canvas = drawToCanvas(decodificada, destino.largura, destino.altura);
+  } finally {
+    decodificada.close();
+  }
 
   for (const q of [qualidade, 0.7, 0.55, 0.4]) {
-    const dataUri = canvas.toDataURL("image/jpeg", q);
-    if (bytesDoDataUri(dataUri) <= tetoBytes) return dataUri;
+    const blob = await encodeCanvas(canvas, q);
+    if (blob.size <= tetoBytes) return blobToDataUrl(blob);
   }
   throw new Error("imagem muito pesada mesmo depois de reduzida");
 };

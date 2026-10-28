@@ -1,53 +1,16 @@
-export async function compressImage(
-  imageUrl,
-  maxWidth = 1600,
-  quality = 0.8,
-  isGif = false,
-) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      // GIFs: manter como é (sem reconverter)
-      if (isGif) {
-        fetch(imageUrl)
-          .then((res) => res.blob())
-          .then(resolve)
-          .catch(reject);
-        return;
-      }
+import { reencodeImage } from "./cleanImage.js";
 
-      const canvas = document.createElement("canvas");
-      let { width, height } = img;
-
-      if (width > height && width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      } else if (height > maxWidth) {
-        width = Math.round((width * maxWidth) / height);
-        height = maxWidth;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error("Failed to compress image"));
-            return;
-          }
-          resolve(blob);
-        },
-        "image/jpeg",
-        quality,
-      );
-    };
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = imageUrl;
-  });
+/**
+ * Foto da conversa (DM): reduzida e re-codificada pela limpeza comum de
+ * services/cleanImage.js — girada certo e sem EXIF (GPS). Fica no registro da
+ * mensagem como data URL.
+ *
+ * GIF enviado pela pessoa segue como veio: redesenhar mataria a animação, e
+ * GIF não carrega EXIF.
+ */
+export async function compressImage(imageUrl, maxWidth = 1600, quality = 0.8, isGif = false) {
+  if (isGif) return (await fetch(imageUrl)).blob();
+  return reencodeImage(imageUrl, { maxWidth, quality });
 }
 
 export function readFileAsDataUrl(file) {

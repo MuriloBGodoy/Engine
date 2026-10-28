@@ -3,6 +3,7 @@ import { X, ZoomIn, ZoomOut, RotateCw, RotateCcw, Save } from "lucide-react";
 import Cropper from "react-easy-crop";
 import { useTranslation } from "react-i18next";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
+import { cleanFileFrom, encodeCanvas } from "../services/cleanImage";
 
 export function ImageCropper({ imageFile, isOpen, onClose, onSave }) {
   const { t } = useTranslation();
@@ -72,13 +73,8 @@ export function ImageCropper({ imageFile, isOpen, onClose, onSave }) {
           finalHeight,
         );
 
-        canvas.toBlob(
-          (blob) => {
-            resolve(blob);
-          },
-          "image/jpeg",
-          0.82,
-        );
+        // Mesma codificação de toda foto que sobe: JPEG sem metadados.
+        encodeCanvas(canvas, 0.82).then(resolve, () => resolve(null));
       };
     });
   };
@@ -108,7 +104,8 @@ export function ImageCropper({ imageFile, isOpen, onClose, onSave }) {
 
       // Cria um File object a partir do blob para compatibilidade com uploadUserPhoto
       const fileName = `cropped-${Date.now()}.jpg`;
-      const file = new File([croppedBlob], fileName, { type: "image/jpeg" });
+      // Marcado como limpo: o upload não recomprime de novo.
+      const file = cleanFileFrom(croppedBlob, fileName);
 
       const result = await onSave(file);
 

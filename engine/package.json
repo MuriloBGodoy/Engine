@@ -16,6 +16,7 @@
     "check:android": "node scripts/check-android-contract.mjs",
     "check:escala": "node scripts/check-escala.mjs",
     "check:imagens": "node scripts/check-imagens.mjs",
+    "check:exif": "node scripts/check-exif.mjs",
     "check:affordability": "node scripts/check-affordability.mjs",
     "check:spec-sheet": "node scripts/check-spec-sheet.mjs",
     "check:garage-input": "node scripts/check-garage-input.mjs",

@@ -1,4 +1,5 @@
 import { must, supabase } from "./supabase";
+import { blobToDataUrl, ensureCleanImage, isCleanImage, reencodeImage, stripJpegFile } from "./cleanImage.js";
 
 /**
  * Upload de fotos do usuário.
@@ -37,48 +38,13 @@ const withUploadTimeout = (promise) =>
     }),
   ]);
 
-// Desenha o arquivo num canvas redimensionado e entrega o resultado no
-// formato pedido: "blob" (para upload no Storage) ou "dataURL" (fallback no
-// registro). Centraliza a leitura/redimensionamento das duas rotas.
-const renderCompressed = (file, { maxSize, quality, output }) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
-    reader.onload = () => {
-      const image = new Image();
-      image.onerror = () => reject(new Error("Imagem inválida."));
-      image.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
-
-        const context = canvas.getContext("2d");
-        if (!context) {
-          reject(new Error("Não foi possível preparar a imagem."));
-          return;
-        }
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        if (output === "blob") {
-          canvas.toBlob(
-            (blob) =>
-              blob
-                ? resolve(blob)
-                : reject(new Error("Não foi possível comprimir a imagem.")),
-            "image/jpeg",
-            quality,
-          );
-          return;
-        }
-
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      image.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
+// Toda foto passa pela limpeza de services/cleanImage.js: redesenhada no
+// canvas já girada, re-codificada em JPEG, sem EXIF (GPS). "blob" vai para o
+// Storage; "dataURL" é o fallback que cai dentro do registro.
+const renderCompressed = async (file, { maxSize, quality, output }) => {
+  const blob = await reencodeImage(file, { maxWidth: maxSize, quality });
+  return output === "blob" ? blob : blobToDataUrl(blob);
+};
 
 // Fallback pequeno para caber no registro (data URL base64).
 export const compressImageFile = (file) =>
@@ -108,10 +74,13 @@ export const isFileTooBig = (file) => (file?.size || 0) > MAX_FILE_BYTES;
  * O caminho tem que começar por `users/<uid do logado>/` — é a única pasta em
  * que o banco deixa cada pessoa escrever.
  */
-export const uploadToStorage = async (path, payload, contentType) => {
+export const uploadToStorage = async (path, payload) => {
+  // Última barreira: nada sobe sem passar pela limpeza de metadados, venha
+  // de onde vier. O que já saiu limpo passa direto.
+  const clean = await ensureCleanImage(payload, { maxWidth: UPLOAD_MAX_SIZE, quality: UPLOAD_QUALITY });
   must(
-    await supabase.storage.from(BUCKET).upload(path, payload, {
-      contentType,
+    await supabase.storage.from(BUCKET).upload(path, clean, {
+      contentType: "image/jpeg",
       cacheControl: "31536000",
       upsert: false,
     }),
@@ -129,7 +98,7 @@ export const storeDataUri = async (dataUri, { userId, folder }) => {
   try {
     const blob = await (await fetch(dataUri)).blob();
     const path = `users/${userId}/${folder}/${Date.now()}-${crypto.randomUUID()}.jpg`;
-    return await withUploadTimeout(uploadToStorage(path, blob, blob.type || "image/jpeg"));
+    return await withUploadTimeout(uploadToStorage(path, blob));
   } catch (error) {
     console.warn("[photos] Storage indisponível, mantendo a imagem no registro.", error);
     return dataUri;
@@ -147,27 +116,25 @@ export const uploadUserPhoto = async (file, { userId, folder }) => {
     const path = `users/${userId}/${folder}/${Date.now()}-${crypto.randomUUID()}-${safeName}.jpg`;
 
     try {
+      // Sempre redesenhada, inclusive JPEG pequeno: era aqui que a foto
+      // crua subia com o GPS. O recorte da garagem já entrega limpo.
       let payload = file;
-      let contentType = file.type;
-      const isSmallJpeg = file.type === "image/jpeg" && file.size < 500 * 1024;
-
-      if (!isSmallJpeg) {
+      if (!isCleanImage(file)) {
         try {
           payload = await renderCompressed(file, {
             maxSize: UPLOAD_MAX_SIZE,
             quality: UPLOAD_QUALITY,
             output: "blob",
           });
-          contentType = "image/jpeg";
         } catch (compressError) {
-          console.warn(
-            "[photos] Falha ao comprimir, subindo original.",
-            compressError,
-          );
+          // Canvas falhou (memória, formato): JPEG ainda sobe, só sem os
+          // metadados e sem recomprimir. Outro formato não sobe cru.
+          console.warn("[photos] Falha ao comprimir, limpando o original.", compressError);
+          payload = await stripJpegFile(file);
         }
       }
 
-      return await withUploadTimeout(uploadToStorage(path, payload, contentType));
+      return await withUploadTimeout(uploadToStorage(path, payload));
     } catch (error) {
       console.warn("[photos] Storage indisponível, comprimindo local.", error);
     }
