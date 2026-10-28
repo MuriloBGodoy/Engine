@@ -1,14 +1,18 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { Fuel, Gauge, Loader2, Receipt, Sparkles, Trash2, X } from "lucide-react";
+import { Check, Fuel, Gauge, Loader2, Receipt, Sparkles, Trash2, X } from "lucide-react";
 import { engineDB } from "../services/db";
-import { EXPENSE_CATEGORIES, expenseInsights } from "../services/expenses";
+import { EXPENSE_CATEGORIES, FUEL_TYPES, expenseInsights } from "../services/expenses";
+import { localISODate, validateExpense } from "../services/garageInput";
+import { useConfirm } from "./ConfirmProvider";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatCarName } from "../services/carDisplay";
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Fuso do aparelho. Era `toISOString()` (UTC): no Brasil, depois das 21h o
+// gasto nascia com a data de amanha.
+const today = () => localISODate();
 
 /** Categorias em que faz sentido oferecer um prestador logo depois do lançamento. */
 const SERVICE_CATEGORIES = ["cleaning", "maintenance", "tires"];
@@ -20,6 +24,11 @@ const emptyForm = () => ({
   odometer: "",
   liters: "",
   note: "",
+  // Combustivel e tanque cheio: sem eles o km/l nao e medicao. Ficam entre um
+  // lancamento e outro (como a categoria), porque quem abastece costuma
+  // repetir o mesmo.
+  fuel: "",
+  fullTank: false,
 });
 
 /**
@@ -38,6 +47,7 @@ export function ExpensesModal({ car, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [lastCategory, setLastCategory] = useState("");
+  const confirm = useConfirm();
 
   const insights = useMemo(() => expenseInsights(car || {}), [car]);
 
@@ -54,6 +64,10 @@ export function ExpensesModal({ car, onClose, onSaved }) {
       maximumFractionDigits: digits,
     }).format(value || 0);
 
+  // Valor de um lancamento: centavos so quando existem ("R$ 230,50", nunca
+  // "R$ 231").
+  const exact = (value) => money(value, Number(value) % 1 ? 2 : 0);
+
   const decimal = (value, digits = 1) =>
     new Intl.NumberFormat(i18n.language, {
       minimumFractionDigits: digits,
@@ -63,15 +77,47 @@ export function ExpensesModal({ car, onClose, onSaved }) {
   const setField = (field) => (event) =>
     setForm((current) => ({ ...current, [field]: event.target.value }));
 
-  const parseAmount = (value) =>
-    Number(String(value).replace(/\./g, "").replace(",", "."));
+  const km = (value) => `${new Intl.NumberFormat(i18n.language).format(value || 0)} km`;
+
+  // Parametros das mensagens de plausibilidade, cada um na sua unidade.
+  const inputParams = (key, params = {}) => {
+    if (key.includes("odometer")) {
+      return { value: km(params.value), previous: km(params.previous), max: km(params.max) };
+    }
+    if (key.includes("liters")) {
+      return {
+        value: decimal(params.value),
+        max: new Intl.NumberFormat(i18n.language).format(params.max || 0),
+      };
+    }
+    if (key.includes("pricePerLiter")) return { value: money(params.value, 2) };
+    return { value: exact(params.value), max: money(params.max) };
+  };
 
   const submit = async (event) => {
     event.preventDefault();
-    const amount = parseAmount(form.amount);
-    if (!amount || amount <= 0) {
-      setError(t("expenses.invalidAmount"));
+    // Virgula ou ponto: "38.5" e "38,5" sao 38,5 L. O parse antigo tirava todo
+    // ponto e gravava 385 L.
+    const previousOdometer = insights.expenses.reduce(
+      (max, entry) => Math.max(max, entry.odometer || 0),
+      0,
+    );
+    const check = validateExpense(form, { previousOdometer });
+    if (check.error) {
+      setError(t(check.error, inputParams(check.error, check.errorParams)));
       return;
+    }
+    if (check.warnings.length) {
+      const ok = await confirm({
+        title: t("garageInput.confirmTitle"),
+        message: check.warnings
+          .map((warning) => t(warning.key, inputParams(warning.key, warning.params)))
+          .join(" "),
+        confirmLabel: t("garageInput.confirmSave"),
+        cancelLabel: t("garageInput.reviewValue"),
+        tone: "neutral",
+      });
+      if (!ok) return;
     }
 
     setSaving(true);
@@ -79,16 +125,23 @@ export function ExpensesModal({ car, onClose, onSaved }) {
     try {
       const updated = await engineDB.addCarExpense(car.id, {
         category: form.category,
-        amount,
+        amount: check.value.amount,
         date: form.date,
-        odometer: parseAmount(form.odometer) || 0,
-        liters: parseAmount(form.liters) || 0,
+        odometer: check.value.odometer,
+        liters: check.value.liters,
         note: form.note,
+        ...(form.category === "fuel"
+          ? { fuel: form.fuel || null, fullTank: Boolean(form.fullTank) }
+          : {}),
       });
       trackEvent("gasto_registrado", { categoria: form.category, carId: car.id });
       setLastCategory(form.category);
       onSaved?.(updated);
-      setForm((current) => ({ ...emptyForm(), category: current.category }));
+      setForm((current) => ({
+        ...emptyForm(),
+        category: current.category,
+        fuel: current.fuel,
+      }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,15 +149,46 @@ export function ExpensesModal({ car, onClose, onSaved }) {
     }
   };
 
-  const remove = async (expenseId) => {
+  // Apagar pede confirmacao (a lixeira fica colada ao valor), e a recusa do
+  // servidor aparece em vez de virar rejeicao nao tratada.
+  const remove = async (entry) => {
+    const ok = await confirm({
+      title: t("garageInput.deleteExpenseTitle"),
+      message: t("garageInput.deleteExpenseBody", {
+        value: exact(entry.amount),
+        date: new Date(`${entry.date}T12:00:00`).toLocaleDateString(i18n.language),
+      }),
+      confirmLabel: t("common.delete"),
+    });
+    if (!ok) return;
+
     setSaving(true);
+    setError("");
     try {
-      const updated = await engineDB.removeCarExpense(car.id, expenseId);
-      onSaved?.(updated);
+      const updated = await engineDB.removeCarExpense(car.id, entry.id);
+      if (updated) onSaved?.(updated);
+    } catch (err) {
+      setError(err?.message || t("garageInput.deleteError"));
     } finally {
       setSaving(false);
     }
   };
+
+  // Consumo: so e "medido" com tanque cheio nas pontas e um combustivel so.
+  // O resto e aproximado e diz isso na propria tela -- nunca "real".
+  const consumption = insights.consumption;
+  const consumptionLabel = !consumption
+    ? t("garageFixes.consumption.label")
+    : consumption.approximate
+      ? t("garageFixes.consumption.approximate")
+      : t("garageFixes.consumption.measured");
+  const consumptionHint = !consumption
+    ? t("garageFixes.consumption.needFullFills")
+    : consumption.approximate
+      ? t("garageFixes.consumption.approximateHint")
+      : t("garageFixes.consumption.fuelHint", {
+          fuel: t(`garageFixes.fuel.${consumption.fuel}`).toLowerCase(),
+        });
 
   const isFuel = form.category === "fuel";
   const showServiceHint = SERVICE_CATEGORIES.includes(lastCategory);
@@ -170,15 +254,15 @@ export function ExpensesModal({ car, onClose, onSaved }) {
               />
               <SummaryTile
                 icon={Fuel}
-                label={t("expenses.realConsumption")}
+                label={consumptionLabel}
                 value={
-                  insights.consumption
-                    ? t("expenses.kmPerLiter", {
-                        value: decimal(insights.consumption.kmPerLiter),
-                      })
+                  consumption
+                    ? `${consumption.approximate ? "~" : ""}${t("expenses.kmPerLiter", {
+                        value: decimal(consumption.kmPerLiter),
+                      })}`
                     : "—"
                 }
-                hint={insights.consumption ? null : t("expenses.needTwoFills")}
+                hint={consumptionHint}
               />
               <SummaryTile
                 icon={Gauge}
@@ -270,12 +354,70 @@ export function ExpensesModal({ car, onClose, onSaved }) {
                     value={form.liters}
                     onChange={setField("liters")}
                     inputMode="decimal"
-                    placeholder="38"
+                    placeholder="38,5"
                     className={inputClass}
                   />
                 </Field>
               )}
             </div>
+
+            {isFuel && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-muted)]">
+                  {t("garageFixes.fuel.label")}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {FUEL_TYPES.map((fuel) => {
+                    const active = form.fuel === fuel;
+                    return (
+                      <button
+                        key={fuel}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() =>
+                          setForm((current) => ({ ...current, fuel: active ? "" : fuel }))
+                        }
+                        className={`min-h-11 rounded-full px-4 text-[11px] font-bold uppercase tracking-wide transition ${
+                          active
+                            ? "bg-[var(--engine-accent)] text-white"
+                            : "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                        }`}
+                      >
+                        {t(`garageFixes.fuel.${fuel}`)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-[var(--engine-border)] px-3.5 py-2">
+                  <input
+                    type="checkbox"
+                    checked={form.fullTank}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, fullTank: event.target.checked }))
+                    }
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--engine-ring)] ${
+                      form.fullTank
+                        ? "border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
+                        : "border-[var(--engine-border-strong)]"
+                    }`}
+                  >
+                    {form.fullTank && <Check size={13} strokeWidth={3} />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold text-[var(--engine-text)]">
+                      {t("garageFixes.fuel.fullTank")}
+                    </span>
+                    <span className="block text-[10px] leading-tight text-[var(--engine-text-subtle)]">
+                      {t("garageFixes.fuel.fullTankHint")}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
 
             <Field label={t("expenses.note")}>
               <input
@@ -337,15 +479,17 @@ export function ExpensesModal({ car, onClose, onSaved }) {
                           ? ` · ${new Intl.NumberFormat(i18n.language).format(entry.odometer)} km`
                           : ""}
                         {entry.liters ? ` · ${decimal(entry.liters)} L` : ""}
+                        {entry.fuel ? ` · ${t(`garageFixes.fuel.${entry.fuel}`)}` : ""}
+                        {entry.fullTank === false ? ` · ${t("garageFixes.fuel.partial")}` : ""}
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-3">
                       <span className="text-sm font-black tabular-nums text-[var(--engine-text)]">
-                        {money(entry.amount)}
+                        {exact(entry.amount)}
                       </span>
                       <button
                         type="button"
-                        onClick={() => remove(entry.id)}
+                        onClick={() => remove(entry)}
                         disabled={saving}
                         aria-label={t("common.delete")}
                         /* O alvo era o ícone nu, 15x15; 44x44 com margem

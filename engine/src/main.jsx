@@ -10,6 +10,7 @@ import "./services/i18n";
 import "./services/i18n-billing";
 import "./services/i18n-reviews";
 import "./services/i18n-services-extra";
+import "./services/i18n-garage-fixes";
 
 // Antes do render: erro que acontece na montagem também precisa ser visto.
 initObservability();

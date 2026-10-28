@@ -5,8 +5,12 @@ import { engineDB } from "../services/db";
 import { forecastCompletion } from "../services/forecast";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
+import { useConfirm } from "./ConfirmProvider";
+import { localISODate, validateContribution } from "../services/garageInput";
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Fuso do aparelho. Era `toISOString()` (UTC): no Brasil, depois das 21h o
+// aporte nascia com a data de amanhã.
+const today = () => localISODate();
 
 /**
  * Registro de aporte na meta.
@@ -21,6 +25,7 @@ export function ContributionModal({ car, onClose, onSaved }) {
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
 
   // Voltar no Android fecha o modal em vez de sair da garagem.
   const close = useCallback(() => onClose?.(), [onClose]);
@@ -28,11 +33,13 @@ export function ContributionModal({ car, onClose, onSaved }) {
 
   if (!car) return null;
 
+  // Centavos só quando existem: "R$ 500" e "R$ 500,50", nunca "R$ 501".
   const money = (value) =>
     new Intl.NumberFormat(i18n.language, {
       style: "currency",
       currency: "BRL",
-      maximumFractionDigits: 0,
+      minimumFractionDigits: Number(value) % 1 ? 2 : 0,
+      maximumFractionDigits: 2,
     }).format(value || 0);
 
   const forecast = forecastCompletion(car);
@@ -40,10 +47,35 @@ export function ContributionModal({ car, onClose, onSaved }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    const value = Number(String(amount).replace(/\./g, "").replace(",", "."));
-    if (!value || value <= 0) {
-      setError(t("contribution.invalidAmount"));
+    // Vírgula ou ponto: "1500.50" e "1.500,50" são R$ 1.500,50. O parse antigo
+    // tirava todo ponto e transformava "1500.50" em R$ 150.050.
+    const remaining = car.targetValue > 0 ? car.targetValue - (car.savedValue || 0) : null;
+    const check = validateContribution(amount, { remaining });
+    if (check.error) {
+      setError(
+        t(check.error, {
+          max: money(check.errorParams?.max),
+        }),
+      );
       return;
+    }
+    const value = check.value;
+    if (check.warnings.length) {
+      const ok = await confirm({
+        title: t("garageInput.confirmTitle"),
+        message: check.warnings
+          .map((warning) =>
+            t(warning.key, {
+              value: money(warning.params.value),
+              remaining: money(warning.params.remaining),
+            }),
+          )
+          .join(" "),
+        confirmLabel: t("garageInput.confirmSave"),
+        cancelLabel: t("garageInput.reviewValue"),
+        tone: "neutral",
+      });
+      if (!ok) return;
     }
 
     setSaving(true);
@@ -60,11 +92,27 @@ export function ContributionModal({ car, onClose, onSaved }) {
     }
   };
 
-  const remove = async (contributionId) => {
+  // A lixeira fica colada ao valor, numa lista feita para o polegar: apagar
+  // pede confirmação, e a recusa do servidor aparece em vez de sumir numa
+  // rejeição não tratada.
+  const remove = async (entry) => {
+    const ok = await confirm({
+      title: t("garageInput.deleteContributionTitle"),
+      message: t("garageInput.deleteContributionBody", {
+        value: money(entry.amount),
+        date: new Date(`${entry.date}T12:00:00`).toLocaleDateString(i18n.language),
+      }),
+      confirmLabel: t("common.delete"),
+    });
+    if (!ok) return;
+
     setSaving(true);
+    setError("");
     try {
-      const updated = await engineDB.removeCarContribution(car.id, contributionId);
-      onSaved?.(updated);
+      const updated = await engineDB.removeCarContribution(car.id, entry.id);
+      if (updated) onSaved?.(updated);
+    } catch (err) {
+      setError(err?.message || t("garageInput.deleteError"));
     } finally {
       setSaving(false);
     }
@@ -191,7 +239,7 @@ export function ContributionModal({ car, onClose, onSaved }) {
                       </span>
                       <button
                         type="button"
-                        onClick={() => remove(entry.id)}
+                        onClick={() => remove(entry)}
                         disabled={saving}
                         aria-label={t("common.delete")}
                         /* O alvo era o ícone nu, 15x15; 44x44 com margem
