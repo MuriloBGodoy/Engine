@@ -9,6 +9,7 @@ import {
   LogOut,
   MessageCircle,
   Settings,
+  ShieldAlert,
   Users,
 } from "lucide-react";
 import { authPath } from "../services/authRedirect";
@@ -16,6 +17,7 @@ import { useSignOut } from "../hooks/useSignOut";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
+import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { Logo } from "./Logo";
 import { Topbar } from "./TopBar";
 import { GuestLoginHint } from "./GuestLoginHint";
@@ -50,6 +52,9 @@ export function TopNav({
   const avatar = profileSettings.avatar || user?.photoURL;
   const username = publicUsername(profileSettings.username, user?.uid);
   const unreadMessages = useUnreadMessages(user?.uid);
+  // Moderação: só para quem o banco diz que é admin (is_service_admin).
+  const { isAdmin } = useServiceAdmin(user);
+  const moderationActive = location.pathname.startsWith("/moderacao");
 
   // Sair pede confirmação (ver useSignOut).
   const handleLogout = useSignOut();
@@ -135,6 +140,20 @@ export function TopNav({
                 onSettingsUpdate={onSettingsUpdate}
                 user={user}
               />
+              {isAdmin && (
+                <Link
+                  to="/moderacao"
+                  title={t("nav.moderation")}
+                  aria-label={t("nav.moderation")}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
+                    moderationActive
+                      ? "bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
+                      : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
+                  }`}
+                >
+                  <ShieldAlert size={20} strokeWidth={moderationActive ? 2.4 : 2} />
+                </Link>
+              )}
               <Link
                 to="/settings"
                 title={t("nav.settings")}

@@ -14,6 +14,7 @@ import {
   LogOut,
   Mail,
   Palette,
+  ShieldAlert,
   Sparkles,
   Trash2,
   UserRound,
@@ -33,6 +34,7 @@ import { languageOptions, normalizeLanguage } from "../services/languages";
 import { chooseLanguage } from "../services/languageChoice";
 import { downloadMyData } from "../services/dataExport";
 import { useSignOut } from "../hooks/useSignOut";
+import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { countries, getStates } from "../services/locations";
 import { NOTIFICATION_PREFERENCES } from "../services/notifications";
 import {
@@ -862,6 +864,10 @@ export function Settings({ user, settings, onSettingsUpdate }) {
 
   // Sair pede confirmação; no celular este é o único "Sair" (25/10/2026).
   const handleLogout = useSignOut();
+  // Moderação: no celular não há sidebar, e o header não tem espaço para
+  // mais um ícone; a porta de entrada é aqui. Só admin (is_service_admin).
+  const { isAdmin } = useServiceAdmin(user);
+  const navigate = useNavigate();
 
   const [exporting, setExporting] = useState(false);
   const handleExport = async () => {
@@ -988,6 +994,18 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   {exporting && <Loader2 size={18} className="animate-spin text-[var(--engine-text-muted)]" />}
                 </Row>
               </Group>
+
+              {isAdmin && (
+                <Group>
+                  <Row
+                    icon={ShieldAlert}
+                    label={t("nav.moderation")}
+                    hint={t("moderation.title")}
+                    chevron
+                    onClick={() => navigate("/moderacao")}
+                  />
+                </Group>
+              )}
 
               <Group>
                 <Row icon={LogOut} label={t("settings.account.logout")} onClick={handleLogout} />

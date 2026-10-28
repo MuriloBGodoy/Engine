@@ -9,6 +9,7 @@ import {
   LogOut,
   MessageCircle,
   Settings,
+  ShieldAlert,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import { useSignOut } from "../hooks/useSignOut";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
+import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { Logo } from "./Logo";
 import { GuestLoginHint } from "./GuestLoginHint";
 import { InstallButton } from "./InstallButton";
@@ -49,6 +51,8 @@ export function Sidebar({
   const username = publicUsername(profileSettings.username, user?.uid);
   const showEmail = privacySettings.showEmailInSidebar !== false;
   const unreadMessages = useUnreadMessages(user?.uid);
+  // Moderação: só para quem o banco diz que é admin (is_service_admin).
+  const { isAdmin } = useServiceAdmin(user);
 
   // Sair pede confirmação (ver useSignOut).
   const handleLogout = useSignOut();
@@ -170,6 +174,23 @@ export function Sidebar({
             <Sparkles size={18} className="shrink-0" />
             {!collapsed && <span className="truncate">{t("nav.plans")}</span>}
           </Link>
+          {isAdmin && (
+            <Link
+              to="/moderacao"
+              title={collapsed ? t("nav.moderation") : undefined}
+              aria-label={collapsed ? t("nav.moderation") : undefined}
+              className={`flex h-10 items-center rounded-xl text-[13px] font-medium transition-colors ${
+                collapsed ? "mx-auto w-11 justify-center" : "gap-3 px-3"
+              } ${
+                isActivePath("/moderacao")
+                  ? "text-[var(--engine-accent)]"
+                  : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
+              }`}
+            >
+              <ShieldAlert size={18} className="shrink-0" />
+              {!collapsed && <span className="truncate">{t("nav.moderation")}</span>}
+            </Link>
+          )}
         </div>
       </nav>
 
