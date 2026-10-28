@@ -82,7 +82,36 @@ export const getNotificationTarget = (notification) => {
   return "";
 };
 
-export const getNotificationCopy = (notification) => {
+// Tipos que a tela traduz no idioma de quem LÊ. Desde 25/10/2026 o banco
+// grava só o tipo e os dados (nome de quem agiu, título do post); antes o
+// título e o corpo iam prontos, em pt-BR, escritos por quem mandava — e eram
+// texto livre, a porta do golpe "Anúncio recusado — clique aqui".
+const TRANSLATED_TYPES = new Set([
+  "follow", "like", "comment", "rating", "message", "achievement",
+  "service_approved", "service_changes_requested", "service_rejected", "service_suspended",
+]);
+
+/**
+ * Título e corpo de um aviso. `t` (i18next) traduz pelo tipo; `nameOf` dá o
+ * nome de uma conquista. Sem `t` cai no texto pt-BR antigo.
+ */
+export const getNotificationCopy = (notification, t, nameOf) => {
+  const actor = notification.actorName || "";
+  if (t && TRANSLATED_TYPES.has(notification.type)) {
+    const vars = {
+      actor: actor || t("notifications.someone"),
+      title: notification.goalTitle || notification.serviceTitle || "",
+      achievement:
+        notification.type === "achievement" && notification.achievementId && nameOf
+          ? nameOf(notification.achievementId)
+          : "",
+    };
+    return {
+      title: t(`notifications.types.${notification.type}.title`, vars),
+      body: t(`notifications.types.${notification.type}.body`, vars),
+    };
+  }
+
   if (notification.notificationTitle || notification.notificationBody) {
     return {
       title:
@@ -93,38 +122,13 @@ export const getNotificationCopy = (notification) => {
     };
   }
 
-  const actor = notification.actorName || "Alguém";
+  const fallbackActor = actor || "Alguém";
   const byType = {
-    service_approved: {
-      title: "Anúncio aprovado",
-      body: "Seu anúncio foi publicado.",
-    },
-    service_changes_requested: {
-      title: "Alterações solicitadas",
-      body: "Revise os comentários do admin.",
-    },
-    service_rejected: {
-      title: "Anúncio recusado",
-      body: "Confira o motivo enviado.",
-    },
-    service_suspended: {
-      title: "Anúncio tirado do ar",
-      body: "Confira o motivo. Você pode corrigir e reenviar.",
-    },
-    like: { title: "Nova curtida", body: `${actor} curtiu sua publicação.` },
-    comment: {
-      title: "Novo comentário",
-      body: `${actor} comentou na sua publicação.`,
-    },
-    rating: {
-      title: "Nova avaliação",
-      body: `${actor} avaliou sua publicação.`,
-    },
-    follow: { title: "Novo seguidor", body: `${actor} começou a seguir você.` },
-    message: {
-      title: "Nova mensagem",
-      body: `${actor} te enviou uma mensagem.`,
-    },
+    like: { title: "Nova curtida", body: `${fallbackActor} curtiu sua publicação.` },
+    comment: { title: "Novo comentário", body: `${fallbackActor} comentou na sua publicação.` },
+    rating: { title: "Nova avaliação", body: `${fallbackActor} avaliou sua publicação.` },
+    follow: { title: "Novo seguidor", body: `${fallbackActor} começou a seguir você.` },
+    message: { title: "Nova mensagem", body: `${fallbackActor} te enviou uma mensagem.` },
   };
 
   return (

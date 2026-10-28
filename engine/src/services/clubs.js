@@ -27,7 +27,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { auth, must, supabase } from "./supabase";
-import { grantAchievement, grantOwn, grantSeries } from "./achievements";
+import { grantOwn } from "./achievements";
 import { engineDB, goalFromRow, isUserId, normalizeCommunityGoal, POST_KIND_POST } from "./db";
 import { eventFromRow } from "./events";
 import { normalizeFipeBrand } from "./fipeVersion";
@@ -73,22 +73,8 @@ const contar = async (request) => {
   return count || 0;
 };
 
-/**
- * Degraus de "seu clube chegou a N membros", para quem fundou. Conta as
- * linhas de membro, que só o banco escreve com honestidade. Sem await em quem
- * chama: falhar aqui não pode desfazer a entrada.
- */
-const concederMembrosAoFundador = async (clubId, founderId) => {
-  if (!founderId) return;
-  try {
-    const total = await contar(
-      supabase.from("club_members").select("*", { count: "exact", head: true }).eq("club_id", String(clubId)),
-    );
-    await grantSeries(String(founderId), "club_members", total);
-  } catch {
-    // Conquista é enfeite: a entrada no clube já aconteceu.
-  }
-};
+// Degraus de "seu clube chegou a N membros" e o "entrou num clube" de quem
+// foi aprovado: concedidos pelo banco (trigger em club_members), não aqui.
 
 // ---------------------------------------------------------------------------
 // Erros
@@ -850,7 +836,6 @@ export async function joinClub(clubId) {
   must(await supabase.from("club_members").insert({ club_id: String(clubId), uid, role: "member", ...cartao }));
 
   grantOwn("club_joined");
-  concederMembrosAoFundador(clubId, club.founderId);
   return "member";
 }
 
@@ -900,8 +885,6 @@ export async function approveRequest(clubId, alvoUid) {
   );
   if (!pedido) throw erroDeClube("not-found", "Pedido não encontrado.");
 
-  const row = must(await supabase.from("clubs").select("founder_id").eq("id", String(clubId)).single());
-
   must(
     await supabase.from("club_members").insert({
       club_id: String(clubId),
@@ -913,10 +896,6 @@ export async function approveRequest(clubId, alvoUid) {
     }),
   );
 
-  // Quem aprova concede a quem entrou — escrita no perfil alheio, que o banco
-  // permite só para ids da lista fechada.
-  grantAchievement(alvoUid, "club_joined").catch(() => false);
-  concederMembrosAoFundador(clubId, row.founder_id);
 }
 
 export async function rejectRequest(clubId, alvoUid) {

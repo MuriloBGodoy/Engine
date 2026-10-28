@@ -86,25 +86,24 @@ try {
   check("visitante não lê garagem", (await anon.from("cars").select("*")).data?.length === 0);
 
   console.log("\nconquistas");
-  check("qualquer logado concede marco da lista", passed(await a.client.from("achievements").insert({ user_id: b.id, achievement_id: "first_post" })));
-  check("marco repetido é recusado (dedup)", denied(await a.client.from("achievements").insert({ user_id: b.id, achievement_id: "first_post" })));
-  check("id fora da lista é recusado", denied(await a.client.from("achievements").insert({ user_id: b.id, achievement_id: "selo_inventado" })));
-  await a.client.from("achievements").insert({ user_id: b.id, achievement_id: "first_comment", unlocked_at: "2099-01-01T00:00:00Z" });
-  const data2099 = (await admin.from("achievements").select("unlocked_at").eq("user_id", b.id).eq("achievement_id", "first_comment").single()).data;
+  // Desde 20261025162000: marco social é do banco; o cliente só grava marco
+  // da garagem, e só para si.
+  check("ninguém concede conquista a terceiros", denied(await a.client.from("achievements").insert({ user_id: b.id, achievement_id: "first_goal" })));
+  check("ninguém se dá marco social", denied(await b.client.from("achievements").insert({ user_id: b.id, achievement_id: "likes_1000000" })));
+  check("dono grava marco da garagem para si", passed(await b.client.from("achievements").insert({ user_id: b.id, achievement_id: "first_goal" })));
+  check("marco repetido é recusado (dedup)", denied(await b.client.from("achievements").insert({ user_id: b.id, achievement_id: "first_goal" })));
+  check("id fora da lista é recusado", denied(await b.client.from("achievements").insert({ user_id: b.id, achievement_id: "selo_inventado" })));
+  await b.client.from("achievements").insert({ user_id: b.id, achievement_id: "owned_car", unlocked_at: "2099-01-01T00:00:00Z" });
+  const data2099 = (await admin.from("achievements").select("unlocked_at").eq("user_id", b.id).eq("achievement_id", "owned_car").single()).data;
   check("a data da conquista é do banco, não de quem concede", data2099 && !data2099.unlocked_at.startsWith("2099"));
   check("outro não revoga conquista alheia", denied(await a.client.from("achievements").delete().eq("user_id", b.id).select()));
   check("conquista é vitrine pública", (await anon.from("achievements").select("*").eq("user_id", b.id)).data?.length === 2);
 
   console.log("\navisos");
-  check("avisar com o próprio nome passa", passed(await a.client.from("notifications").insert({ user_id: b.id, actor_id: a.id, type: "follow", data: { text: "oi" } })));
-  check("assinar em nome de outro é recusado", denied(await a.client.from("notifications").insert({ user_id: b.id, actor_id: c.id, type: "follow" })));
-  check("aviso já lido é recusado", denied(await a.client.from("notifications").insert({ user_id: b.id, actor_id: a.id, type: "follow", read: true })));
-  check("tipo inventado é recusado", denied(await a.client.from("notifications").insert({ user_id: b.id, actor_id: a.id, type: "spam" })));
-  check("texto gigante é recusado", denied(await a.client.from("notifications").insert({ user_id: b.id, actor_id: a.id, type: "follow", data: { text: "x".repeat(600) } })));
-  check("ninguém lê o sino alheio", (await a.client.from("notifications").select("*").eq("user_id", b.id)).data?.length === 0);
-  await b.client.from("notifications").update({ read: true, data: { text: "editado" } }).eq("user_id", b.id);
-  const aviso = (await admin.from("notifications").select("read, data").eq("user_id", b.id).limit(1).single()).data;
-  check("dono marca lido mas não reescreve o aviso", aviso?.read === true && aviso?.data?.text === "oi");
+  // Desde 20261025161000 o sino só é escrito pelo banco.
+  check("cliente não escreve no sino alheio", denied(await a.client.from("notifications").insert({ user_id: b.id, actor_id: a.id, type: "follow", data: { text: "oi" } })));
+  check("aviso falso de anúncio é recusado", denied(await a.client.from("notifications").insert({ user_id: b.id, actor_id: a.id, type: "service_rejected", data: { notificationTitle: "golpe" } })));
+  check("cliente não chama notify", Boolean((await a.client.rpc("notify", { p_user: b.id, p_actor: a.id, p_type: "follow", p_data: {}, p_dedupe: false })).error));
 
   console.log("\n@ e perfil");
   const nome = `rls${run}`;
@@ -119,13 +118,24 @@ try {
 
   console.log("\nseguidores");
   check("seguir por si passa", passed(await a.client.from("follows").insert({ follower_id: a.id, target_id: b.id })));
+  const avisoSeguir = (await b.client.from("notifications").select("type, data").eq("type", "follow")).data;
+  check("seguir vira aviso escrito pelo banco", avisoSeguir?.length === 1);
+  await b.client.from("notifications").update({ read: true, data: { text: "editado" } }).eq("user_id", b.id);
+  const aviso = (await admin.from("notifications").select("read, data").eq("user_id", b.id).eq("type", "follow").single()).data;
+  check("dono marca lido mas não reescreve o aviso", aviso?.read === true && aviso?.data?.text !== "editado");
+  check("ninguém lê o sino alheio", (await a.client.from("notifications").select("*").eq("user_id", b.id)).data?.length === 0);
+  check("visitante vê o número de seguidores", (await anon.rpc("follow_counts", { p_user: b.id })).data?.followers === 1);
   check("seguir em nome de outro é recusado", denied(await a.client.from("follows").insert({ follower_id: c.id, target_id: b.id })));
   check("visitante não lista seguidores", (await anon.from("follows").select("*")).data?.length === 0);
   check("outro não desfaz seguir alheio", denied(await c.client.from("follows").delete().eq("follower_id", a.id).select()));
 
   console.log("\ncomunidade");
   const post = `post-${a.id}-${run}`;
-  check("dono publica", passed(await a.client.from("community_goals").insert({ id: post, owner_id: a.id, data: { title: "Golf" } })));
+  check("dono publica", passed(await a.client.from("community_goals").insert({ id: post, owner_id: a.id, data: { title: "Golf", savedValue: 30000, targetValue: 120000 } })));
+  const publico = (await anon.from("community_goals").select("data").eq("id", post).single()).data;
+  check("visitante não lê valor em dinheiro, só a porcentagem",
+    publico && !("savedValue" in publico.data) && !("targetValue" in publico.data) && publico.data.progress === 25,
+    JSON.stringify(publico?.data));
   check("publicar em nome de outro é recusado", denied(await b.client.from("community_goals").insert({ id: `x-${run}`, owner_id: a.id })));
   check("outro não edita a publicação", denied(await b.client.from("community_goals").update({ data: { title: "hack" } }).eq("id", post).select()));
   check("visitante lê o feed", (await anon.from("community_goals").select("id").eq("id", post)).data?.length === 1);
@@ -208,6 +218,9 @@ try {
   check("lotação é conferida pelo banco", lotado.error?.message === "event-full", why(lotado));
   check("confirmar em nome de outro é recusado", denied(await b.client.from("event_participants").insert({ event_id: evento.data.id, uid: c.id })));
   check("outro não edita o evento", denied(await b.client.from("events").update({ data: { title: "hack" } }).eq("id", evento.data.id).select()));
+  check("visitante não lê a lista de presença", (await anon.from("event_participants").select("*").eq("event_id", evento.data.id)).data?.length === 0);
+  const totalPublico = (await anon.rpc("event_participant_counts", { p_event_ids: [evento.data.id] })).data;
+  check("visitante lê só o total", Number(totalPublico?.[0]?.total) === 1, JSON.stringify(totalPublico));
 
   console.log("\nmensagens");
   const conversa = await a.client.rpc("start_conversation", { p_other: b.id, p_my_card: { author: "A" }, p_other_card: { author: "B" } });
@@ -292,8 +305,20 @@ try {
   check("autor apaga a própria", passed(await b.client.from("service_reviews").delete().eq("id", reviewId)));
   check("apagar desconta da média", (await nota())?.rating_count === 0);
 
+  console.log("\nbloqueio");
+  check("bloquear passa", passed(await a.client.from("blocks").insert({ blocker_id: a.id, blocked_id: b.id })));
+  check("bloqueado não vê quem o bloqueou", (await b.client.from("blocks").select("*")).data?.length === 0);
+  const comentarioBloqueado = await b.client.rpc("add_comment", { p_post_id: post, p_comment: { text: "oi" } });
+  check("bloqueado não comenta", comentarioBloqueado.error?.message === "blocked", why(comentarioBloqueado));
+  const conversaBloqueada = await b.client.rpc("start_conversation", { p_other: a.id, p_my_card: {}, p_other_card: {} });
+  check("bloqueado não abre conversa", conversaBloqueada.error?.message === "blocked", why(conversaBloqueada));
+  check("bloqueado não curte", denied(await b.client.from("post_likes").insert({ post_id: post, liker_id: b.id })));
+  check("desbloquear passa", passed(await a.client.from("blocks").delete().eq("blocker_id", a.id).eq("blocked_id", b.id)));
+
   console.log("\ndenúncias");
   check("logado denuncia", passed(await a.client.from("reports").insert({ reporter_id: a.id, target_id: post, reason: "teste" })));
+  check("tipo inventado é recusado", denied(await a.client.from("reports").insert({ reporter_id: a.id, target_type: "nada", target_id: post })));
+  check("moderação comum (não-admin) não remove", Boolean((await a.client.rpc("moderation_remove", { p_report_id: "00000000-0000-0000-0000-000000000000" })).error));
   check("denúncia em nome de outro é recusada", denied(await a.client.from("reports").insert({ reporter_id: b.id, target_id: post })));
   check("quem denunciou não relê", (await a.client.from("reports").select("*")).data?.length === 0);
 

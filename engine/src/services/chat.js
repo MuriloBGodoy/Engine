@@ -98,10 +98,11 @@ export const attachmentSummary = (attachment) =>
   attachment?.title ? `📷 ${attachment.title}` : "📷 Publicação";
 
 export const attachmentFromGoal = (goal = {}) => {
+  // Post de outra pessoa não traz dinheiro, só `progress` (0–100).
   const target = Number(goal.targetValue) || 0;
   const progress = target
     ? Math.min((Number(goal.savedValue) / target) * 100, 100)
-    : 0;
+    : Math.min(Math.max(Number(goal.progress) || 0, 0), 100);
 
   return {
     kind: "post",

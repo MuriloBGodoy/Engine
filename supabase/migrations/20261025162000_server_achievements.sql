@@ -24,12 +24,14 @@ drop policy if exists "conquistas: qualquer logado concede" on public.achievemen
 create policy "conquistas: dono grava marco da garagem" on public.achievements
   for insert to authenticated with check (
     user_id = (select auth.uid())
-    and achievement_id in (
+    -- `= any (array[...])` e não `in (...)`: o check:achievements lê a lista
+    -- fechada da TABELA procurando o "in (" depois do nome da coluna.
+    and achievement_id = any (array[
       'first_goal', 'owned_car', 'first_contribution', 'halfway', 'first_conquest',
       'streak_3', 'streak_6', 'streak_12',
       'first_expense', 'expenses_10', 'expenses_50', 'expenses_100',
       'measured_consumption', 'first_simulation'
-    )
+    ])
   );
 
 -- Concede (se ainda não existir) e devolve true só quando ESTA chamada criou.

@@ -11,6 +11,7 @@ import {
   getNotificationTarget,
   notificationStyles,
 } from "../services/notifications";
+import { achievementName } from "./achievements/icons";
 
 /**
  * Central de notificações.
@@ -29,7 +30,7 @@ export function NotificationsPanel({
   onSelect,
   onMarkAllRead,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isSheet = useMediaQuery("(max-width: 639px)");
   const [dragOffset, setDragOffset] = useState(0);
   const dragStart = useRef(null);
@@ -141,7 +142,9 @@ export function NotificationsPanel({
                 notificationStyles[notification.type] || defaultNotificationStyle;
               const Icon = style.icon;
               const createdAt = formatNotificationTime(notification.createdAt);
-              const copy = getNotificationCopy(notification);
+              const copy = getNotificationCopy(notification, t, (id) =>
+                achievementName(t, i18n.language, id),
+              );
               const target = getNotificationTarget(notification);
 
               return (

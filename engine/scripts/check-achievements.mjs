@@ -168,23 +168,24 @@ const eventos = fs.readFileSync(path.join(ROOT, "src/services/events.js"), "utf8
 // mutação — o método existia, ninguém invocava, e o teste dizia que estava tudo
 // certo.
 const ligacoes = [
-  // Sem await de propósito: o aviso de curtida sai antes, a conquista depois.
-  ["curtir concede degrau ao dono do post", db, "this.concederDegrausDeCurtida(goalData.ownerId, goalData.title);"],
-  ["o degrau usa a contagem das curtidas, não o likesCount", db, "await this.countLikesReceived("],
-  ["seguir confere a série de seguidores", db, 'grantSeries(targetUserId, "followers", total)'],
+  // Desde 25/10/2026 os marcos sociais de TERCEIROS são concedidos pelo banco
+  // (20261025162000_server_achievements.sql), contando as tabelas de verdade.
+  ["curtir concede degrau ao dono do post (banco)", migracoes, "create trigger achievements_on_like after insert on public.post_likes"],
+  ["o degrau usa a contagem das curtidas, não o likesCount", migracoes, "select count(*) from public.post_likes where post_owner_id = p_user"],
+  ["seguir confere a série de seguidores (banco)", migracoes, "create trigger achievements_on_follow after insert on public.follows"],
   ["a garagem usa o cálculo puro", db, "garageAchievementIds(cars, {"],
   ["publicar dá primeiro post", db, 'grantOwn("first_post")'],
   ["comentar dá primeiro comentário", db, 'grantOwn("first_comment")'],
   ["criar clube dá fundador", clubes, 'grantOwn("club_founder")'],
   ["entrar em clube dá a conquista", clubes, 'grantOwn("club_joined")'],
-  ["aprovar pedido dá a conquista a quem entrou", clubes, 'grantAchievement(alvoUid, "club_joined")'],
+  ["aprovar pedido dá a conquista a quem entrou (banco)", migracoes, "create trigger achievements_on_club_member after insert on public.club_members"],
   // Conta as linhas de membro, nunca o `member_count` de vitrine.
-  ["membros do clube contam as linhas de membro", clubes, 'from("club_members").select("*", { count: "exact", head: true }).eq("club_id", String(clubId))'],
-  ["entrar ou ser aprovado confere os membros do fundador", clubes, "concederMembrosAoFundador(clubId, club.founderId);"],
+  ["membros do clube contam as linhas de membro", migracoes, "(select count(*) from public.club_members where club_id = p_club)"],
   ["postar no mural do clube dá a conquista", clubes, 'grantOwn("club_first_post")'],
   ["criar evento dá organizador", eventos, 'grantOwn("event_organizer")'],
   ["confirmar presença dá a conquista", eventos, 'grantOwn("event_rsvp")'],
-  ["confirmados contam para quem organizou", eventos, 'grantSeries(String(organizer), "event_attendees", total)'],
+  ["confirmados contam para quem organizou (banco)", migracoes, "create trigger achievements_on_rsvp after insert on public.event_participants"],
+  ["o cliente não concede a terceiros", servico, "if (userId !== auth.currentUser.uid) return false;"],
   ["a garagem concede os marcos próprios", db, "this.sincronizarMarcosDaGaragem(cars)"],
   ["o perfil lê as conquistas de verdade", perfil, "listAchievements(userProfile.userId)"],
   ["o perfil conta as curtidas recebidas", perfil, "engineDB.countLikesReceived("],

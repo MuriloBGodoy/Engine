@@ -1,12 +1,6 @@
 import { get, set, del } from "idb-keyval";
 import { auth, must, nowIso, supabase, watchTable } from "./supabase";
-import {
-  grantOwn,
-  grantSeries,
-  garageAchievementIds,
-  syncLikeAchievements,
-  syncOwnMilestones,
-} from "./achievements";
+import { grantOwn, garageAchievementIds, syncOwnMilestones } from "./achievements";
 import { inferLocation } from "./locations";
 import { listingEditNeedsReview, PRICE_MAX_LENGTH } from "./serviceListingRules";
 import { normalizeOwnershipInputs, LIFE_SITUATION_TYPES } from "./ownership";
@@ -205,7 +199,9 @@ const refreshMyLikedGoals = async (userId) => {
     warnFirestoreFallback("refreshMyLikedGoals", error);
   }
 };
-// Paginação do feed por cursor: o `updated_at` e o id do último post da página.
+// Paginação do feed por cursor: o `created_at` e o id do último post da página.
+// Era `updated_at`, que sobe a cada curtida, comentário e troca de tema: o
+// feed virava "último que alguém mexeu" e post pulava de página.
 let communityGoalsCursor = null;
 let communityGoalsHasMore = true;
 
@@ -630,6 +626,14 @@ const buildPublicProfile = (settings = {}, userId = currentUserId) => {
   };
 };
 
+// A Política promete "metas publicadas aparecem sem os valores em dinheiro":
+// o post público leva só a porcentagem inteira (0–100).
+const goalProgressPercent = (car = {}) => {
+  const target = Number(car.targetValue) || 0;
+  if (target <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.floor(((Number(car.savedValue) || 0) * 100) / target)));
+};
+
 const buildCommunityGoal = (goal, userId, settings = {}, note = "", club = null) => {
   const profile = getProfileSnapshot(settings, userId);
 
@@ -649,8 +653,9 @@ const buildCommunityGoal = (goal, userId, settings = {}, note = "", club = null)
     year: goal.year,
     image: goal.image,
     images: normalizeCarImages(goal),
-    savedValue: goal.savedValue,
-    targetValue: goal.targetValue,
+    // Só a porcentagem: o valor guardado e o preço-alvo são da pessoa. O banco
+    // descarta os dois se um cliente antigo ainda mandar.
+    progress: goalProgressPercent(goal),
     // Legenda escrita na hora de publicar — não é mais a bio do perfil.
     note: String(note || "").trim().slice(0, 280),
     // Carimbo de clube (campos NOVOS e opcionais). Publicar a meta a partir da
@@ -690,8 +695,9 @@ const legacyCommunityGoalId = (goal, userId = currentUserId) => {
 //
 // Não é pelo motivo que parece. O argumento óbvio seria "o código permite
 // descobrir o valor do carro dos outros" — e ele não se sustenta, porque
-// `targetValue` já é o preço FIPE e já é publicado aqui de propósito: é o
-// denominador da barra de progresso, é a feature.
+// `targetValue` era publicado aqui como denominador da barra de progresso.
+// (Desde 25/10/2026 não é mais: o post leva só a porcentagem — ver
+// `goalProgressPercent`.)
 //
 // O motivo real é outro, e é de porta de mão única. Publicar um identificador
 // é irreversível na prática: dá para acrescentar um campo a uma coleção
@@ -711,8 +717,7 @@ const communityCarPatch = (car) => ({
   year: car.year,
   image: car.image,
   images: normalizeCarImages(car),
-  savedValue: car.savedValue,
-  targetValue: car.targetValue,
+  progress: goalProgressPercent(car),
   // DECISÃO EXPLÍCITA, e ela vai no sentido CONTRÁRIO da de cima. A ficha
   // declarada pelo dono ENTRA no payload público.
   //
@@ -786,8 +791,11 @@ export const normalizeCommunityGoal = (goal = {}) => {
     // normalização da escrita: post antigo, post adulterado e post de outra
     // versão do app caem na mesma peneira, e valor sem `origin` não sobrevive.
     specs: normalizeSpecSheet(goal.specs),
+    // Valores em dinheiro só existem no post do próprio dono (mesclado com o
+    // carro dele na tela); para os outros vem só `progress`.
     savedValue: Number(goal.savedValue) || 0,
     targetValue: Number(goal.targetValue) || 0,
+    progress: Math.max(0, Math.min(100, Number(goal.progress) || 0)),
     streak: Number(goal.streak) || 1,
     // Durante a transição um post pode ter só o mapa antigo, só o contador
     // novo, ou os dois. `likesCount` ganha quando existe.
@@ -996,19 +1004,19 @@ const fetchFeedPage = async (cursor) => {
   let request = supabase
     .from("community_goals")
     .select("*")
-    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(COMMUNITY_GOALS_PAGE_SIZE);
   if (cursor) {
     request = request.or(
-      `updated_at.lt."${cursor.updatedAt}",and(updated_at.eq."${cursor.updatedAt}",id.lt."${cursor.id}")`,
+      `created_at.lt."${cursor.createdAt}",and(created_at.eq."${cursor.createdAt}",id.lt."${cursor.id}")`,
     );
   }
   const rows = must(await request);
   const last = rows[rows.length - 1];
   return {
     goals: rows.map((row) => normalizeCommunityGoal(goalFromRow(row))),
-    cursor: last ? { updatedAt: last.updated_at, id: last.id } : cursor,
+    cursor: last ? { createdAt: last.created_at, id: last.id } : cursor,
     hasMore: rows.length === COMMUNITY_GOALS_PAGE_SIZE,
   };
 };
@@ -1728,11 +1736,6 @@ export const engineDB = {
         warnFirestoreFallback("moderateServiceListing.get", error);
         return null;
       });
-    const listing = current
-      ? normalizeServiceListing(listingFromRow(current))
-      : ((await get("engine_service_listings")) || [])
-          .map(normalizeServiceListing)
-          .find((item) => item.id === String(listingId));
     const cleanNote = String(note || "").trim().slice(0, 600);
     const reviewedAt = new Date().toISOString();
     const historyEntry = {
@@ -1789,52 +1792,8 @@ export const engineDB = {
       await set("engine_service_listings", localListings);
     }
 
-    if (listing?.ownerId) {
-      const copy = {
-        [SERVICE_STATUS_APPROVED]: {
-          type: "service_approved",
-          title: "Anúncio aprovado",
-          body: "Seu anúncio foi publicado.",
-          text: `Seu anúncio ${listing.title} foi aprovado e publicado.`,
-        },
-        [SERVICE_STATUS_CHANGES_REQUESTED]: {
-          type: "service_changes_requested",
-          title: "Alterações solicitadas",
-          body: "Revise os comentários da moderação.",
-          text: `Seu anúncio ${listing.title} voltou para ajustes.`,
-        },
-        [SERVICE_STATUS_REJECTED]: {
-          type: "service_rejected",
-          title: "Anúncio recusado",
-          body: "Confira o motivo enviado pela moderação.",
-          text: `Seu anúncio ${listing.title} foi recusado.`,
-        },
-        [SERVICE_STATUS_SUSPENDED]: {
-          type: "service_suspended",
-          title: "Anúncio tirado do ar",
-          body: "Confira o motivo. Você pode corrigir e reenviar.",
-          text: `Seu anúncio ${listing.title} foi tirado do ar pela moderação.`,
-        },
-      }[status];
-
-      // A decisão já está gravada. Se o aviso falhar, a moderação não pode
-      // ver "não foi possível aprovar" com o anúncio já aprovado.
-      try {
-        await this.notifyUser(listing.ownerId, {
-          type: copy.type,
-          actorId: reviewerId,
-          serviceId: String(listingId),
-          serviceTitle: listing.title,
-          moderationNote: patch.moderationNote,
-          targetPath: "/services",
-          notificationTitle: copy.title,
-          notificationBody: copy.body,
-          text: copy.text,
-        });
-      } catch (error) {
-        warnFirestoreFallback("moderateServiceListing.notify", error);
-      }
-    }
+    // O aviso ao prestador sai do banco (trigger em service_listings,
+    // 20261025161000): o cliente não escreve mais no sino de ninguém.
   },
 
   async deleteServiceListing(listingId, userId = currentUserId) {
@@ -1979,21 +1938,26 @@ export const engineDB = {
       await supabase.from("community_goals").select("id, data").eq("owner_id", userId),
     );
 
+    // Só os posts cujo cartão MUDOU. Antes era um update por post a cada
+    // `saveSettings` — trocar o tema reescrevia todos, e cada escrita
+    // disparava o Realtime do feed em todo cliente aberto.
+    const card = {
+      author: profile.author,
+      username: profile.username,
+      avatar: profile.avatar,
+      avatarInitials: profile.avatarInitials,
+      city: profile.city,
+    };
+    const stale = rows.filter((row) =>
+      Object.entries(card).some(([key, value]) => (row.data?.[key] ?? "") !== value),
+    );
+
     await Promise.all(
-      rows.map(async (row) =>
+      stale.map(async (row) =>
         must(
           await supabase
             .from("community_goals")
-            .update({
-              data: {
-                ...row.data,
-                author: profile.author,
-                username: profile.username,
-                avatar: profile.avatar,
-                avatarInitials: profile.avatarInitials,
-                city: profile.city,
-              },
-            })
+            .update({ data: { ...row.data, ...card } })
             .eq("id", row.id),
         ),
       ),
@@ -2060,39 +2024,6 @@ export const engineDB = {
     }
   },
 
-  /**
-   * Confere os degraus de curtida do dono do post e concede o que faltar.
-   *
-   * Roda no cliente de QUEM CURTIU — é escrita no perfil de outra pessoa, e o
-   * banco é a defesa: lista fechada de ids, data carimbada por ele. Falha aqui
-   * nunca derruba a curtida: o selo é consequência, não o ato.
-   */
-  async concederDegrausDeCurtida(ownerId, goalTitle) {
-    if (!ownerId) return;
-    try {
-      const total = await this.countLikesReceived(ownerId);
-      const novos = await syncLikeAchievements(ownerId, total);
-      // Só o maior degrau novo vira aviso: quem já tinha 60 curtidas antes dos
-      // degraus pequenos existirem ganha 10 e 50 juntos na próxima curtida.
-      for (const id of novos.slice(-1)) {
-        await this.notifyUser(ownerId, {
-          type: "achievement",
-          achievementId: id,
-          goalTitle: goalTitle || "",
-          targetPath: "/settings",
-          notificationTitle: "Conquista desbloqueada",
-          // Diz QUAL, e não "uma conquista": o aviso genérico obriga a abrir o
-          // perfil pra descobrir o que aconteceu.
-          notificationBody: `Sua garagem passou de ${new Intl.NumberFormat("pt-BR").format(
-            Number(id.replace("likes_", "")),
-          )} curtidas.`,
-          text: "Você desbloqueou uma conquista.",
-        });
-      }
-    } catch (error) {
-      warnFirestoreFallback("concederDegrausDeCurtida", error);
-    }
-  },
 
   /** Quantas curtidas UM post tem, contadas nas linhas de curtida. */
   async countPostLikes(goalId) {
@@ -2119,18 +2050,33 @@ export const engineDB = {
     }
   },
 
+  /**
+   * Seguidores e seguindo, em número. Público (função do banco): a LISTA de
+   * quem segue é só para quem tem conta, mas o visitante via "0 seguidores".
+   */
+  async getFollowCounts(userId) {
+    if (!isUserId(userId)) return { followers: 0, following: 0 };
+    try {
+      const counts = must(await supabase.rpc("follow_counts", { p_user: userId })) || {};
+      return { followers: Number(counts.followers) || 0, following: Number(counts.following) || 0 };
+    } catch (error) {
+      warnFirestoreFallback("getFollowCounts", error);
+      return { followers: 0, following: 0 };
+    }
+  },
+
   async getPublicProfile(userId) {
     if (!isUserId(userId)) return null;
 
-    const [profileRow, goalRows, followersCount, myFollow] = await Promise.all([
+    const [profileRow, goalRows, followCounts, myFollow] = await Promise.all([
       supabase.from("public_profiles").select("*").eq("user_id", userId).maybeSingle().then(must),
       supabase
         .from("community_goals")
         .select("*")
         .eq("owner_id", userId)
-        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .then(must),
-      countRows("follows", "target_id", userId).catch(() => 0),
+      this.getFollowCounts(userId),
       currentUserId && currentUserId !== userId
         ? supabase
             .from("follows")
@@ -2144,10 +2090,7 @@ export const engineDB = {
     ]);
 
     const goals = goalRows.map((row) => normalizeCommunityGoal(goalFromRow(row)));
-    const totalProgress = goals.reduce((sum, goal) => {
-      const target = Number(goal.targetValue) || 0;
-      return sum + (target ? Math.min((Number(goal.savedValue) / target) * 100, 100) : 0);
-    }, 0);
+    const totalProgress = goals.reduce((sum, goal) => sum + (Number(goal.progress) || 0), 0);
 
     // O perfil público só nasce quando a pessoa salva os ajustes; até lá, os
     // dados do autor que viajam junto de cada meta são a melhor fonte.
@@ -2169,7 +2112,8 @@ export const engineDB = {
       goalsCount: goals.length,
       likesCount: goals.reduce((sum, goal) => sum + (Number(goal.likes) || 0), 0),
       averageProgress: goals.length ? totalProgress / goals.length : 0,
-      followersCount,
+      followersCount: followCounts.followers,
+      followingCount: followCounts.following,
       isFollowedByMe: Boolean(myFollow),
     };
   },
@@ -2197,34 +2141,8 @@ export const engineDB = {
         }),
       );
 
-      // Mesma forma do degrau de curtida: quem segue é quem detecta.
-      try {
-        const total = await countRows("follows", "target_id", targetUserId);
-        // A série inteira (10, 100, 1.000). Notifica só o maior degrau que
-        // esta chamada concedeu.
-        const novos = await grantSeries(targetUserId, "followers", total);
-        const maior = novos[novos.length - 1];
-        if (maior) {
-          const degrau = Number(maior.split("_")[1]);
-          await this.notifyUser(targetUserId, {
-            type: "achievement",
-            achievementId: maior,
-            targetPath: "/settings",
-            notificationTitle: "Conquista desbloqueada",
-            notificationBody: `${degrau.toLocaleString("pt-BR")} pessoas seguem sua garagem.`,
-            text: `Você alcançou ${degrau.toLocaleString("pt-BR")} seguidores.`,
-          });
-        }
-      } catch (error) {
-        warnFirestoreFallback("marco de seguidores", error);
-      }
-      // A notificação mora AQUI, e não em quem chama: havia dois botões de
-      // seguir e só um deles avisava (auditoria de 25/09/2026).
-      if (followerId === currentUserId) {
-        await this.notifyFollow(targetUserId).catch((error) =>
-          warnFirestoreFallback("notifyFollow", error),
-        );
-      }
+      // Aviso de "novo seguidor" e degraus de seguidores saem do banco
+      // (triggers em `follows`), um aviso por pessoa a cada 24 h.
     } else {
       must(
         await supabase
@@ -2245,7 +2163,7 @@ export const engineDB = {
           .from("community_goals")
           .select("*")
           .eq("owner_id", userId)
-          .order("updated_at", { ascending: false }),
+          .order("created_at", { ascending: false }),
       );
       return rows.map((row) => normalizeCommunityGoal(goalFromRow(row)));
     } catch (error) {
@@ -2339,6 +2257,49 @@ export const engineDB = {
    * Abre uma denúncia. Só a moderação lê — quem denuncia não relê a própria
    * denúncia, para ninguém mapear o que já foi reportado.
    */
+  /**
+   * Denúncias abertas do social (post, comentário, perfil, mensagem, clube,
+   * evento), da mais antiga para a mais nova. Só a moderação lê. O `context`
+   * é o retrato do conteúdo, gravado pelo banco na hora da denúncia.
+   */
+  async fetchSocialReports() {
+    const rows = must(
+      await supabase
+        .from("reports")
+        .select("id, target_type, target_id, reported_user_id, reason, context, created_at")
+        .in("target_type", ["goal", "post", "comment", "profile", "message", "club", "event"])
+        .eq("status", "pending")
+        .order("created_at", { ascending: true })
+        .limit(200),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      reportedUserId: row.reported_user_id,
+      reason: row.reason || "",
+      context: row.context || {},
+      createdAt: row.created_at,
+    }));
+  },
+
+  /** Dispensa as denúncias abertas de um alvo (nada a remover). */
+  async dismissSocialReports(targetType, targetId) {
+    must(
+      await supabase
+        .from("reports")
+        .update({ status: "dismissed" })
+        .eq("target_type", String(targetType))
+        .eq("target_id", String(targetId))
+        .eq("status", "pending"),
+    );
+  },
+
+  /** Tira do ar o alvo de uma denúncia (função do banco, só moderação). */
+  async removeReportedContent(reportId) {
+    must(await supabase.rpc("moderation_remove", { p_report_id: reportId }));
+  },
+
   async reportContent({ targetType, targetId, reportedUserId = "", reason = "" }) {
     if (!currentUserId || !targetId) return;
 
@@ -2386,11 +2347,19 @@ export const engineDB = {
     }
   },
 
+  /**
+   * Quem eu bloqueei. Mora na tabela `blocks`, que o banco consulta para
+   * recusar DM, comentário, curtida, avaliação, seguir e aviso — o bloqueio
+   * deixou de ser só um filtro do feed (20261025160000).
+   */
   async getBlockedUsers(userId = currentUserId) {
     if (!userId) return [];
 
     try {
-      return (await readPrivateDoc("moderation", userId))?.blockedUserIds || [];
+      const rows = must(
+        await supabase.from("blocks").select("blocked_id").eq("blocker_id", userId),
+      );
+      return rows.map((row) => row.blocked_id);
     } catch (error) {
       warnFirestoreFallback("getBlockedUsers", error);
       return [];
@@ -2398,13 +2367,19 @@ export const engineDB = {
   },
 
   async setUserBlocked(targetUserId, blocked, userId = currentUserId) {
-    if (!userId || !targetUserId || targetUserId === userId) return;
+    if (!userId || !isUserId(targetUserId) || targetUserId === userId) return;
 
-    const atual = (await readPrivateDoc("moderation", userId))?.blockedUserIds || [];
-    const blockedUserIds = blocked
-      ? [...new Set([...atual, targetUserId])]
-      : atual.filter((id) => id !== targetUserId);
-    await writePrivateDoc("moderation", { blockedUserIds, updatedAt: nowIso() }, { userId });
+    if (blocked) {
+      const { error } = await supabase
+        .from("blocks")
+        .insert({ blocker_id: userId, blocked_id: targetUserId });
+      // Já bloqueado: chave repetida não é erro para quem pediu.
+      if (error && error.code !== "23505") throw error;
+      return;
+    }
+    must(
+      await supabase.from("blocks").delete().eq("blocker_id", userId).eq("blocked_id", targetUserId),
+    );
   },
 
   async followUser(followerId, targetUserId) {
@@ -2417,38 +2392,8 @@ export const engineDB = {
     await this.setFollow(targetUserId, false, followerId);
   },
 
-  async notifyUser(userId, notification) {
-    const actorId = notification?.actorId || currentUserId;
-    if (!isUserId(userId) || userId === actorId) return;
-
-    const { type, ...data } = notification || {};
-    must(
-      await supabase.from("notifications").insert({
-        user_id: userId,
-        actor_id: actorId,
-        type,
-        read: false,
-        data: serializeForFirestore(omitKeys(data, ["actorId", "recipientId", "read", "createdAt"])),
-      }),
-    );
-  },
-
-  async notifyFollow(userId) {
-    if (!userId || userId === currentUserId) return;
-
-    const actorSettings = await this.getSettings();
-    const actor = getProfileSnapshot(actorSettings, currentUserId);
-    await this.notifyUser(userId, {
-      type: "follow",
-      actorId: currentUserId,
-      actorName: actor.author,
-      actorUsername: actor.username,
-      targetPath: `/community?user=${encodeURIComponent(currentUserId)}`,
-      notificationTitle: "Novo seguidor",
-      notificationBody: `${actor.author} começou a seguir sua garagem.`,
-      text: `${actor.author} começou a seguir sua garagem.`,
-    });
-  },
+  // notifyUser/notifyFollow saíram em 25/10/2026: o sino só é escrito pelo
+  // banco (função `notify`, chamada por triggers), com tipo fixo.
 
   subscribeNotifications(userId = currentUserId, callback) {
     if (!userId) return () => {};
@@ -2491,7 +2436,7 @@ export const engineDB = {
 
     // As três leituras não dependem uma da outra: em paralelo, para a curtida
     // não esperar três idas ao servidor em fila.
-    const [goalRow, likeRow, actorSettings] = await Promise.all([
+    const [goalRow, likeRow] = await Promise.all([
       supabase.from("community_goals").select("owner_id, data").eq("id", goalId).maybeSingle().then(must),
       supabase
         .from("post_likes")
@@ -2500,7 +2445,6 @@ export const engineDB = {
         .eq("liker_id", userId)
         .maybeSingle()
         .then(must),
-      liked ? this.getSettings() : null,
     ]);
     const goalData = goalRow ? { ...goalRow.data, ownerId: goalRow.owner_id } : null;
     // Uma linha por pessoa em `post_likes`; o contador do post é mantido pelo
@@ -2520,26 +2464,8 @@ export const engineDB = {
     myLikedGoalIds.add(goalId);
     if (!goalData) return;
 
-    // O aviso sai ANTES da conferência de conquista: ele é o que o dono do
-    // post precisa ver, e a conquista custa mais umas idas ao servidor. Quem
-    // curte e logo sai da página (recarregar, fechar a aba) cortava a
-    // corrente no meio — e era o aviso, que vinha por último, que se perdia.
-    const actor = getProfileSnapshot(actorSettings, userId);
-    await this.notifyUser(goalData.ownerId, {
-      type: "like",
-      actorId: userId,
-      actorName: actor.author,
-      actorUsername: actor.username,
-      goalId,
-      goalTitle: goalData.title,
-      targetPath: `/community?goal=${encodeURIComponent(goalId)}`,
-      notificationTitle: "Nova curtida",
-      notificationBody: `${actor.author} curtiu sua publicação.`,
-      text: `${actor.author} curtiu sua meta ${goalData.title}.`,
-    });
-
-    // Sem await: a conquista é consequência, não o ato.
-    this.concederDegrausDeCurtida(goalData.ownerId, goalData.title);
+    // Aviso ao dono e degraus de curtida saem do banco (triggers em
+    // `post_likes`).
   },
 
   async addCommunityComment(goalId, comment, userId = currentUserId) {
@@ -2560,26 +2486,9 @@ export const engineDB = {
         },
       }),
     );
+    // Aviso ao dono do post e o marco de primeiro comentário saem do banco.
     grantOwn("first_comment");
-
-    const goalRow = must(
-      await supabase.from("community_goals").select("owner_id, data").eq("id", goalId).maybeSingle(),
-    );
-    if (goalRow) {
-      await this.notifyUser(goalRow.owner_id, {
-        type: "comment",
-        actorId: userId,
-        actorName: actor.author,
-        actorUsername: actor.username,
-        goalId,
-        goalTitle: goalRow.data?.title,
-        commentId: saved?.id,
-        targetPath: `/community?goal=${encodeURIComponent(goalId)}&comments=1`,
-        notificationTitle: "Novo comentário",
-        notificationBody: `${actor.author} comentou na sua publicação.`,
-        text: `${actor.author} comentou na sua meta ${goalRow.data?.title}.`,
-      });
-    }
+    return saved;
   },
 
   async updateCommunityComment(goalId, commentId, text, userId = currentUserId) {
@@ -2613,25 +2522,7 @@ export const engineDB = {
       }),
     );
 
-    const goalRow = must(
-      await supabase.from("community_goals").select("owner_id, data").eq("id", goalId).maybeSingle(),
-    );
-    if (goalRow && goalRow.owner_id !== userId) {
-      const actorSettings = await this.getSettings();
-      const actor = getProfileSnapshot(actorSettings, userId);
-      await this.notifyUser(goalRow.owner_id, {
-        type: "rating",
-        actorId: userId,
-        actorName: actor.author,
-        actorUsername: actor.username,
-        goalId,
-        goalTitle: goalRow.data?.title,
-        targetPath: `/community?goal=${encodeURIComponent(goalId)}`,
-        notificationTitle: "Nova avaliação",
-        notificationBody: `${actor.author} avaliou sua publicação.`,
-        text: `${actor.author} avaliou sua meta ${goalRow.data?.title}.`,
-      });
-    }
+    // O aviso ao dono sai do banco, dentro de `rate_goal`.
   },
 
   async getSettings() {

@@ -11,11 +11,12 @@
  *   conquistas nem duas notificações — a segunda falha sozinha.
  * - **Revogável.** Fraude descoberta depois se desfaz apagando o documento,
  *   sem reconstruir nada, porque ele não guarda estado incremental.
- * - **Escrita alheia contida.** Quem detecta o cruzamento é o cliente de quem
- *   praticou a ação (quem curtiu, quem seguiu). Ou seja: é escrita no perfil de
- *   OUTRA pessoa. O banco prende por uma lista fechada de ids e carimba a data
- *   ele mesmo, então o máximo que se consegue é dar a alguém uma conquista que
- *   ela já ia ganhar.
+ * - **Quem concede.** Desde 25/10/2026 (migration 20261025162000) os marcos
+ *   SOCIAIS — curtidas, seguidores, posts, comentários, clubes, eventos — são
+ *   concedidos pelo BANCO, em trigger, contando as tabelas de verdade. Antes o
+ *   cliente de quem curtia gravava no perfil do outro, e pelo console qualquer
+ *   conta dava `likes_1000000` a qualquer pessoa. O cliente só grava os marcos
+ *   da GARAGEM, e só para a própria conta.
  *
  * A LISTA DE IDS AQUI ESPELHA A DO BANCO. Se mudar um, mude o outro — id fora
  * da lista é recusado pelo `check` da tabela `achievements` (ver
@@ -23,6 +24,7 @@
  */
 import { auth, must, supabase } from "./supabase";
 import {
+  ACHIEVEMENT_CATALOG,
   earnedLikeTiers,
   earnedTiers,
   isAchievementId,
@@ -110,8 +112,47 @@ export const listAchievements = async (userId) => {
 // por post, para sempre. Chave `${uid}/${id}`.
 const jaResolvido = new Set();
 
+// Marcos que o cliente ainda grava (para si): dependem do conteúdo privado
+// da garagem. A lista espelha a política "conquistas: dono grava marco da
+// garagem" do banco.
+const CLIENT_GRANTED = new Set(
+  ACHIEVEMENT_CATALOG.filter((category) => ["garage", "logbook", "simulator"].includes(category.key))
+    .flatMap((category) => category.items)
+    .flatMap((item) => (item.id ? [item.id] : item.tiers.map((tier) => seriesTierId(item.series, tier)))),
+);
+
+/**
+ * Marco social: quem grava é o banco. Aqui só se confere se ELE acabou de
+ * conceder (nos últimos 2 minutos), para a tela comemorar na hora.
+ */
+const noticeServerGrant = async (achievementId) => {
+  const uid = auth.currentUser?.uid;
+  const chave = `${uid}/${achievementId}`;
+  if (!uid || jaResolvido.has(chave)) return false;
+  try {
+    const row = must(
+      await supabase
+        .from("achievements")
+        .select("unlocked_at")
+        .eq("user_id", uid)
+        .eq("achievement_id", achievementId)
+        .maybeSingle(),
+    );
+    if (!row) return false;
+    jaResolvido.add(chave);
+    if (Date.now() - new Date(row.unlocked_at).getTime() > 2 * 60 * 1000) return false;
+    anunciar(uid, achievementId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const grantAchievement = async (userId, achievementId) => {
   if (!userId || !auth.currentUser || !isAchievementId(achievementId)) return false;
+  // Ninguém concede conquista a outra pessoa pelo cliente.
+  if (userId !== auth.currentUser.uid) return false;
+  if (!CLIENT_GRANTED.has(achievementId)) return noticeServerGrant(achievementId);
   const chave = `${userId}/${achievementId}`;
   if (jaResolvido.has(chave)) return false;
   try {
