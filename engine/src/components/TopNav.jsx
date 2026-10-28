@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Car,
   BriefcaseBusiness,
@@ -11,7 +11,8 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { signOut } from "../services/supabase";
+import { authPath } from "../services/authRedirect";
+import { useSignOut } from "../hooks/useSignOut";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
@@ -44,21 +45,15 @@ export function TopNav({
 }) {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
   const isGuest = !user;
   const displayName = profileSettings.displayName || user?.displayName;
   const avatar = profileSettings.avatar || user?.photoURL;
   const username = publicUsername(profileSettings.username, user?.uid);
   const unreadMessages = useUnreadMessages(user?.uid);
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate("/login");
-    } catch (error) {
-      console.error("Erro ao deslogar:", error);
-    }
-  };
+  // Sair pede confirmação (ver useSignOut).
+  const handleLogout = useSignOut();
+  const here = `${location.pathname}${location.search}`;
 
   const menuItems = [
     { name: t("nav.home"), path: "/", icon: Home },
@@ -124,7 +119,7 @@ export function TopNav({
           {isGuest ? (
             <div className="relative">
               <Link
-                to="/login"
+                to={authPath("/login", here)}
                 title={t("nav.login")}
                 className="flex h-9 items-center gap-2 rounded-full bg-[var(--engine-accent)] px-4 text-[13px] font-semibold text-white transition hover:brightness-95"
               >
@@ -173,6 +168,7 @@ export function TopNav({
                 onClick={handleLogout}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--engine-text-subtle)] transition-colors hover:bg-[var(--engine-accent-soft)] hover:text-[var(--engine-accent)]"
                 title={t("nav.logout")}
+                aria-label={t("nav.logout")}
               >
                 <LogOut size={18} />
               </button>

@@ -1,15 +1,16 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Car,
   BriefcaseBusiness,
   Home,
   LayoutDashboard,
   LogIn,
-  LogOut,
   MessageCircle,
+  Settings,
   Users,
 } from "lucide-react";
-import { auth, signOut } from "../services/supabase";
+import { auth } from "../services/supabase";
+import { authPath } from "../services/authRedirect";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
@@ -64,7 +65,6 @@ export function MobileNav({
 }) {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
   const currentUser = user || auth.currentUser;
   const isGuest = !currentUser;
   const displayName = profileSettings.displayName || currentUser?.displayName;
@@ -72,14 +72,8 @@ export function MobileNav({
   const username = publicUsername(profileSettings.username, currentUser?.uid);
   const unreadMessages = useUnreadMessages(currentUser?.uid);
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate("/login");
-    } catch (error) {
-      console.error("Erro ao deslogar:", error);
-    }
-  };
+  const here = `${location.pathname}${location.search}`;
+  const settingsActive = location.pathname.startsWith("/settings");
 
   const menuItems = [
     { name: t("nav.home"), path: "/", icon: Home },
@@ -112,7 +106,7 @@ export function MobileNav({
           {isGuest ? (
             <div className="relative ml-1">
               <Link
-                to="/login"
+                to={authPath("/login", here)}
                 title={t("nav.login")}
                 className="flex h-11 items-center gap-1.5 rounded-full bg-[var(--engine-accent)] px-4 text-[13px] font-semibold text-white transition active:scale-95"
               >
@@ -156,21 +150,26 @@ export function MobileNav({
                   getInitials(displayName)
                 )}
               </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--engine-text-subtle)] transition-colors active:text-[var(--engine-accent)]"
-                title={t("nav.logout")}
-                aria-label={t("nav.logout")}
+              {/* Configurações no celular (até 25/10/2026 não tinha porta de
+                  entrada abaixo de lg). O "Sair" que morava aqui, colado no
+                  avatar, foi para dentro de Configurações, com confirmação. */}
+              <Link
+                to="/settings"
+                title={t("nav.settings")}
+                aria-label={t("nav.settings")}
+                aria-current={settingsActive ? "page" : undefined}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors active:text-[var(--engine-accent)] ${
+                  settingsActive ? "text-[var(--engine-accent)]" : "text-[var(--engine-text-subtle)]"
+                }`}
               >
-                <LogOut size={19} />
-              </button>
+                <Settings size={20} strokeWidth={settingsActive ? 2.4 : 2} />
+              </Link>
             </>
           )}
         </div>
       </header>
 
-      <nav className="engine-mobile-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-[var(--engine-border)] bg-[var(--engine-bg)]/95 pb-[max(env(safe-area-inset-bottom),0.35rem)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] pt-1 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl lg:hidden">
+      <nav aria-label={t("nav.main")} className="engine-mobile-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-[var(--engine-border)] bg-[var(--engine-bg)]/95 pb-[max(env(safe-area-inset-bottom),0.35rem)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] pt-1 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl lg:hidden">
         {menuItems.map((item) => {
           const active = isActivePath(item.path);
           const Icon = item.icon;

@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { LogIn, Lock } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { authPath } from "../services/authRedirect";
 
 /**
  * Portão de rota para áreas que só fazem sentido logado (garagem, dashboard,
@@ -10,8 +11,12 @@ import { useTranslation } from "react-i18next";
  */
 export function RequireAuth({ user, children }) {
   const { t } = useTranslation();
+  const location = useLocation();
 
   if (user) return children;
+
+  // Entra e volta para a página que pediu a conta, não para a Home.
+  const here = `${location.pathname}${location.search}${location.hash}`;
 
   return (
     <div className="flex flex-1 items-center justify-center py-10">
@@ -29,7 +34,7 @@ export function RequireAuth({ user, children }) {
         </div>
         <div className="flex w-full flex-col gap-2.5">
           <Link
-            to="/login"
+            to={authPath("/login", here)}
             className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] text-sm font-semibold text-white transition hover:brightness-95"
           >
             <LogIn size={18} />

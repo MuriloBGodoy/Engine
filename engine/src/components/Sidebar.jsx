@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Car,
   BriefcaseBusiness,
@@ -12,7 +12,9 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { auth, signOut } from "../services/supabase";
+import { auth } from "../services/supabase";
+import { authPath } from "../services/authRedirect";
+import { useSignOut } from "../hooks/useSignOut";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
@@ -40,7 +42,6 @@ export function Sidebar({
 }) {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
   const user = userProp || auth.currentUser;
   const isGuest = !user;
   const displayName = profileSettings.displayName || user?.displayName;
@@ -49,14 +50,9 @@ export function Sidebar({
   const showEmail = privacySettings.showEmailInSidebar !== false;
   const unreadMessages = useUnreadMessages(user?.uid);
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate("/login");
-    } catch (error) {
-      console.error("Erro ao deslogar:", error);
-    }
-  };
+  // Sair pede confirmação (ver useSignOut).
+  const handleLogout = useSignOut();
+  const here = `${location.pathname}${location.search}`;
 
   const menuItems = [
     { name: t("nav.home"), path: "/", icon: Home },
@@ -216,7 +212,7 @@ export function Sidebar({
         {isGuest ? (
           <div className="relative">
             <Link
-              to="/login"
+              to={authPath("/login", here)}
               title={t("nav.login")}
               aria-label={t("nav.login")}
               className={`flex h-11 items-center rounded-xl bg-[var(--engine-accent)] font-semibold text-white transition hover:brightness-95 ${
@@ -262,6 +258,7 @@ export function Sidebar({
                 onClick={handleLogout}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-subtle)] transition-colors hover:bg-[var(--engine-accent-soft)] hover:text-[var(--engine-accent)]"
                 title={t("nav.logout")}
+                aria-label={t("nav.logout")}
               >
                 <LogOut size={17} />
               </button>
