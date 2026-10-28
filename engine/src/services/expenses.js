@@ -8,6 +8,8 @@
 // histórico suficiente para uma conta ser honesta, a função devolve `null` e a
 // tela mostra menos, em vez de mostrar errado.
 
+import { localISODate } from "./garageInput.js";
+
 /** Categorias de gasto, na ordem em que aparecem na tela. */
 export const EXPENSE_CATEGORIES = [
   "fuel",
@@ -29,6 +31,12 @@ export const EXPENSE_CATEGORIES = [
  */
 const RECURRING_CATEGORIES = EXPENSE_CATEGORIES.filter((key) => key !== "fine");
 
+/**
+ * Combustíveis do abastecimento. GNV é medido em m³, não em litros: entra no
+ * histórico, mas nunca na média de km/l.
+ */
+export const FUEL_TYPES = ["gasoline", "ethanol", "diesel", "gnv"];
+
 /** Teto de lançamentos guardados no documento do carro. */
 export const MAX_EXPENSES = 300;
 
@@ -37,7 +45,9 @@ const num = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// Fuso do aparelho, não UTC: `toISOString()` datava de amanhã o que era
+// lançado no Brasil depois das 21h.
+const todayISO = () => localISODate();
 
 /** Data de um lançamento como Date local, sem escorregar de fuso. */
 const entryDate = (entry) => new Date(`${entry.date}T12:00:00`);
@@ -55,6 +65,15 @@ export const normalizeExpense = (raw = {}) => ({
   liters: Math.max(num(raw.liters), 0),
   note: String(raw.note || "").trim().slice(0, 120),
   createdAt: raw.createdAt || new Date().toISOString(),
+  // Só no abastecimento, e só quando a pessoa disse. `null` = não informado
+  // (todo lançamento anterior a 25/10/2026): a conta assume tanque cheio, como
+  // sempre assumiu, mas o resultado sai marcado como aproximado.
+  ...(raw.category === "fuel"
+    ? {
+        fullTank: typeof raw.fullTank === "boolean" ? raw.fullTank : null,
+        fuel: FUEL_TYPES.includes(raw.fuel) ? raw.fuel : null,
+      }
+    : {}),
 });
 
 export const normalizeExpenses = (list) =>
@@ -67,34 +86,113 @@ export const normalizeExpenses = (list) =>
     : [];
 
 /**
- * Consumo real, pelo método tanque a tanque.
+ * Consumo, pelo método tanque cheio a tanque cheio.
  *
- * Distância entre dois abastecimentos dividida pelos litros do segundo. Vale a
- * pena repetir por que é o segundo e não o primeiro: os litros que você põe
- * agora são os que repõem o que gastou desde a última parada.
+ * A distância entre dois abastecimentos de tanque cheio, dividida por TODOS os
+ * litros postos depois do primeiro — inclusive os parciais do meio ("põe
+ * R$ 50"). Os litros que você põe agora repõem o que gastou desde a última vez
+ * em que o tanque estava cheio.
  *
- * Precisa de dois abastecimentos com odômetro, e assume tanque cheio nos dois.
+ * Três jeitos de o número sair errado com cara de certo, e o que se faz com
+ * cada um:
+ *   - último abastecimento parcial: não fecha trecho; o trecho só conta quando
+ *     o tanque enche de novo;
+ *   - abastecimento com odômetro mas sem litros no meio: o trecho é descartado
+ *     (antes, a distância dos dois era somada com os litros de um só, e o km/l
+ *     inflava);
+ *   - etanol e gasolina no mesmo trecho: o número não é de nenhum dos dois.
+ *
+ * Um trecho é MEDIDO quando as duas pontas e tudo no meio dizem "tanque cheio"
+ * ou "parcial" explicitamente e são do mesmo combustível. Havendo trecho
+ * medido, a média usa só os medidos do combustível com mais quilômetros, e
+ * `approximate` é false. Sem nenhum, a média usa todos os trechos (como era
+ * antes) e sai `approximate: true` — a tela não pode chamar isso de "real".
+ *
+ * Devolve `null` sem pelo menos um trecho fechado.
  */
 export const realConsumption = (expenses = []) => {
   const fills = expenses
-    .filter((entry) => entry.category === "fuel" && entry.odometer > 0 && entry.liters > 0)
-    .sort((a, b) => a.odometer - b.odometer);
+    .filter((entry) => entry.category === "fuel" && Number(entry.odometer) > 0)
+    .map((entry) => ({
+      odometer: Number(entry.odometer),
+      liters: Math.max(Number(entry.liters) || 0, 0),
+      date: String(entry.date || ""),
+      createdAt: String(entry.createdAt || ""),
+      // Legado (sem o campo) conta como cheio, como sempre contou.
+      full: entry.fullTank !== false,
+      declared: typeof entry.fullTank === "boolean",
+      fuel: FUEL_TYPES.includes(entry.fuel) ? entry.fuel : null,
+    }))
+    .sort(
+      (a, b) =>
+        a.odometer - b.odometer ||
+        a.date.localeCompare(b.date) ||
+        a.createdAt.localeCompare(b.createdAt),
+    );
 
-  if (fills.length < 2) return null;
-
-  let distance = 0;
+  const segments = [];
+  let anchor = null;
   let liters = 0;
-  for (let index = 1; index < fills.length; index += 1) {
-    const leg = fills[index].odometer - fills[index - 1].odometer;
-    // Odômetro que não avançou (ou voltou) é digitação errada: ignora o trecho
-    // em vez de estourar a média. O mesmo vale para salto absurdo.
-    if (leg <= 0 || leg > 5000) continue;
-    distance += leg;
-    liters += fills[index].liters;
+  let broken = false;
+  let members = [];
+
+  for (const fill of fills) {
+    if (!anchor) {
+      if (fill.full) anchor = fill;
+      continue;
+    }
+    // GNV no meio: o carro rodou num combustível que não está em litros.
+    if (fill.liters <= 0 || fill.fuel === "gnv") broken = true;
+    else liters += fill.liters;
+    members.push(fill);
+
+    if (!fill.full) continue;
+
+    const distance = fill.odometer - anchor.odometer;
+    // Odômetro que não avançou é digitação errada; salto absurdo também.
+    if (!broken && distance > 0 && distance <= 5000 && liters > 0) {
+      const all = [anchor, ...members];
+      const fuel = anchor.fuel;
+      const pure =
+        all.every((item) => item.declared) &&
+        fuel !== null &&
+        all.every((item) => item.fuel === fuel);
+      segments.push({ distance, liters, pure, fuel: pure ? fuel : null, fills: members.length });
+    }
+    anchor = fill;
+    liters = 0;
+    broken = false;
+    members = [];
   }
 
-  if (distance <= 0 || liters <= 0) return null;
-  return { kmPerLiter: distance / liters, distance, liters, fills: fills.length };
+  if (!segments.length) return null;
+
+  const pure = segments.filter((segment) => segment.pure);
+  let used = segments;
+  let fuel = null;
+  if (pure.length) {
+    const byFuel = new Map();
+    for (const segment of pure) {
+      byFuel.set(segment.fuel, (byFuel.get(segment.fuel) || 0) + segment.distance);
+    }
+    fuel = [...byFuel.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    used = pure.filter((segment) => segment.fuel === fuel);
+  }
+
+  const distance = used.reduce((sum, segment) => sum + segment.distance, 0);
+  const totalLiters = used.reduce((sum, segment) => sum + segment.liters, 0);
+  if (distance <= 0 || totalLiters <= 0) return null;
+
+  return {
+    kmPerLiter: distance / totalLiters,
+    distance,
+    liters: totalLiters,
+    // Abastecimentos que fecharam ou estão dentro dos trechos usados.
+    fills: used.reduce((sum, segment) => sum + segment.fills, 0),
+    segments: used.length,
+    approximate: !pure.length,
+    fuel,
+  };
 };
 
 /** Km rodado por mês, medido pelo odômetro — não estimado. */

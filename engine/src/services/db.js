@@ -11,6 +11,7 @@ import { inferLocation } from "./locations";
 import { listingEditNeedsReview, PRICE_MAX_LENGTH } from "./serviceListingRules";
 import { normalizeOwnershipInputs, LIFE_SITUATION_TYPES } from "./ownership";
 import { normalizeExpense, normalizeExpenses, realConsumption } from "./expenses";
+import { localISODate } from "./garageInput";
 import { normalizeSpecSheet, publicSpecSheet } from "./carSpecSheet";
 
 const defaultSettings = {
@@ -1183,7 +1184,8 @@ export const engineDB = {
     const contribution = {
       id: crypto.randomUUID(),
       amount: value,
-      date: String(date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      // Fuso do aparelho: em UTC o aporte das 21h nascia com a data de amanhã.
+      date: String(date || localISODate()).slice(0, 10),
       createdAt: new Date().toISOString(),
     };
 

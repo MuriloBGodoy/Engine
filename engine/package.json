@@ -18,6 +18,7 @@
     "check:imagens": "node scripts/check-imagens.mjs",
     "check:affordability": "node scripts/check-affordability.mjs",
     "check:spec-sheet": "node scripts/check-spec-sheet.mjs",
+    "check:garage-input": "node scripts/check-garage-input.mjs",
     "check:leitura": "node scripts/check-leitura-honesta.mjs",
     "check:events-i18n": "node scripts/check-events-i18n.mjs",
     "check:achievements": "node scripts/check-achievements.mjs",
