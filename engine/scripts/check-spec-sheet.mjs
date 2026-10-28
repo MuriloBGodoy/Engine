@@ -1052,34 +1052,41 @@ const measure = (label, year) => {
  * vendidos. Esta é a taxa que a pessoa de verdade vai encontrar, e a de cima é
  * o piso. As duas juntas são a resposta honesta; qualquer uma sozinha mente.
  */
+// Versão E ano conferidos um a um contra a FIPE (parallelum, /anos) em
+// 27/10/2026: nenhuma linha aqui é um carro que não foi vendido.
 const FLEET = [
   ["GM - Chevrolet", "ONIX HATCH LT 1.0 12V Flex 5p Mec.", "2022 Gasolina"],
   ["GM - Chevrolet", "ONIX HATCH LTZ 1.0 12V TB Flex 5p Aut.", "2022 Gasolina"],
-  ["GM - Chevrolet", "TRACKER 1.0 Turbo 12V Flex Aut.", "2022 Gasolina"],
-  ["Hyundai", "HB20 Comfort 1.0 Flex 12V 5p Mec.", "2023 Gasolina"],
-  ["Hyundai", "HB20 Platinum Plus 1.0 TGDI Flex 12V Aut.", "2026 Gasolina"],
-  ["Hyundai", "Creta Comfort 1.0 TGDI Flex 12V Aut.", "2023 Gasolina"],
-  ["Fiat", "STRADA Freedom 1.3 Flex 8V CD", "2023 Gasolina"],
+  ["GM - Chevrolet", "TRACKER LT 1.0 Turbo 12V Flex Aut.", "2022 Gasolina"],
+  ["Hyundai", "HB20 Comfort 1.0 Flex 12V Mec.", "2023 Gasolina"],
+  ["Hyundai", "HB20 Platinum Plus 1.0 TB Flex 12V Aut.", "2024 Gasolina"],
+  ["Hyundai", "Creta Comfort 1.0 TB 12V Flex Aut.", "2023 Gasolina"],
+  ["Fiat", "Strada Freedom 1.3 Flex 8V CD", "2023 Gasolina"],
   ["Fiat", "ARGO DRIVE 1.0 6V Flex", "2022 Gasolina"],
-  ["Fiat", "MOBI LIKE 1.0 Fire Flex 8V 5p", "2022 Gasolina"],
-  ["Fiat", "PULSE Drive 1.0 Turbo 200 Flex Aut.", "2023 Gasolina"],
-  ["Fiat", "Toro Volcano 1.3 T270 16V Flex Aut.", "2023 Gasolina"],
-  ["Jeep", "COMPASS Longitude 1.3 T270 4x2 Flex Aut.", "2022 Gasolina"],
-  ["Jeep", "Renegade Sport 1.3 T270 4x2 Flex Aut.", "2022 Gasolina"],
-  ["VW - VolksWagen", "Polo Track 1.0 Flex 12V 5p Mec.", "2023 Gasolina"],
-  ["VW - VolksWagen", "T-Cross 200 TSI 1.0 Flex 12V 5p Aut.", "2022 Gasolina"],
+  ["Fiat", "MOBI LIKE 1.0 Fire Flex 5p.", "2022 Gasolina"],
+  ["Fiat", "PULSE DRIVE 1.0 Turbo 200 Flex Aut.", "2023 Gasolina"],
+  ["Fiat", "Toro Volcano 1.3 T270 4x2 Flex Aut.", "2023 Gasolina"],
+  ["Jeep", "COMPASS LONG. T270 1.3 TB 4x2 Flex Aut.", "2022 Gasolina"],
+  ["Jeep", "Renegade Sport T270 1.3 TB 4x2 Flex Aut.", "2022 Gasolina"],
+  ["VW - VolksWagen", "Polo Track 1.0 Flex 12V 5p", "2023 Gasolina"],
+  ["VW - VolksWagen", "T-Cross Sense 200 TSI 1.0 Flex 5p Aut.", "2022 Gasolina"],
   ["VW - VolksWagen", "VIRTUS 1.6 MSI Flex 16V 4p Aut.", "2022 Gasolina"],
   ["VW - VolksWagen", "Nivus Comfortline 1.0 200 TSI Flex Aut.", "2022 Gasolina"],
   ["VW - VolksWagen", "Gol 1.0 Flex 12V 5p", "2020 Gasolina"],
-  ["VW - VolksWagen", "Saveiro Robust 1.6 Total Flex 16V CS", "2022 Gasolina"],
+  ["VW - VolksWagen", "Saveiro Robust 1.6 Total Flex 16V CD", "2023 Gasolina"],
   ["Renault", "KWID Zen 1.0 Flex 12V 5p Mec.", "2023 Gasolina"],
-  ["Renault", "DUSTER Intense 1.6 16V Flex 5p Aut.", "2023 Gasolina"],
-  ["Toyota", "Corolla XEi 2.0 16V Flex Aut.", "2022 Gasolina"],
-  ["Toyota", "Hilux SRV 2.8 TDI 4x4 Diesel Aut.", "2022 Diesel"],
+  ["Renault", "DUSTER Intense 1.6 16V Flex Aut.", "2023 Gasolina"],
+  ["Toyota", "Corolla XEi 2.0 Flex 16V Aut.", "2022 Gasolina"],
+  ["Toyota", "Hilux CD SRV 4x4 2.8 TDI Diesel Aut.", "2022 Diesel"],
   ["Toyota", "Hilux SW4 SRX 4x4 2.8 TDI 16V Dies. Aut.", "2023 Diesel"],
-  ["Honda", "HR-V EXL 1.5 Flex TB 16V 5p Aut.", "2023 Gasolina"],
+  // Era "HR-V EXL 1.5 Flex TB", que não existe na FIPE: o EXL de 2023 é
+  // aspirado (Sensing) e o turbo é só Advance/Touring. O teste contava 177 cv
+  // para um carro de 126 — o carro impossível dentro do próprio teste.
+  ["Honda", "HR-V EXL 1.5 Flex Sensing 16V 5p Aut.", "2023 Gasolina"],
+  ["Honda", "HR-V Touring 1.5 Flex TB 16V 5p Aut.", "2023 Gasolina"],
   ["Nissan", "KICKS Active 1.6 16V Flex Aut.", "2023 Gasolina"],
-  ["Ford", "Ranger XLS 3.2 Diesel 4x4 CD Aut.", "2020 Diesel"],
+  ["Ford", "Ranger XLS 3.2 20V 4x4 CD Diesel Aut.", "2016 Diesel"],
+  ["Toyota", "YARIS XL 1.3 Flex 16V 5p Mec.", "2020 Gasolina"],
 ];
 
 const measureFleet = () => {
@@ -1104,6 +1111,31 @@ const measureFleet = () => {
   }
   const pct = (n) => `${((n / FLEET.length) * 100).toFixed(0)}%`;
   console.log(`  => potência de fábrica em ${withValue}/${FLEET.length} (${pct(withValue)})`);
+
+  // A frota só mede alguma coisa se as versões EXISTEM. Até 25/10/2026 a
+  // fixture tinha 18 strings que a FIPE não escreve assim, uma delas um HR-V
+  // EXL turbo que nunca foi vendido — e o teste contava 177 cv para ele.
+  const known = new Set(sample.map((row) => `${row.brand}|${row.model}`));
+  for (const [brand, model] of FLEET) {
+    check(`frota: "${model}" existe na amostra FIPE`, known.has(`${brand}|${model}`), true);
+  }
+  // Números que conhecemos do motor, com versão e ano que existem.
+  const powerOf = (brand, model, year) => {
+    const cell = getFactorySpecs({ brand, model, year }).fields.powerCv;
+    if (cell.status !== SPEC_STATUS.VALUE) return cell.status;
+    return cell.pair ? [cell.pair.ethanol, cell.pair.gasoline] : cell.value;
+  };
+  check(
+    "frota: HR-V EXL 2023 é aspirado, nunca os 177 cv do turbo",
+    powerOf("Honda", "HR-V EXL 1.5 Flex Sensing 16V 5p Aut.", "2023 Gasolina") === 177,
+    false,
+  );
+  check("frota: HR-V Touring turbo 177 cv", powerOf("Honda", "HR-V Touring 1.5 Flex TB 16V 5p Aut.", "2023 Gasolina"), 177);
+  check("frota: Polo Track 84/77 cv", powerOf("VW - VolksWagen", "Polo Track 1.0 Flex 12V 5p", "2023 Gasolina"), [84, 77]);
+  check("frota: T270 185/180 cv", powerOf("Jeep", "COMPASS LONG. T270 1.3 TB 4x2 Flex Aut.", "2022 Gasolina"), [185, 180]);
+  check("frota: Corolla 2.0 177/169 cv", powerOf("Toyota", "Corolla XEi 2.0 Flex 16V Aut.", "2022 Gasolina"), [177, 169]);
+  // Onix 1.0 sem marcador de turbo: retido, não chutado.
+  check("frota: Onix LT 1.0 sem TB fica retido", powerOf("GM - Chevrolet", "ONIX HATCH LT 1.0 12V Flex 5p Mec.", "2022 Gasolina"), SPEC_STATUS.HELD);
   // O 0-100 é o campo que o dono mais quer ver, e é o mais esparso. Medido à
   // parte porque a média com a potência esconderia os dois.
   console.log(`  => 0-100 em ${withAccel}/${FLEET.length} (${pct(withAccel)})`);

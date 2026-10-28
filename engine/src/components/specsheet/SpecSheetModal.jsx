@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { canEditSpecSheet, resolveVehicleSpecSheet } from "../../services/carSpecSheet";
 import { SpecSheetEditor } from "./SpecSheetEditor";
 import { SpecSheetView } from "./SpecSheetView";
 import { formatFipeYear } from "../../services/carDisplay";
+import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 
 /**
  * A ficha tecnica, nas tres entradas.
@@ -28,6 +29,11 @@ export function SpecSheetModal({ car, onClose, onSave }) {
   const [highlightUnlock, setHighlightUnlock] = useState(false);
 
   const resolved = useMemo(() => (car ? resolveVehicleSpecSheet(car) : null), [car]);
+
+  // Voltar no Android fecha a ficha em vez de sair da Garagem (ou do app, no
+  // PWA). Era o único modal da Garagem sem isso (auditoria de 25/10/2026).
+  const close = useCallback(() => onClose?.(), [onClose]);
+  useHistoryDismiss(Boolean(car), close);
 
   useEffect(() => {
     const onKey = (event) => {
@@ -104,7 +110,7 @@ export function SpecSheetModal({ car, onClose, onSave }) {
             type="button"
             onClick={onClose}
             aria-label={t("specSheet.close")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
           >
             <X size={18} />
           </button>
