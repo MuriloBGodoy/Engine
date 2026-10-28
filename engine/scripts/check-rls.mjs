@@ -242,8 +242,13 @@ try {
 
   console.log("\nserviços");
   check("anúncio nasce pendente", passed(await a.client.from("service_listings").insert({ id: `s-${run}`, owner_id: a.id, data: { title: "Funilaria" } })));
-  check("anúncio já aprovado é recusado", denied(await a.client.from("service_listings").insert({ id: `s2-${run}`, owner_id: a.id, moderation_status: "approved" })));
-  check("dono não se aprova", denied(await a.client.from("service_listings").update({ moderation_status: "approved" }).eq("id", `s-${run}`).select()));
+  // Desde 20261025150000 a RLS aceita 'approved' do dono (edição leve fica no
+  // ar) e o gatilho decide o status: o que importa é o que fica gravado.
+  const status = async (id) => (await admin.from("service_listings").select("moderation_status").eq("id", id).maybeSingle()).data?.moderation_status;
+  await a.client.from("service_listings").insert({ id: `s2-${run}`, owner_id: a.id, moderation_status: "approved" });
+  check("anúncio já aprovado nasce pendente", [undefined, "pending"].includes(await status(`s2-${run}`)));
+  await a.client.from("service_listings").update({ moderation_status: "approved" }).eq("id", `s-${run}`);
+  check("dono não se aprova", (await status(`s-${run}`)) === "pending");
   check("pendente não é público", (await anon.from("service_listings").select("*").eq("id", `s-${run}`)).data?.length === 0);
   await anon.rpc("track_listing_metric", { p_listing_id: `s-${run}`, p_metric: "view" });
   await a.client.from("service_listings").update({ view_count: 500, data: { title: "Funilaria 2" } }).eq("id", `s-${run}`);
