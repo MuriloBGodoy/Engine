@@ -141,8 +141,9 @@ export function Terms() {
         </p>
         <p>
           <strong className="text-[var(--engine-text)]">Pagamento.</strong>{" "}
-          Processado pelo Stripe (ou Mercado Pago, em alguns países da América
-          Latina). Preços podem mudar, com aviso antecipado, e nunca valem para
+          Processado pelo Stripe, na moeda do seu país. As assinaturas ainda
+          não estão à venda em todos os países; a página Planos mostra se
+          estão no seu. Preços podem mudar, com aviso antecipado, e nunca valem para
           um período já pago. O preço de fundador é mantido enquanto a
           assinatura continuar ativa.
         </p>
@@ -186,9 +187,15 @@ export function Terms() {
 
       <LegalSection title="Lei aplicável">
         <p>
-          Estes termos seguem a lei brasileira. Eventuais disputas serão
-          resolvidas no foro do domicílio do consumidor, como prevê o Código de
-          Defesa do Consumidor.
+          O Engine é oferecido a partir do Brasil, e estes termos seguem a lei
+          brasileira — em especial o Código de Defesa do Consumidor e a Lei
+          Geral de Proteção de Dados (LGPD) —, também para quem usa o Engine de
+          fora do Brasil. Eventuais disputas serão resolvidas no foro do
+          domicílio do consumidor, como prevê o Código de Defesa do Consumidor.
+        </p>
+        <p>
+          Para quem está fora do Brasil, estes termos estão por enquanto só em
+          português. A tradução está a caminho; até lá, vale este texto.
         </p>
       </LegalSection>
 

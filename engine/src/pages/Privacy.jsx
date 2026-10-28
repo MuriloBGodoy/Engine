@@ -121,9 +121,8 @@ export function Privacy() {
             hospedagem.
           </li>
           <li>
-            <strong className="text-[var(--engine-text)]">Stripe</strong> (e
-            Mercado Pago, em alguns países da América Latina) — pagamento dos
-            planos. Mesmo quando o pagamento aparece dentro do app, os campos do
+            <strong className="text-[var(--engine-text)]">Stripe</strong> —
+            pagamento dos planos. Mesmo quando o pagamento aparece dentro do app, os campos do
             cartão são do Stripe:{" "}
             <strong className="text-[var(--engine-text)]">o Engine nunca recebe
             nem armazena dados do seu cartão</strong>. Guardamos só o plano, as
@@ -179,6 +178,18 @@ export function Privacy() {
           Apagar a conta remove seu perfil, suas metas e suas publicações.
           Mensagens já enviadas podem permanecer na caixa de quem recebeu, e
           registros que a lei exige guardar são mantidos pelo prazo legal.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Lei aplicável e quem está fora do Brasil">
+        <p>
+          O Engine é oferecido a partir do Brasil, e o tratamento dos seus dados
+          segue a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018) e o
+          Código de Defesa do Consumidor, onde quer que você esteja.
+        </p>
+        <p>
+          Para quem está fora do Brasil, esta política está por enquanto só em
+          português. A tradução está a caminho; até lá, vale este texto.
         </p>
       </LegalSection>
 

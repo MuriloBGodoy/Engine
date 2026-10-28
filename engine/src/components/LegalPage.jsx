@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -11,7 +11,10 @@ import { useTranslation } from "react-i18next";
  */
 export function LegalPage({ title, updatedAt, children }) {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // O texto legal só existe em português. Em outra língua, um aviso no topo
+  // diz isso e que vale a lei brasileira (i18n-intl.js).
+  const showLanguageNotice = !String(i18n.resolvedLanguage || i18n.language || "pt").startsWith("pt");
 
   useEffect(() => {
     const previous = document.title;
@@ -47,11 +50,23 @@ export function LegalPage({ title, updatedAt, children }) {
       </div>
 
       <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+        {showLanguageNotice && (
+          <div
+            className="mb-6 flex items-start gap-3 rounded-2xl border border-[var(--engine-border-strong)] bg-[var(--engine-surface-2)] px-4 py-3.5 text-[13px] leading-relaxed text-[var(--engine-text-muted)]"
+          >
+            <Languages size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <p>
+              <span className="font-semibold text-[var(--engine-text)]">{t("legal.languageNotice.title")}</span>{" "}
+              {t("legal.languageNotice.body")}
+            </p>
+          </div>
+        )}
+
         <p className="text-xs font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
           {t("legal.updatedAt", { date: updatedAt })}
         </p>
 
-        <div className="legal-body mt-6 space-y-6 text-sm leading-7 text-[var(--engine-text-muted)]">
+        <div lang="pt-BR" className="legal-body mt-6 space-y-6 text-sm leading-7 text-[var(--engine-text-muted)]">
           {children}
         </div>
       </article>
