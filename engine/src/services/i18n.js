@@ -969,7 +969,7 @@ const resources = {
         title: "Custo real: {{car}}",
         subtitle:
           "Descubra quanto custa comprar e manter esse carro por mês — e quanto você precisa ganhar.",
-        cardMonthly: "Custo real/mês",
+        cardMonthly: "Custo estimado/mês",
         cardMonthlyShort: "Custo/mês",
         cardSimulate: "Simular",
         sections: {
@@ -2730,7 +2730,7 @@ const resources = {
         title: "True cost: {{car}}",
         subtitle:
           "See how much it costs to buy and keep this car every month — and how much you need to earn.",
-        cardMonthly: "True cost/mo",
+        cardMonthly: "Est. cost/mo",
         cardMonthlyShort: "Cost/mo",
         cardSimulate: "Simulate",
         sections: {
@@ -4483,7 +4483,7 @@ const resources = {
         title: "Costo real: {{car}}",
         subtitle:
           "Descubre cuánto cuesta comprar y mantener este auto por mes — y cuánto necesitas ganar.",
-        cardMonthly: "Costo real/mes",
+        cardMonthly: "Costo estimado/mes",
         cardMonthlyShort: "Costo/mes",
         cardSimulate: "Simular",
         sections: {
