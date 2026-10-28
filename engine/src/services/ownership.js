@@ -16,6 +16,8 @@
 // Todos os valores são ESTIMATIVAS de planejamento, não cotações.
 
 import marketData from "./market-data.json" with { type: "json" };
+import { parseFipeVersion, CONFIDENCE } from "./fipeVersion.js";
+import { consumptionFor } from "./consumption.js";
 
 // ---------------------------------------------------------------------------
 // Brasil — dados por UF
@@ -68,7 +70,9 @@ const IPVA_BR = {
   PB: 0.025, PR: 0.019, PE: 0.024, PI: 0.025, RJ: 0.04, RN: 0.03, RS: 0.03,
   RO: 0.03, RR: 0.03, SC: 0.02, SP: 0.04, SE: 0.025, TO: 0.02,
 };
-const IPVA_BR_DEFAULT = 0.03;
+// Sem UF não há alíquota: até 25/10/2026 havia aqui um "padrão" de 3% sem
+// fonte, somado ao total de quem ainda não tinha escolhido o estado. Agora a
+// conta devolve `basis: "no_state"` e a tela pede o estado no lugar do valor.
 
 // Idade a partir da qual não se paga IPVA.
 //
@@ -264,7 +268,7 @@ const ipvaRateBR = (state, fuelType, value) => {
   }
   const bracket = IPVA_BR_VALUE_BRACKET[state];
   if (bracket && value > bracket.threshold) return bracket.above;
-  return IPVA_BR[state] ?? IPVA_BR_DEFAULT;
+  return IPVA_BR[state];
 };
 
 // Taxa anual de licenciamento (CRLV) por UF, exercício 2026, em BRL.
@@ -308,7 +312,8 @@ const LICENSING_BR = {
   PI: 110, // sem fonte: 40 UFR-PI pela Lei 6.441/2013, UFR-PI de 2026 não achada
   AP: 115, // sem fonte: a lei de taxas do DETRAN-AP não foi achada
 };
-const LICENSING_BR_DEFAULT = 140;
+// Sem padrão de propósito, pelo mesmo motivo do IPVA: os R$ 140 que ficavam
+// aqui não tinham fonte, e entravam no total de quem não escolheu o estado.
 // UFs cuja taxa de 2026 está em fonte oficial. As outras a tela chama de
 // aproximação, em vez de citar o DETRAN.
 const LICENSING_BR_VERIFIED = new Set([
@@ -466,6 +471,9 @@ export const defaultOwnershipInputs = () => ({
   kmPerMonth: 1000,
   fuelType: "gasoline",
   consumption: 0, // 0 = usar padrão do combustível
+  // Consumo informado pela pessoa, POR COMBUSTÍVEL. `userConsumption` é só o
+  // do combustível escolhido, derivado deste mapa (ver normalizeOwnershipInputs).
+  userConsumptionByFuel: {},
   userConsumption: 0, // 0 = não informado, usar automático ou default
   driverAgeBand: "18-25",
   hasGarage: true,
@@ -486,13 +494,41 @@ export const defaultOwnershipInputs = () => ({
   maintenanceMonthly: 0,
 });
 
+// Consumo informado, um número por combustível.
+//
+// Até 25/10/2026 era um número só, e atravessava a troca do seletor: quem
+// informava 13 km/l na gasolina e trocava para etanol para comparar via o
+// etanol a 13 km/l — Onix em SP, 1.000 km: R$ 298/mês em vez de R$ 408, 27% a
+// menos, e o flex parecia mais vantajoso no etanol do que é.
+//
+// Documento salvo antes disso só tem o escalar `userConsumption`; ele pertence
+// ao combustível que estava salvo junto, e é para lá que migra. Com o mapa
+// presente, o escalar cru é ignorado — senão ele voltaria a atravessar.
+const normalizeConsumptionMap = (raw, fuelType) => {
+  const map = {};
+  const source = raw.userConsumptionByFuel;
+  if (source && typeof source === "object") {
+    for (const fuel of FUEL_TYPES) {
+      const value = clamp(num(source[fuel], 0), 0, 50);
+      if (value > 0) map[fuel] = value;
+    }
+  } else {
+    const legacy = clamp(num(raw.userConsumption, 0), 0, 50);
+    if (legacy > 0) map[fuelType] = legacy;
+  }
+  return map;
+};
+
 export const normalizeOwnershipInputs = (raw = {}) => {
   const base = defaultOwnershipInputs();
+  const fuelType = FUEL_TYPES.includes(raw.fuelType) ? raw.fuelType : base.fuelType;
+  const userConsumptionByFuel = normalizeConsumptionMap(raw, fuelType);
   return {
     kmPerMonth: clamp(num(raw.kmPerMonth, base.kmPerMonth), 100, 20000),
-    fuelType: FUEL_TYPES.includes(raw.fuelType) ? raw.fuelType : base.fuelType,
+    fuelType,
     consumption: clamp(num(raw.consumption, 0), 0, 50),
-    userConsumption: clamp(num(raw.userConsumption, 0), 0, 50), // Consumo informado pelo user
+    userConsumptionByFuel,
+    userConsumption: userConsumptionByFuel[fuelType] || 0,
     driverAgeBand: AGE_BANDS.includes(raw.driverAgeBand)
       ? raw.driverAgeBand
       : base.driverAgeBand,
@@ -564,6 +600,16 @@ const countryProfile = (country) => COUNTRY_PROFILES[country] || COUNTRY_PROFILE
 //   "sp_hybrid"         híbrido flex em SP, isento ou na escada até 2030
 const annualVehicleTax = (car, value, country, state, fuelType, carAge, year) => {
   if (country === "BR") {
+    // UF desconhecida: não há lei estadual para aplicar. Fica fora da soma e a
+    // tela pede o estado — melhor um buraco declarado que um número sem fonte.
+    // A imunidade dos 20 anos é constitucional e vale sem saber a UF.
+    if (!(state in IPVA_BR)) {
+      if (carAge >= IPVA_BR_EXEMPT_AGE_DEFAULT) {
+        return { annual: 0, basis: "age_exempt", exemptAge: IPVA_BR_EXEMPT_AGE_DEFAULT };
+      }
+      return { annual: 0, basis: "no_state" };
+    }
+
     // Imunidade por idade antes de qualquer alíquota: acima do limite não há
     // imposto a calcular. Ver IPVA_BR_EXEMPT_AGE.
     const exemptAge = IPVA_BR_EXEMPT_AGE[state] ?? IPVA_BR_EXEMPT_AGE_DEFAULT;
@@ -586,7 +632,7 @@ const annualVehicleTax = (car, value, country, state, fuelType, carAge, year) =>
 };
 
 const annualLicensing = (country, state) => {
-  if (country === "BR") return LICENSING_BR[state] || LICENSING_BR_DEFAULT;
+  if (country === "BR") return LICENSING_BR[state] || 0;
   return countryProfile(country).registrationFlat || 0;
 };
 
@@ -730,7 +776,8 @@ const monthlyFuel = (inputs, country, state) => {
     consumption = inputs.userConsumption; // User sempre sobrescreve
   }
 
-  return (inputs.kmPerMonth / consumption) * basePrice * stateFactor;
+  const price = basePrice * stateFactor;
+  return { monthly: (inputs.kmPerMonth / consumption) * price, price, consumption };
 };
 
 const annualMaintenance = (value, carAge, inputs, country) => {
@@ -862,7 +909,19 @@ export function estimateOwnershipRange(car, rawInputs = {}, location = {}, unkno
     const next = [];
     for (const scenario of scenarios) {
       for (const value of values) {
-        next.push({ ...scenario, [field]: value });
+        // O consumo informado mora no mapa por combustível; trocar só o escalar
+        // seria desfeito pela normalização.
+        next.push(
+          field === "userConsumption"
+            ? {
+                ...scenario,
+                userConsumptionByFuel: {
+                  ...scenario.userConsumptionByFuel,
+                  [scenario.fuelType]: value,
+                },
+              }
+            : { ...scenario, [field]: value },
+        );
         if (next.length >= 512) break;
       }
     }
@@ -1077,7 +1136,8 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
     ? { annual: inputs.insuranceMonthly * 12, basis: "user" }
     : { annual: 0, basis: "not_informed" };
   const insurance = insuranceResult.annual;
-  const fuel = monthlyFuel(inputs, country, state);
+  const fuelResult = monthlyFuel(inputs, country, state);
+  const fuel = fuelResult.monthly;
   const maintenance = inputs.maintenanceMonthly * 12;
   const depreciation = (value * annualDepreciationRate(carAge)) / 12;
 
@@ -1137,6 +1197,17 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
     },
     // Se a taxa de licenciamento desta UF foi conferida ou é aproximação.
     licensingVerified: country === "BR" && LICENSING_BR_VERIFIED.has(state),
+    // Sem UF não há IPVA nem licenciamento na soma (ver annualVehicleTax): a
+    // tela precisa dizer que eles FALTAM, não que são zero.
+    needsState: country === "BR" && !(state in LICENSING_BR),
+    // Preço e consumo que a linha de combustível usou. `priceSourced` é falso
+    // para o elétrico: o kWh não vem da ANP nem de fonte nenhuma conferida, e a
+    // tela tem de chamar isso de estimativa sem fonte, não de "preço da ANP".
+    fuel: {
+      price: fuelResult.price,
+      consumption: fuelResult.consumption,
+      priceSourced: inputs.fuelType !== "electric",
+    },
     // Idem para o IPVA. Ver annualVehicleTax.
     tax: {
       basis: taxResult.basis,
@@ -1251,6 +1322,118 @@ export function affordabilityLevers(car, rawInputs = {}, location = {}) {
   }
 
   return levers.sort((a, b) => b.delta - a.delta);
+}
+
+// ---------------------------------------------------------------------------
+// Um carro, um número
+// ---------------------------------------------------------------------------
+//
+// Até 25/10/2026 modal, card da garagem e Painel montavam a conta cada um do
+// seu jeito, e o mesmo Onix financiado em SP aparecia como R$ 3.163/mês + R$
+// 3.374/ano no modal e R$ 3.562 no card e no Painel. Três causas: o modal
+// injetava o consumo do INMETRO e os outros dois não; o modal separava os
+// boletos anuais e os outros diluíam em 12; e ninguém além do modal sabia que
+// carro já quitado não tem parcela. Agora os três chamam `simulateCar`.
+
+// Tipo de carro que a pessoa já tem (o mesmo valor de CAR_TYPE_OWNED do db.js,
+// que não dá para importar daqui: o db.js importa este módulo).
+const OWNED_CAR_TYPE = "owned";
+
+/**
+ * Combustível do carro pelo nome e pelo ano da FIPE, no vocabulário do
+ * simulador. Só devolve o que o parser leu com certeza: diesel, elétrico e
+ * álcool são marcados explicitamente pela FIPE. Flex, híbrido, GNV e o
+ * "Gasolina" do campo de ano (que a FIPE usa também para flex) viram gasolina,
+ * que é o que já era o padrão.
+ */
+export const fuelTypeForCar = (car) => {
+  let parsed = null;
+  try {
+    parsed = parseFipeVersion(car || {}).fuel;
+  } catch {
+    parsed = null;
+  }
+  if (parsed?.confidence === CONFIDENCE.EXPLICIT) {
+    if (parsed.value === "diesel") return { fuelType: "diesel", locked: true };
+    if (parsed.value === "electric") return { fuelType: "electric", locked: true };
+    if (parsed.value === "ethanol") return { fuelType: "ethanol", locked: true };
+  }
+  return { fuelType: "gasoline", locked: false };
+};
+
+/**
+ * Inputs com que o simulador abre ESTE carro — salvos ou não.
+ *
+ * Duas regras que corrigem o que o padrão genérico dizia:
+ *
+ * 1. Carro que a pessoa já tem é à vista. O padrão do motor é financiar com a
+ *    entrada igual ao que foi guardado, e para um carro na garagem isso
+ *    inventava uma parcela: Onix 2024 de R$ 80 mil em SP saía a R$ 3.448/mês,
+ *    R$ 2.592 deles de um financiamento que não existe. À vista são R$ 855.
+ * 2. O combustível nasce do carro. Hilux 2.8 diesel em MS simulada a gasolina
+ *    pagava IPVA de 3% em vez de 4,5% e 22% menos de combustível — erro para
+ *    baixo, o lado que não pode. Dolphin elétrico na BA pagava IPVA de isento.
+ *
+ * As duas valem para simulação salva também, porque o documento salvo antes
+ * delas carrega o padrão antigo e não dá para distinguir "escolheu financiar"
+ * de "salvou sem mexer". O que a pessoa escolheu de verdade a tela registra em
+ * `touched` (que o db.js já persiste), e o que está lá é respeitado.
+ */
+export const resolveOwnershipInputs = (car, saved = car?.ownership) => {
+  const touched = new Set(Array.isArray(saved?.touched) ? saved.touched : []);
+  const fipe = fuelTypeForCar(car);
+  const inputs = normalizeOwnershipInputs(saved || { fuelType: fipe.fuelType });
+  if (car?.type === OWNED_CAR_TYPE && !touched.has("purchaseMode")) {
+    inputs.purchaseMode = "cash";
+  }
+  if (fipe.locked && !touched.has("fuelType") && inputs.fuelType !== fipe.fuelType) {
+    inputs.fuelType = fipe.fuelType;
+    inputs.userConsumption = inputs.userConsumptionByFuel[fipe.fuelType] || 0;
+  }
+  return inputs;
+};
+
+/**
+ * A conta de um carro, igual em toda tela que mostra o custo dele.
+ *
+ * `inputs` e `location` são opcionais: sem eles valem os salvos no carro (e,
+ * sem UF salva, a do perfil). O consumo do INMETRO entra aqui, e não no que é
+ * salvo, para que um carro simulado antes de a tabela mudar use a tabela nova.
+ *
+ * `headline` é o recorte que a tela mostra, e é o mesmo em todo lugar: o que
+ * sai TODO MÊS, e os boletos ANUAIS (IPVA e licenciamento) à parte, com valor
+ * cheio. `comparableMonthly` dilui os anuais em 12 e só serve para ordenar
+ * carros entre si — não é número de tela.
+ */
+export function simulateCar(car, { inputs, location, profile } = {}) {
+  const resolved = inputs ? normalizeOwnershipInputs(inputs) : resolveOwnershipInputs(car);
+  const saved = car?.ownership || {};
+  const place = location || {
+    country: saved.country || profile?.country,
+    state: saved.state || profile?.state,
+  };
+  let modelConsumption = null;
+  try {
+    modelConsumption = consumptionFor(car);
+  } catch {
+    modelConsumption = null;
+  }
+  const result = estimateOwnership(
+    car,
+    { ...resolved, consumption: Number(modelConsumption?.[resolved.fuelType]) || 0 },
+    place,
+  );
+  const yearly = (result.monthly.tax + result.monthly.licensing) * 12;
+  return {
+    ...result,
+    modelConsumption,
+    headline: {
+      monthly: result.totals.monthlyTotal - yearly / 12,
+      yearly,
+      needsState: result.needsState,
+    },
+    comparableMonthly: result.totals.monthlyTotal,
+  };
 }
 
 // Estimativas que saíram da conta em 06/10/2026 — ver estimateOwnership.

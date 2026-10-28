@@ -14,7 +14,7 @@
  *   node scripts/check-ipva.mjs
  */
 
-import { estimateOwnership } from "../src/services/ownership.js";
+import { estimateOwnership, simulateCar } from "../src/services/ownership.js";
 
 let failures = 0;
 const check = (label, actual, expected) => {
@@ -138,6 +138,96 @@ check(
   // O caso que as listas da imprensa erram: Tocantins cobra de quem tem 15+.
   check("TO: 18 anos ainda paga (TO não isenta antes dos 20)", annualTax(gol(18), "TO"), 400);
   check("PE: 19 anos ainda paga, a 2,4%", annualTax(gol(19), "PE"), 480);
+}
+
+// --- Auditoria de 25/10/2026: um carro, um número ---------------------------
+// Cada caso fixa um bug medido na auditoria (docs/auditoria-simulador-2026-10-25.md).
+// Rodam pelo `simulateCar`, a função que modal, card e Painel chamam. Os
+// valores em reais dependem do market-data.json da semana, então as
+// assertivas de reais são por faixa; as de estrutura são exatas.
+{
+  const SP = { country: "BR", state: "SP" };
+  const within = (label, value, low, high) =>
+    check(`${label} (obtido ${Math.round(value)})`, value >= low && value <= high, true);
+  const onix = {
+    brand: "GM - Chevrolet",
+    model: "ONIX HATCH 1.0 12V Flex 5p Mec.",
+    year: "2024 Gasolina",
+    targetValue: 80000,
+    savedValue: 0,
+    type: "owned",
+  };
+
+  // 1. Carro próprio é à vista — sem simulação salva e com a salva antiga.
+  const owned = simulateCar(onix, { profile: SP });
+  check("Onix quitado: abre à vista", owned.inputs.purchaseMode, "cash");
+  check("Onix quitado: sem parcela", owned.monthly.financing, 0);
+  // R$ 855/mês na auditoria = 1.000 km a 11,1 km/l padrão + IPVA e
+  // licenciamento diluídos. Com o INMETRO (13,4 km/l) a conta comparável cai.
+  within("Onix quitado SP: comparável entre R$ 700 e R$ 900/mês", owned.comparableMonthly, 700, 900);
+  const legacy = simulateCar({ ...onix, ownership: { purchaseMode: "finance", ...SP } });
+  check("Onix quitado com simulação antiga 'finance': vira à vista", legacy.monthly.financing, 0);
+  const chosen = simulateCar({
+    ...onix,
+    ownership: { purchaseMode: "finance", ...SP, touched: ["purchaseMode"] },
+  });
+  check("financiar escolhido de verdade (touched) é respeitado", chosen.inputs.purchaseMode, "finance");
+
+  // 2. Combustível vem da FIPE.
+  const hilux = {
+    brand: "Toyota",
+    model: "Hilux CD SRX 4x4 2.8 TDI Diesel Aut.",
+    year: "2024 Diesel",
+    targetValue: 250000,
+    ownership: { kmPerMonth: 1500, purchaseMode: "cash", fuelType: "gasoline", country: "BR", state: "MS" },
+  };
+  const hiluxRun = simulateCar(hilux);
+  check("Hilux diesel salva como gasolina: simula diesel", hiluxRun.inputs.fuelType, "diesel");
+  check("Hilux diesel em MS: IPVA de 4,5%", round(hiluxRun.monthly.tax * 12), 11250);
+  const dolphin = {
+    brand: "BYD",
+    model: "DOLPHIN 95 cv (Elétrico)",
+    year: "2024 Elétrico",
+    targetValue: 150000,
+    ownership: { purchaseMode: "cash", country: "BR", state: "BA" },
+  };
+  const dolphinRun = simulateCar(dolphin);
+  check("Dolphin: simula elétrico", dolphinRun.inputs.fuelType, "electric");
+  check("Dolphin na BA: IPVA zero (isento até R$ 300 mil)", dolphinRun.monthly.tax, 0);
+  check("Dolphin: preço da energia marcado como sem fonte", dolphinRun.fuel.priceSourced, false);
+  check(
+    "Onix flex não é forçado a combustível nenhum",
+    simulateCar({ ...onix, ownership: { fuelType: "ethanol", ...SP } }).inputs.fuelType,
+    "ethanol",
+  );
+
+  // 3. Um carro, um número: o consumo do INMETRO entra sem estar salvo, e a
+  // manchete é "todo mês" + anual à parte.
+  const goal = { ...onix, type: "goal", ownership: { kmPerMonth: 1200, ...SP } };
+  const goalRun = simulateCar(goal);
+  check("consumo do INMETRO entra na conta salva", goalRun.fuel.consumption, 13.4);
+  check(
+    "manchete + anual/12 = total comparável",
+    round(goalRun.headline.monthly + goalRun.headline.yearly / 12),
+    round(goalRun.comparableMonthly),
+  );
+
+  // 6. Consumo por combustível: 13 km/l da gasolina não atravessa para o etanol.
+  const g13 = simulateCar({
+    ...onix,
+    ownership: { purchaseMode: "cash", userConsumption: 13, fuelType: "gasoline", ...SP },
+  });
+  check("consumo antigo migra para o combustível salvo", g13.inputs.userConsumptionByFuel, { gasoline: 13 });
+  const eth = simulateCar(onix, { inputs: { ...g13.inputs, fuelType: "ethanol" }, location: SP });
+  check("trocar para etanol não herda os 13 km/l", eth.fuel.consumption, 9.5);
+
+  // 8. Sem estado: nada de IPVA ou licenciamento de padrão na soma.
+  const noState = simulateCar(onix);
+  check("sem estado: pede o estado", noState.needsState, true);
+  check("sem estado: IPVA fora da soma", noState.tax.basis, "no_state");
+  check("sem estado: anual zero", noState.headline.yearly, 0);
+  const oldNoState = simulateCar({ brand: "Fiat", model: "Palio 1.0", year: `${YEAR - 21} Gasolina`, targetValue: 15000 });
+  check("sem estado, 20+ anos: imune pela Constituição, vale sem UF", oldNoState.tax.basis, "age_exempt");
 }
 
 console.log("");

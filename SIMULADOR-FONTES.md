@@ -122,7 +122,14 @@ o simulador ainda não diz isso.
 
 **O que este CSV não cobre:** diesel (é outro arquivo da ANP, não baixado — o
 valor segue o de jul/2026, não reconferido) e energia elétrica. Candidata para
-o kWh: ANEEL dados abertos, não verificada.
+o kWh: ANEEL dados abertos, não verificada. Até haver fonte, a tela chama o
+R$ 0,85/kWh e os 6 km/kWh de "estimativa sem fonte oficial" (25/10/2026); antes
+dizia "preço médio da ANP" e "km/l" para o elétrico.
+
+**Sem estado escolhido (25/10/2026):** saíram os padrões de 3% de IPVA e
+R$ 140 de licenciamento, que não tinham fonte e entravam no total. Sem UF, os
+dois ficam fora da soma e a tela pede o estado. Só a imunidade dos 20 anos
+(EC 137/2025) vale sem UF, porque é constitucional.
 
 ## 3. IPVA e licenciamento — não existe fonte consolidada
 
