@@ -56,6 +56,7 @@ const UserProfile = lazyNamed(() => import("./pages/UserProfile"), "UserProfile"
 const Services = lazyNamed(() => import("./pages/Services"), "Services");
 const ServicePublicPage = lazyNamed(() => import("./pages/ServicePublicPage"), "ServicePublicPage");
 const ServiceApprovals = lazyNamed(() => import("./pages/Services"), "ServiceApprovals");
+const Moderation = lazyNamed(() => import("./pages/Moderation"), "Moderation");
 const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
 const Support = lazyNamed(() => import("./pages/Support"), "Support");
 const Advertise = lazyNamed(() => import("./pages/Advertise"), "Advertise");
@@ -583,6 +584,15 @@ function App() {
             element={
               <RequireAuth user={user}>
                 <ServiceApprovals user={user} />
+              </RequireAuth>
+            }
+          />
+          {/* Fila de denúncias do social; só a moderação vê (is_service_admin). */}
+          <Route
+            path="/moderacao"
+            element={
+              <RequireAuth user={user}>
+                <Moderation user={user} />
               </RequireAuth>
             }
           />
