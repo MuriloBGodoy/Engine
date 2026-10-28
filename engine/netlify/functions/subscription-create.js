@@ -8,16 +8,18 @@
  *
  * Resposta:
  *   Stripe        → { provider: "stripe", clientSecret }  (checkout embutido no app)
- *   Mercado Pago  → { provider: "mercadopago", url }      (página do Mercado Pago)
+ *   Mercado Pago  → { provider: "mercadopago", url }      (página do Mercado Pago;
+ *                   desligado desde 28/10/2026, ver lib/providers.js)
+ *   País fora da venda → 403 { error, code: "country_not_sellable", country }
  *
- * O catálogo e os preços estão em lib/plans.js. Quem ativa o plano é o
- * webhook; esta função só abre o pagamento.
+ * O catálogo, os preços por moeda e os países à venda estão em lib/plans.js.
+ * Quem ativa o plano é o webhook; esta função só abre o pagamento.
  */
 import MercadoPagoConfig, { PreApproval } from "mercadopago";
 import Stripe from "stripe";
 import { countFounders, json, readSettings, readUserPlan, requireUser } from "./lib/supabase.js";
 import { MERCADO_PAGO, currencyForCountry, providerForCountry } from "./lib/providers.js";
-import { FOUNDER_SLOTS, offerFor } from "./lib/plans.js";
+import { FOUNDER_SLOTS, isSellableCountry, offerFor, priceFor, toMajorUnits } from "./lib/plans.js";
 
 /**
  * Endereço para onde o gateway devolve a pessoa no fim do checkout.
@@ -50,6 +52,9 @@ const siteUrl = () => {
   return url.replace(/\/+$/, "");
 };
 
+// Sem uso desde 28/10/2026: providerForCountry devolve Stripe para todos e o
+// Mercado Pago nunca foi configurado. Fica para o caso de o Pix do Stripe não
+// ser liberado (ver lib/providers.js).
 async function createMercadoPago({ user, country, email, offerId, offer }) {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
   if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN ausente.");
@@ -71,7 +76,7 @@ async function createMercadoPago({ user, country, email, offerId, offer }) {
         frequency: offer.interval === "year" ? 12 : 1,
         frequency_type: "months",
         // Mercado Pago quer o valor em unidades, não em centavos.
-        transaction_amount: offer.amount[currency] / 100,
+        transaction_amount: toMajorUnits(offer.amount[currency], currency),
         currency_id: currency,
       },
       status: "pending",
@@ -86,14 +91,14 @@ async function createStripe({ user, country, email, offerId, offer }) {
   if (!key) throw new Error("STRIPE_SECRET_KEY ausente.");
 
   const stripe = new Stripe(key);
-  const currency = currencyForCountry(country);
+  const { currency, amount, founderAmount } = priceFor(offer, country);
 
   // Preço de fundador: os primeiros do Pro pagam menos para sempre. A vaga é
   // conferida aqui e gravada pelo webhook; numa corrida de dois no último
   // lugar, os dois levam, e tudo bem.
   const founder =
-    offerId === "pro_monthly" && offer.founderAmount && (await countFounders()) < FOUNDER_SLOTS;
-  const unitAmount = founder ? offer.founderAmount[currency] : offer.amount[currency];
+    offerId === "pro_monthly" && founderAmount && (await countFounders()) < FOUNDER_SLOTS;
+  const unitAmount = founder ? founderAmount : amount;
 
   // Quem já usou o teste grátis uma vez não ganha outro.
   const previous = await readUserPlan(user.uid);
@@ -163,11 +168,29 @@ export default async (request) => {
     const offer = offerFor(offerId);
     if (!offer) return json({ error: "Plano desconhecido." }, 400);
 
-    // País vem do perfil salvo; o corpo só serve de fallback pra quem ainda
-    // não preencheu o cadastro. Nunca confiar só no que o cliente manda.
+    // De onde vem o país (igual a antes de 28/10/2026, só normalizado):
+    //   1. o país do perfil salvo (Configurações › Perfil);
+    //   2. sem ele, o que o app manda — a região de navegação
+    //      (services/region.js: escolha salva, geo-IP, idioma do navegador);
+    //   3. sem nenhum dos dois, BR.
+    // O 2 é palpite do cliente e dá para forjar; o pior caso é alguém sem
+    // país no perfil comprar no preço de outro país à venda. A moeda e o
+    // preço, esses, nunca vêm do cliente.
     const settings = await readSettings(user.uid);
-    const country =
-      settings?.profile?.country || String(body.country || "BR").toUpperCase();
+    const country = String(settings?.profile?.country || body.country || "BR")
+      .trim()
+      .toUpperCase();
+
+    if (!isSellableCountry(country)) {
+      return json(
+        {
+          error: "As assinaturas ainda não estão disponíveis no seu país.",
+          code: "country_not_sellable",
+          country,
+        },
+        403,
+      );
+    }
 
     const provider = providerForCountry(country);
     const email = user.email || body.email || undefined;

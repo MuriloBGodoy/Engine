@@ -1,42 +1,23 @@
 /**
  * Qual gateway atende cada região.
  *
- * Desde 24/10/2026 o Brasil vai pelo Stripe (decisão do dono): checkout
- * embutido no app, assinatura, teste grátis e portal de cancelamento prontos,
- * e a conta será aberta já como MEI/CNPJ (o tipo da conta no Stripe Brasil não
- * muda depois de verificado). O Pix do Stripe é só por convite e só em
- * pagamento único; se ele não for liberado, o Pix do Mercado Pago entra como
- * complemento, por isso o caminho do Mercado Pago continua aqui.
+ * Desde 28/10/2026 TUDO vai pelo Stripe. Na conta de teste (Brasil, CPF,
+ * liquida em BRL) o Checkout criou assinatura e pagamento único em usd, eur,
+ * gbp, ars, mxn, clp e cop, então um gateway só cobre todos os países, com o
+ * preço local de lib/plans.js.
  *
- * O Mercado Pago segue atendendo a LatAm de língua espanhola, onde é o checkout
- * que o vendedor reconhece. O resto vai pelo Stripe.
+ * O Mercado Pago nunca chegou a ser configurado (sem MERCADOPAGO_ACCESS_TOKEN
+ * em lugar nenhum). O caminho dele continua no código — createMercadoPago em
+ * subscription-create.js e subscription-webhook-mercadopago.js — porque o Pix
+ * do Stripe é só por convite; se ele não for liberado, o Pix do Mercado Pago
+ * pode entrar como complemento no Brasil. Hoje ninguém é mandado para lá.
  */
 export const MERCADO_PAGO = "mercadopago";
 export const STRIPE = "stripe";
 
-// Países onde o Mercado Pago opera e que o Engine suporta (locations.js).
-const MERCADO_PAGO_COUNTRIES = ["AR", "MX", "CL", "CO"];
+// A moeda de cada país mora no catálogo, que a tela de Planos também lê.
+export { currencyForCountry } from "./plans.js";
 
-const COUNTRY_CURRENCY = {
-  BR: "BRL",
-  AR: "USD",
-  MX: "USD",
-  CL: "USD",
-  CO: "USD",
-  US: "USD",
-  PT: "EUR",
-  ES: "EUR",
-  GB: "EUR",
-  FR: "EUR",
-  DE: "EUR",
-  IT: "EUR",
-};
-
-export function providerForCountry(country) {
-  const code = String(country || "").toUpperCase();
-  return MERCADO_PAGO_COUNTRIES.includes(code) ? MERCADO_PAGO : STRIPE;
-}
-
-export function currencyForCountry(country) {
-  return COUNTRY_CURRENCY[String(country || "").toUpperCase()] || "USD";
+export function providerForCountry() {
+  return STRIPE;
 }
