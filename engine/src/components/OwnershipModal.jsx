@@ -2,10 +2,8 @@ import { useMemo, useState } from "react";
 import { X, Save, Loader2, Hammer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
-  estimateOwnership,
-  normalizeOwnershipInputs,
-  defaultOwnershipInputs,
-  DEFAULT_CONSUMPTION,
+  simulateCar,
+  resolveOwnershipInputs,
   FUEL_TYPES,
   isSimulatorAvailable,
   MARKET_DATA_DATES,
@@ -13,7 +11,6 @@ import {
 import { pickReferenceCar } from "../services/expenses";
 import { engineDB } from "../services/db";
 import { getStates, getStateName } from "../services/locations";
-import { consumptionFor } from "../services/consumption";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatCarName, formatFipeYear } from "../services/carDisplay";
 import { useToast } from "./ToastProvider";
@@ -72,6 +69,42 @@ function MoneyInput({ id, value, onChange, placeholder }) {
       value={value > 0 ? value : ""}
       placeholder={placeholder}
       onChange={(event) => onChange(Number(event.target.value) || 0)}
+      className={fieldClass}
+    />
+  );
+}
+
+/**
+ * Número com casa decimal (juros, consumo) que aceita vírgula.
+ *
+ * `type="number"` não serve aqui: com teclado pt-BR a pessoa digita "1,5" e
+ * parte dos navegadores devolve vazio, que o `|| 0` transformava em "usar o
+ * padrão" sem aviso. O texto digitado fica em estado local para "1," não ser
+ * comido no meio da digitação; quando o valor muda por fora (medição aplicada,
+ * troca de combustível) o campo mostra o de fora — derivado, sem efeito.
+ */
+const parseDecimal = (text) => {
+  const parsed = Number(String(text || "").trim().replace(",", "."));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+};
+
+function DecimalInput({ id, value, onChange, placeholder, comma }) {
+  const format = (n) => (n > 0 ? (comma ? String(n).replace(".", ",") : String(n)) : "");
+  const [text, setText] = useState(() => format(value));
+  const shown = parseDecimal(text) === (Number(value) || 0) ? text : format(value);
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      value={shown}
+      placeholder={placeholder}
+      onChange={(event) => {
+        const next = event.target.value.replace(/[^0-9.,]/g, "");
+        setText(next);
+        onChange(parseDecimal(next));
+      }}
       className={fieldClass}
     />
   );
@@ -223,8 +256,12 @@ function ComingSoon({ car, onClose }) {
 function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdate }) {
   const showToast = useToast();
   const { i18n, t } = useTranslation();
-  const [inputs, setInputs] = useState(() =>
-    car.ownership ? normalizeOwnershipInputs(car.ownership) : defaultOwnershipInputs(),
+  // Mesma resolução que o card e o Painel usam: carro próprio abre à vista e
+  // o combustível nasce da FIPE (ver resolveOwnershipInputs).
+  const [inputs, setInputs] = useState(() => resolveOwnershipInputs(car));
+  // O que a pessoa escolheu de verdade, para a escolha sobreviver ao reabrir.
+  const [touched, setTouched] = useState(
+    () => new Set(Array.isArray(car.ownership?.touched) ? car.ownership.touched : []),
   );
   // Só o Brasil chega aqui (ver OwnershipModal).
   const country = "BR";
@@ -238,43 +275,59 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
   useHistoryDismiss(true, onClose);
 
   const states = useMemo(() => getStates(country), [country]);
-  const modelConsumption = useMemo(() => consumptionFor(car), [car]);
 
-  // `consumption` é o degrau do meio do motor (pessoa > INMETRO > padrão).
-  const effectiveInputs = useMemo(
-    () => ({
-      ...inputs,
-      consumption: Number(modelConsumption?.[inputs.fuelType]) || 0,
-    }),
-    [inputs, modelConsumption],
-  );
+  // A conta é a de `simulateCar`, a mesma do card e do Painel: um carro, um
+  // número. O consumo do INMETRO entra lá dentro.
   const result = useMemo(
-    () => estimateOwnership(car, effectiveInputs, { country, state }),
-    [car, effectiveInputs, country, state],
+    () => simulateCar(car, { inputs, location: { country, state } }),
+    [car, inputs, country, state],
   );
+  const modelConsumption = result.modelConsumption;
+  const isElectric = inputs.fuelType === "electric";
 
   // Carro da garagem com gastos lançados: os km MEDIDOS valem mais que qualquer
   // faixa. O consumo medido só vale quando o carro simulado é o próprio — o
   // km/l de um Gol 1.6 não diz nada sobre um Pulse turbo, e a versão anterior
-  // copiava um para o outro.
+  // copiava um para o outro. E nunca para elétrico: os abastecimentos medem
+  // litros, não kWh. Os lançamentos não dizem com que combustível foram feitos,
+  // então o medido vale para o combustível escolhido agora — e o botão diz qual.
   const reference = useMemo(() => pickReferenceCar(cars, car.id), [cars, car.id]);
   const measured = reference?.insights;
   const sameCar = String(reference?.car?.id) === String(car.id);
-  const measuredPatch = useMemo(() => {
-    if (!measured) return null;
-    const patch = {};
-    if (measured.kmPerMonth) patch.kmPerMonth = Math.round(measured.kmPerMonth);
-    if (sameCar && measured.consumption) {
-      patch.userConsumption = Number(measured.consumption.kmPerLiter.toFixed(1));
-    }
-    return Object.keys(patch).length ? patch : null;
-  }, [measured, sameCar]);
+  const measuredKm = measured?.kmPerMonth ? Math.round(measured.kmPerMonth) : 0;
+  const measuredKmpl =
+    sameCar && !isElectric && measured?.consumption
+      ? Number(measured.consumption.kmPerLiter.toFixed(1))
+      : 0;
   const measuredApplied =
-    measuredPatch &&
-    Object.entries(measuredPatch).every(([key, value]) => Number(inputs[key]) === value);
+    (!measuredKm || Number(inputs.kmPerMonth) === measuredKm) &&
+    (!measuredKmpl || Number(inputs.userConsumption) === measuredKmpl);
+  const hasMeasured = Boolean(measuredKm || measuredKmpl);
 
-  const set = (key, value) => setInputs((prev) => ({ ...prev, [key]: value }));
+  const set = (key, value) => {
+    if (key === "purchaseMode" || key === "fuelType") {
+      setTouched((prev) => new Set(prev).add(key));
+    }
+    setInputs((prev) => {
+      const next = { ...prev, [key]: value };
+      // O consumo informado é por combustível; trocar o seletor traz o daquele.
+      if (key === "fuelType") next.userConsumption = prev.userConsumptionByFuel?.[value] || 0;
+      return next;
+    });
+  };
+  const setUserConsumption = (value) =>
+    setInputs((prev) => {
+      const map = { ...prev.userConsumptionByFuel };
+      if (value > 0) map[prev.fuelType] = value;
+      else delete map[prev.fuelType];
+      return { ...prev, userConsumptionByFuel: map, userConsumption: value };
+    });
+  const applyMeasured = () => {
+    if (measuredKm) set("kmPerMonth", measuredKm);
+    if (measuredKmpl) setUserConsumption(measuredKmpl);
+  };
 
+  const comma = !i18n.language.startsWith("en");
   const money = (value) =>
     new Intl.NumberFormat(i18n.language, {
       style: "currency",
@@ -284,7 +337,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
   const decimal = (value, digits = 2) =>
     Number(value || 0)
       .toFixed(digits)
-      .replace(".", i18n.language.startsWith("en") ? "." : ",");
+      .replace(".", comma ? "," : ".");
 
   const handleSave = async () => {
     setSaving(true);
@@ -297,52 +350,10 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
         .then((saved) => onSettingsUpdate?.(saved))
         .catch((error) => showToast(error?.message || t("ownership.budget.saveError"), "error"));
     }
-    const saved = await onSave(car, { ...inputs, country, state });
+    const saved = await onSave(car, { ...inputs, country, state, touched: [...touched] });
     setSaving(false);
     if (saved) onClose();
   };
-
-  // ------------------------------- a conta -------------------------------
-  const isBR = result.country === "BR";
-  const isFinance = inputs.purchaseMode === "finance";
-  const financing = result.financing;
-  const stateLabel = state ? getStateName(country, state) || state : "";
-  const effectiveTaxRate = result.value > 0 ? (result.monthly.tax * 12) / result.value : 0;
-
-  const taxSource = (() => {
-    if (result.tax?.basis === "age_exempt") return t("ownership.results.taxAgeExempt", { age: result.tax.exemptAge });
-    if (result.tax?.basis === "sp_hybrid") {
-      return result.tax.rate === 0
-        ? t("ownership.results.taxSpHybridExempt")
-        : t("ownership.results.taxSpHybridReduced", { rate: decimal(result.tax.rate * 100, 0) });
-    }
-    if (!isBR) return t("ownership.lean.taxSourceCountry");
-    return state
-      ? t("ownership.lean.taxSource", { rate: decimal(effectiveTaxRate * 100, 1), state: stateLabel })
-      : t("ownership.lean.taxSourceNoState");
-  })();
-
-  const modelKmPerLiter = modelConsumption?.[inputs.fuelType];
-  const consumptionSource = inputs.userConsumption
-    ? "User"
-    : !modelKmPerLiter
-      ? "Default"
-      : modelConsumption.dated
-        ? "InmetroDated"
-        : modelConsumption.match === "model"
-          ? "InmetroModel"
-          : "Inmetro";
-  const shownConsumption = Number(
-    inputs.userConsumption || modelKmPerLiter || DEFAULT_CONSUMPTION[inputs.fuelType],
-  ).toFixed(1);
-  const kmShown = Number(inputs.kmPerMonth || 0).toLocaleString(i18n.language);
-
-  // O que sai todo mês e o que é boleto anual, separados (ver o slab).
-  const yearly = (result.monthly.tax + result.monthly.licensing) * 12;
-  const monthlyOnly = result.totals.monthlyTotal - yearly / 12;
-  // A fatia da renda usa o custo inteiro, com os boletos anuais diluídos.
-  const total = result.totals.monthlyTotal;
-  const sharePct = income > 0 ? Math.round((total / income) * 100) : null;
 
   // De quando são os números de mercado (ANP e Banco Central), para a tela dizer.
   const fuelDate = MARKET_DATA_DATES.fuelTo
@@ -355,6 +366,75 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
         new Date(`${MARKET_DATA_DATES.rateMonth}-15T12:00:00`),
       )
     : "";
+
+  // ------------------------------- a conta -------------------------------
+  const isBR = result.country === "BR";
+  const isFinance = inputs.purchaseMode === "finance";
+  const financing = result.financing;
+  // Entrada igual ou maior que o carro: não há o que financiar, e o bloco de
+  // parcela R$ 0 e juros R$ 0 era só ruído.
+  const showFinancing = Boolean(isFinance && financing && financing.principal > 0);
+  const needsState = result.needsState;
+  const stateLabel = state ? getStateName(country, state) || state : "";
+  const effectiveTaxRate = result.value > 0 ? (result.monthly.tax * 12) / result.value : 0;
+
+  const taxSource = (() => {
+    if (result.tax?.basis === "age_exempt") return t("ownership.results.taxAgeExempt", { age: result.tax.exemptAge });
+    if (result.tax?.basis === "sp_hybrid") {
+      return result.tax.rate === 0
+        ? t("ownership.results.taxSpHybridExempt")
+        : t("ownership.results.taxSpHybridReduced", { rate: decimal(result.tax.rate * 100, 0) });
+    }
+    if (!isBR) return t("ownership.lean.taxSourceCountry");
+    if (needsState) return t("ownership.lean.taxSourceNoState");
+    // Elétrico isento por valor (BA até R$ 300 mil): zero precisa dizer por quê.
+    if (isElectric && result.monthly.tax === 0) {
+      return t("ownership.lean.taxElectricExempt", { state: stateLabel });
+    }
+    return t("ownership.lean.taxSource", { rate: decimal(effectiveTaxRate * 100, 1), state: stateLabel });
+  })();
+
+  const modelKmPerLiter = isElectric ? 0 : modelConsumption?.[inputs.fuelType];
+  const consumptionSource = inputs.userConsumption
+    ? "User"
+    : !modelKmPerLiter
+      ? "Default"
+      : modelConsumption.dated
+        ? "InmetroDated"
+        : modelConsumption.match === "model"
+          ? "InmetroModel"
+          : "Inmetro";
+  const shownConsumption = decimal(result.fuel.consumption, 1);
+  const kmShown = Number(inputs.kmPerMonth || 0).toLocaleString(i18n.language);
+
+  // Elétrico: nem consumo nem preço têm fonte. A linha diz isso com todas as
+  // letras, em vez de citar a ANP (que não publica energia) ou escrever km/l.
+  const fuelSource = isElectric
+    ? `${t("ownership.lean.fuelKm", { km: kmShown })} ${t(
+        inputs.userConsumption
+          ? "ownership.lean.electricUserConsumption"
+          : "ownership.lean.electricDefaultConsumption",
+        { value: shownConsumption },
+      )} ${t("ownership.lean.electricPrice", { price: decimal(result.fuel.price) })}`
+    : `${t("ownership.lean.fuelKm", { km: kmShown })} ${t(
+        `ownership.fields.consumption${consumptionSource}Hint`,
+        { value: shownConsumption, year: modelConsumption?.tableYear },
+      )}. ${t(state ? "ownership.lean.fuelPrice" : "ownership.lean.fuelPriceBR", {
+        state: stateLabel,
+        date: fuelDate,
+      })}`;
+
+  // O que sai todo mês e o que é boleto anual, separados (ver o slab). O mesmo
+  // recorte de `simulateCar().headline` que o card e o Painel mostram.
+  const yearly = result.headline.yearly;
+  const monthlyOnly = result.headline.monthly;
+  // A fatia da renda usa o custo inteiro, com os boletos anuais diluídos —
+  // e, sem estado, diz que eles ficaram de fora.
+  const total = result.totals.monthlyTotal;
+  const sharePct = income > 0 ? Math.round((total / income) * 100) : null;
+  const yearlyText = needsState
+    ? t("ownership.lean.plusYearlyNoState")
+    : t("ownership.lean.plusYearly", { value: money(yearly) });
 
   const carName = formatCarName(car);
   const carYear = formatFipeYear(String(car.year || "").split(" ")[0], t("car.zeroKm"));
@@ -401,36 +481,35 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               </span>
             </p>
             <p className="mt-3 text-[16px] font-semibold leading-snug text-[var(--engine-slab-fg)]">
-              {t("ownership.lean.plusYearly", { value: money(yearly) })}
+              {yearlyText}
             </p>
             {sharePct !== null ? (
               <p className="mt-4 rounded-xl bg-[var(--engine-slab-raise)] px-3.5 py-3 text-[14px] leading-snug text-[var(--engine-slab-fg)]">
-                {t("ownership.lean.share", { pct: sharePct, income: money(income) })}
+                {t(needsState ? "ownership.lean.shareNoState" : "ownership.lean.share", {
+                  pct: sharePct,
+                  income: money(income),
+                })}
               </p>
             ) : null}
 
             <GroupLabel>{t("ownership.lean.monthlyGroup")}</GroupLabel>
             <div className="mt-2 border-t border-[var(--engine-slab-line)]">
-              {isFinance && financing ? (
+              {showFinancing ? (
                 <Line
                   label={t("ownership.results.installment")}
                   source={`${t("ownership.detail.installmentBasis", {
                     months: financing.months,
                     principal: money(financing.principal),
                     rate: decimal(financing.monthlyRate * 100),
-                  })}${inputs.monthlyRatePct > 0 ? "" : ` · ${t("ownership.lean.rateAverage", { month: rateMonth })}`}`}
+                  })}${inputs.monthlyRatePct > 0 ? "" : ` · ${t("ownership.lean.rateAverage", { month: rateMonth })}`} · ${t(
+                    "ownership.lean.installmentFloor",
+                  )}`}
                   value={money(result.monthly.financing)}
                 />
               ) : null}
               <Line
-                label={t("ownership.results.fuel")}
-                source={`${t("ownership.lean.fuelKm", { km: kmShown })} ${t(
-                  `ownership.fields.consumption${consumptionSource}Hint`,
-                  { value: shownConsumption, year: modelConsumption?.tableYear },
-                )}. ${t(state ? "ownership.lean.fuelPrice" : "ownership.lean.fuelPriceBR", {
-                  state: stateLabel,
-                  date: fuelDate,
-                })}`}
+                label={isElectric ? t("ownership.lean.energy") : t("ownership.results.fuel")}
+                source={fuelSource}
                 value={money(result.monthly.fuel)}
               />
               <Line
@@ -472,32 +551,44 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 source={[taxSource, isBR ? t(state === "SP" ? "ownership.lean.ipvaPaySP" : "ownership.lean.ipvaPay") : null]
                   .filter(Boolean)
                   .join(" · ")}
-                value={`${money(result.monthly.tax * 12)}${t("ownership.lean.perYearShort")}`}
+                value={
+                  result.tax?.basis === "no_state"
+                    ? t("ownership.lean.pickState")
+                    : `${money(result.monthly.tax * 12)}${t("ownership.lean.perYearShort")}`
+                }
+                missing={result.tax?.basis === "no_state"}
               />
               <Line
                 label={t("ownership.results.licensing")}
                 source={[
                   result.licensingVerified
                     ? t("ownership.lean.licensingSource", { state: stateLabel })
-                    : isBR && state
-                      ? t("ownership.lean.licensingApprox", { state: stateLabel })
-                      : t("ownership.lean.licensingSourceGeneric"),
+                    : needsState
+                      ? t("ownership.lean.licensingNoState")
+                      : isBR
+                        ? t("ownership.lean.licensingApprox", { state: stateLabel })
+                        : t("ownership.lean.licensingSourceGeneric"),
                   isBR ? t(state === "SP" ? "ownership.lean.licensingPaySP" : "ownership.lean.licensingPay") : null,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
-                value={`${money(result.monthly.licensing * 12)}${t("ownership.lean.perYearShort")}`}
+                value={
+                  needsState
+                    ? t("ownership.lean.pickState")
+                    : `${money(result.monthly.licensing * 12)}${t("ownership.lean.perYearShort")}`
+                }
+                missing={needsState}
               />
             </div>
 
             {/* Quanto o financiamento custa a mais, no total. Grátis para todo
                 mundo: é a conta que mais muda a decisão de financiar. */}
-            {isFinance && financing ? (
+            {showFinancing ? (
               <>
                 <GroupLabel>{t("ownership.lean.financeTotalGroup")}</GroupLabel>
                 <div className="mt-2 border-t border-[var(--engine-slab-line)]">
                   <Line
-                    label={t("ownership.results.totalInterest")}
+                    label={t("ownership.lean.totalInterestFloor")}
                     source={t("ownership.lean.totalInterestSource", {
                       months: financing.months,
                       installment: money(financing.installment),
@@ -505,7 +596,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                     value={money(financing.totalInterest)}
                   />
                   <Line
-                    label={t("ownership.results.totalPaid")}
+                    label={t("ownership.lean.totalPaidFloor")}
                     source={t("ownership.lean.totalPaidSource", {
                       down: money(financing.downPayment),
                     })}
@@ -523,6 +614,27 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </p>
 
           {/* ============================ o ajuste ============================ */}
+          {/* O estado vem primeiro: ele decide IPVA e licenciamento, e sem ele
+              os dois ficam fora da soma. No fim da tela, no celular, ninguém
+              chegava nele antes de ler um número incompleto. */}
+          <Section title={t("ownership.lean.whereTitle")} hint={t("ownership.lean.whereHint")}>
+            <Field label={t("ownership.fields.state")} htmlFor="engine-own-state">
+              <select
+                id="engine-own-state"
+                value={state}
+                onChange={(event) => setState(event.target.value)}
+                className={fieldClass}
+              >
+                <option value="">{t("ownership.lean.pickStateOption")}</option>
+                {states.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </Section>
+
           <Section title={t("ownership.adjust.qPurchase")}>
             <div className="grid grid-cols-2 gap-2">
               {["finance", "cash"].map((mode) => (
@@ -557,15 +669,11 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                     value: decimal((financing?.monthlyRate || 0) * 100),
                   })}
                 >
-                  <input
+                  <DecimalInput
                     id="engine-own-rate"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={inputs.monthlyRatePct > 0 ? inputs.monthlyRatePct : ""}
-                    onChange={(event) => set("monthlyRatePct", Number(event.target.value) || 0)}
-                    className={fieldClass}
+                    value={inputs.monthlyRatePct}
+                    onChange={(value) => set("monthlyRatePct", value)}
+                    comma={comma}
                   />
                 </Field>
                 <div className="sm:col-span-2">
@@ -588,17 +696,24 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </Section>
 
           <Section title={t("ownership.adjust.qKm")} hint={t("ownership.adjust.qKmHint")}>
-            {measuredPatch && !measuredApplied ? (
+            {hasMeasured && !measuredApplied ? (
               <button
                 type="button"
-                onClick={() => setInputs((prev) => ({ ...prev, ...measuredPatch }))}
+                onClick={applyMeasured}
                 className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--engine-accent)] bg-[var(--engine-accent-soft)] px-3 text-left text-[13px] font-semibold text-[var(--engine-text)]"
               >
                 <span className="min-w-0">
-                  {t("ownership.lean.useMeasured", {
-                    km: (measuredPatch.kmPerMonth || 0).toLocaleString(i18n.language),
-                    car: formatCarName(reference.car),
-                  })}
+                  {measuredKmpl
+                    ? t("ownership.lean.useMeasuredConsumption", {
+                        km: measuredKm.toLocaleString(i18n.language),
+                        value: decimal(measuredKmpl, 1),
+                        fuel: t(`ownership.fuel.${inputs.fuelType}`),
+                        car: formatCarName(reference.car),
+                      })
+                    : t("ownership.lean.useMeasured", {
+                        km: measuredKm.toLocaleString(i18n.language),
+                        car: formatCarName(reference.car),
+                      })}
                 </span>
                 <span className="shrink-0 text-[12px] font-bold">{t("ownership.precision.apply")}</span>
               </button>
@@ -645,17 +760,19 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                   ))}
                 </select>
               </Field>
-              <Field label={t("ownership.fields.consumption")} htmlFor="engine-own-consumption">
-                <input
+              <Field
+                label={isElectric ? t("ownership.lean.consumptionElectric") : t("ownership.fields.consumption")}
+                htmlFor="engine-own-consumption"
+              >
+                <DecimalInput
                   id="engine-own-consumption"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  inputMode="decimal"
-                  value={inputs.userConsumption > 0 ? inputs.userConsumption : ""}
-                  placeholder={t("ownership.fields.consumptionPlaceholder", { value: shownConsumption })}
-                  onChange={(event) => set("userConsumption", Number(event.target.value) || 0)}
-                  className={fieldClass}
+                  value={inputs.userConsumption}
+                  onChange={setUserConsumption}
+                  comma={comma}
+                  placeholder={t(
+                    isElectric ? "ownership.lean.consumptionElectricPlaceholder" : "ownership.fields.consumptionPlaceholder",
+                    { value: shownConsumption },
+                  )}
                 />
               </Field>
             </div>
@@ -680,27 +797,10 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
             </div>
           </Section>
 
-          <Section title={t("ownership.lean.lastTitle")} hint={t("ownership.lean.lastHint")}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={t("ownership.fields.state")} htmlFor="engine-own-state">
-                <select
-                  id="engine-own-state"
-                  value={state}
-                  onChange={(event) => setState(event.target.value)}
-                  className={fieldClass}
-                >
-                  <option value="">—</option>
-                  {states.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t("ownership.fields.monthlyIncome")} htmlFor="engine-own-income">
-                <MoneyInput id="engine-own-income" value={income} onChange={setIncome} />
-              </Field>
-            </div>
+          <Section title={t("ownership.lean.incomeTitle")} hint={t("ownership.lean.incomeHint")}>
+            <Field label={t("ownership.fields.monthlyIncome")} htmlFor="engine-own-income">
+              <MoneyInput id="engine-own-income" value={income} onChange={setIncome} />
+            </Field>
           </Section>
         </div>
 
@@ -710,7 +810,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               {money(monthlyOnly)}
             </span>{" "}
             {t("ownership.lean.perMonth")}
-            <span className="block text-[12px]">{t("ownership.lean.plusYearly", { value: money(yearly) })}</span>
+            <span className="block text-[12px]">{yearlyText}</span>
           </p>
           <button
             type="button"
