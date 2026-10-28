@@ -86,12 +86,18 @@
   --engine-text-muted: #9aa3b2;
   --engine-text-subtle: var(--engine-text-muted);
 
-  /* Marca / acento */
-  --engine-accent: #ff3b47;
-  --engine-accent-soft: rgba(255, 59, 71, 0.14);
+  /* Marca / acento
+     Era #ff3b47: branco por cima dava 3,52:1, e o botao primario (Entrar,
+     Comecar, Criar conta) e texto de 13-14px — precisa de 4,5:1. #e22a37 da
+     4,55:1 com branco. O custo: vermelho usado como TEXTO sobre o fundo cai
+     de 5,66 para 4,38:1 (4,12 no surface, 3,83 no surface-2) — passa como
+     icone, borda e texto grande (3:1), nao como texto miudo. Auditoria geral,
+     25/10/2026. */
+  --engine-accent: #e22a37;
+  --engine-accent-soft: rgba(226, 42, 55, 0.16);
 
   /* Sombras */
-  --engine-ring: rgba(255, 59, 71, 0.4);
+  --engine-ring: rgba(226, 42, 55, 0.45);
   --engine-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --engine-shadow-md: 0 8px 28px rgba(0, 0, 0, 0.45);
   --engine-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
