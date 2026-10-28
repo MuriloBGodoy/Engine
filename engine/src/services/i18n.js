@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
-import { supportedLngs } from "./languages";
+import { normalizeLanguage, pickSupportedLanguage, supportedLngs } from "./languages";
 
 const resources = {
   "pt-BR": {
@@ -6334,8 +6334,22 @@ applyLocalePatch("ar-SA", "en-US", {
   services: mergeDeep({ ...sharedServiceFallback }, { ...servicesEn, title: "اعثر على من ينجز المهمة. انشر خدمتك.", createService: "إضافة خدمة جديدة", myListings: "إعلاناتي", approvals: "الموافقات" }),
 });
 
+// Só pt-BR, en-US e es-ES valem como idioma ativo (ver languages.js). O
+// i18next usa direto qualquer idioma detectado que tenha ALGUMA tradução no
+// `resources` — passando por cima do `supportedLngs` —, então um navegador
+// em japonês, ou um "de-DE" antigo no localStorage, abriria a tela meio em
+// japonês. Por isso o detector já entrega um dos três.
+const languageDetector = new LanguageDetector();
+languageDetector.addDetector({
+  name: "engineNavigator",
+  lookup() {
+    if (typeof navigator === "undefined") return undefined;
+    return pickSupportedLanguage(navigator.languages?.length ? navigator.languages : [navigator.language]);
+  },
+});
+
 i18n
-  .use(LanguageDetector)
+  .use(languageDetector)
   .use(initReactI18next)
   .init({
     resources,
@@ -6360,8 +6374,9 @@ i18n
       escapeValue: false,
     },
     detection: {
-      order: ["localStorage", "navigator"],
+      order: ["localStorage", "engineNavigator"],
       caches: ["localStorage"],
+      convertDetectedLanguage: (lng) => normalizeLanguage(lng) || lng,
     },
   });
 

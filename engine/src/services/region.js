@@ -29,9 +29,10 @@ const KNOWN_COUNTRY_CODES = new Set(countries.map((country) => country.code));
 
 // País -> idioma preferido. Serve só para SUGERIR o idioma ao trocar de país
 // (nunca forçar) — idioma e região seguem independentes.
+// Só os três idiomas oferecidos (services/languages.js).
 export const COUNTRY_TO_LANGUAGE = {
   BR: "pt-BR",
-  PT: "pt-PT",
+  PT: "pt-BR",
   US: "en-US",
   GB: "en-US",
   ES: "es-ES",
@@ -39,9 +40,9 @@ export const COUNTRY_TO_LANGUAGE = {
   MX: "es-ES",
   CL: "es-ES",
   CO: "es-ES",
-  FR: "fr-FR",
-  DE: "de-DE",
-  IT: "it-IT",
+  FR: "en-US",
+  DE: "en-US",
+  IT: "en-US",
 };
 
 // Palpite pelo idioma base quando o locale não traz país (pt -> BR, es -> ES).

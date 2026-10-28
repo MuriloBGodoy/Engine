@@ -1,5 +1,5 @@
 import i18n from "./i18n";
-import { supportedLngs } from "./languages";
+import { normalizeLanguage } from "./languages";
 
 /**
  * Idioma: escolha explícita da pessoa × idioma do navegador.
@@ -22,8 +22,9 @@ const RTL = new Set(["ar"]);
 
 const readChoice = () => {
   try {
-    const value = window.localStorage.getItem(CHOICE_KEY) || "";
-    return supportedLngs.includes(value) ? value : "";
+    // Uma escolha antiga num idioma que saiu da lista ("ja-JP") vira o
+    // mais próximo dos três (ver languages.js), em vez de sumir.
+    return normalizeLanguage(window.localStorage.getItem(CHOICE_KEY));
   } catch {
     return "";
   }
@@ -43,7 +44,7 @@ export const explicitLanguage = () => readChoice();
  * Devolve o idioma que ficou valendo.
  */
 export async function chooseLanguage(lng) {
-  const value = supportedLngs.includes(lng) ? lng : "";
+  const value = normalizeLanguage(lng);
   try {
     if (value) window.localStorage.setItem(CHOICE_KEY, value);
     else {
@@ -63,7 +64,8 @@ export async function chooseLanguage(lng) {
  * Vazio (contas novas) = não mexe: continua o do navegador.
  */
 export function applySavedLanguage(saved) {
-  const value = supportedLngs.includes(saved) ? saved : "";
+  // "de-DE" salvo na conta antes de 28/10/2026 vira "en-US"; "pt-PT", "pt-BR".
+  const value = normalizeLanguage(saved);
   if (!value || i18n.language === value) return;
   try {
     window.localStorage.setItem(CHOICE_KEY, value);

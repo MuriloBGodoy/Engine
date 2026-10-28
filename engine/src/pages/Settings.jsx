@@ -29,7 +29,7 @@ import {
   verifyCurrentPassword,
 } from "../services/supabase";
 import { getMyClubs } from "../services/clubs";
-import { languageOptions } from "../services/languages";
+import { languageOptions, normalizeLanguage } from "../services/languages";
 import { chooseLanguage } from "../services/languageChoice";
 import { downloadMyData } from "../services/dataExport";
 import { useSignOut } from "../hooks/useSignOut";
@@ -1084,7 +1084,9 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   <select
                     className={selectClass}
                     aria-label={t("settings.fields.language")}
-                    value={prefs.language || ""}
+                    // Idioma salvo que saiu da lista ("ja-JP") aparece como o
+                    // que de fato está valendo (ver services/languages.js).
+                    value={normalizeLanguage(prefs.language)}
                     onChange={(e) => updateSetting("preferences", "language", e.target.value)}
                   >
                     <option value="">{t("settings.app.languageAuto")}</option>
