@@ -32,7 +32,9 @@ const defaultSettings = {
   // alertas por e-mail, 2FA e tempo de sessão — chaves gravadas e nunca
   // consultadas por ninguém. Documentos antigos ainda as carregam; são inertes.
   preferences: {
-    language: "pt-BR",
+    // Vazio = seguir o idioma do navegador (ver services/languageChoice.js).
+    // Era "pt-BR", e o App aplicava o default por cima da detecção.
+    language: "",
     theme: "dark",
     navLayout: "sidebar",
     defaultGarageSort: "progress-desc",

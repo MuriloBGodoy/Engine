@@ -10,6 +10,7 @@ import {
   FaYoutube,
 } from "react-icons/fa6";
 import { LogoMark } from "./Logo";
+import { LanguagePicker } from "./LanguagePicker";
 import { ADSENSE_ENABLED, resetAdsConsent } from "../services/consent";
 
 /**
@@ -106,7 +107,7 @@ function StoreBadge(props) {
   );
 }
 
-export function Footer() {
+export function Footer({ user = null }) {
   const { t } = useTranslation();
   const year = new Date().getFullYear();
 
@@ -243,6 +244,8 @@ export function Footer() {
           <p className="text-[12px] font-medium text-[var(--engine-text-subtle)]">
             © {year} Engine Garage. {t("footer.rights")}
           </p>
+          {/* Quem tem conta troca em Configurações › App. */}
+          {!user && <LanguagePicker />}
           <p className="text-[12px] font-medium text-[var(--engine-text-subtle)]">
             {t("footer.madeWith")}
           </p>
