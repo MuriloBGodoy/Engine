@@ -3,7 +3,31 @@
 Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 `ROADMAP.md`; aqui é só o que fazer.
 
-Última atualização: 24 de outubro de 2026 (planos, Stripe e direitos).
+Última atualização: 28 de outubro de 2026 (ideias pré e pós-lançamento).
+
+---
+
+## Ideias do Claude (28/10/2026)
+
+**Antes do lançamento (código, rodada curta):**
+- [ ] Tirar EXIF/GPS de toda foto antes do upload (foto do carro na garagem de
+      casa entrega o endereço).
+- [ ] Suspender conta denunciada como menor de idade (ECA Digital): botão na
+      `/moderacao`, conta suspensa não loga nem aparece; hoje só apaga conteúdo.
+- [ ] Link para `/moderacao` no menu, só para admin.
+
+**Depois do lançamento:**
+- [ ] /anuncie para empresas do ramo (concessionárias, seminovos, garagens,
+      oficinas, autopeças, estética, seguradoras, autoescolas). Pacotes fixos
+      por cidade/mês vendidos na mão: destaque patrocinado em Serviços,
+      patrocínio de evento/clube, espaço "oferecido por…" na Home/Garagem,
+      combo com o Instagram do Murilo. Página com alcance na região (números só
+      acima de 500), exemplos de como aparece e WhatsApp. Dá para a Jesse
+      desenhar antes; os números entram quando houver usuários.
+- [ ] Notificação push (o sino no app já funciona).
+- [ ] Gastos: amortizar IPVA/seguro, editar lançamento, "ver mais", aviso do
+      teto de 300.
+- [ ] Cadastro do carro: ano antes do modelo (FIPE v2), via Jesse.
 
 ---
 
