@@ -25,6 +25,8 @@ import { Garagem } from "./pages/Garagem";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { useToast } from "./components/ToastProvider";
+import { applySavedLanguage } from "./services/languageChoice";
+import { getConsentStatus } from "./services/onboarding";
 
 // Carregamento sob demanda. Até 25/09/2026 o app inteiro era UM arquivo de
 // 2,9 MB (870 KB gzip) — nada pintava antes dele baixar e ser lido, e a Mia
@@ -57,6 +59,24 @@ const ServiceApprovals = lazyNamed(() => import("./pages/Services"), "ServiceApp
 const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
 const Support = lazyNamed(() => import("./pages/Support"), "Support");
 const Advertise = lazyNamed(() => import("./pages/Advertise"), "Advertise");
+const Onboarding = lazyNamed(() => import("./pages/Onboarding"), "Onboarding");
+
+// "Já vi a apresentação da Garagem", por conta e por aparelho.
+const introKey = (uid) => `engine.garageIntroSeen:${uid}`;
+const readIntroSeen = (uid) => {
+  try {
+    return Boolean(window.localStorage.getItem(introKey(uid)));
+  } catch {
+    return true;
+  }
+};
+const markIntroSeen = (uid) => {
+  try {
+    window.localStorage.setItem(introKey(uid), "1");
+  } catch {
+    // sem armazenamento, a apresentação some só nesta visita
+  }
+};
 
 /**
  * Numa SPA a troca de tela não recarrega a página, então o pageview não sai
@@ -74,7 +94,7 @@ function RouteTracker() {
 
 function App() {
   const showToast = useToast();
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -84,6 +104,9 @@ function App() {
   // dizia "adicione seu primeiro carro" para quem tem sete.
   const [carsError, setCarsError] = useState(null);
   const [settings, setSettings] = useState(engineDB.getDefaultSettings());
+  // Preferências da conta que não puderam ser lidas: o default entra no lugar
+  // e o primeiro uso NÃO pode concluir daí que falta o nome de usuário.
+  const [settingsFailed, setSettingsFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [carToEdit, setCarToEdit] = useState(null);
   const [ownershipCar, setOwnershipCar] = useState(null);
@@ -129,10 +152,9 @@ function App() {
         if (!userId) {
           const savedSettings = await engineDB.getSettings();
           if (cancelado) return;
+          // O idioma do visitante NÃO vem daqui: o default gravado era
+          // "pt-BR" e atropelava o navegador. Ver services/languageChoice.js.
           setSettings(savedSettings);
-          if (i18n.language !== savedSettings.preferences.language) {
-            i18n.changeLanguage(savedSettings.preferences.language);
-          }
           return;
         }
 
@@ -163,18 +185,20 @@ function App() {
         if (resultadoAjustes.status === "rejected") throw resultadoAjustes.reason;
         const savedSettings = resultadoAjustes.value;
         setSettings(savedSettings);
+        setSettingsFailed(false);
         // O perfil público só era escrito ao salvar os ajustes — quem nunca
         // entrou lá aparecia como "Usuário Engine" para os outros.
         engineDB
           .syncPublicProfile(savedSettings, userId)
           .catch((error) => console.warn("syncPublicProfile", error));
-        if (i18n.language !== savedSettings.preferences.language) {
-          i18n.changeLanguage(savedSettings.preferences.language);
-        }
+        applySavedLanguage(savedSettings.preferences.language);
       } catch (error) {
         console.error(error);
         // Sem preferências legíveis, o default é melhor que tela travada.
-        if (!cancelado) setSettings(engineDB.getDefaultSettings());
+        if (!cancelado) {
+          setSettings(engineDB.getDefaultSettings());
+          setSettingsFailed(true);
+        }
       } finally {
         if (!cancelado) setDbLoading(false);
       }
@@ -183,7 +207,22 @@ function App() {
     return () => {
       cancelado = true;
     };
-  }, [i18n, userId]);
+  }, [userId]);
+
+  // Primeiro uso: aceite de 18+ e dos termos, gravado no servidor. Lido por
+  // conta; "unknown" (sem rede) não bloqueia.
+  const [consent, setConsent] = useState({ userId: null, status: "unknown" });
+  const [introDone, setIntroDone] = useState({});
+  useEffect(() => {
+    if (!userId) return undefined;
+    let alive = true;
+    getConsentStatus(userId).then((result) => {
+      if (alive) setConsent({ userId, ...result });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   /**
    * Re-leitura da garagem depois de uma escrita, e o botao de tentar de novo.
@@ -341,6 +380,65 @@ function App() {
 
   if (authLoading) {
     return <div className="min-h-screen bg-[var(--engine-bg)]" />;
+  }
+
+  // O que falta para a conta usar o app. Enquanto o aceite desta conta não foi
+  // lido, segura a tela (sem isso o app pisca antes do bloqueio).
+  const consentLoaded = Boolean(userId) && consent.userId === userId;
+  const needsConsent = consentLoaded && (consent.status === "missing" || consent.status === "outdated");
+  const needsUsername = Boolean(userId) && !dbLoading && !settingsFailed && !settings.profile.username;
+  const showIntro =
+    Boolean(userId) &&
+    !dbLoading &&
+    !carsError &&
+    cars.length === 0 &&
+    !introDone[userId] &&
+    !readIntroSeen(userId);
+  const finishIntro = () => {
+    markIntroSeen(userId);
+    setIntroDone((current) => ({ ...current, [userId]: true }));
+  };
+  const gateActive =
+    Boolean(userId) && (!consentLoaded || dbLoading || needsConsent || needsUsername || showIntro);
+
+  if (gateActive) {
+    const waiting = !consentLoaded || dbLoading;
+    return (
+      <BrowserRouter>
+        <RouteTracker />
+        <Suspense fallback={<div className="min-h-[100dvh] bg-[var(--engine-bg)]" />}>
+          <Routes>
+            {/* Os termos precisam abrir de dentro da tela de aceite. */}
+            <Route path="/termos" element={<Terms />} />
+            <Route path="/privacidade" element={<Privacy />} />
+            <Route
+              path="*"
+              element={
+                waiting ? (
+                  <div className="min-h-[100dvh] bg-[var(--engine-bg)]" />
+                ) : (
+                  <Onboarding
+                    user={user}
+                    settings={settings}
+                    onSettingsUpdate={setSettings}
+                    needsConsent={needsConsent}
+                    consentOutdated={consent.status === "outdated"}
+                    needsUsername={needsUsername}
+                    onAccountDone={() => setConsent({ userId, status: "accepted" })}
+                    onAddCar={() => {
+                      finishIntro();
+                      window.history.replaceState(null, "", "/garagem");
+                      handleOpenModal();
+                    }}
+                    onSkipIntro={finishIntro}
+                  />
+                )
+              }
+            />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    );
   }
 
   return (
@@ -636,7 +734,7 @@ function AppLayout({
         )}
 
         {/* Rodapé global — acompanha o conteúdo no fim da rolagem. */}
-        {!dbLoading && !isMessages && <Footer />}
+        {!dbLoading && !isMessages && <Footer user={user} />}
       </main>
 
       {/* A key remonta o formulário a cada carro: sem isso o modal fica

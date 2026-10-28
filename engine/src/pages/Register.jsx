@@ -12,6 +12,7 @@ import { PasswordStrength } from "../components/PasswordStrength";
 import { passwordLevel } from "../services/passwordStrength";
 import { countries, getStates, DEFAULT_COUNTRY } from "../services/locations";
 import { isPhoneValueValid } from "../services/phone";
+import { acceptTerms } from "../services/onboarding";
 
 export function Register() {
   const { t } = useTranslation();
@@ -43,7 +44,9 @@ export function Register() {
       setError(t("auth.adultRequired"));
       return;
     }
-    if (!isPhoneValueValid(phone)) {
+    // Telefone é opcional desde 25/10/2026: nenhum fluxo de conta usa, e ele
+    // barrava o cadastro. Se vier preenchido, precisa ser válido.
+    if (phone.trim() && !isPhoneValueValid(phone)) {
       setError(t("auth.invalidPhone"));
       return;
     }
@@ -107,6 +110,13 @@ export function Register() {
         createdUser.uid,
       ).catch((error) => console.warn("[register] configurações só locais", error));
 
+      // O checkbox de 18+ e termos foi marcado acima: grava o aceite no
+      // servidor, com a data do banco. Se falhar, a tela de primeiro uso
+      // pergunta de novo — nunca trava o cadastro que já deu certo.
+      await acceptTerms(createdUser.uid).catch((error) =>
+        console.warn("[register] aceite fica para o primeiro uso", error),
+      );
+
       // Conta nova vai para a Garagem, cujo estado vazio convida a cadastrar
       // o primeiro carro — o primeiro passo de tudo no app. A home genérica,
       // que era o destino, não conduzia a nada.
@@ -134,7 +144,8 @@ export function Register() {
       title={t("auth.registerTitle")}
       subtitle={t("auth.registerSubtitle")}
     >
-      <SocialAuthButtons redirectPath={next || "/"} />
+      {/* Conta nova pelo Google cai no mesmo lugar que a do e-mail. */}
+      <SocialAuthButtons redirectPath={next || "/garagem"} />
 
       <form onSubmit={handleRegister} className="auth-form auth-register-form">
         <label className="auth-field auth-span-two">
@@ -162,7 +173,10 @@ export function Register() {
           />
         </label>
         <label className="auth-field">
-          <span>{t("auth.phone")}</span>
+          <span>
+            {t("auth.phone")}{" "}
+            <small className="text-[0.8rem] font-medium text-zinc-400">({t("auth.optional")})</small>
+          </span>
           <PhoneField
             value={phone}
             onChange={setPhone}
