@@ -6,6 +6,7 @@ import {
   BellOff,
   Check,
   ChevronRight,
+  Download,
   CreditCard,
   EyeOff,
   KeyRound,
@@ -24,12 +25,14 @@ import { engineDB } from "../services/db";
 import {
   sendPasswordReset,
   setNewPassword,
-  signOut,
   supabase,
   verifyCurrentPassword,
 } from "../services/supabase";
 import { getMyClubs } from "../services/clubs";
 import { languageOptions } from "../services/languages";
+import { chooseLanguage } from "../services/languageChoice";
+import { downloadMyData } from "../services/dataExport";
+import { useSignOut } from "../hooks/useSignOut";
 import { countries, getStates } from "../services/locations";
 import { NOTIFICATION_PREFERENCES } from "../services/notifications";
 import {
@@ -776,7 +779,6 @@ function DeleteAccountDialog({ t, user, open, onClose }) {
 
 export function Settings({ user, settings, onSettingsUpdate }) {
   const { i18n, t } = useTranslation();
-  const navigate = useNavigate();
   const toast = useToast();
   const { region, setRegion } = useRegion();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -822,7 +824,8 @@ export function Settings({ user, settings, onSettingsUpdate }) {
     const next = { ...previous, [group]: { ...previous[group], [key]: value } };
     latest.current = next;
     onSettingsUpdate(next);
-    if (group === "preferences" && key === "language") i18n.changeLanguage(value);
+    // "" = seguir o navegador (ver services/languageChoice.js).
+    if (group === "preferences" && key === "language") chooseLanguage(value);
 
     saveQueue.current = saveQueue.current
       .then(() => engineDB.saveSettings(next, user.uid))
@@ -831,7 +834,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
           latest.current = previous;
           onSettingsUpdate(previous);
           if (group === "preferences" && key === "language") {
-            i18n.changeLanguage(previous.preferences.language);
+            chooseLanguage(previous.preferences.language);
           }
         }
         toast(error?.message || t("settings.status.saveError"), "error");
@@ -857,12 +860,19 @@ export function Settings({ user, settings, onSettingsUpdate }) {
     }
   };
 
-  const handleLogout = async () => {
+  // Sair pede confirmação; no celular este é o único "Sair" (25/10/2026).
+  const handleLogout = useSignOut();
+
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
     try {
-      await signOut();
-      navigate("/login");
-    } catch (error) {
-      toast(t(authErrorKey(error)), "error");
+      await downloadMyData(user);
+      toast(t("settings.account.exportDone"));
+    } catch {
+      toast(t("settings.account.exportError"), "error");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -969,6 +979,17 @@ export function Settings({ user, settings, onSettingsUpdate }) {
               <PlanGroup t={t} i18n={i18n} user={user} />
 
               <Group>
+                <Row
+                  icon={Download}
+                  label={t("settings.account.exportData")}
+                  hint={t("settings.account.exportDataHint")}
+                  onClick={exporting ? undefined : handleExport}
+                >
+                  {exporting && <Loader2 size={18} className="animate-spin text-[var(--engine-text-muted)]" />}
+                </Row>
+              </Group>
+
+              <Group>
                 <Row icon={LogOut} label={t("settings.account.logout")} onClick={handleLogout} />
                 <Row
                   icon={Trash2}
@@ -1063,9 +1084,10 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   <select
                     className={selectClass}
                     aria-label={t("settings.fields.language")}
-                    value={prefs.language || "pt-BR"}
+                    value={prefs.language || ""}
                     onChange={(e) => updateSetting("preferences", "language", e.target.value)}
                   >
+                    <option value="">{t("settings.app.languageAuto")}</option>
                     {languageOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {t(option.labelKey)}

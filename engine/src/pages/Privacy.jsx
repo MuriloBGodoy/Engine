@@ -170,7 +170,8 @@ export function Privacy() {
         <p>
           Você pode pedir acesso, correção, portabilidade ou exclusão dos seus
           dados, e revogar consentimentos. A maior parte disso está no próprio
-          app, em Configurações: editar o perfil, exportar os dados e{" "}
+          app: o perfil se edita na sua página de perfil, e em Configurações ›
+          Conta você baixa uma cópia dos seus dados (arquivo JSON) e pode{" "}
           <strong className="text-[var(--engine-text)]">apagar a conta
           permanentemente</strong>.
         </p>
@@ -194,8 +195,9 @@ export function Privacy() {
 
       <LegalSection title="Mudanças nesta política">
         <p>
-          Quando esta política mudar de forma relevante, avisamos no app antes
-          de a mudança valer. A data no topo indica a última atualização.
+          Quando esta política mudar de forma relevante, o app pede que você
+          leia e aceite a nova versão antes de continuar usando a conta. A data
+          no topo indica a última atualização.
         </p>
       </LegalSection>
     </LegalPage>
