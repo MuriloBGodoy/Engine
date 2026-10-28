@@ -2,9 +2,26 @@ import { supabase } from "./supabase";
 // O catálogo é um só: o mesmo arquivo que a função de checkout usa para
 // cobrar. A tela de Planos lê os preços daqui para nunca mostrar um valor e
 // cobrar outro.
-import { FOUNDER_SLOTS, OFFERS, PRO_TRIAL_DAYS } from "../../netlify/functions/lib/plans.js";
+import {
+  FOUNDER_SLOTS,
+  OFFERS,
+  PRO_TRIAL_DAYS,
+  SELLABLE_COUNTRIES,
+  currencyForCountry,
+  isSellableCountry,
+  priceFor,
+  toMajorUnits,
+} from "../../netlify/functions/lib/plans.js";
 
-export { FOUNDER_SLOTS, OFFERS, PRO_TRIAL_DAYS };
+export {
+  FOUNDER_SLOTS,
+  OFFERS,
+  PRO_TRIAL_DAYS,
+  SELLABLE_COUNTRIES,
+  currencyForCountry,
+  isSellableCountry,
+  priceFor,
+};
 
 /** Chave publicável do Stripe. Vazia = assinatura ainda não aberta. */
 export const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
@@ -18,9 +35,38 @@ export const SUPPORT_PIX_KEY = (import.meta.env.VITE_SUPPORT_PIX_KEY || "").trim
  */
 export const SUPPORT_EMAIL = "muxdtuber@gmail.com";
 
-/** Valor em centavos → texto de moeda no idioma da tela (R$ 79,90). */
-export function formatPrice(cents, language = "pt-BR", currency = "BRL") {
-  return new Intl.NumberFormat(language, { style: "currency", currency }).format(cents / 100);
+// Moedas em que centavo não aparece na vitrine: "$ 8.900", não "$ 8.900,00".
+const WHOLE_UNIT_DISPLAY = ["CLP", "COP", "ARS"];
+
+/**
+ * Valor como vai ao Stripe (centavos, ou unidade no CLP) → texto de moeda no
+ * idioma da tela: R$ 79,90 · US$ 19,90 · CLP 8.990.
+ */
+export function formatPrice(amount, language = "pt-BR", currency = "BRL") {
+  const whole = WHOLE_UNIT_DISPLAY.includes(currency);
+  return new Intl.NumberFormat(language, {
+    style: "currency",
+    currency,
+    ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+  }).format(toMajorUnits(amount, currency));
+}
+
+/**
+ * País salvo no perfil, lido do mesmo lugar e do mesmo jeito que a função de
+ * checkout lê (user_private/settings, sem preencher padrão). "" quando a
+ * pessoa nunca salvou um país — aí o servidor usa a região de navegação, e a
+ * tela também.
+ */
+export async function fetchProfileCountry(userId) {
+  if (!userId) return "";
+  const { data, error } = await supabase
+    .from("user_private")
+    .select("data")
+    .eq("user_id", String(userId))
+    .eq("doc_id", "settings")
+    .maybeSingle();
+  if (error) throw error;
+  return String(data?.data?.profile?.country || "").trim().toUpperCase();
 }
 
 /** Data por extenso no idioma da tela, para "primeira cobrança em …". */

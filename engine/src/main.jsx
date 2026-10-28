@@ -15,6 +15,7 @@ import "./services/i18n-services-extra";
 import "./services/i18n-garage-fixes";
 import "./services/i18n-general-fixes";
 import "./services/i18n-social-fixes";
+import "./services/i18n-intl";
 import "./services/languageChoice";
 
 // Antes do render: erro que acontece na montagem também precisa ser visto.

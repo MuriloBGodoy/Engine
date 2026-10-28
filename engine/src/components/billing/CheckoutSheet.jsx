@@ -11,7 +11,6 @@ import {
   formatPrice,
   trialEndFromNow,
 } from "../../services/billing";
-import { useRegion } from "../../hooks/RegionProvider";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { Button } from "../Button";
 import { useToast } from "../ToastProvider";
@@ -48,10 +47,9 @@ function SummaryRow({ label, children }) {
  * "Voltar" daqui. Renovação, data da primeira cobrança, como cancelar e o
  * arrependimento de 7 dias aparecem antes de qualquer campo de cartão.
  */
-export function CheckoutSheet({ offerId, subscription, onClose }) {
+export function CheckoutSheet({ offerId, subscription, country = "BR", currency = "BRL", onClose }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const { region } = useRegion();
   const [step, setStep] = useState("summary");
   const [clientSecret, setClientSecret] = useState("");
   const [error, setError] = useState("");
@@ -77,21 +75,22 @@ export function CheckoutSheet({ offerId, subscription, onClose }) {
 
   if (!offer) return null;
 
-  const price = formatPrice(offer.amount.BRL, lang);
-  const founderPrice = offer.founderAmount ? formatPrice(offer.founderAmount.BRL, lang) : "";
+  // País e moeda chegam da tela de Planos (useBillingCountry), que segue a
+  // mesma cascata do servidor; o valor exato volta no próprio checkout.
+  const price = formatPrice(offer.amount[currency], lang, currency);
+  const founderPrice = offer.founderAmount ? formatPrice(offer.founderAmount[currency], lang, currency) : "";
 
   const handleContinue = async () => {
     setStep("starting");
     setError("");
     try {
-      const country = region?.country && region.country !== "all" ? region.country : undefined;
       const result = await startCheckout(offerId, { country });
       if (result.clientSecret) {
         setClientSecret(result.clientSecret);
         setStep("checkout");
         return;
       }
-      // Mercado Pago (AR, MX, CL, CO): o pagamento acontece na página deles.
+      // Mercado Pago (desligado desde 28/10/2026): o pagamento seria na página deles.
       setStep("redirecting");
       window.location.href = result.url;
     } catch (caught) {

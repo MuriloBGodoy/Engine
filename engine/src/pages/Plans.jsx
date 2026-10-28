@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Check,
   Clock3,
+  Globe,
   Info,
   LogIn,
   Settings as SettingsIcon,
@@ -15,6 +16,7 @@ import {
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { useIsPremium } from "../hooks/useIsPremium";
+import { useBillingCountry } from "../hooks/useBillingCountry";
 import {
   FOUNDER_SLOTS,
   OFFERS,
@@ -59,6 +61,15 @@ const PRO_FEATURES = [
 ];
 
 const PREMIUM_OPTIONS = ["premium_yearly", "premium_pass_3m", "premium_pass_1m"];
+
+/** "peso mexicano", "libra esterlina"… no idioma da tela; o código, se o navegador não souber. */
+function currencyName(currency, language) {
+  try {
+    return new Intl.DisplayNames([language], { type: "currency" }).of(currency) || currency;
+  } catch {
+    return currency;
+  }
+}
 
 function FeatureList({ items, t, base }) {
   return (
@@ -146,7 +157,10 @@ function CurrentBadge({ children }) {
 export function Plans({ user }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { plan, subscription, loading } = useIsPremium(user?.uid);
+  const { plan, subscription, loading: planLoading } = useIsPremium(user?.uid);
+  // País e moeda de quem olha: perfil, depois região (a mesma conta do servidor).
+  const { country, currency, sellable, loading: countryLoading } = useBillingCountry(user?.uid);
+  const loading = planLoading || countryLoading;
   const [premiumOffer, setPremiumOffer] = useState("premium_yearly");
   const [checkoutOffer, setCheckoutOffer] = useState(null);
 
@@ -156,7 +170,9 @@ export function Plans({ user }) {
   const hasSubscription = plan !== "free" && subscription?.kind === "subscription";
   const hasPass = plan === "premium" && subscription?.kind === "pass";
   const trialUsed = Boolean(subscription?.trialEnd);
-  const price = (id) => formatPrice(OFFERS[id].amount.BRL, lang);
+  const money = (amount) => formatPrice(amount, lang, currency);
+  const price = (id) => money(OFFERS[id].amount[currency]);
+  const founderPrice = money(OFFERS.pro_monthly.founderAmount[currency]);
 
   const planName = plan === "pro" ? "Engine Pro" : plan === "premium" ? "Engine Premium" : "";
 
@@ -174,6 +190,15 @@ export function Plans({ user }) {
         <Button disabled className="w-full">
           {t("billing.plans.cta.soon")}
         </Button>
+      );
+    }
+    if (!sellable) {
+      // Fora dos países à venda: o preço fica como informação, sem botão.
+      return (
+        <p className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--engine-surface-2)] px-3 py-2.5 text-center text-xs leading-relaxed text-[var(--engine-text-muted)]">
+          <Globe size={15} className="shrink-0" aria-hidden="true" />
+          {t("billing.plans.cta.notSellable")}
+        </p>
       );
     }
     if (isGuest) {
@@ -316,13 +341,23 @@ export function Plans({ user }) {
         </div>
       )}
 
+      {billingOpen && !sellable && !loading && (
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--engine-border-strong)] px-4 py-3.5 text-[13px] leading-relaxed text-[var(--engine-text-muted)]">
+          <Globe size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <p>
+            <span className="font-semibold text-[var(--engine-text)]">{t("billing.plans.notSellable.title")}</span>{" "}
+            {t("billing.plans.notSellable.body", { currency: currencyName(currency, lang) })}
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-5 pt-3 lg:grid-cols-3 lg:items-stretch">
         {/* Grátis — longo de propósito: é a maior parte do Engine. */}
         <PlanCard
           eyebrow={t("billing.plans.free.eyebrow")}
           name={t("billing.plans.free.name")}
           audience={t("billing.plans.free.audience")}
-          price={<BigPrice value={formatPrice(0, lang)} suffix={t("billing.plans.free.forever")} />}
+          price={<BigPrice value={money(0)} suffix={t("billing.plans.free.forever")} />}
           footer={freeFooter}
         >
           <FeatureList
@@ -349,7 +384,7 @@ export function Plans({ user }) {
           priceNote={
             premiumOffer === "premium_yearly"
               ? t("billing.plans.premium.yearlyNote", {
-                  monthly: formatPrice(Math.round(OFFERS.premium_yearly.amount.BRL / 12), lang),
+                  monthly: money(Math.round(OFFERS.premium_yearly.amount[currency] / 12)),
                 })
               : t(`billing.plans.premium.passNote.${premiumOffer}`)
           }
@@ -418,7 +453,7 @@ export function Plans({ user }) {
             <Wrench size={17} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" />
             <p className="text-[13px] leading-relaxed text-[var(--engine-text)]">
               {t("billing.plans.pro.founder", {
-                founderPrice: formatPrice(OFFERS.pro_monthly.founderAmount.BRL, lang),
+                founderPrice,
                 slots: FOUNDER_SLOTS,
                 price: price("pro_monthly"),
               })}
@@ -445,7 +480,7 @@ export function Plans({ user }) {
                   days: PRO_TRIAL_DAYS,
                   email: SUPPORT_EMAIL,
                   slots: FOUNDER_SLOTS,
-                  founderPrice: formatPrice(OFFERS.pro_monthly.founderAmount.BRL, lang),
+                  founderPrice,
                   price: price("pro_monthly"),
                 })}
               </p>
@@ -476,6 +511,8 @@ export function Plans({ user }) {
         <Suspense fallback={null}>
           <CheckoutSheet
             offerId={checkoutOffer}
+            country={country}
+            currency={currency}
             subscription={subscription}
             onClose={() => setCheckoutOffer(null)}
           />
