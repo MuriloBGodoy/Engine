@@ -25,6 +25,7 @@
     "check:achievements": "node scripts/check-achievements.mjs",
     "check:ipva": "node scripts/check-ipva.mjs",
     "check:rls": "node scripts/check-rls.mjs",
+    "check:reminders": "node scripts/check-reminders.mjs",
     "icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {

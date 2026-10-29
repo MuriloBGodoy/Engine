@@ -142,8 +142,11 @@ export function NotificationsPanel({
                 notificationStyles[notification.type] || defaultNotificationStyle;
               const Icon = style.icon;
               const createdAt = formatNotificationTime(notification.createdAt);
-              const copy = getNotificationCopy(notification, t, (id) =>
-                achievementName(t, i18n.language, id),
+              const copy = getNotificationCopy(
+                notification,
+                t,
+                (id) => achievementName(t, i18n.language, id),
+                i18n.language,
               );
               const target = getNotificationTarget(notification);
 

@@ -7,6 +7,7 @@ import { normalizeOwnershipInputs, LIFE_SITUATION_TYPES } from "./ownership";
 import { normalizeExpense, normalizeExpenses, realConsumption } from "./expenses";
 import { localISODate } from "./garageInput";
 import { normalizeSpecSheet, publicSpecSheet } from "./carSpecSheet";
+import { normalizeReminderSettings } from "./reminders";
 
 const defaultSettings = {
   profile: {
@@ -477,6 +478,11 @@ const normalizeCar = (car) => ({
   // teto — são 2.750 bytes medidos: 0,3% do orçamento do documento, contra
   // 200-700 KB de UMA foto em base64. Limites e faixas em `carSpecSheet.js`.
   specs: normalizeSpecSheet(car.specs),
+  // Lembretes (IPVA, licenciamento, revisão, seguro): UF, SÓ o último dígito
+  // da placa e as datas que a pessoa informou. Privado como `ownership` — o
+  // `communityCarPatch` é lista branca e não leva este campo. `null` quando
+  // nunca configurado. Regras em `reminders.js`.
+  reminders: normalizeReminderSettings(car.reminders),
   // Simulação de custo real de posse (inputs do usuário), quando existir.
   ownership: car.ownership
     ? {

@@ -1,4 +1,4 @@
-import { Calculator, ChevronRight, Key, PiggyBank, Receipt, Trash2, Trophy, CarFront } from "lucide-react";
+import { BellRing, Calculator, ChevronRight, Key, PiggyBank, Receipt, Trash2, Trophy, CarFront } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { resolveVehicleSpecSheet } from "../services/carSpecSheet";
@@ -8,6 +8,8 @@ import { forecastCompletion } from "../services/forecast";
 import { expenseInsights } from "../services/expenses";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarBrand, formatFipeYear } from "../services/carDisplay";
+import { mostUrgent } from "../services/reminders";
+import { reminderStatusText, reminderTone } from "../services/reminderLabels";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1598209279122-8541213a0387?q=80&w=600";
@@ -184,9 +186,13 @@ export function CarCard({
   onAddExpense,
   onMarkAchieved,
   onOpenSpecs,
+  onOpenReminders,
   hideValues = false,
 }) {
   const { i18n, t } = useTranslation();
+  // O vencimento mais urgente (até 30 dias), ao lado do selo "na garagem":
+  // cabe na linha que já existe, custa zero de altura.
+  const urgent = onOpenReminders && car.type === CAR_TYPE_OWNED ? mostUrgent(car) : null;
   // Fora do Brasil o simulador não responde: o botão vira só a porta para o
   // "estamos trabalhando nisso", sem número. O número é a manchete do modal
   // (`simulateCar`): o que sai todo mês, sem os boletos anuais — a mesma
@@ -341,10 +347,35 @@ export function CarCard({
             barra entra o selo de garagem. O ano, que antes vinha ao lado dele,
             agora esta na identidade sobre a foto. */}
         {isOwned ? (
-          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[var(--engine-accent-soft)] px-2.5 py-1 text-[11px] font-black uppercase tracking-widest text-[var(--engine-accent)]">
-            <Key size={11} />
-            {t("car.owned")}
-          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[var(--engine-accent-soft)] px-2.5 py-1 text-[11px] font-black uppercase tracking-widest text-[var(--engine-accent)]">
+              <Key size={11} />
+              {t("car.owned")}
+            </span>
+            {urgent && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenReminders(car);
+                }}
+                // Alvo de 44px; a pílula visível continua do tamanho do selo.
+                className="-my-1.5 flex min-h-11 min-w-0 max-w-full items-center"
+              >
+                <span
+                  className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black ${reminderTone(urgent)}`}
+                >
+                  <BellRing size={11} className="shrink-0" />
+                  <span className="truncate">
+                    {t("reminders.cardChip", {
+                      item: t(`reminders.kinds.${urgent.kind}`),
+                      status: reminderStatusText(t, urgent),
+                    })}
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
         ) : (
           <ProgressStrip
             car={car}

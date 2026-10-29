@@ -1,6 +1,7 @@
 import {
   BadgeDollarSign,
   Bell,
+  CalendarClock,
   CheckCircle2,
   ClipboardList,
   Heart,
@@ -12,6 +13,8 @@ import {
   UserPlus,
   XCircle,
 } from "lucide-react";
+import { localISODate } from "./reminders";
+import { reminderNotificationCopy } from "./reminderLabels";
 
 /**
  * Rótulos, ícones e textos das notificações — fora do componente para que o
@@ -27,6 +30,7 @@ const notificationLabels = {
   service_rejected: "Anúncio recusado",
   service_suspended: "Anúncio tirado do ar",
   message: "Nova mensagem",
+  garage_reminder: "Lembrete da garagem",
 };
 
 export const notificationStyles = {
@@ -40,6 +44,7 @@ export const notificationStyles = {
   service_suspended: { icon: XCircle, iconClass: "text-red-500" },
   message: { icon: Send, iconClass: "text-[var(--engine-accent)]" },
   achievement: { icon: Trophy, iconClass: "text-[var(--engine-accent)]" },
+  garage_reminder: { icon: CalendarClock, iconClass: "text-amber-500" },
   quote_request: { icon: ClipboardList, iconClass: "text-[var(--engine-accent)]" },
   quote_reply: { icon: BadgeDollarSign, iconClass: "text-emerald-500" },
 };
@@ -107,7 +112,12 @@ const quoteCategoryLabel = (category, t) =>
  * Título e corpo de um aviso. `t` (i18next) traduz pelo tipo; `nameOf` dá o
  * nome de uma conquista. Sem `t` cai no texto pt-BR antigo.
  */
-export const getNotificationCopy = (notification, t, nameOf) => {
+export const getNotificationCopy = (notification, t, nameOf, locale = "pt-BR") => {
+  // Lembrete da garagem: "IPVA vence em 7 dias", com o "quando" calculado na
+  // hora em que a pessoa LÊ (o aviso pode ficar dias no sino).
+  if (t && notification.type === "garage_reminder") {
+    return reminderNotificationCopy(notification, t, locale, localISODate());
+  }
   const actor = notification.actorName || "";
   if (t && TRANSLATED_TYPES.has(notification.type)) {
     const vars = {

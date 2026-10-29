@@ -13,6 +13,7 @@ const SOURCES = [
   ["consents", (uid) => supabase.from("user_consents").select("*").eq("user_id", uid)],
   ["publicProfile", (uid) => supabase.from("public_profiles").select("*").eq("user_id", uid)],
   ["cars", (uid) => supabase.from("cars").select("*").eq("user_id", uid)],
+  ["garageReminders", (uid) => supabase.from("garage_reminders").select("*").eq("user_id", uid)],
   ["posts", (uid) => supabase.from("community_goals").select("*").eq("owner_id", uid)],
   ["serviceListings", (uid) => supabase.from("service_listings").select("*").eq("owner_id", uid)],
   ["quoteRequests", (uid) => supabase.from("quote_requests").select("*").eq("customer_id", uid)],

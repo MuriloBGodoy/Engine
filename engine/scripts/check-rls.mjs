@@ -85,6 +85,30 @@ try {
   check("ninguém se dá plano premium", denied(await a.client.from("user_plans").insert({ user_id: a.id, plan: "premium" })));
   check("visitante não lê garagem", (await anon.from("cars").select("*")).data?.length === 0);
 
+  console.log("\nlembretes da garagem");
+  // Desde 20261029130000: as datas de IPVA/licenciamento/revisão/seguro são
+  // do dono do carro; o que já foi avisado (de-duplicação) só o servidor vê.
+  const lembrete = { user_id: a.id, car_id: "car1", kind: "ipva", due_date: "2099-01-10", detail: { n: 1 } };
+  check("dono grava lembrete do próprio carro", passed(await a.client.from("garage_reminders").insert(lembrete)));
+  check("dono lê os próprios lembretes", (await a.client.from("garage_reminders").select("*").eq("user_id", a.id)).data?.length === 1);
+  check("outro não lê lembrete alheio", (await b.client.from("garage_reminders").select("*").eq("user_id", a.id)).data?.length === 0);
+  check("visitante não lê lembretes", (await anon.from("garage_reminders").select("*")).data?.length === 0);
+  check("outro não grava lembrete no carro alheio",
+    denied(await b.client.from("garage_reminders").insert({ ...lembrete, user_id: a.id, due_date: "2099-02-10" })));
+  check("ninguém grava lembrete para carro que não é dele (chave do carro)",
+    denied(await b.client.from("garage_reminders").insert({ ...lembrete, user_id: b.id, due_date: "2099-02-10" })));
+  check("outro não altera lembrete alheio",
+    denied(await b.client.from("garage_reminders").update({ due_date: "2099-03-01" }).eq("user_id", a.id).select()));
+  check("outro não apaga lembrete alheio",
+    denied(await b.client.from("garage_reminders").delete().eq("user_id", a.id).select()));
+  check("tipo de lembrete fora da lista é recusado",
+    denied(await a.client.from("garage_reminders").insert({ ...lembrete, kind: "multa", due_date: "2099-04-10" })));
+  check("dono não lê o registro de avisos enviados",
+    (await a.client.from("garage_reminder_deliveries").select("*")).data?.length === 0);
+  check("dono não forja aviso enviado",
+    denied(await a.client.from("garage_reminder_deliveries").insert({ user_id: a.id, car_id: "car1", kind: "ipva", due_date: "2099-01-10", stage: 30 })));
+  check("cliente não roda o job do sino", denied(await a.client.rpc("run_garage_reminders")));
+
   console.log("\nconquistas");
   // Desde 20261025162000: marco social é do banco; o cliente só grava marco
   // da garagem, e só para si.

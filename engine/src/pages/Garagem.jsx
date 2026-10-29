@@ -1,5 +1,9 @@
+import { useEffect, useState } from "react";
 import { CloudOff, Plus, RefreshCw, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { GarageReminders } from "../components/reminders/GarageReminders";
+import { ReminderSettingsModal } from "../components/reminders/ReminderSettingsModal";
+import { syncGarageReminders } from "../services/remindersSync";
 import { CarCard } from "../components/CarCard";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { PageHeader } from "../components/PageHeader";
@@ -40,8 +44,20 @@ export function Garagem({
   loadError = null,
   onRetry,
   accountEmail = "",
+  userId = "",
+  onSaveReminders,
 }) {
   const { t } = useTranslation();
+  // Id, não o objeto: depois de salvar, o carro novo vem da lista recarregada.
+  const [remindersCarId, setRemindersCarId] = useState(null);
+  const remindersCar = cars.find((car) => car.id === remindersCarId) || null;
+
+  // Leva as datas firmes ao servidor (o job diário do sino). Só reenvia o carro
+  // cujo conteúdo mudou — ver remindersSync.js. Efeito sem setState.
+  useEffect(() => {
+    if (userId && cars.length) syncGarageReminders(userId, cars);
+  }, [userId, cars]);
+
   const sortedCars = sortCars(cars, defaultSort);
   const goalCars = sortedCars.filter((car) => car.type !== CAR_TYPE_OWNED);
   const ownedCars = sortedCars.filter((car) => car.type === CAR_TYPE_OWNED);
@@ -58,6 +74,10 @@ export function Garagem({
           </Button>
         }
       />
+
+      {onSaveReminders && (
+        <GarageReminders cars={cars} onOpenCar={(car) => setRemindersCarId(car.id)} />
+      )}
 
       {/* Duas listas quando os dois tipos existem: sonho e realidade não se
           comparam lado a lado, e misturar deixa a garagem confusa. Com um tipo
@@ -158,6 +178,7 @@ export function Garagem({
                   onOpenOwnership={onOpenOwnership}
                   onAddExpense={onAddExpense}
                   onOpenSpecs={onOpenSpecs}
+                  onOpenReminders={onSaveReminders ? (item) => setRemindersCarId(item.id) : undefined}
                   onDelete={(event) => {
                     event.stopPropagation();
                     onOpenDelete(car);
@@ -167,6 +188,14 @@ export function Garagem({
             ))}
           </div>
         </>
+      )}
+
+      {remindersCar && (
+        <ReminderSettingsModal
+          car={remindersCar}
+          onClose={() => setRemindersCarId(null)}
+          onSave={onSaveReminders}
+        />
       )}
     </section>
   );

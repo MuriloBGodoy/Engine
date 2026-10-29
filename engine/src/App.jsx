@@ -310,6 +310,23 @@ function App() {
     }
   };
 
+  /**
+   * Lembretes do carro (IPVA, licenciamento, revisão, seguro). Mesmo `saveCar`
+   * do resto do carro. As datas vão ao servidor pela Garagem (de onde este
+   * modal abre): a lista recarregada muda a assinatura do carro e o efeito de
+   * sincronização de lá reenvia — um caminho só, sem corrida entre dois.
+   */
+  const saveRemindersAction = async (car, reminders) => {
+    try {
+      await engineDB.saveCar({ ...car, reminders });
+      await recarregarCarros();
+      return true;
+    } catch (error) {
+      captureError(error, { action: "saveReminders", carId: car?.id });
+      return { ok: false, message: error.message };
+    }
+  };
+
   const saveOwnershipAction = async (car, ownershipInputs) => {
     try {
       await engineDB.saveCar({ ...car, ownership: ownershipInputs });
@@ -564,6 +581,8 @@ function App() {
                   loadError={carsError}
                   onRetry={recarregarCarros}
                   accountEmail={user?.email || ""}
+                  userId={userId || ""}
+                  onSaveReminders={saveRemindersAction}
                 />
               </RequireAuth>
             }

@@ -10,6 +10,7 @@ import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatFipeYear } from "../services/carDisplay";
 import { localISODate } from "../services/garageInput";
 import { useConfirm } from "./ConfirmProvider";
+import { getStates } from "../services/locations";
 
 const FIPE_BRANDS_URL = "https://parallelum.com.br/fipe/api/v1/carros/marcas";
 
@@ -65,6 +66,10 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
   const confirm = useConfirm();
   const [carType, setCarType] = useState(carToEdit?.type || CAR_TYPE_GOAL);
   const isOwned = carType === CAR_TYPE_OWNED;
+  // Lembretes: UF e SÓ o último dígito da placa (o resto mora no modal de
+  // lembretes da Garagem). Opcionais e só para carro que a pessoa tem.
+  const [reminderUf, setReminderUf] = useState(carToEdit?.reminders?.uf || "");
+  const [plateDigit, setPlateDigit] = useState(carToEdit?.reminders?.plateDigit || "");
   const [loading, setLoading] = useState(false);
   const [photos, setPhotos] = useState(() =>
     Array.isArray(carToEdit?.images) && carToEdit.images.length
@@ -388,6 +393,12 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
         ? carToEdit.fipe
         : null;
 
+    // Lembretes: só mexe se a pessoa preencheu algo ou se já existiam.
+    const reminders =
+      reminderUf || plateDigit || carToEdit?.reminders
+        ? { ...(carToEdit?.reminders || {}), uf: reminderUf, plateDigit }
+        : null;
+
     const carData = {
       // O carro inteiro primeiro, os campos do formulário por cima. Até o
       // Firebase isso era o `merge: true` do setDoc; o upsert do Supabase
@@ -408,6 +419,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
       savedValue: isOwned ? targetValue : savedValue,
       images: photos,
       image: photos[0],
+      reminders,
       updatedAt: new Date().toISOString(),
     };
 
@@ -715,6 +727,45 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
               )}
             </div>
           </div>
+
+          {isOwned && (
+            <div className="space-y-2 rounded-xl border border-[var(--engine-border)] p-3.5">
+              <p className={`${fieldLabelClass} text-[var(--engine-text-subtle)]`}>
+                {t("reminders.carForm.section")}
+              </p>
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <select
+                  value={reminderUf}
+                  onChange={(e) => setReminderUf(e.target.value)}
+                  aria-label={t("reminders.settings.uf")}
+                  className={fieldClass}
+                >
+                  <option value="">{t("reminders.settings.ufNone")}</option>
+                  {getStates("BR").map((state) => (
+                    <option key={state.code} value={state.code}>
+                      {state.code} · {state.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={plateDigit}
+                  onChange={(e) => setPlateDigit(e.target.value)}
+                  aria-label={t("reminders.settings.plateDigit")}
+                  className={`${fieldClass} w-28`}
+                >
+                  <option value="">{t("reminders.settings.plateDigitNone")}</option>
+                  {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
+                    <option key={digit} value={digit}>
+                      {digit}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="ml-1 text-[11px] text-[var(--engine-text-muted)]">
+                {t("reminders.carForm.hint")} {t("reminders.settings.plateHint")}
+              </p>
+            </div>
+          )}
 
           {error && (
             <p className="text-center text-sm font-semibold text-[var(--engine-accent)]">
