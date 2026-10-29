@@ -320,6 +320,63 @@ try {
   check("bloqueado não curte", denied(await b.client.from("post_likes").insert({ post_id: post, liker_id: b.id })));
   check("desbloquear passa", passed(await a.client.from("blocks").delete().eq("blocker_id", a.id).eq("blocked_id", b.id)));
 
+  // Pedido de orçamento (migration 20261029120000). A é o prestador (anúncio
+  // aprovado de mecânica em Araraquara), B pede, C é terceiro.
+  console.log("\npedido de orçamento");
+  const qListing = `q-${run}`;
+  await admin.from("service_listings").insert({
+    id: qListing, owner_id: a.id, moderation_status: "approved",
+    data: { title: "Oficina RLS", category: "mechanics", city: "Araraquara", state: "SP", country: "BR", serviceMode: "place" },
+  });
+  const pedido = { category: "mechanics", carLabel: "Gol 2014", description: "Barulho na suspensão dianteira (teste RLS)", city: "Araraquara", state: "SP", country: "BR" };
+  check("visitante não pede orçamento", Boolean((await anon.rpc("create_quote_request", { p_request: pedido })).error));
+  check("ninguém insere pedido direto na tabela",
+    denied(await b.client.from("quote_requests").insert({ customer_id: b.id, category: "mechanics", description: "x".repeat(30), state: "SP", city: "Araraquara", expires_at: "2099-01-01" }).select()));
+  const fotoAlheia = await b.client.rpc("create_quote_request", { p_request: { ...pedido, photos: [`${URL_}/storage/v1/object/public/photos/users/${a.id}/x.jpg`] } });
+  check("foto da pasta alheia é recusada", fotoAlheia.error?.message === "invalid-photo", why(fotoAlheia));
+  const novoPedido = await b.client.rpc("create_quote_request", { p_request: pedido });
+  check("logado pede orçamento", passed(novoPedido), why(novoPedido));
+  const qid = novoPedido.data;
+  const avisoPedido = (await admin.from("notifications").select("actor_id, data").eq("user_id", a.id).eq("type", "quote_request")).data || [];
+  check("prestador da cidade recebe aviso sem o nome do cliente",
+    avisoPedido.length === 1 && avisoPedido[0].actor_id === null && !avisoPedido[0].data?.actorUsername, JSON.stringify(avisoPedido));
+  let caixa = (await a.client.rpc("quote_inbox")).data || [];
+  const naCaixa = caixa.find((item) => item.id === qid);
+  check("pedido aparece na caixa do prestador, sem o cliente", Boolean(naCaixa) && naCaixa.customer_id === null, JSON.stringify(naCaixa));
+  check("terceiro sem anúncio não vê o pedido", !((await c.client.rpc("quote_inbox")).data || []).some((item) => item.id === qid));
+  check("prestador não lê a tabela de pedidos", (await a.client.from("quote_requests").select("id").eq("id", qid)).data?.length === 0);
+  let resposta = await c.client.rpc("reply_quote_request", { p_request: qid, p_reply: { priceMin: 100, message: "oi" } });
+  check("quem não está no alcance não responde", resposta.error?.message === "not-found", why(resposta));
+  resposta = await a.client.rpc("reply_quote_request", { p_request: qid, p_reply: { priceMin: 250, priceMax: 400, estimatedTime: "1 dia", message: "Pode trazer" } });
+  check("prestador responde", passed(resposta), why(resposta));
+  const replyId = resposta.data;
+  resposta = await a.client.rpc("reply_quote_request", { p_request: qid, p_reply: { priceMin: 200, message: "de novo" } });
+  check("uma resposta por prestador", resposta.error?.message === "already-replied", why(resposta));
+  check("cliente recebe quote_reply",
+    (await admin.from("notifications").select("id").eq("user_id", b.id).eq("type", "quote_reply")).data?.length === 1);
+  caixa = (await a.client.rpc("quote_inbox")).data || [];
+  check("depois de responder o prestador vê quem pediu", caixa.find((item) => item.id === qid)?.customer_id === b.id);
+  const meus = (await b.client.rpc("my_quote_requests")).data || [];
+  check("cliente vê a resposta", meus.find((item) => item.id === qid)?.replies?.length === 1);
+  check("terceiro não lê respostas alheias", (await c.client.from("quote_replies").select("id")).data?.length === 0);
+  check("terceiro não fecha pedido alheio",
+    (await c.client.rpc("close_quote_request", { p_request: qid, p_outcome: "gave_up" })).error?.message === "not-found");
+  check("terceiro não denuncia resposta que não vê",
+    denied(await c.client.from("reports").insert({ reporter_id: c.id, target_type: "quote_reply", target_id: replyId })));
+  check("cliente denuncia a resposta",
+    passed(await b.client.from("reports").insert({ reporter_id: b.id, target_type: "quote_reply", target_id: replyId, reason: "spam" })));
+  check("cliente escolhe a resposta",
+    passed(await b.client.rpc("close_quote_request", { p_request: qid, p_outcome: "chosen", p_reply: replyId })));
+  await a.client.from("blocks").insert({ blocker_id: a.id, blocked_id: b.id });
+  const bloqueadoPede = await b.client.rpc("create_quote_request", { p_request: { ...pedido, description: "Segundo pedido com bloqueio (teste RLS)" } });
+  check("pedido com bloqueio não avisa quem bloqueou",
+    (await admin.from("notifications").select("id").eq("user_id", a.id).eq("type", "quote_request")).data?.length === 1, why(bloqueadoPede));
+  check("pedido de quem bloqueei não aparece na caixa",
+    !((await a.client.rpc("quote_inbox")).data || []).some((item) => item.id === bloqueadoPede.data));
+  await a.client.from("blocks").delete().eq("blocker_id", a.id).eq("blocked_id", b.id);
+  await admin.from("reports").delete().eq("target_type", "quote_reply").eq("target_id", replyId);
+  await admin.from("service_listings").delete().eq("id", qListing);
+
   console.log("\ndenúncias");
   check("logado denuncia", passed(await a.client.from("reports").insert({ reporter_id: a.id, target_id: post, reason: "teste" })));
   check("tipo inventado é recusado", denied(await a.client.from("reports").insert({ reporter_id: a.id, target_type: "nada", target_id: post })));
