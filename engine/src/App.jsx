@@ -57,6 +57,7 @@ const UserProfile = lazyNamed(() => import("./pages/UserProfile"), "UserProfile"
 const Services = lazyNamed(() => import("./pages/Services"), "Services");
 const ServicePublicPage = lazyNamed(() => import("./pages/ServicePublicPage"), "ServicePublicPage");
 const ServiceApprovals = lazyNamed(() => import("./pages/Services"), "ServiceApprovals");
+const Quotes = lazyNamed(() => import("./pages/Quotes"), "Quotes");
 const Moderation = lazyNamed(() => import("./pages/Moderation"), "Moderation");
 const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
 const Support = lazyNamed(() => import("./pages/Support"), "Support");
@@ -613,6 +614,16 @@ function App() {
           <Route
             path="/services"
             element={<Services settings={settings} user={user} />}
+          />
+          {/* Pedido de orçamento: só logado. O visitante vê o convite do
+              RequireAuth, que manda para o login com ?next= de volta aqui. */}
+          <Route
+            path="/services/orcamentos"
+            element={
+              <RequireAuth user={user}>
+                <Quotes user={user} settings={settings} cars={cars} />
+              </RequireAuth>
+            }
           />
           <Route
             path="/services/approvals"

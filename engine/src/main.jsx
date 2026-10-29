@@ -11,6 +11,7 @@ import "./index.css";
 import "./services/i18n";
 import "./services/i18n-billing";
 import "./services/i18n-reviews";
+import "./services/i18n-quotes";
 import "./services/i18n-services-extra";
 import "./services/i18n-garage-fixes";
 import "./services/i18n-general-fixes";

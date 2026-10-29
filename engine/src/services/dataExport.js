@@ -15,6 +15,8 @@ const SOURCES = [
   ["cars", (uid) => supabase.from("cars").select("*").eq("user_id", uid)],
   ["posts", (uid) => supabase.from("community_goals").select("*").eq("owner_id", uid)],
   ["serviceListings", (uid) => supabase.from("service_listings").select("*").eq("owner_id", uid)],
+  ["quoteRequests", (uid) => supabase.from("quote_requests").select("*").eq("customer_id", uid)],
+  ["quoteReplies", (uid) => supabase.from("quote_replies").select("*").eq("provider_id", uid)],
   ["following", (uid) => supabase.from("follows").select("target_id, created_at").eq("follower_id", uid)],
   ["followers", (uid) => supabase.from("follows").select("follower_id, created_at").eq("target_id", uid)],
 ];

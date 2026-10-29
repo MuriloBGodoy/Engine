@@ -93,6 +93,7 @@ import {
 import { authPath } from "../services/authRedirect";
 import { BioLinkCard, ShareListingButton } from "../components/services/ShareListing";
 import { ListingMonthPanel } from "../components/services/ListingMonthPanel";
+import { QuoteEntryCard } from "../components/services/QuoteEntryCard";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
@@ -2984,6 +2985,8 @@ export function Services({ user, settings }) {
           </aside>
         </div>
       </header>
+
+      <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
 
       <div className="engine-card p-4 sm:p-5">
         {/* Cabeçalho: alterna a exibição dos filtros avançados */}

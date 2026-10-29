@@ -2267,7 +2267,7 @@ export const engineDB = {
       await supabase
         .from("reports")
         .select("id, target_type, target_id, reported_user_id, reason, context, created_at")
-        .in("target_type", ["goal", "post", "comment", "profile", "message", "club", "event"])
+        .in("target_type", ["goal", "post", "comment", "profile", "message", "club", "event", "quote_request", "quote_reply"])
         .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(200),

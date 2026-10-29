@@ -1,6 +1,8 @@
 import {
+  BadgeDollarSign,
   Bell,
   CheckCircle2,
+  ClipboardList,
   Heart,
   MessageCircle,
   RotateCcw,
@@ -38,6 +40,8 @@ export const notificationStyles = {
   service_suspended: { icon: XCircle, iconClass: "text-red-500" },
   message: { icon: Send, iconClass: "text-[var(--engine-accent)]" },
   achievement: { icon: Trophy, iconClass: "text-[var(--engine-accent)]" },
+  quote_request: { icon: ClipboardList, iconClass: "text-[var(--engine-accent)]" },
+  quote_reply: { icon: BadgeDollarSign, iconClass: "text-emerald-500" },
 };
 
 export const defaultNotificationStyle = {
@@ -89,7 +93,15 @@ export const getNotificationTarget = (notification) => {
 const TRANSLATED_TYPES = new Set([
   "follow", "like", "comment", "rating", "message", "achievement",
   "service_approved", "service_changes_requested", "service_rejected", "service_suspended",
+  "quote_request", "quote_reply",
 ]);
+
+// Pedido de orçamento: o aviso traz o id da categoria ("body-paint"); o
+// rótulo é o mesmo de Serviços (services.categories.bodyPaint).
+const quoteCategoryLabel = (category, t) =>
+  category
+    ? t(`services.categories.${String(category).replace(/-([a-z])/g, (_, c) => c.toUpperCase())}`)
+    : "";
 
 /**
  * Título e corpo de um aviso. `t` (i18next) traduz pelo tipo; `nameOf` dá o
@@ -105,6 +117,8 @@ export const getNotificationCopy = (notification, t, nameOf) => {
         notification.type === "achievement" && notification.achievementId && nameOf
           ? nameOf(notification.achievementId)
           : "",
+      category: quoteCategoryLabel(notification.quoteCategory, t),
+      city: notification.quoteCity || "",
     };
     return {
       title: t(`notifications.types.${notification.type}.title`, vars),
