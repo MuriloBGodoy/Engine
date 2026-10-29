@@ -544,7 +544,7 @@ function App() {
             />
           }
         >
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Home user={user} />} />
           <Route
             path="/garagem"
             element={

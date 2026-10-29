@@ -3,8 +3,18 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, ArrowUpRight, Car, LayoutDashboard, Users } from "lucide-react";
 import { Button } from "../components/Button";
 import { AdSlot } from "../components/AdSlot";
+import { VisitorHome } from "../components/home/VisitorHome";
 
-export function Home() {
+/**
+ * "/" mostra duas telas: a vitrine para quem não entrou (VisitorHome) e os
+ * atalhos de sempre para quem já tem conta.
+ */
+export function Home({ user }) {
+  if (!user) return <VisitorHome />;
+  return <MemberHome />;
+}
+
+function MemberHome() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
