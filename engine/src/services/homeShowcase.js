@@ -3,10 +3,10 @@ import { goalFromRow, normalizeCommunityGoal, serviceListingFromRow } from "./db
 import { upcomingCutoffIso } from "./eventTime";
 
 /**
- * O que a Home do visitante mostra de conteúdo real: publicações recentes,
- * anúncios de serviço aprovados e os próximos encontros.
+ * O que a Home do visitante mostra de conteúdo real: metas e publicações
+ * recentes, anúncios de serviço aprovados, clubes e os próximos encontros.
  *
- * São três leituras únicas, sem Realtime: a Home é uma vitrine, não um feed
+ * São leituras únicas, sem Realtime: a Home é uma vitrine, não um feed
  * vivo, e assinar três tabelas para quem só está olhando a porta de entrada
  * seria custo sem retorno. Cada leitura falha sozinha — se uma cair, a seção
  * dela mostra o vazio e as outras seguem.
@@ -15,8 +15,7 @@ import { upcomingCutoffIso } from "./eventTime";
  * aquele módulo traz junto o de conquistas, e a Home está no pacote inicial.
  */
 
-const POSTS_TO_READ = 12;
-const POSTS_TO_SHOW = 6;
+const POSTS_TO_READ = 16;
 const LISTINGS_TO_READ = 24;
 const EVENTS_TO_READ = 12;
 
@@ -33,7 +32,7 @@ const fetchRecentPosts = async () => {
   // ordem de chegada, e só depois os sem foto para completar.
   const withImage = posts.filter((post) => post.image || post.images?.length);
   const withoutImage = posts.filter((post) => !(post.image || post.images?.length));
-  return [...withImage, ...withoutImage].slice(0, POSTS_TO_SHOW);
+  return [...withImage, ...withoutImage];
 };
 
 const fetchApprovedListings = async () => {
@@ -81,17 +80,48 @@ const fetchUpcomingEvents = async () => {
   }
 };
 
+const CLUBS_TO_READ = 12;
+
+// Só as colunas do card: o `data` do clube traz regras, links e cores que a
+// vitrine não usa.
+const fetchClubs = async () => {
+  const rows = must(
+    await supabase
+      .from("clubs")
+      .select("id, tag, member_count, country, state, name:data->>name, motto:data->>motto, city:data->>city")
+      .eq("archived", false)
+      .order("member_count", { ascending: false })
+      .limit(CLUBS_TO_READ),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    tag: row.tag || "",
+    name: row.name || "",
+    motto: row.motto || "",
+    city: row.city || "",
+    state: row.state || "",
+    country: row.country || "",
+    memberCount: Number(row.member_count) || 0,
+  }));
+};
+
 const settle = (result) =>
   result.status === "fulfilled"
     ? { items: result.value, failed: false }
     : { items: [], failed: true };
 
-/** As três vitrines de uma vez. Nunca rejeita: cada seção diz se falhou. */
+/** Todas as vitrines de uma vez. Nunca rejeita: cada seção diz se falhou. */
 export async function fetchHomeShowcase() {
-  const [posts, listings, events] = await Promise.allSettled([
+  const [posts, listings, events, clubs] = await Promise.allSettled([
     fetchRecentPosts(),
     fetchApprovedListings(),
     fetchUpcomingEvents(),
+    fetchClubs(),
   ]);
-  return { posts: settle(posts), listings: settle(listings), events: settle(events) };
+  return {
+    posts: settle(posts),
+    listings: settle(listings),
+    events: settle(events),
+    clubs: settle(clubs),
+  };
 }
