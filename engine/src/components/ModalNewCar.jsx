@@ -389,6 +389,11 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
         : null;
 
     const carData = {
+      // O carro inteiro primeiro, os campos do formulário por cima. Até o
+      // Firebase isso era o `merge: true` do setDoc; o upsert do Supabase
+      // grava o documento INTEIRO, e sem esta linha editar marca/foto/preço
+      // apagava gastos, aportes, simulação, ficha técnica e lembretes.
+      ...(carToEdit || {}),
       id: carToEdit ? carToEdit.id : Date.now(),
       brand: brandName,
       model: modelName,
@@ -403,6 +408,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
       savedValue: isOwned ? targetValue : savedValue,
       images: photos,
       image: photos[0],
+      updatedAt: new Date().toISOString(),
     };
 
     const saved = await onSave(carData);
