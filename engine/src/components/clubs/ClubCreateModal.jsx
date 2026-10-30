@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Loader2, Check } from "lucide-react";
-import { ClubEmblem, ClubTag } from "./ClubEmblem";
+import { X, Loader2 } from "lucide-react";
+import { ClubTag } from "./ClubEmblem";
+import { ClubLookFields } from "./ClubLookFields";
 import { ClubCard } from "./ClubCard";
 import { checkTagAvailable } from "./clubsDataSource";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { getStates } from "../../services/locations";
 import { useIsDark } from "../../hooks/useIsDark";
 import {
-  CLUB_ICON_PATHS,
-  CLUB_ICON_VALUES,
   CLUB_NAME_MAX,
   CLUB_MOTTO_MAX,
-  CLUB_PALETTE,
-  CLUB_SHAPE_VALUES,
   CLUB_STYLE_VALUES,
-  clubColorLabel,
   clubColorVars,
-  clubIconLabel,
-  clubShapeLabel,
   clubStyleLabel,
   emptyClubDraft,
   isValidClubTag,
@@ -33,7 +27,9 @@ import {
  * tecla. E não mostra só o card — mostra a sigla ao lado do seu nome no feed
  * e no card de encontro, que é o que faz a sigla valer a pena.
  *
- * O emblema é montado por composição; não há upload (Storage desligado).
+ * O emblema é montado por composição. Logo e capa próprias entram depois, no
+ * "Personalizar" da página do clube: a pasta do Storage é do clube, e antes
+ * de fundar ele ainda não existe.
  */
 export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) {
   // A paleta tem uma tinta por tema; sem passar isDark o componente
@@ -230,86 +226,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
               />
             </div>
 
-            <div className="space-y-2">
-              <span className={labelClass}>{t("clubs.form.shape")}</span>
-              <div className="flex flex-wrap gap-2">
-                {CLUB_SHAPE_VALUES.map((shape) => (
-                  <button
-                    key={shape}
-                    type="button"
-                    onClick={() => setEmblem({ shape })}
-                    aria-pressed={draft.emblem.shape === shape}
-                    aria-label={clubShapeLabel(t, shape)}
-                    className={`grid h-14 w-14 place-items-center rounded-xl border transition ${
-                      draft.emblem.shape === shape
-                        ? "border-[var(--engine-accent)] bg-[var(--engine-accent-soft)]"
-                        : "border-[var(--engine-border)] bg-[var(--engine-surface-2)]"
-                    }`}
-                  >
-                    <ClubEmblem club={{ ...previewClub, emblem: { ...draft.emblem, shape } }} size={40} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <span className={labelClass}>{t("clubs.form.icon")}</span>
-              <div className="grid max-w-[340px] grid-cols-6 gap-2">
-                {CLUB_ICON_VALUES.map((icon) => (
-                  <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setEmblem({ icon })}
-                    aria-pressed={draft.emblem.icon === icon}
-                    aria-label={clubIconLabel(t, icon)}
-                    className={`grid aspect-square place-items-center rounded-xl border transition ${
-                      draft.emblem.icon === icon
-                        ? "border-[var(--engine-accent)] bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
-                        : "border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]"
-                    }`}
-                  >
-                    {icon === "none" ? (
-                      <span className="text-[10px] font-bold text-[var(--engine-text-muted)]">—</span>
-                    ) : (
-                      // O ícone puro, e não um emblema em miniatura: com a
-                      // forma em volta, os doze símbolos ficavam idênticos a
-                      // 30px e o seletor não selecionava nada de visível.
-                      <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true">
-                        <path d={CLUB_ICON_PATHS[icon]} fill="currentColor" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <span className={labelClass}>{t("clubs.form.color")}</span>
-              <div className="flex flex-wrap gap-2">
-                {CLUB_PALETTE.map((color) => (
-                  <button
-                    key={color.id}
-                    type="button"
-                    onClick={() => setColors({ primary: color.id })}
-                    aria-pressed={draft.colors.primary === color.id}
-                    aria-label={clubColorLabel(t, color.id)}
-                    style={{ background: color.hex }}
-                    className={`grid h-11 w-11 place-items-center rounded-xl border-2 transition ${
-                      draft.colors.primary === color.id
-                        ? "border-[var(--engine-text)]"
-                        : "border-transparent"
-                    }`}
-                  >
-                    {draft.colors.primary === color.id ? (
-                      <Check size={16} className="text-white drop-shadow" />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-              <p className="ml-0.5 text-[11.5px] text-[var(--engine-text-muted)]">
-                {t("clubs.form.colorHint")}
-              </p>
-            </div>
+            <ClubLookFields club={previewClub} onEmblem={setEmblem} onColors={setColors} />
 
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -506,7 +423,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
             </div>
 
             <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--engine-text-muted)]">
-              {t("clubs.form.previewNote")}
+              {t("clubs.form.previewNote")} {t("clubs.custom.photosLater")}
             </p>
           </aside>
         </form>

@@ -31,7 +31,9 @@ componente nenhum lê `snapshot.data()`:
   description: "",
   emblem: { shape: "plate", icon: "target" },   // shape: plate|shield|circle|hex
   colors: { primary: "azul-noite", secondary: "" },  // NOMES da paleta, nunca hex
-  cover: "",                     // base64 comprimido ou ""
+  logo: "",                      // caminho no Storage: clubs/<id>/logo-....jpg, ou ""
+  cover: "",                     // idem (clubs/<id>/cover-....jpg); URL https antiga ainda lida
+  logoUrl: "", coverUrl: "",     // DERIVADOS: URL pública montada na leitura (29/10/2026)
   country: "BR", state: "SP", city: "Campinas",
   foundedYear: 2011,
   meetupSchedule: "1º domingo do mês",
@@ -121,8 +123,12 @@ useClubMembership(clubId) → {
 }
 
 useClubAdmin(clubId) → {
-  updateClub(parcial),        // fundador: tudo. capitão: só description,
-                              // rules, links, meetupSchedule, cover.
+  updateClub(parcial),        // fundador: tudo menos a sigla. capitão: só
+                              // description, rules, links, meetupSchedule,
+                              // cover, logo, colors, emblem (29/10/2026).
+  uploadImage(kind, file),    // "logo" | "cover" → caminho em clubs/<id>/;
+                              // o banco só aceita logo/capa que existe ali
+  removeImage(caminho),       // melhor esforço, só dentro de clubs/<id>/
   listRequests(),             // [{ uid, displayName, username, avatar, message, createdAt }]
   approveRequest(uid),
   rejectRequest(uid),

@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Flag, Loader2 } from "lucide-react";
 import { ClubHeader, ClubTabs } from "./ClubHeader";
-import { ClubWall, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./ClubPanels";
+import { ClubWall, ClubGallery, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./ClubPanels";
 import { ClubCaptainPanel } from "./ClubCaptainPanel";
+import { ClubEditModal } from "./ClubEditModal";
 import {
   useClubDetail,
   useClubMembers,
@@ -47,6 +48,7 @@ export function ClubDetail({ clubId, onClose }) {
   const { promote, demote, removeMember } = useClubAdmin(clubId);
 
   const [tab, setTab] = useState("wall");
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (!clubId) return;
@@ -164,7 +166,16 @@ export function ClubDetail({ clubId, onClose }) {
         onJoin={handleJoin}
         onLeave={handleLeave}
         onShare={handleShare}
+        onCustomize={canManage && !club.archived ? () => setEditing(true) : null}
         actionLoading={membershipLoading}
+      />
+
+      <ClubEditModal
+        club={club}
+        role={role}
+        isOpen={editing}
+        onClose={() => setEditing(false)}
+        onSaved={() => fetch()}
       />
 
       <ClubTabs active={tab} onChange={setTab} />
@@ -180,6 +191,8 @@ export function ClubDetail({ clubId, onClose }) {
           onCreatePost={() => navigate(`/community?tab=feed&club=${clubId}&compose=1`)}
         />
       ) : null}
+
+      {tab === "photos" ? <ClubGallery posts={posts} loading={loadingPosts} /> : null}
 
       {tab === "garage" ? (
         <ClubGarage

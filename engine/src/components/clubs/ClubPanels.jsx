@@ -1,5 +1,7 @@
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Calendar, Lock, MapPin, Link2, Loader2, Pin } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Lock, MapPin, Link2, Loader2, Pin, X } from "lucide-react";
 // O ícone do Instagram saiu do lucide-react (marcas foram removidas na v1);
 // o projeto já usa `react-icons` para o WhatsApp pelo mesmo motivo.
 import { FaInstagram } from "react-icons/fa6";
@@ -7,6 +9,13 @@ import { ClubTag } from "./ClubEmblem";
 import { ClubEmptyState } from "./ClubHeader";
 import { clubPlaceLabel, clubStyleLabel } from "../../services/clubStyles";
 import { formatFipeYear } from "../../services/carDisplay";
+import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
+
+/**
+ * Link digitado pela direção vira `href` só se for http(s). Sem isso um
+ * `javascript:` no campo "site" era um link clicável na página do clube.
+ */
+const safeHref = (value) => (/^https?:\/\//i.test(String(value || "").trim()) ? String(value).trim() : "");
 
 /**
  * Os quatro painéis internos da página do clube — mural, garagem, encontros,
@@ -83,10 +92,16 @@ export function ClubWall({ club, posts, loading, canPost, onCreatePost }) {
             }`}
           >
             <header className="flex items-center gap-2.5">
-              <Avatar name={post.authorName} avatar={post.authorAvatar} ring={post.pinned} />
+              {/* O post do mural é o da Comunidade: o nome vem em `author`.
+                  `authorName` ficou do contrato antigo e saía vazio. */}
+              <Avatar
+                name={post.authorName || post.author}
+                avatar={/^(https?:|data:image\/)/.test(post.authorAvatar || post.avatar || "") ? post.authorAvatar || post.avatar : ""}
+                ring={post.pinned}
+              />
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-bold text-[var(--engine-text)]">
-                  {post.authorName}
+                  {post.authorName || post.author}
                   <ClubTag tag={club?.tag} />
                 </p>
                 <p className="text-[11.5px] text-[var(--engine-text-muted)]">
@@ -125,6 +140,122 @@ export function ClubWall({ club, posts, loading, canPost, onCreatePost }) {
         {t("clubs.wall.note")}
       </p>
     </div>
+  );
+}
+
+/* ------------------------------- Fotos ------------------------------- */
+/**
+ * A galeria do clube: as fotos das publicações do mural, sem upload próprio.
+ * Quem posta no mural já é membro (regra do banco), a foto já passou pela
+ * limpeza de EXIF e já tem denúncia e moderação — uma segunda porta de foto
+ * teria de reinventar as três.
+ */
+export function ClubGallery({ posts, loading }) {
+  const { t } = useTranslation();
+  const [openAt, setOpenAt] = useState(-1);
+  const photos = [];
+  for (const post of posts || []) {
+    const list = post.images?.length ? post.images : post.image ? [post.image] : [];
+    for (const src of list) {
+      if (/^(https?:|data:image\/)/.test(src) && !photos.some((photo) => photo.src === src)) {
+        photos.push({ src, author: post.author || post.authorName || "", postId: post.id });
+      }
+    }
+  }
+  if (loading && !photos.length) return <Loading />;
+
+  return (
+    <div className="space-y-3">
+      {!photos.length ? (
+        <ClubEmptyState title={t("clubs.custom.gallery.emptyTitle")} copy={t("clubs.custom.gallery.emptyCopy")} />
+      ) : (
+        <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-2xl sm:grid-cols-4 sm:gap-1.5">
+          {photos.map((photo, index) => (
+            <button
+              key={photo.src}
+              type="button"
+              onClick={() => setOpenAt(index)}
+              aria-label={t("clubs.custom.gallery.open", { name: photo.author })}
+              className="relative aspect-square overflow-hidden bg-[var(--engine-surface-2)]"
+            >
+              <img src={photo.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="text-[12px] leading-relaxed text-[var(--engine-text-muted)]">{t("clubs.custom.gallery.note")}</p>
+      {openAt >= 0 && photos[openAt] ? (
+        <GalleryViewer photos={photos} index={openAt} onIndex={setOpenAt} onClose={() => setOpenAt(-1)} />
+      ) : null}
+    </div>
+  );
+}
+
+function GalleryViewer({ photos, index, onIndex, onClose }) {
+  const { t } = useTranslation();
+  useHistoryDismiss(true, onClose);
+  const photo = photos[index];
+  const go = (step) => onIndex((index + step + photos.length) % photos.length);
+  const navButton =
+    "absolute top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white transition hover:bg-black/75";
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("clubs.clubTabs.photos")}
+      className="fixed inset-0 z-[120] flex flex-col bg-black/90"
+      onClick={onClose}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-3 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] text-white">
+        <p className="min-w-0 truncate text-[13px] font-semibold">
+          {photo.author} · {index + 1}/{photos.length}
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("clubs.custom.gallery.close")}
+          className="grid h-11 w-11 place-items-center rounded-full bg-white/10 transition hover:bg-white/20"
+        >
+          <X size={20} />
+        </button>
+      </div>
+      <div className="relative flex min-h-0 flex-1 items-center justify-center px-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <img
+          src={photo.src}
+          alt=""
+          onClick={(event) => event.stopPropagation()}
+          className="max-h-full max-w-full rounded-lg object-contain"
+        />
+        {photos.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                go(-1);
+              }}
+              aria-label={t("clubs.custom.gallery.previous")}
+              className={`${navButton} left-2`}
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                go(1);
+              }}
+              aria-label={t("clubs.custom.gallery.next")}
+              className={`${navButton} right-2`}
+            >
+              <ChevronRight size={22} />
+            </button>
+          </>
+        ) : null}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -421,7 +552,7 @@ export function ClubAbout({ club, isMember }) {
           <div className="space-y-2">
             {club.links.instagram ? (
               <a
-                href={`https://instagram.com/${club.links.instagram}`}
+                href={`https://instagram.com/${encodeURIComponent(club.links.instagram)}`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[var(--club-ink)]"
@@ -429,10 +560,10 @@ export function ClubAbout({ club, isMember }) {
                 <FaInstagram size={15} />@{club.links.instagram}
               </a>
             ) : null}
-            {club.links.whatsapp ? (
+            {safeHref(club.links.whatsapp) ? (
               isMember ? (
                 <a
-                  href={club.links.whatsapp}
+                  href={safeHref(club.links.whatsapp)}
                   target="_blank"
                   rel="noreferrer"
                   className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[var(--club-ink)]"
@@ -448,9 +579,9 @@ export function ClubAbout({ club, isMember }) {
                 </p>
               )
             ) : null}
-            {club.links.website ? (
+            {safeHref(club.links.website) ? (
               <a
-                href={club.links.website}
+                href={safeHref(club.links.website)}
                 target="_blank"
                 rel="noreferrer"
                 className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[var(--club-ink)]"

@@ -57,24 +57,30 @@ export const clubStyleOptions = (t, { withAll = false } = {}) => [
  *
  * `light: true` marca as cores claras o bastante para pedirem texto escuro em
  * cima — sem isso, "Entrar" em amarelo vira branco no branco.
+ *
+ * Contraste conferido em 29/10/2026 (WCAG, texto normal, 4,5:1): `ink` sobre
+ * --engine-surface e --engine-surface-2 claros, `inkDark` sobre os escuros, e
+ * o texto do botão (`--club-on`) sobre `hex`. Laranja, verde bandeira, ciano,
+ * celeste e rosa escureceram um tom no `hex` (o branco do botão ficava entre
+ * 3,4 e 4,5:1); laranja, verde limão, ciano e bege, no `ink`.
  */
 export const CLUB_PALETTE = [
   { id: "vermelho-corrida", hex: "#d92534", ink: "#c01f2d", inkDark: "#ff6b74" },
-  { id: "laranja-turbo", hex: "#e2680f", ink: "#b8530a", inkDark: "#ff9a4d" },
+  { id: "laranja-turbo", hex: "#be570d", ink: "#ad4e09", inkDark: "#ff9a4d" },
   { id: "amarelo-pista", hex: "#e0a80c", ink: "#8a6605", inkDark: "#facc4b", light: true },
-  { id: "verde-bandeira", hex: "#1f9d55", ink: "#157744", inkDark: "#4ade80" },
-  { id: "verde-limao", hex: "#7cb518", ink: "#5a8410", inkDark: "#a3e635", light: true },
-  { id: "ciano-nitro", hex: "#0e9aa7", ink: "#0a7b86", inkDark: "#3ed6e4" },
+  { id: "verde-bandeira", hex: "#1a8548", ink: "#157744", inkDark: "#4ade80" },
+  { id: "verde-limao", hex: "#7cb518", ink: "#50750e", inkDark: "#a3e635", light: true },
+  { id: "ciano-nitro", hex: "#0c818c", ink: "#0a7681", inkDark: "#3ed6e4" },
   { id: "azul-mercosul", hex: "#1f4fd8", ink: "#2145b4", inkDark: "#7d9dff" },
-  { id: "azul-celeste", hex: "#2f8fd8", ink: "#1f6ea9", inkDark: "#6cc2ff" },
+  { id: "azul-celeste", hex: "#2778b5", ink: "#1f6ea9", inkDark: "#6cc2ff" },
   { id: "roxo-neon", hex: "#7b3fe4", ink: "#6a32cc", inkDark: "#b491ff" },
-  { id: "rosa-vinil", hex: "#d6338c", ink: "#b32873", inkDark: "#ff7ab8" },
+  { id: "rosa-vinil", hex: "#d23289", ink: "#b32873", inkDark: "#ff7ab8" },
   { id: "vinho", hex: "#8e1f38", ink: "#8e1f38", inkDark: "#ef7d96" },
   { id: "marrom-couro", hex: "#8a5a2b", ink: "#754a22", inkDark: "#d8a56a" },
   { id: "grafite", hex: "#3c4452", ink: "#3c4452", inkDark: "#b7c0cf" },
   { id: "prata", hex: "#8b93a3", ink: "#5b6472", inkDark: "#cbd3e0", light: true },
   { id: "preto-fosco", hex: "#1c2028", ink: "#1c2028", inkDark: "#c9d1de" },
-  { id: "bege-areia", hex: "#b79a68", ink: "#8a7342", inkDark: "#e3c78d", light: true },
+  { id: "bege-areia", hex: "#b79a68", ink: "#7c673b", inkDark: "#e3c78d", light: true },
 ];
 
 export const CLUB_COLOR_VALUES = CLUB_PALETTE.map((color) => color.id);
@@ -120,23 +126,44 @@ export const clubShapeLabel = (t, value) =>
   value ? t(`clubs.shapes.${value}`, { defaultValue: value }) : "";
 
 /**
- * Os 12 símbolos, no vocabulário da cena. A lista alimenta o formulário e o
- * i18n; os desenhos vêm logo abaixo.
+ * Os símbolos do emblema, em grupos para o seletor. Os 12 primeiros ids
+ * (roda, turbo, pistão, chave, bandeira, raio, montanha, velocímetro, chassi
+ * baixo, farol, escudo, nenhum) são os desenhos à mão logo abaixo; o resto
+ * vem do lucide-react (components/clubs/clubIcons.js). A lista e os grupos
+ * moram aqui, sem componente, para o i18n e a validação lerem sem React.
+ * Rótulo: `clubs.icons.<id>`; grupo: `clubs.custom.iconGroups.<id>`.
  */
-export const CLUB_ICON_VALUES = [
-  "wheel",
-  "turbo",
-  "piston",
-  "wrench",
-  "flag",
-  "bolt",
-  "mountain",
-  "gauge",
-  "lowered",
-  "headlight",
-  "shield",
-  "none",
+export const CLUB_ICON_GROUPS = [
+  {
+    id: "cars",
+    icons: ["car", "car-front", "car-taxi-front", "lowered", "headlight", "bus", "truck",
+      "truck-electric", "caravan", "tractor", "motorbike", "bike"],
+  },
+  {
+    id: "mechanics",
+    icons: ["wheel", "turbo", "piston", "wrench", "gauge", "cog", "disc", "fuel", "ev-charger",
+      "battery", "plug", "key", "fan", "thermometer", "hammer", "drill", "spray-can", "paintbrush"],
+  },
+  {
+    id: "road",
+    icons: ["flag", "pennant", "route", "map-pin", "navigation", "compass", "milestone",
+      "signpost", "cone", "parking", "mountain", "mountain-snow", "palm", "tent", "waves",
+      "sunset", "sun", "moon", "snowflake", "wind"],
+  },
+  {
+    id: "scene",
+    icons: ["trophy", "medal", "award", "crown", "star", "sparkles", "bolt", "flame", "rocket",
+      "timer", "siren", "skull", "ghost", "swords", "hand-metal", "speaker", "music", "radio",
+      "camera", "users", "heart", "dog", "anchor"],
+  },
+  {
+    id: "symbols",
+    icons: ["shield", "shield-check", "gem", "infinity", "none"],
+  },
 ];
+
+export const CLUB_ICON_VALUES = CLUB_ICON_GROUPS.flatMap((group) => group.icons);
+
 /**
  * Os desenhos dos 12 símbolos. Moram aqui, e não no componente, porque o
  * formulário de criação também precisa deles para o seletor — e um módulo de

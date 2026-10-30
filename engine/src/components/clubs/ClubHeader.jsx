@@ -1,11 +1,12 @@
 import { useTranslation } from "react-i18next";
-import { Loader2, Share2, Star } from "lucide-react";
+import { Loader2, Palette, Share2, Star } from "lucide-react";
 import { ClubEmblem } from "./ClubEmblem";
 import { GhostCar } from "./GhostCar";
 import { clubPlaceLabel, clubStyleLabel } from "../../services/clubStyles";
 
 /**
- * O cabeçalho da página do clube: capa na cor, emblema sobreposto, sigla,
+ * O cabeçalho da página do clube: capa (a foto da direção, ou a cor do
+ * clube), logo ou emblema sobreposto, sigla,
  * lema, a linha "desde · cidade · encontro fixo", três números e o CTA.
  *
  * Os três números são os do contrato §6 — membros por agregação (é uma tela
@@ -21,6 +22,7 @@ export function ClubHeader({
   onJoin,
   onLeave,
   onShare,
+  onCustomize = null,
   actionLoading = false,
 }) {
   const { t } = useTranslation();
@@ -56,9 +58,34 @@ export function ClubHeader({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)]">
-      <div className="relative h-32 bg-[linear-gradient(135deg,var(--club)_0%,var(--club-2)_62%,color-mix(in_srgb,var(--club-2)_60%,#000)_100%)] sm:h-44">
-        <GhostCar className="absolute -bottom-2.5 right-3 w-[210px] opacity-30" />
-        <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
+      <div className="relative h-32 overflow-hidden bg-[linear-gradient(135deg,var(--club)_0%,var(--club-2)_62%,color-mix(in_srgb,var(--club-2)_60%,#000)_100%)] sm:h-44">
+        {club.coverUrl ? (
+          <img
+            src={club.coverUrl}
+            alt=""
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <>
+            <GhostCar className="absolute -bottom-2.5 right-3 w-[210px] opacity-30" />
+            <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
+          </>
+        )}
+        {onCustomize ? (
+          // Sobre a capa, em vidro escuro: legível em cima de qualquer foto e
+          // de qualquer cor da paleta, nos dois temas.
+          <button
+            type="button"
+            onClick={onCustomize}
+            className="absolute right-2.5 top-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-black/55 px-3.5 text-[12.5px] font-bold text-white transition hover:bg-black/70"
+          >
+            <Palette size={15} aria-hidden="true" />
+            {t("clubs.custom.open")}
+          </button>
+        ) : null}
         {club.official ? (
           <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
             <Star size={11} className="fill-current" />
@@ -175,11 +202,11 @@ export function ClubHeader({
   );
 }
 
-/** As 5 abas da página. Rolável no celular — cabem em 360px sem rolar, mas
- *  um rótulo traduzido pode ser mais longo (Encuentros, Meetups). */
+/** As 6 abas da página. Rolável no celular: a 360px "Sobre" fica a um
+ *  arrasto, e um rótulo traduzido pode ser mais longo (Encuentros). */
 export function ClubTabs({ active, onChange }) {
   const { t } = useTranslation();
-  const tabs = ["wall", "garage", "meetups", "members", "about"];
+  const tabs = ["wall", "photos", "garage", "meetups", "members", "about"];
   return (
     <div
       role="tablist"

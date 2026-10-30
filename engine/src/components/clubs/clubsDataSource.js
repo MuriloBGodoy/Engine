@@ -27,6 +27,8 @@ export {
   useClubMembership,
   useClubAdmin,
   checkTagAvailable,
+  clubImageUrl,
+  CAMPOS_DO_CAPITAO,
 } from "../../services/clubs";
 
 /**
@@ -48,6 +50,14 @@ export function clubErrorMessage(error, t) {
     // "não deu para completar" sem saber qual campo consertar.
     "name-invalid": "clubs.errors.nameInvalid",
     "focus-empty": "clubs.errors.focusRequired",
+    // Personalização (29/10/2026): imagem, cor e símbolo.
+    "account-suspended": "clubs.custom.errors.suspended",
+    "upload-failed": "clubs.custom.errors.uploadFailed",
+    "invalid-image": "clubs.custom.errors.invalidImage",
+    "image-too-big": "clubs.custom.errors.tooBig",
+    "invalid-colors": "clubs.custom.errors.generic",
+    "invalid-emblem": "clubs.custom.errors.generic",
+    "invalid-link": "clubs.custom.errors.invalidLink",
   };
   if (code && known[code]) return t(known[code]);
   return error?.message || t("clubs.errors.generic");

@@ -20,8 +20,8 @@ import {
  * duas contagens. Três clubes diferentes saíam idênticos — era esse o "nem
  * parece personalizável".
  *
- * Aqui cada linha é identidade: faixa na cor do clube com a silhueta, emblema
- * gerado, a sigla que o membro carrega, cidade e ano, dois chips de foco, e o
+ * Aqui cada linha é identidade: faixa na cor do clube com a silhueta (ou a
+ * capa que a direção subiu), logo ou emblema gerado, a sigla que o membro carrega, cidade e ano, dois chips de foco, e o
  * PRÓXIMO ENCONTRO, que é o único dado que prova que o clube está vivo.
  */
 export function ClubCard({ club, onOpen, onJoined, showRole = false }) {
@@ -77,9 +77,25 @@ export function ClubCard({ club, onOpen, onJoined, showRole = false }) {
         onClick={() => onOpen?.(club.id)}
         className="flex-1 text-left"
       >
-        <div className="relative h-16 bg-[linear-gradient(120deg,var(--club)_0%,var(--club-2)_100%)]">
-          <GhostCar className="absolute -bottom-1.5 -right-2 w-[150px] opacity-30" />
-          <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
+        <div className="relative h-20 overflow-hidden bg-[linear-gradient(120deg,var(--club)_0%,var(--club-2)_100%)]">
+          {club.coverUrl ? (
+            // Capa própria por cima do gradiente: se a foto falhar, a faixa
+            // na cor do clube continua ali embaixo.
+            <img
+              src={club.coverUrl}
+              alt=""
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+              }}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <>
+              <GhostCar className="absolute -bottom-1.5 -right-2 w-[150px] opacity-30" />
+              <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
+            </>
+          )}
           {club.official ? (
             <span className="absolute left-2.5 top-2 inline-flex items-center gap-1 rounded-full bg-black/35 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">
               <Star size={10} className="fill-current" />

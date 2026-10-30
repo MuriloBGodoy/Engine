@@ -5,7 +5,11 @@ import { useTranslation } from "react-i18next";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { cleanFileFrom, encodeCanvas } from "../services/cleanImage";
 
-export function ImageCropper({ imageFile, isOpen, onClose, onSave }) {
+/**
+ * `aspect` e `cropShape` são opcionais: o padrão (16:9, retângulo) é o da foto
+ * da garagem. O clube usa 1:1 para a logo e 3:1 para a capa.
+ */
+export function ImageCropper({ imageFile, isOpen, onClose, onSave, aspect = 16 / 9, cropShape = "rect", title = "" }) {
   const { t } = useTranslation();
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -148,7 +152,7 @@ export function ImageCropper({ imageFile, isOpen, onClose, onSave }) {
       <div className="engine-modal-panel engine-pop sm:max-w-3xl">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4 sm:px-7">
           <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)]">
-            {t("imageCropper.title") || "Cortar imagem"}
+            {title || t("imageCropper.title") || "Cortar imagem"}
           </h2>
           <button
             onClick={onClose}
@@ -168,8 +172,8 @@ export function ImageCropper({ imageFile, isOpen, onClose, onSave }) {
               crop={crop}
               zoom={zoom}
               rotation={rotation}
-              aspect={16 / 9}
-              cropShape="rect"
+              aspect={aspect}
+              cropShape={cropShape}
               showGrid
               onCropChange={setCrop}
               onCropComplete={handleCropComplete}

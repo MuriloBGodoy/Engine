@@ -31,6 +31,8 @@ import { grantOwn } from "./achievements";
 import { engineDB, goalFromRow, isUserId, normalizeCommunityGoal, POST_KIND_POST } from "./db";
 import { eventFromRow } from "./events";
 import { normalizeFipeBrand } from "./fipeVersion";
+import { isFileTooBig, isImageFile, uploadToStorage } from "./photos";
+import { getMySuspension } from "./suspension";
 
 const PAPEIS_DE_CARGO = ["founder", "captain"];
 
@@ -159,6 +161,23 @@ export const normalizeTag = (tag) =>
   String(tag ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
 
 /**
+ * Caminho do Storage → URL pública. Capa antiga gravada como URL https
+ * (semente, admin) continua valendo; qualquer outra coisa vira "".
+ */
+const urlDaImagem = (valor) => {
+  const caminho = String(valor ?? "").trim();
+  if (!caminho) return "";
+  if (/^https:\/\//.test(caminho)) return caminho;
+  if (!caminho.startsWith("clubs/")) return "";
+  return supabase.storage.from(BUCKET_FOTOS).getPublicUrl(caminho).data.publicUrl;
+};
+
+const BUCKET_FOTOS = "photos";
+
+/** A mesma conversão, para a tela mostrar a imagem recém-subida. */
+export const clubImageUrl = (caminho) => urlDaImagem(caminho);
+
+/**
  * O clube como a tela recebe (contrato §1). Linha migrada do Firestore e
  * linha nova caem todas aqui: o que falta vira "", [] ou
  * null, e nada sai como `undefined`.
@@ -182,7 +201,13 @@ const normalizeClub = (id, dados = {}, derivados = {}) => ({
     primary: texto(dados.colors?.primary, 32) || "azul-mercosul",
     secondary: texto(dados.colors?.secondary, 32),
   },
+  // Logo e capa são o CAMINHO no Storage (`clubs/<id>/...`), não a URL: o
+  // banco só aceita objeto que existe na pasta do clube (migration
+  // 20261029150000). A URL pública sai daqui, em `logoUrl`/`coverUrl`.
+  logo: String(dados.logo ?? ""),
   cover: String(dados.cover ?? ""),
+  logoUrl: urlDaImagem(dados.logo),
+  coverUrl: urlDaImagem(dados.cover),
   country: texto(dados.country, 4) || "BR",
   state: texto(dados.state, 8),
   city: texto(dados.city, 60),
@@ -274,6 +299,7 @@ const normalizeClubParaEscrita = (form = {}) => {
       primary: texto(form.colors?.primary, 32) || "azul-mercosul",
       secondary: texto(form.colors?.secondary, 32),
     },
+    logo: String(form.logo ?? ""),
     cover: String(form.cover ?? ""),
     country: texto(form.country, 4).toUpperCase() || "BR",
     state: texto(form.state, 8).toUpperCase(),
@@ -297,8 +323,14 @@ const normalizeClubParaEscrita = (form = {}) => {
   };
 };
 
-/** Campos que o capitão pode editar. Identidade é do fundador (modelo §2.4). */
-const CAMPOS_DO_CAPITAO = ["description", "rules", "links", "meetupSchedule", "cover"];
+/**
+ * Campos que o capitão pode editar: o recheio e, desde 29/10/2026, o visual
+ * (logo, capa, cores, símbolo). Nome, sigla, cidade e foco são do fundador
+ * (modelo §2.4). A mesma lista mora no `update_club`.
+ */
+export const CAMPOS_DO_CAPITAO = [
+  "description", "rules", "links", "meetupSchedule", "cover", "logo", "colors", "emblem",
+];
 
 /**
  * Nome, @ e avatar viajam junto do doc de membro, como já acontece em
@@ -965,6 +997,44 @@ export async function updateClub(clubId, parcial = {}) {
   return getClub(clubId);
 }
 
+/**
+ * Logo ou capa do clube: sobe para `clubs/<id>/` e devolve o CAMINHO, que a
+ * tela manda no `updateClub`. Quem pode subir é o Storage que decide (só a
+ * direção de clube não arquivado; conta suspensa não sobe nada); a checagem
+ * daqui é para o erro chegar com nome.
+ *
+ * O arquivo passa por `uploadToStorage`, que limpa o que não saiu limpo de
+ * services/cleanImage.js (EXIF/GPS) — o recorte já entrega JPEG limpo.
+ */
+export async function uploadClubImage(clubId, kind, file) {
+  await exigeCargo(clubId);
+  if (!isImageFile(file)) throw erroDeClube("invalid-image", "Arquivo não é uma imagem.");
+  if (isFileTooBig(file)) throw erroDeClube("image-too-big", "Imagem maior que 6 MB.");
+  const suspensao = await getMySuspension();
+  if (suspensao.status === "suspended") {
+    throw erroDeClube("account-suspended", "Sua conta está suspensa.");
+  }
+  const tipo = kind === "cover" ? "cover" : "logo";
+  const caminho = `clubs/${String(clubId)}/${tipo}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
+  try {
+    await uploadToStorage(caminho, file);
+  } catch (erro) {
+    throw erroDeClube("upload-failed", erro?.message || "Não deu para subir a imagem.");
+  }
+  return caminho;
+}
+
+/**
+ * Apaga imagem que saiu de uso (trocada, removida ou subida e não salva).
+ * Melhor esforço: falhar aqui deixa um arquivo órfão, não quebra a tela.
+ */
+export async function removeClubImage(clubId, caminho) {
+  const alvo = String(caminho || "");
+  if (!alvo.startsWith(`clubs/${String(clubId)}/`)) return;
+  const { error } = await supabase.storage.from(BUCKET_FOTOS).remove([alvo]);
+  if (error) console.warn("[clubes] imagem antiga ficou no Storage.", error.message || error);
+}
+
 /** Arquivar em vez de apagar: membros e sigla continuam apontando para algo. */
 export async function archiveClub(clubId) {
   await exigeCargo(clubId, ["founder"]);
@@ -1202,6 +1272,11 @@ export const useClubAdmin = (clubId) => {
     ),
     removeMember: useCallback((uid) => correr(() => removeMember(clubId, uid)), [correr, clubId]),
     archiveClub: useCallback(() => correr(() => archiveClub(clubId)), [correr, clubId]),
+    uploadImage: useCallback(
+      (kind, file) => correr(() => uploadClubImage(clubId, kind, file)),
+      [correr, clubId],
+    ),
+    removeImage: useCallback((caminho) => removeClubImage(clubId, caminho), [clubId]),
   };
 };
 

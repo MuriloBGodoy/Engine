@@ -17,6 +17,8 @@
  *   ?dark=1                        tema escuro
  *   ?papel=visitante|membro|capitao|fundador
  *   ?vazio=1                       estados vazios (clube sem nada, zero clubes)
+ *   ?tela=editar                   o "Personalizar" (29/10/2026)
+ *   ?fotos=1                       clube com capa e logo próprias
  */
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -24,17 +26,26 @@ import { BrowserRouter } from "react-router-dom";
 import { ToastProvider } from "./components/ToastProvider";
 import { ClubCard } from "./components/clubs/ClubCard";
 import { ClubHeader, ClubTabs } from "./components/clubs/ClubHeader";
-import { ClubWall, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./components/clubs/ClubPanels";
+import { ClubWall, ClubGallery, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./components/clubs/ClubPanels";
 import { ClubCreateModal } from "./components/clubs/ClubCreateModal";
+import { ClubEditModal } from "./components/clubs/ClubEditModal";
 import { clubColorVars } from "./services/clubStyles";
 import "./index.css";
 import "./services/i18n";
+import "./services/i18n-social-fixes";
 
 const QUERY = new URLSearchParams(window.location.search);
 if (QUERY.get("dark") === "1") document.documentElement.classList.add("dark");
 const TELA = QUERY.get("tela") || "descoberta";
 const PAPEL = QUERY.get("papel") || "capitao";
 const VAZIO = QUERY.get("vazio") === "1";
+const FOTOS = QUERY.get("fotos") === "1";
+
+// Capa e logo de mentira, desenhadas aqui: o harness não fala com o Storage.
+const svgUri = (w, h, body) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`)}`;
+const CAPA = svgUri(1200, 400, '<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#0b1d3a"/><stop offset="1" stop-color="#d92534"/></linearGradient></defs><rect width="1200" height="400" fill="url(#g)"/><circle cx="900" cy="330" r="60" fill="#111"/><circle cx="300" cy="330" r="60" fill="#111"/><rect x="200" y="200" width="800" height="110" rx="40" fill="#e9ebf0"/>');
+const LOGO = svgUri(400, 400, '<rect width="400" height="400" fill="#111827"/><circle cx="200" cy="200" r="150" fill="none" stroke="#facc4b" stroke-width="24"/><text x="200" y="230" font-size="110" font-family="Arial" font-weight="900" text-anchor="middle" fill="#facc4b">CVC</text>');
 
 const emDias = (n) => {
   const d = new Date();
@@ -75,6 +86,9 @@ const clube = (over = {}) => ({
   myRole: PAPEL === "visitante" ? null : PAPEL === "membro" ? "member" : PAPEL === "fundador" ? "founder" : "captain",
   myRequestPending: false,
   nextMeetup: { id: "e1", title: "Encontro mensal do CVC", eventDate: emDias(13), city: "Campinas" },
+  logo: "",
+  logoUrl: FOTOS ? LOGO : "",
+  coverUrl: FOTOS ? CAPA : "",
   ...over,
 });
 
@@ -86,6 +100,7 @@ const CLUBES = [
     city: "Brasília", state: "DF", foundedYear: 1998, memberCount: 96, joinPolicy: "open",
     focus: { brands: ["GM - Chevrolet"], models: ["Opala"], styles: ["antigos"] },
     myRole: null, nextMeetup: { id: "e2", title: "Encontro", eventDate: emDias(19), city: "Brasília" },
+    logoUrl: "", coverUrl: "",
   }),
   clube({
     id: "cbsc", name: "Celta Brabo Social Club", tag: "CBSC", motto: "Popular, mas nosso",
@@ -93,6 +108,7 @@ const CLUBES = [
     city: "Curitiba", state: "PR", foundedYear: 2021, memberCount: 342, joinPolicy: "open",
     focus: { brands: ["GM - Chevrolet"], models: ["Celta"], styles: ["rebaixados", "preparados"] },
     myRole: null, nextMeetup: { id: "e3", title: "Encontro", eventDate: emDias(12), city: "Curitiba" },
+    logoUrl: "", coverUrl: FOTOS ? CAPA : "",
   }),
   clube({
     id: "eng4", name: "Engine Off-road", tag: "ENG4", motto: "O asfalto acaba, a gente continua",
@@ -107,7 +123,8 @@ const POSTS = [
   { id: "p1", authorName: "Paula Mendes", authorAvatar: "", pinned: true, createdAt: emDias(-3),
     note: "Confirmado: 5 de outubro, 9h, estacionamento do Parque Portugal. Quem for levar carro pra exposição chega 8h30." },
   { id: "p2", authorName: "Tiago Lima", authorAvatar: "", pinned: false, createdAt: emDias(-1),
-    note: "Saiu da repintura. Agora é original de fábrica de novo, só que melhor." },
+    note: "Saiu da repintura. Agora é original de fábrica de novo, só que melhor.",
+    images: [CAPA, LOGO] },
 ];
 
 const MEMBROS = [
@@ -151,8 +168,10 @@ function PaginaDoClube() {
         onJoin={() => {}}
         onLeave={() => {}}
         onShare={() => {}}
+        onCustomize={canManage ? () => {} : null}
       />
       <ClubTabs active={tab} onChange={setTab} />
+      {tab === "photos" && <ClubGallery posts={VAZIO ? [] : POSTS} loading={false} />}
       {tab === "wall" && (
         <ClubWall club={alvo} posts={VAZIO ? [] : POSTS} loading={false} canPost={Boolean(role)} onCreatePost={() => {}} />
       )}
@@ -199,6 +218,14 @@ function App() {
     <div className="mx-auto w-full max-w-5xl p-4">
       {TELA === "clube" ? <PaginaDoClube /> : null}
       {TELA === "descoberta" ? <Descoberta /> : null}
+      {TELA === "editar" ? (
+        <ClubEditModal
+          club={clube({ coverUrl: "", logoUrl: "" })}
+          role={PAPEL === "fundador" ? "founder" : "captain"}
+          isOpen
+          onClose={() => {}}
+        />
+      ) : null}
       {TELA === "criar" ? (
         <ClubCreateModal isOpen onClose={() => {}} onCreate={async () => {}} />
       ) : null}
