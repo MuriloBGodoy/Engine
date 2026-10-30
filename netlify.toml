@@ -2,6 +2,10 @@
   base = "engine"
   command = "npm run build"
   publish = "dist"
+  # Cada deploy de produção custa créditos do plano grátis. Sem mudança no
+  # site (só .md, migração do Supabase, ferramentas fora de engine/), pula o
+  # build. Roda a partir da base (engine/); sai 0 = pular.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../netlify.toml ':(exclude,glob)**/*.md'"
 
 # Funções de servidor: guardam as chaves dos gateways (que nunca podem ir pro
 # navegador) e recebem os webhooks de pagamento.
