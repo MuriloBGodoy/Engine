@@ -5376,7 +5376,7 @@ const withTranslation = (baseLanguage, translation) => ({
 const servicesPt = {
   title: "Encontre quem resolve. Publique o que você faz.",
   subtitle:
-    "Busque serviços, veja fotos, confira se o profissional vai até você e entre em contato por WhatsApp ou e-mail.",
+    "Busque serviços, veja fotos, confira se o profissional vai até você e chame pelo app ou pelo WhatsApp.",
   createService: "Cadastrar novo serviço",
   myListings: "Meus anúncios",
   approvals: "Aprovações",
@@ -5608,7 +5608,7 @@ const servicesPt = {
 const servicesEn = {
   title: "Find who can help. Publish what you do.",
   subtitle:
-    "Search services, view photos, see whether the professional comes to you, and contact them by WhatsApp or email.",
+    "Search services, view photos, see whether the professional comes to you, and message them in the app or on WhatsApp.",
   createService: "Add new service",
   myListings: "My listings",
   approvals: "Approvals",
@@ -5695,7 +5695,7 @@ const servicesEn = {
 const servicesEs = {
   title: "Encuentra quien lo resuelve. Publica lo que haces.",
   subtitle:
-    "Busca servicios, mira fotos, confirma si el profesional va hasta ti y contacta por WhatsApp o correo.",
+    "Busca servicios, mira fotos, confirma si el profesional va hasta ti y escríbele por la app o por WhatsApp.",
   createService: "Registrar nuevo servicio",
   myListings: "Mis anuncios",
   approvals: "Aprobaciones",
