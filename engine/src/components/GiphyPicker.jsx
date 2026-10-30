@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Search, X, Loader } from "lucide-react";
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || "";
@@ -58,8 +59,13 @@ export function GiphyPicker({ onSelect, onClose }) {
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40 sm:items-center">
+  // Portal no body: dentro de Mensagens há um ancestral com backdrop-filter, e
+  // `fixed` passa a ser relativo a ele (o modal abria no canto, sobre a sidebar).
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="w-full max-h-[80vh] bg-[var(--engine-surface)] rounded-t-2xl sm:rounded-2xl sm:max-w-md overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between gap-2 border-b border-[var(--engine-border)] p-4">
@@ -143,6 +149,7 @@ export function GiphyPicker({ onSelect, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
