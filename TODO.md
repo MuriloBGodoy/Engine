@@ -7,6 +7,19 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 
 ---
 
+## Pedidos do Murilo (30/10/2026)
+
+- [ ] Editor de texto na foto (`ImageEditor.jsx`): posicionar o texto
+      arrastando com o dedo/mouse, não por sliders X/Y. PC e celular.
+- [ ] Comunidade no jeito do Instagram: tocar no post abre o post; tocar em
+      comentários abre os comentários (hoje abre direto nos comentários e
+      precisa voltar para ver o post). Perfil da pessoa com grade das
+      publicações dela. Estudar o Instagram e ficar pelo menos tão bom.
+- [ ] Perguntar o país no primeiro acesso (hoje todo perfil nasce BR).
+- [ ] Recalcular o preço da Argentina; decidir EUR €3,99 × €5,99.
+
+---
+
 ## Ideias do Claude (28/10/2026)
 
 **Antes do lançamento (código, rodada curta):**
