@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Flag, Loader2 } from "lucide-react";
@@ -6,6 +6,7 @@ import { ClubHeader, ClubTabs } from "./ClubHeader";
 import { ClubWall, ClubGallery, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./ClubPanels";
 import { ClubCaptainPanel } from "./ClubCaptainPanel";
 import { ClubEditModal } from "./ClubEditModal";
+import { ClubPhotoPicker } from "./ClubPhotoPicker";
 import {
   useClubDetail,
   useClubMembers,
@@ -45,7 +46,10 @@ export function ClubDetail({ clubId, onClose }) {
   const { events: pastEvents, fetch: fetchPast } = useClubEvents(clubId, { past: true });
   const { cars, fetch: fetchGarage, loading: loadingGarage } = useClubGarage(clubId);
   const { join, leave, loading: membershipLoading } = useClubMembership(clubId);
-  const { promote, demote, removeMember } = useClubAdmin(clubId);
+  const { promote, demote, removeMember, uploadImage, removeImage, updateClub } = useClubAdmin(clubId);
+  const logoPicker = useRef(null);
+  const coverPicker = useRef(null);
+  const [photoBusy, setPhotoBusy] = useState("");
 
   const [tab, setTab] = useState("wall");
   const [editing, setEditing] = useState(false);
@@ -121,6 +125,32 @@ export function ClubDetail({ clubId, onClose }) {
     }
   };
 
+  // Trocar logo/capa direto do cabeçalho: sobe, grava, apaga a antiga. Se
+  // gravar falhar, o arquivo novo sai do Storage para não ficar órfão. O erro
+  // volta como exceção com a frase pronta, e o recorte a mostra.
+  const quickPhoto = (kind) => async (file) => {
+    setPhotoBusy(kind);
+    try {
+      const path = await uploadImage(kind, file);
+      try {
+        await updateClub({ [kind]: path });
+      } catch (error) {
+        removeImage(path);
+        throw error;
+      }
+      const old = club?.[kind] || "";
+      if (old.startsWith(`clubs/${clubId}/`)) removeImage(old);
+      showToast(t("clubs.custom.saved"), "success");
+      fetch();
+      return true;
+    } catch (error) {
+      throw new Error(clubErrorMessage(error, t), { cause: error });
+    } finally {
+      setPhotoBusy("");
+    }
+  };
+  const canEditLook = canManage && club && !club.archived;
+
   const handleShare = async () => {
     const url = `${window.location.origin}/clubs/${clubId}`;
     try {
@@ -166,9 +196,19 @@ export function ClubDetail({ clubId, onClose }) {
         onJoin={handleJoin}
         onLeave={handleLeave}
         onShare={handleShare}
-        onCustomize={canManage && !club.archived ? () => setEditing(true) : null}
+        onCustomize={canEditLook ? () => setEditing(true) : null}
+        onPickLogo={canEditLook ? () => logoPicker.current?.open() : null}
+        onPickCover={canEditLook ? () => coverPicker.current?.open() : null}
+        photoBusy={photoBusy}
         actionLoading={membershipLoading}
       />
+
+      {canEditLook ? (
+        <>
+          <ClubPhotoPicker ref={logoPicker} kind="logo" onCropped={quickPhoto("logo")} />
+          <ClubPhotoPicker ref={coverPicker} kind="cover" onCropped={quickPhoto("cover")} />
+        </>
+      ) : null}
 
       <ClubEditModal
         club={club}

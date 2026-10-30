@@ -802,7 +802,7 @@ export async function getMembershipStatus(clubId) {
  * banco (`create_club`). A unicidade da sigla é restrição da tabela — dois
  * formulários enviados no mesmo segundo não passam os dois.
  */
-export async function createClub(form) {
+export async function createClub(form, { logoFile = null, coverFile = null } = {}) {
   const uid = exigeLogin();
   const dados = normalizeClubParaEscrita(form);
 
@@ -828,10 +828,35 @@ export async function createClub(form) {
   grantOwn("club_founder");
   grantOwn("club_joined");
 
+  // Logo e capa escolhidas na fundação: o `create_club` não aceita imagem
+  // (a pasta `clubs/<id>/` só passa a existir agora), então elas sobem
+  // depois do id e entram por `update_club`. Falhar aqui NÃO desfaz o
+  // clube: ele já existe, e a foto dá para pôr depois em Personalizar.
+  const imagens = {};
+  let photoUploadFailed = false;
+  for (const [kind, file] of [["logo", logoFile], ["cover", coverFile]]) {
+    if (!file) continue;
+    try {
+      imagens[kind] = await uploadClubImage(id, kind, file);
+    } catch (erro) {
+      console.warn(`[clubes] ${kind} da fundação não subiu.`, erro?.message || erro);
+      photoUploadFailed = true;
+    }
+  }
+  if (Object.keys(imagens).length) {
+    try {
+      must(await supabase.rpc("update_club", { p_club_id: String(id), p_patch: imagens }));
+    } catch (erro) {
+      console.warn("[clubes] logo/capa da fundação não foram gravadas.", erro?.message || erro);
+      photoUploadFailed = true;
+      for (const caminho of Object.values(imagens)) removeClubImage(id, caminho);
+    }
+  }
+
   const criado = await supabase.from("clubs").select("*").eq("id", id).maybeSingle().then(must).catch(() => null);
   return criado
-    ? normalizeClub(id, clubFromRow(criado), { myRole: "founder" })
-    : normalizeClub(id, { ...dados, founderId: uid, memberCount: 1 }, { myRole: "founder" });
+    ? normalizeClub(id, clubFromRow(criado), { myRole: "founder", photoUploadFailed })
+    : normalizeClub(id, { ...dados, founderId: uid, memberCount: 1 }, { myRole: "founder", photoUploadFailed });
 }
 
 /**
@@ -1176,11 +1201,11 @@ export const useCreateClub = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const create = useCallback(async (form) => {
+  const create = useCallback(async (form, files) => {
     setLoading(true);
     setError(null);
     try {
-      return await createClub(form);
+      return await createClub(form, files);
     } catch (erro) {
       setError(erro.message);
       throw erro;

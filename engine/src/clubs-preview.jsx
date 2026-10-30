@@ -169,6 +169,8 @@ function PaginaDoClube() {
         onLeave={() => {}}
         onShare={() => {}}
         onCustomize={canManage ? () => {} : null}
+        onPickLogo={canManage ? () => {} : null}
+        onPickCover={canManage ? () => {} : null}
       />
       <ClubTabs active={tab} onChange={setTab} />
       {tab === "photos" && <ClubGallery posts={VAZIO ? [] : POSTS} loading={false} />}

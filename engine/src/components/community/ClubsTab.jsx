@@ -45,10 +45,14 @@ export function ClubsTab({ searchParams, setSearchParams, user = null }) {
     setSearchParams(params);
   };
 
-  const handleCreateClub = async (clubData) => {
+  const handleCreateClub = async (clubData, files) => {
     try {
-      const newClub = await createClub(clubData);
-      showToast(t("clubs.toast.created"), "success");
+      const newClub = await createClub(clubData, files);
+      // Clube criado mesmo se a foto não subiu: o aviso é calmo, não erro.
+      showToast(
+        newClub?.photoUploadFailed ? t("clubs.custom.photoLater") : t("clubs.toast.created"),
+        newClub?.photoUploadFailed ? { tone: "info", duration: 6000 } : "success",
+      );
       setShowCreateModal(false);
       fetch();
       if (newClub?.id) openClub(newClub.id);

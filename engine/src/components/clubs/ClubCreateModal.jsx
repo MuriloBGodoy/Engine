@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, Trash2 } from "lucide-react";
 import { ClubTag } from "./ClubEmblem";
 import { ClubLookFields } from "./ClubLookFields";
+import { ClubPhotoPicker, ClubPhotoStage } from "./ClubPhotoPicker";
 import { ClubCard } from "./ClubCard";
 import { checkTagAvailable } from "./clubsDataSource";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
@@ -27,9 +28,10 @@ import {
  * tecla. E não mostra só o card — mostra a sigla ao lado do seu nome no feed
  * e no card de encontro, que é o que faz a sigla valer a pena.
  *
- * O emblema é montado por composição. Logo e capa próprias entram depois, no
- * "Personalizar" da página do clube: a pasta do Storage é do clube, e antes
- * de fundar ele ainda não existe.
+ * Logo e capa já se escolhem aqui, no topo: tocar na capa ou na logo da
+ * prévia abre a galeria/câmera e o recorte. Os arquivos ficam em memória —
+ * a pasta do Storage é do clube, e antes de fundar ele não existe — e sobem
+ * depois que o `create_club` devolve o id (services/clubs.js, createClub).
  */
 export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) {
   // A paleta tem uma tinta por tema; sem passar isDark o componente
@@ -78,6 +80,34 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
   // chamaria setState num componente desmontado.
   useEffect(() => () => clearTimeout(tagTimer.current), []);
 
+  // Logo e capa escolhidas: o arquivo recortado (já limpo de EXIF) e uma URL
+  // local só para a prévia. A URL é liberada ao trocar e ao fechar.
+  const [photos, setPhotos] = useState({ logo: null, cover: null });
+  const photoUrls = useRef(new Set());
+  const logoPicker = useRef(null);
+  const coverPicker = useRef(null);
+  useEffect(() => {
+    const urls = photoUrls.current;
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
+  const releaseUrl = (kind) => {
+    const url = photos[kind]?.url;
+    if (!url) return;
+    URL.revokeObjectURL(url);
+    photoUrls.current.delete(url);
+  };
+  const choosePhoto = (kind) => async (file) => {
+    releaseUrl(kind);
+    const url = URL.createObjectURL(file);
+    photoUrls.current.add(url);
+    setPhotos((prev) => ({ ...prev, [kind]: { file, url } }));
+    return true;
+  };
+  const dropPhoto = (kind) => {
+    releaseUrl(kind);
+    setPhotos((prev) => ({ ...prev, [kind]: null }));
+  };
+
   const states = useMemo(() => getStates(draft.country), [draft.country]);
 
   // O clube da prévia é o rascunho com os campos que o card espera. Os
@@ -91,6 +121,8 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
     myRole: null,
     nextMeetup: null,
     official: false,
+    logoUrl: photos.logo?.url || "",
+    coverUrl: photos.cover?.url || "",
   };
 
   if (!isOpen) return null;
@@ -117,10 +149,13 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
     setErrors(next);
     if (Object.keys(next).length) return;
 
-    await onCreate({
-      ...draft,
-      foundedYear: draft.foundedYear ? Number(draft.foundedYear) : "",
-    });
+    await onCreate(
+      {
+        ...draft,
+        foundedYear: draft.foundedYear ? Number(draft.foundedYear) : "",
+      },
+      { logoFile: photos.logo?.file || null, coverFile: photos.cover?.file || null },
+    );
   };
 
   const fieldClass =
@@ -159,6 +194,41 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
           className="engine-modal-body engine-scroll grid content-start gap-5 px-4 py-4 sm:px-6 sm:py-5 lg:grid-cols-[1fr_360px] lg:items-start lg:gap-x-7"
         >
           <div className="grid content-start gap-3.5">
+            {/* Primeira coisa da tela: é aqui que a pessoa procura "pôr a
+                foto do clube". Tocar na capa ou na logo abre a galeria. */}
+            <div className="space-y-2">
+              <span className={labelClass}>{t("clubs.custom.photosTitle")}</span>
+              <ClubPhotoStage
+                club={previewClub}
+                title={previewClub.name}
+                onPickCover={() => coverPicker.current?.open()}
+                onPickLogo={() => logoPicker.current?.open()}
+              />
+              {photos.logo || photos.cover ? (
+                <div className="flex flex-wrap gap-2">
+                  {["cover", "logo"].map((kind) =>
+                    photos[kind] ? (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() => dropPhoto(kind)}
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--engine-border-strong)] px-3 text-[12.5px] font-bold text-[var(--engine-text-muted)]"
+                      >
+                        <Trash2 size={14} />
+                        {t(kind === "cover" ? "clubs.custom.removeCover" : "clubs.custom.removeLogo")}
+                      </button>
+                    ) : null,
+                  )}
+                </div>
+              ) : (
+                <p className="ml-0.5 text-[11.5px] text-[var(--engine-text-muted)]">
+                  {t("clubs.custom.photosHint")}
+                </p>
+              )}
+              <ClubPhotoPicker ref={coverPicker} kind="cover" onCropped={choosePhoto("cover")} />
+              <ClubPhotoPicker ref={logoPicker} kind="logo" onCropped={choosePhoto("logo")} />
+            </div>
+
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className={labelClass} htmlFor="club-name">
@@ -423,7 +493,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
             </div>
 
             <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--engine-text-muted)]">
-              {t("clubs.form.previewNote")} {t("clubs.custom.photosLater")}
+              {t("clubs.form.previewNote")}
             </p>
           </aside>
         </form>

@@ -2,15 +2,13 @@ import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ImagePlus, Loader2, Trash2, X } from "lucide-react";
-import { ClubEmblem } from "./ClubEmblem";
 import { ClubLookFields } from "./ClubLookFields";
+import { ClubPhotoPicker, ClubPhotoStage } from "./ClubPhotoPicker";
 import { CAMPOS_DO_CAPITAO, clubErrorMessage, clubImageUrl, useClubAdmin } from "./clubsDataSource";
-import { ImageCropper } from "../ImageCropper";
 import { useToast } from "../ToastProvider";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { useIsDark } from "../../hooks/useIsDark";
 import { getStates } from "../../services/locations";
-import { isFileTooBig, isImageFile } from "../../services/photos";
 import {
   CLUB_DESCRIPTION_MAX,
   CLUB_FOCUS_MAX,
@@ -36,7 +34,7 @@ import {
  * só vê os campos que o banco deixa ele mudar (`CAMPOS_DO_CAPITAO`, igual ao
  * `update_club`). Esconder o campo é educação; quem barra é o banco.
  *
- * Imagem: escolhe → recorta (1:1 logo, 3:1 capa) → sobe na hora para
+ * Imagem (toque na capa ou na logo da prévia, ou nos botões): escolhe → recorta (1:1 logo, 3:1 capa) → sobe na hora para
  * `clubs/<id>/` → o rascunho guarda o caminho. Salvar grava; cancelar apaga o
  * que subiu e não foi usado, e salvar apaga a imagem antiga que saiu.
  */
@@ -104,12 +102,11 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
   const [rulesText, setRulesText] = useState(original.rules.join("\n"));
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState("");
-  const [crop, setCrop] = useState(null); // { kind, file }
   const [linkError, setLinkError] = useState("");
   // Tudo que subiu nesta sessão: o que não for salvo é apagado ao sair.
   const uploaded = useRef(new Set());
-  const coverInput = useRef(null);
-  const logoInput = useRef(null);
+  const coverPicker = useRef(null);
+  const logoPicker = useRef(null);
 
   const cleanupUnsaved = (keep = []) => {
     for (const path of uploaded.current) {
@@ -138,27 +135,10 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
     coverUrl: clubImageUrl(draft.cover),
   };
 
-  const pickFile = (kind) => (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (!isImageFile(file)) {
-      showToast(t("clubs.custom.errors.invalidImage"), "error");
-      return;
-    }
-    if (isFileTooBig(file)) {
-      showToast(t("clubs.custom.errors.tooBig"), "error");
-      return;
-    }
-    setCrop({ kind, file });
-  };
-
   // Erro sai como exceção com a frase pronta: o recorte mostra a mensagem e
   // continua aberto (devolver `false` mostrava "imagem de até 6 MB" para
   // qualquer falha, inclusive conta suspensa).
-  const handleCropped = async (file) => {
-    const kind = crop?.kind;
-    if (!kind) return false;
+  const handleCropped = (kind) => async (file) => {
     setUploading(kind);
     try {
       const path = await uploadImage(kind, file);
@@ -250,11 +230,11 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
   const ghostButton =
     "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-[var(--engine-border-strong)] px-3.5 text-[13px] font-bold text-[var(--engine-text)] transition-colors hover:border-[var(--club)] disabled:opacity-50";
 
-  const imageButtons = (kind, inputRef) => (
+  const imageButtons = (kind, picker) => (
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => picker.current?.open()}
         disabled={Boolean(uploading) || saving}
         className={ghostButton}
       >
@@ -306,35 +286,29 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
           <section className="grid gap-3.5">
             <h3 className={sectionTitle}>{t("clubs.custom.sectionLook")}</h3>
 
-            {/* Prévia: capa 3:1 e logo sobreposta, como no topo da página. */}
-            <div className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)]">
-              <div className="relative aspect-[3/1] bg-[linear-gradient(135deg,var(--club)_0%,var(--club-2)_100%)]">
-                {previewClub.coverUrl ? (
-                  <img src={previewClub.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                ) : null}
-              </div>
-              <div className="relative flex items-end gap-3 px-3 pb-3">
-                <ClubEmblem club={previewClub} size={68} className="-mt-8" />
-                <p className="min-w-0 flex-1 truncate pb-1 text-[15px] font-extrabold text-[var(--engine-text)]">
-                  {draft.name || club.name}
-                </p>
-              </div>
-            </div>
+            {/* Prévia tocável: capa 3:1 e logo sobreposta, como no topo da página. */}
+            <ClubPhotoStage
+              club={previewClub}
+              title={draft.name || club.name}
+              busy={uploading}
+              onPickCover={() => coverPicker.current?.open()}
+              onPickLogo={() => logoPicker.current?.open()}
+            />
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <span className={labelClass}>{t("clubs.custom.cover")}</span>
                 <p className="ml-0.5 text-[11.5px] text-[var(--engine-text-muted)]">{t("clubs.custom.coverHint")}</p>
-                {imageButtons("cover", coverInput)}
+                {imageButtons("cover", coverPicker)}
               </div>
               <div className="space-y-1.5">
                 <span className={labelClass}>{t("clubs.custom.logo")}</span>
                 <p className="ml-0.5 text-[11.5px] text-[var(--engine-text-muted)]">{t("clubs.custom.logoHint")}</p>
-                {imageButtons("logo", logoInput)}
+                {imageButtons("logo", logoPicker)}
               </div>
             </div>
-            <input ref={coverInput} type="file" accept="image/*" className="hidden" onChange={pickFile("cover")} />
-            <input ref={logoInput} type="file" accept="image/*" className="hidden" onChange={pickFile("logo")} />
+            <ClubPhotoPicker ref={coverPicker} kind="cover" onCropped={handleCropped("cover")} />
+            <ClubPhotoPicker ref={logoPicker} kind="logo" onCropped={handleCropped("logo")} />
 
             <div className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] p-3">
               <p className="text-[13px] font-bold text-[var(--engine-text)]">{t("clubs.custom.emblemTitle")}</p>
@@ -589,23 +563,6 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
           </div>
         </div>
       </div>
-
-      {/* Portal próprio: dentro do painel (que anima com transform) o
-          overlay fixo do recorte ficaria preso à caixa do modal. */}
-      {crop
-        ? createPortal(
-            <ImageCropper
-              imageFile={crop.file}
-              isOpen
-              onClose={() => setCrop(null)}
-              onSave={handleCropped}
-              aspect={crop.kind === "cover" ? 3 : 1}
-              cropShape="rect"
-              title={crop.kind === "cover" ? t("clubs.custom.cropCover") : t("clubs.custom.cropLogo")}
-            />,
-            document.body,
-          )
-        : null}
     </div>
   );
 }

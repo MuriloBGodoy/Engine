@@ -684,7 +684,6 @@ const clubCustomPtBR = {
       "save": "Salvar",
       "saving": "Salvando…",
       "saved": "Clube atualizado.",
-      "photosLater": "Logo e capa próprias você sobe depois, em Personalizar, na página do clube.",
       "iconGroups": {
         "cars": "Carros",
         "mechanics": "Mecânica",
@@ -709,7 +708,20 @@ const clubCustomPtBR = {
         "close": "Fechar",
         "previous": "Foto anterior",
         "next": "Próxima foto"
-      }
+      },
+      "photoLater": "Clube criado! A foto não subiu agora — dá para pôr depois em Personalizar, na página do clube.",
+      "addCover": "Pôr capa",
+      "changeCover": "Trocar a capa",
+      "addLogo": "Pôr logo",
+      "changeLogo": "Trocar a logo",
+      "tapToChange": "Toque na capa ou na logo para escolher uma foto.",
+      "photosTitle": "Foto do clube",
+      "photosHint": "Da galeria ou da câmera. A capa é larga; a logo, quadrada.",
+      "removeCover": "Tirar a capa",
+      "removeLogo": "Tirar a logo",
+      "firstTitle": "Ainda não existe nenhum clube",
+      "firstCopy": "Funde o primeiro: escolha a foto, o símbolo e as cores, e chame a sua turma.",
+      "firstCta": "Fundar o primeiro clube"
     }
   }
 };
@@ -817,7 +829,6 @@ const clubCustomEnUS = {
       "save": "Save",
       "saving": "Saving…",
       "saved": "Club updated.",
-      "photosLater": "You can upload your own logo and cover later, under Customize on the club page.",
       "iconGroups": {
         "cars": "Cars",
         "mechanics": "Mechanics",
@@ -842,7 +853,20 @@ const clubCustomEnUS = {
         "close": "Close",
         "previous": "Previous photo",
         "next": "Next photo"
-      }
+      },
+      "photoLater": "Club created! The photo didn't upload this time — you can add it later under Customize on the club page.",
+      "addCover": "Add cover",
+      "changeCover": "Change cover",
+      "addLogo": "Add logo",
+      "changeLogo": "Change logo",
+      "tapToChange": "Tap the cover or the logo to pick a photo.",
+      "photosTitle": "Club photo",
+      "photosHint": "From your gallery or camera. The cover is wide; the logo is square.",
+      "removeCover": "Remove cover",
+      "removeLogo": "Remove logo",
+      "firstTitle": "There are no clubs yet",
+      "firstCopy": "Found the first one: pick a photo, a symbol and colors, and bring your crew.",
+      "firstCta": "Found the first club"
     }
   }
 };
@@ -950,7 +974,6 @@ const clubCustomEsES = {
       "save": "Guardar",
       "saving": "Guardando…",
       "saved": "Club actualizado.",
-      "photosLater": "El logo y la portada propios los subes después, en Personalizar, en la página del club.",
       "iconGroups": {
         "cars": "Coches",
         "mechanics": "Mecánica",
@@ -975,7 +998,20 @@ const clubCustomEsES = {
         "close": "Cerrar",
         "previous": "Foto anterior",
         "next": "Foto siguiente"
-      }
+      },
+      "photoLater": "¡Club creado! La foto no se subió ahora — puedes ponerla después en Personalizar, en la página del club.",
+      "addCover": "Poner portada",
+      "changeCover": "Cambiar la portada",
+      "addLogo": "Poner logo",
+      "changeLogo": "Cambiar el logo",
+      "tapToChange": "Toca la portada o el logo para elegir una foto.",
+      "photosTitle": "Foto del club",
+      "photosHint": "De la galería o de la cámara. La portada es ancha; el logo, cuadrado.",
+      "removeCover": "Quitar la portada",
+      "removeLogo": "Quitar el logo",
+      "firstTitle": "Todavía no hay ningún club",
+      "firstCopy": "Funda el primero: elige la foto, el símbolo y los colores, y llama a tu grupo.",
+      "firstCta": "Fundar el primer club"
     }
   }
 };

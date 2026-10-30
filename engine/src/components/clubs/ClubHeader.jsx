@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Palette, Share2, Star } from "lucide-react";
 import { ClubEmblem } from "./ClubEmblem";
 import { GhostCar } from "./GhostCar";
+import { CameraBadge } from "./ClubPhotoPicker";
 import { clubPlaceLabel, clubStyleLabel } from "../../services/clubStyles";
 
 /**
@@ -23,6 +24,9 @@ export function ClubHeader({
   onLeave,
   onShare,
   onCustomize = null,
+  onPickLogo = null,
+  onPickCover = null,
+  photoBusy = "",
   actionLoading = false,
 }) {
   const { t } = useTranslation();
@@ -74,6 +78,22 @@ export function ClubHeader({
             <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
           </>
         )}
+        {onPickCover ? (
+          // Para a direção, a capa inteira é o botão de trocar a capa. Fica
+          // por baixo do "Personalizar" e do selo, que vêm depois no DOM.
+          <button
+            type="button"
+            onClick={onPickCover}
+            aria-label={club.coverUrl ? t("clubs.custom.changeCover") : t("clubs.custom.addCover")}
+            className="absolute inset-0"
+          >
+            <CameraBadge
+              busy={photoBusy === "cover"}
+              label={club.coverUrl ? t("clubs.custom.cover") : t("clubs.custom.addCover")}
+              className="absolute bottom-2.5 right-2.5"
+            />
+          </button>
+        ) : null}
         {onCustomize ? (
           // Sobre a capa, em vidro escuro: legível em cima de qualquer foto e
           // de qualquer cor da paleta, nos dois temas.
@@ -103,7 +123,20 @@ export function ClubHeader({
                 posicionado, e sem contexto próprio o emblema (estático) é
                 pintado ANTES delas — a metade de cima do emblema sumia. */}
             <div className="relative flex items-start gap-3 pt-2.5 sm:gap-4">
-              <ClubEmblem club={club} size={84} className="-mt-10 sm:-mt-12" />
+              {onPickLogo ? (
+                // Tocar no emblema abre direto a galeria/câmera para a logo.
+                <button
+                  type="button"
+                  onClick={onPickLogo}
+                  aria-label={club.logoUrl ? t("clubs.custom.changeLogo") : t("clubs.custom.addLogo")}
+                  className="relative -mt-10 shrink-0 rounded-[22%] sm:-mt-12"
+                >
+                  <ClubEmblem club={club} size={84} />
+                  <CameraBadge busy={photoBusy === "logo"} className="absolute -bottom-1 -right-1" />
+                </button>
+              ) : (
+                <ClubEmblem club={club} size={84} className="-mt-10 sm:-mt-12" />
+              )}
               <div className="min-w-0 flex-1 pb-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="rounded-md border border-[color-mix(in_srgb,var(--club)_42%,transparent)] bg-[color-mix(in_srgb,var(--club)_18%,transparent)] px-1.5 py-0.5 font-mono text-[11px] font-extrabold tracking-wide text-[var(--club-ink)]">
