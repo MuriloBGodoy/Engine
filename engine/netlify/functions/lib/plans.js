@@ -57,6 +57,7 @@
 export const FOUNDER_SLOTS = 30;
 export const PRO_TRIAL_DAYS = 30;
 
+// GBP segue a mesma lógica do EUR (IVA de 20% embutido + ~6% do Stripe): £4,99 deixa ~£3,90 líquidos, acima do R$ 25 do Brasil; £3,99 deixava ~£3,10.
 // EUR = mesmos números do USD (€5,99 / €19,99), não PPP×$ (€3,99): preço ao consumidor na UE já inclui ~21% de IVA e o Stripe come ~6% (3,99% + 2% internacional), então €3,99 deixava ~€3,00 líquidos, menos que o R$ 25 do Brasil; €5,99 deixa ~€4,50 e fica na faixa de €4,99–€9,99/mês dos apps de consumo da zona do euro.
 export const OFFERS = {
   pro_monthly: {
@@ -65,8 +66,8 @@ export const OFFERS = {
     interval: "month",
     name: "Engine Pro",
     description: "Para quem presta serviço: métricas mês a mês, pedidos de orçamento e tudo do Premium.",
-    amount: { BRL: 2500, USD: 600, EUR: 599, GBP: 399, MXN: 5900, CLP: 2690, COP: 890000, ARS: 449000 },
-    founderAmount: { BRL: 1500, USD: 400, EUR: 399, GBP: 249, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
+    amount: { BRL: 2500, USD: 600, EUR: 599, GBP: 499, MXN: 5900, CLP: 2690, COP: 890000, ARS: 449000 },
+    founderAmount: { BRL: 1500, USD: 400, EUR: 399, GBP: 349, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
     trialDays: PRO_TRIAL_DAYS,
   },
   premium_yearly: {
@@ -75,7 +76,7 @@ export const OFFERS = {
     interval: "year",
     name: "Engine Premium (anual)",
     description: "Para o dono do carro: alertas de FIPE, manutenção programada, custo total e sem anúncios.",
-    amount: { BRL: 7990, USD: 1990, EUR: 1999, GBP: 1299, MXN: 19900, CLP: 8990, COP: 2990000, ARS: 1499000 },
+    amount: { BRL: 7990, USD: 1990, EUR: 1999, GBP: 1699, MXN: 19900, CLP: 8990, COP: 2990000, ARS: 1499000 },
   },
   premium_pass_1m: {
     plan: "premium",
@@ -83,7 +84,7 @@ export const OFFERS = {
     months: 1,
     name: "Engine Premium — passe de 1 mês",
     description: "Pagamento único, sem renovação automática.",
-    amount: { BRL: 1490, USD: 399, EUR: 399, GBP: 249, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
+    amount: { BRL: 1490, USD: 399, EUR: 399, GBP: 349, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
   },
   premium_pass_3m: {
     plan: "premium",
@@ -91,7 +92,7 @@ export const OFFERS = {
     months: 3,
     name: "Engine Premium — passe de 3 meses",
     description: "Pagamento único, sem renovação automática.",
-    amount: { BRL: 3490, USD: 899, EUR: 899, GBP: 599, MXN: 8900, CLP: 3990, COP: 1390000, ARS: 679000 },
+    amount: { BRL: 3490, USD: 899, EUR: 899, GBP: 749, MXN: 8900, CLP: 3990, COP: 1390000, ARS: 679000 },
   },
 };
 
