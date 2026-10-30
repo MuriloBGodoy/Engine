@@ -162,6 +162,10 @@ export function Footer({ user = null }) {
           <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-[var(--engine-text-muted)]">
             {t("footer.tagline")}
           </p>
+          {/* Assinatura da marca, uma vez só no app (texto em i18n-home.js). */}
+          <p className="mt-2 font-display text-[13px] font-bold italic tracking-tight text-[var(--engine-text)]">
+            {t("brand.signature")}
+          </p>
           {redes.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {redes.map((social) => {

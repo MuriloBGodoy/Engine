@@ -173,11 +173,12 @@ function Hero() {
 
       <div className="engine-rise">
         <h1 className="text-balance font-display text-[2rem] font-bold leading-[1.06] tracking-tight text-[var(--engine-text)] sm:text-5xl lg:text-[3.25rem]">
-          {t("visitorHome.title")}{" "}
+          {t("visitorHome.sloganLead")}{" "}
           {/* Texto grande (≥24px, negrito): o vermelho passa no 3:1 nos dois temas. */}
-          <span className="text-[var(--engine-accent)]">{t("visitorHome.titleAccent")}</span>
+          <span className="text-[var(--engine-accent)]">{t("visitorHome.sloganAccent")}</span>
         </h1>
         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--engine-text-muted)] sm:text-base">
+          <strong className="font-semibold text-[var(--engine-text)]">{t("visitorHome.lead")}</strong>{" "}
           {t("visitorHome.subtitle")}
         </p>
 
@@ -922,6 +923,9 @@ function FinalCta() {
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-[var(--engine-text-muted)]">
           {t("visitorHome.final.body")}
+        </p>
+        <p className="mt-4 font-display text-sm font-bold italic tracking-tight text-[var(--engine-text)]">
+          {t("brand.signature")}
         </p>
       </div>
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row">

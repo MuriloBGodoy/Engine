@@ -13,15 +13,22 @@ import i18n from "./i18n";
  * com clubes, encontros e conquistas. Tudo pesa igual — a Home conta os
  * quatro pilares com o mesmo peso.
  *
+ * Slogan (escolhido pelo Murilo em 29/10/2026): "Todo sonho precisa de um
+ * motor." — engine = motor; o sonho é aonde se quer chegar, o motor é o que
+ * leva até lá. A assinatura "We are Engine." fica em inglês nos três idiomas.
+ *
  * Regra destes textos: nada que o app não entregue. O simulador só responde
  * para carros no Brasil, e a Home diz isso; nenhum número de exemplo é
  * inventado aqui — a conta de verdade só aparece com o carro de verdade.
  */
 
 const ptBR = {
+  // Assinatura da marca (#WeAreEngine): em inglês em todos os idiomas, de propósito.
+  brand: { signature: "We are Engine." },
   visitorHome: {
-    title: "Do carro que você tem ao carro que você sonha.",
-    titleAccent: "Tudo num lugar só.",
+    sloganLead: "Todo sonho precisa de",
+    sloganAccent: "um motor.",
+    lead: "Do carro que você tem ao carro que você sonha. Tudo num lugar só.",
     subtitle:
       "Sua garagem com lembretes de IPVA e revisão, a conta de quanto ganhar para chegar no carro dos sonhos, os serviços de quem você já segue no Insta e no TikTok e uma comunidade com clubes, encontros e conquistas.",
     ctaRegister: "Criar conta grátis",
@@ -149,9 +156,12 @@ const ptBR = {
 };
 
 const enUS = {
+  // Assinatura da marca (#WeAreEngine): em inglês em todos os idiomas, de propósito.
+  brand: { signature: "We are Engine." },
   visitorHome: {
-    title: "From the car you have to the car you dream of.",
-    titleAccent: "All in one place.",
+    sloganLead: "Every dream needs",
+    sloganAccent: "an engine.",
+    lead: "From the car you have to the car you dream of. All in one place.",
     subtitle:
       "Your garage with tax and service reminders, the math on how much you need to earn to reach your dream car, services from people you already follow on Instagram and TikTok, and a community with clubs, meets and achievements.",
     ctaRegister: "Create a free account",
@@ -279,9 +289,12 @@ const enUS = {
 };
 
 const esES = {
+  // Assinatura da marca (#WeAreEngine): em inglês em todos os idiomas, de propósito.
+  brand: { signature: "We are Engine." },
   visitorHome: {
-    title: "Del coche que tienes al coche que sueñas.",
-    titleAccent: "Todo en un solo lugar.",
+    sloganLead: "Todo sueño necesita",
+    sloganAccent: "un motor.",
+    lead: "Del coche que tienes al coche que sueñas. Todo en un solo lugar.",
     subtitle:
       "Tu garaje con avisos de impuestos y revisiones, la cuenta de cuánto necesitas ganar para llegar al coche de tus sueños, los servicios de quienes ya sigues en Instagram y TikTok, y una comunidad con clubes, quedadas y logros.",
     ctaRegister: "Crear cuenta gratis",
