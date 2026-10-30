@@ -35,19 +35,29 @@
  * consultada em 28/10/2026 em
  * https://api.worldbank.org/v2/country/<país>/indicator/PA.NUS.PPP
  *
- *   GB 0,677 · MX 10,33 · CL 453,2 · CO 1.532,7 · AR 567,3
+ *   GB 0,677 · MX 10,33 · CL 453,2 · CO 1.532,7
  *   Zona do euro: o Banco Mundial não publica o agregado; os países vão de
- *   PT 0,534 e ES 0,571 a IT 0,610, FR 0,678 e DE 0,710. Usamos 0,65 para um
- *   preço único em euro.
+ *   PT 0,534 e ES 0,571 a IT 0,610, FR 0,678 e DE 0,710. O euro NÃO sai da
+ *   paridade: ver a nota EUR em OFFERS (30/10/2026).
  *   (BR 2,554 — o preço em reais fica ACIMA da paridade do preço em dólar,
  *   decisão do dono; não foi derivado.)
  *
- * Argentina: o fator de 2025 já envelheceu com a inflação de lá. Antes de
- * abrir a venda na Argentina, refazer a conta com o fator mais novo.
+ * Argentina (refeito em 30/10/2026): o fator de 2025 (567,3) envelheceu com a
+ * inflação. Ele foi trazido para ago/2026 pela inflação relativa:
+ *   567,3 × (IPC INDEC ago/2026 ÷ média 2025 = 1,369)
+ *         ÷ (CPI-U EUA ago/2026 ÷ média 2025 = 1,038) ≈ 748 ARS por $ internacional.
+ *   IPC: INDEC, série 148.3_INIVELNAL_DICI_M_26 (apis.datos.gob.ar);
+ *   CPI: BLS CPIAUCSL via FRED. Para comparar: câmbio oficial BCRA
+ *   (Com. A 3500, variável 5) em 29/10/2026 = 1.539,6 ARS/USD, ou seja, o
+ *   preço argentino fica em ~49% do americano em dólar, como manda a PPP.
+ *   Refazer a cada trimestre enquanto a inflação de lá estiver nesse ritmo.
+ *
+ * Mínimo do Stripe: ver STRIPE_MIN_CHARGE e scripts/check-plans.mjs.
  */
 export const FOUNDER_SLOTS = 30;
 export const PRO_TRIAL_DAYS = 30;
 
+// EUR = mesmos números do USD (€5,99 / €19,99), não PPP×$ (€3,99): preço ao consumidor na UE já inclui ~21% de IVA e o Stripe come ~6% (3,99% + 2% internacional), então €3,99 deixava ~€3,00 líquidos, menos que o R$ 25 do Brasil; €5,99 deixa ~€4,50 e fica na faixa de €4,99–€9,99/mês dos apps de consumo da zona do euro.
 export const OFFERS = {
   pro_monthly: {
     plan: "pro",
@@ -55,8 +65,8 @@ export const OFFERS = {
     interval: "month",
     name: "Engine Pro",
     description: "Para quem presta serviço: métricas mês a mês, pedidos de orçamento e tudo do Premium.",
-    amount: { BRL: 2500, USD: 600, EUR: 399, GBP: 399, MXN: 5900, CLP: 2690, COP: 890000, ARS: 349000 },
-    founderAmount: { BRL: 1500, USD: 400, EUR: 249, GBP: 249, MXN: 3900, CLP: 1790, COP: 590000, ARS: 229000 },
+    amount: { BRL: 2500, USD: 600, EUR: 599, GBP: 399, MXN: 5900, CLP: 2690, COP: 890000, ARS: 449000 },
+    founderAmount: { BRL: 1500, USD: 400, EUR: 399, GBP: 249, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
     trialDays: PRO_TRIAL_DAYS,
   },
   premium_yearly: {
@@ -65,7 +75,7 @@ export const OFFERS = {
     interval: "year",
     name: "Engine Premium (anual)",
     description: "Para o dono do carro: alertas de FIPE, manutenção programada, custo total e sem anúncios.",
-    amount: { BRL: 7990, USD: 1990, EUR: 1299, GBP: 1299, MXN: 19900, CLP: 8990, COP: 2990000, ARS: 1149000 },
+    amount: { BRL: 7990, USD: 1990, EUR: 1999, GBP: 1299, MXN: 19900, CLP: 8990, COP: 2990000, ARS: 1499000 },
   },
   premium_pass_1m: {
     plan: "premium",
@@ -73,7 +83,7 @@ export const OFFERS = {
     months: 1,
     name: "Engine Premium — passe de 1 mês",
     description: "Pagamento único, sem renovação automática.",
-    amount: { BRL: 1490, USD: 399, EUR: 249, GBP: 249, MXN: 3900, CLP: 1790, COP: 590000, ARS: 229000 },
+    amount: { BRL: 1490, USD: 399, EUR: 399, GBP: 249, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
   },
   premium_pass_3m: {
     plan: "premium",
@@ -81,7 +91,7 @@ export const OFFERS = {
     months: 3,
     name: "Engine Premium — passe de 3 meses",
     description: "Pagamento único, sem renovação automática.",
-    amount: { BRL: 3490, USD: 899, EUR: 599, GBP: 599, MXN: 8900, CLP: 3990, COP: 1390000, ARS: 499000 },
+    amount: { BRL: 3490, USD: 899, EUR: 899, GBP: 599, MXN: 8900, CLP: 3990, COP: 1390000, ARS: 679000 },
   },
 };
 
@@ -92,6 +102,27 @@ export const OFFERS = {
  * COP e ARS NÃO estão nela: no Stripe são de duas casas.
  */
 export const ZERO_DECIMAL_CURRENCIES = ["CLP"];
+
+/**
+ * Menor cobrança que o Stripe aceita, na menor unidade de cada moeda
+ * (https://docs.stripe.com/currencies#minimum-and-maximum-charge-amounts,
+ * consultado em 30/10/2026). A regra do Stripe é dupla: o valor tem de passar
+ * o mínimo da moeda E, convertido para a moeda de liquidação da conta (BRL,
+ * mínimo R$ 0,50), o mínimo dela. ARS e COP têm mínimo nominal de 0,50 e o CLP
+ * nem aparece na tabela — para esses três usamos o equivalente a US$ 0,50, que
+ * cobre com folga os R$ 0,50 de liquidação. scripts/check-plans.mjs confere
+ * cada preço contra esta tabela.
+ */
+export const STRIPE_MIN_CHARGE = {
+  BRL: 50,
+  USD: 50,
+  EUR: 50,
+  GBP: 30,
+  MXN: 1000,
+  CLP: 500,
+  COP: 200000,
+  ARS: 100000,
+};
 
 /** Valor em unidades da moeda (25, 2690, 8900) a partir do que vai ao Stripe. */
 export function toMajorUnits(amount, currency) {

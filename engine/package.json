@@ -26,6 +26,7 @@
     "check:ipva": "node scripts/check-ipva.mjs",
     "check:rls": "node scripts/check-rls.mjs",
     "check:reminders": "node scripts/check-reminders.mjs",
+    "check:plans": "node scripts/check-plans.mjs",
     "icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
