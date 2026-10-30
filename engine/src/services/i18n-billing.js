@@ -16,6 +16,15 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
+  countryPrompt: {
+    title: "Em que país você está?",
+    body: "Usamos o país para cobrar na sua moeda e mostrar o que está perto de você. Dá para mudar depois, ao editar o perfil.",
+    label: "País",
+    detected: "Detectado pela sua conexão. Confira se está certo.",
+    confirm: "Confirmar",
+    skip: "Agora não",
+    error: "Não deu para salvar agora. Tente de novo ou pule — dá para mudar depois no perfil.",
+  },
   nav: { plans: "Planos" },
   footer: {
     company: {
@@ -330,6 +339,15 @@ const ptBR = {
 };
 
 const enUS = {
+  countryPrompt: {
+    title: "Which country are you in?",
+    body: "We use your country to charge in your currency and show what's near you. You can change it later when editing your profile.",
+    label: "Country",
+    detected: "Detected from your connection. Please check it's right.",
+    confirm: "Confirm",
+    skip: "Not now",
+    error: "Couldn't save right now. Try again or skip — you can change it later in your profile.",
+  },
   nav: { plans: "Plans" },
   footer: {
     company: {
@@ -642,6 +660,15 @@ const enUS = {
 };
 
 const esES = {
+  countryPrompt: {
+    title: "¿En qué país estás?",
+    body: "Usamos el país para cobrarte en tu moneda y mostrarte lo que está cerca de ti. Puedes cambiarlo después al editar tu perfil.",
+    label: "País",
+    detected: "Detectado por tu conexión. Comprueba que sea correcto.",
+    confirm: "Confirmar",
+    skip: "Ahora no",
+    error: "No se pudo guardar ahora. Inténtalo de nuevo o sáltalo — puedes cambiarlo después en tu perfil.",
+  },
   nav: { plans: "Planes" },
   footer: {
     company: {

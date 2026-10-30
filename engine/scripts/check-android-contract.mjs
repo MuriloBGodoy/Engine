@@ -51,6 +51,7 @@ const OVERLAYS = [
   // Da Jesse, ligado por ela em 16/09/2026 na variante B; fica na trava
   // porque é o overlay mais usado do app.
   "src/components/OwnershipModal.jsx",
+  "src/components/CountryPrompt.jsx",
 ];
 const missingHook = OVERLAYS.filter((f) => !/useHistoryDismiss\(/.test(read(f)));
 check(

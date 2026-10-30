@@ -9,6 +9,8 @@ import { AchievementAnnouncer } from "./components/achievements/AchievementAnnou
 import { InstallPrompt } from "./components/InstallPrompt";
 import { ConsentBanner } from "./components/ConsentBanner";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { CountryPrompt } from "./components/CountryPrompt";
+import { readCountryAsked } from "./services/countryPrompt";
 import "./index.css";
 
 import { Sidebar } from "./components/Sidebar";
@@ -118,6 +120,8 @@ function App() {
   const [expenseCar, setExpenseCar] = useState(null);
   const [specsCar, setSpecsCar] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // "Já perguntamos o país" nesta sessão, por conta (ver CountryPrompt).
+  const [countryDone, setCountryDone] = useState({});
   const userId = user?.uid;
   const isTopNav = settings.preferences.navLayout === "topnav";
 
@@ -495,12 +499,30 @@ function App() {
     );
   }
 
+  // Pergunta do país: uma vez por conta, depois do primeiro uso e com as
+  // preferências lidas de verdade (o default traria `country: "BR"`).
+  const showCountryPrompt =
+    Boolean(userId) &&
+    !dbLoading &&
+    !settingsFailed &&
+    !isModalOpen &&
+    !countryDone[userId] &&
+    !readCountryAsked(userId, settings);
+
   return (
     <BrowserRouter>
       <RouteTracker />
       <UpdateBanner />
       <InstallPrompt />
       <ConsentBanner />
+      {showCountryPrompt && (
+        <CountryPrompt
+          user={user}
+          settings={settings}
+          onSettingsUpdate={setSettings}
+          onDone={() => setCountryDone((current) => ({ ...current, [userId]: true }))}
+        />
+      )}
       <Routes>
         {/* Páginas de autenticação: tela cheia, sem o shell do app. */}
         <Route path="/login" element={<Login />} />
