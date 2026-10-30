@@ -27,6 +27,13 @@
 --
 --   4. `create_club` não aceita logo nem capa: na criação o clube ainda não
 --      tem pasta, então qualquer valor ali seria de fora.
+--
+--   5. Cores e emblema validados nas duas portas (criação e edição) pelas
+--      mesmas funções: cor é NOME da paleta de clubStyles.js (nunca hex);
+--      forma, posição do símbolo e fundo do símbolo são listas fechadas.
+--      O emblema ganhou: símbolo sobre a foto (liga/desliga), cor do
+--      símbolo, posição (centro ou canto), fundo (nenhum, disco, sombra) e
+--      cor da borda (paleta, "none" = sem borda, vazio = padrão).
 
 -- ---------------------------------------------------------------------------
 -- 1. Storage
@@ -104,7 +111,70 @@ $$;
 revoke execute on function public.club_image_ok(text, text) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- 3. Edição
+-- 3. Cores e emblema
+-- ---------------------------------------------------------------------------
+
+-- A paleta fechada de services/clubStyles.js (CLUB_PALETTE). Trocar a paleta
+-- lá pede trocar aqui — o teste do PGlite confere que as duas batem.
+create or replace function public.club_palette_ok(p_value text, p_allow_none boolean default false)
+returns boolean
+language sql immutable
+set search_path = ''
+as $$
+  select p_value is null or p_value = ''
+    or (p_allow_none and p_value = 'none')
+    or p_value = any (array[
+      'vermelho-corrida', 'laranja-turbo', 'amarelo-pista', 'verde-bandeira',
+      'verde-limao', 'ciano-nitro', 'azul-mercosul', 'azul-celeste', 'roxo-neon',
+      'rosa-vinil', 'vinho', 'marrom-couro', 'grafite', 'prata', 'preto-fosco',
+      'bege-areia'
+    ]);
+$$;
+
+create or replace function public.club_colors_ok(p_colors jsonb)
+returns boolean
+language sql immutable
+set search_path = ''
+as $$
+  select p_colors is null or (
+    jsonb_typeof(p_colors) = 'object'
+    and coalesce(jsonb_typeof(p_colors -> 'primary'), 'string') = 'string'
+    and coalesce(jsonb_typeof(p_colors -> 'secondary'), 'string') = 'string'
+    and public.club_palette_ok(p_colors ->> 'primary')
+    and public.club_palette_ok(p_colors ->> 'secondary')
+  );
+$$;
+
+-- Chaves fora da lista são recusadas: o objeto vai inteiro para o card.
+create or replace function public.club_emblem_ok(p_emblem jsonb)
+returns boolean
+language sql immutable
+set search_path = ''
+as $$
+  select p_emblem is null or (
+    jsonb_typeof(p_emblem) = 'object'
+    and not exists (
+      select 1 from jsonb_object_keys(p_emblem) k
+      where k not in ('shape', 'icon', 'showSymbolOnPhoto', 'symbolColor', 'symbolPosition', 'symbolBacking', 'borderColor')
+    )
+    and coalesce(p_emblem ->> 'shape', '') in ('', 'plate', 'shield', 'circle', 'hex')
+    and coalesce(jsonb_typeof(p_emblem -> 'icon'), 'string') = 'string'
+    and coalesce(p_emblem ->> 'icon', '') ~ '^[a-z0-9-]{0,24}$'
+    and coalesce(jsonb_typeof(p_emblem -> 'showSymbolOnPhoto'), 'boolean') = 'boolean'
+    and coalesce(jsonb_typeof(p_emblem -> 'symbolColor'), 'string') = 'string'
+    and coalesce(jsonb_typeof(p_emblem -> 'borderColor'), 'string') = 'string'
+    and public.club_palette_ok(p_emblem ->> 'symbolColor')
+    and public.club_palette_ok(p_emblem ->> 'borderColor', true)
+    and coalesce(p_emblem ->> 'symbolPosition', '') in ('', 'center', 'corner')
+    and coalesce(p_emblem ->> 'symbolBacking', '') in ('', 'none', 'disc', 'scrim')
+  );
+$$;
+revoke execute on function public.club_palette_ok(text, boolean) from public, anon;
+revoke execute on function public.club_colors_ok(jsonb) from public, anon;
+revoke execute on function public.club_emblem_ok(jsonb) from public, anon;
+
+-- ---------------------------------------------------------------------------
+-- 4. Edição
 -- ---------------------------------------------------------------------------
 
 create or replace function public.update_club(p_club_id text, p_patch jsonb)
@@ -151,20 +221,12 @@ begin
   end loop;
 
   -- Cores e emblema são NOMES do vocabulário da tela (clubStyles.js), não
-  -- hex nem SVG: aqui só o formato, para nada estranho chegar ao card.
-  if v_patch ? 'colors' then
-    if jsonb_typeof(v_patch -> 'colors') <> 'object'
-       or coalesce(v_patch -> 'colors' ->> 'primary', '') !~ '^[a-z0-9-]{0,32}$'
-       or coalesce(v_patch -> 'colors' ->> 'secondary', '') !~ '^[a-z0-9-]{0,32}$' then
-      raise exception 'invalid-colors' using errcode = 'P0001';
-    end if;
+  -- hex nem SVG. `jsonb null` explícito também é recusado.
+  if v_patch ? 'colors' and (jsonb_typeof(v_patch -> 'colors') <> 'object' or not public.club_colors_ok(v_patch -> 'colors')) then
+    raise exception 'invalid-colors' using errcode = 'P0001';
   end if;
-  if v_patch ? 'emblem' then
-    if jsonb_typeof(v_patch -> 'emblem') <> 'object'
-       or coalesce(v_patch -> 'emblem' ->> 'shape', '') !~ '^[a-z0-9-]{0,12}$'
-       or coalesce(v_patch -> 'emblem' ->> 'icon', '') !~ '^[a-z0-9-]{0,24}$' then
-      raise exception 'invalid-emblem' using errcode = 'P0001';
-    end if;
+  if v_patch ? 'emblem' and (jsonb_typeof(v_patch -> 'emblem') <> 'object' or not public.club_emblem_ok(v_patch -> 'emblem')) then
+    raise exception 'invalid-emblem' using errcode = 'P0001';
   end if;
 
   update public.clubs set
@@ -192,7 +254,7 @@ revoke execute on function public.update_club(text, jsonb) from public, anon;
 grant execute on function public.update_club(text, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 4. Criação: sem logo nem capa
+-- 5. Criação: sem logo nem capa, cores e emblema validados
 -- ---------------------------------------------------------------------------
 
 create or replace function public.create_club(p_club jsonb, p_member jsonb)
@@ -208,6 +270,12 @@ declare
 begin
   if v_uid is null then
     raise exception 'not-signed-in' using errcode = '42501';
+  end if;
+  if not public.club_colors_ok(p_club -> 'colors') then
+    raise exception 'invalid-colors' using errcode = 'P0001';
+  end if;
+  if not public.club_emblem_ok(p_club -> 'emblem') then
+    raise exception 'invalid-emblem' using errcode = 'P0001';
   end if;
   perform public.trust_this_transaction();
 

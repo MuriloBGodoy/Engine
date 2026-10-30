@@ -235,6 +235,18 @@ try {
   check("capa de arquivo que não existe é recusada", logoFantasma.error?.message === "invalid-image", why(logoFantasma));
   const corHex = await a.client.rpc("update_club", { p_club_id: clubId, p_patch: { colors: { primary: "#ff0000" } } });
   check("cor fora do vocabulário é recusada", corHex.error?.message === "invalid-colors", why(corHex));
+  const emblemaFoto = { shape: "shield", icon: "flame", showSymbolOnPhoto: true, symbolColor: "amarelo-pista", symbolPosition: "corner", symbolBacking: "disc", borderColor: "none" };
+  const comEmblema = await b.client.rpc("update_club", { p_club_id: clubId, p_patch: { emblem: emblemaFoto } });
+  clube = (await anon.from("clubs").select("data").eq("id", clubId).single()).data;
+  check("capitão grava símbolo sobre a foto, posição, fundo e borda",
+    passed(comEmblema) && clube?.data?.emblem?.symbolPosition === "corner" && clube?.data?.emblem?.borderColor === "none", why(comEmblema));
+  for (const [nome, emblem] of [["forma inventada", { shape: "star" }], ["posição inventada", { symbolPosition: "top" }],
+    ["cor do símbolo em hex", { symbolColor: "#fff" }], ["chave desconhecida", { svg: "x" }]]) {
+    const recusado = await a.client.rpc("update_club", { p_club_id: clubId, p_patch: { emblem } });
+    check(`emblema recusado: ${nome}`, recusado.error?.message === "invalid-emblem", why(recusado));
+  }
+  const criadoRuim = await c.client.rpc("create_club", { p_club: { name: "Ruim RLS", tag: tag("R"), emblem: { shape: "star" } }, p_member: {} });
+  check("create_club recusa emblema inválido", criadoRuim.error?.message === "invalid-emblem", why(criadoRuim));
   const criadoComCapa = await c.client.rpc("create_club", {
     p_club: { name: "Capa RLS", tag: tag("K"), cover: "https://example.com/x.jpg", logo: "https://example.com/l.jpg" }, p_member: {},
   });
