@@ -51,8 +51,9 @@ import { authPath } from "../../services/authRedirect";
  * faixa "como tudo se conecta", os quatro pilares com o conteúdo real que cada
  * um tem (metas, anúncios aprovados, clubes, encontros, posts) e o fechamento.
  * Cada vitrine tem carregando, erro e um vazio que explica o que vai aparecer
- * ali. Nenhum número inventado: o simulador é explicado pela regra, não por um
- * exemplo de valor.
+ * ali. As peças exportadas (cards, vazio, cabeçalho) também servem à Home de
+ * quem entrou (MemberHome). Nenhum número inventado: o simulador é explicado
+ * pela regra, não por um exemplo de valor.
  */
 
 // Sem `display` aqui: quem usa decide (inline-flex, ou hidden lg:inline-flex
@@ -76,7 +77,7 @@ const eyebrowClass =
 
 /* ------------------------------------------------------------ peças ------ */
 
-function SectionHeader({ title, to, linkLabel, id }) {
+export function SectionHeader({ title, to, linkLabel, id }) {
   return (
     <div className="mb-3 flex items-end justify-between gap-3">
       <h3 id={id} className="font-display text-base font-bold tracking-tight text-[var(--engine-text)] sm:text-lg">
@@ -111,7 +112,7 @@ function PillarIntro({ id, eyebrow, title, body, children }) {
   );
 }
 
-function EmptyState({ icon, title, body, children }) {
+export function EmptyState({ icon, title, body, children }) {
   return (
     <div className="engine-card flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]">
@@ -126,7 +127,7 @@ function EmptyState({ icon, title, body, children }) {
   );
 }
 
-function SkeletonRail({ short = false }) {
+export function SkeletonRail({ short = false }) {
   return (
     <div className={railClass} aria-hidden="true">
       {[0, 1, 2].map((index) => (
@@ -142,7 +143,7 @@ function SkeletonRail({ short = false }) {
   );
 }
 
-function LoadError() {
+export function LoadError() {
   const { t } = useTranslation();
   return (
     <p className="engine-card px-4 py-3 text-[13px] text-[var(--engine-text-muted)]">
@@ -379,7 +380,7 @@ function PostImage({ post, badge }) {
   );
 }
 
-function GoalCard({ post }) {
+export function GoalCard({ post }) {
   const { t } = useTranslation();
   const progress = Math.round(post.progress);
   return (
@@ -538,7 +539,7 @@ function BioCard() {
   );
 }
 
-function ListingCard({ listing }) {
+export function ListingCard({ listing }) {
   const { t, i18n } = useTranslation();
   const photo = listing.photos[0];
   const place = [listing.city, listing.state].filter(Boolean).join(" · ");
@@ -752,7 +753,7 @@ function ClubCard({ club }) {
   );
 }
 
-function PostCard({ post }) {
+export function PostCard({ post }) {
   const { t } = useTranslation();
   const carName = formatCarName(post) || post.title;
   return (
@@ -769,7 +770,7 @@ function PostCard({ post }) {
   );
 }
 
-function EventRow({ event }) {
+export function EventRow({ event }) {
   const { t, i18n } = useTranslation();
   const day = formatEventDay(event, i18n.language, { day: "2-digit" });
   const month = formatEventDay(event, i18n.language, { month: "short" }).replace(".", "");

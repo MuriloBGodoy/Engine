@@ -23,6 +23,47 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
+  memberHome: {
+    greeting: "Olá, {{name}}.",
+    greetingNoName: "Olá!",
+    today: "O que há de novo com você e o seu carro hoje.",
+    reminders: {
+      title: "Próximos vencimentos",
+      seeGarage: "Ver garagem",
+      setupTitle: "Configure os lembretes",
+      setupBody: "Informe o estado e o final da placa e avisamos no sino antes do IPVA, do licenciamento, da revisão e do seguro.",
+      setupCta: "Configurar na garagem",
+      clearTitle: "Nada vencendo nos próximos 30 dias",
+      clearBody: "Quando um vencimento chegar perto, ele aparece aqui e no sino.",
+    },
+    garage: {
+      title: "Sua garagem",
+      seeAll: "Ver garagem",
+      owned: "Na garagem",
+      goal: "Meta",
+      saved: "{{progress}}% guardado",
+      more_one: "+{{count}} carro",
+      more_other: "+{{count}} carros",
+      emptyTitle: "Sua garagem está vazia",
+      emptyBody: "Cadastre o carro que você tem para receber os lembretes, ou o carro que você quer para acompanhar a meta e ver quanto precisa ganhar.",
+      addCta: "Adicionar carro",
+    },
+    services: {
+      title: "Serviços",
+      inboxTitle: "Pedidos na sua região",
+      inboxCount_one: "{{count}} pedido esperando resposta",
+      inboxCount_other: "{{count}} pedidos esperando resposta",
+      inboxEmpty: "Nenhum pedido novo agora. Avisamos no sino quando chegar.",
+      inboxCta: "Ver pedidos",
+      monthCta: "Meus anúncios e o retorno do mês",
+      pending: "Seu anúncio está em revisão. Os pedidos da região aparecem aqui depois da aprovação.",
+    },
+    community: {
+      title: "Comunidade",
+      postsTitle: "Do feed",
+      emptyPosts: "Ainda não há publicações com foto. Que tal ser o primeiro a postar o seu carro?",
+    },
+  },
   // Assinatura da marca (#WeAreEngine): em inglês em todos os idiomas, de propósito.
   brand: { signature: "We are Engine." },
   visitorHome: {
@@ -155,6 +196,47 @@ const ptBR = {
 };
 
 const enUS = {
+  memberHome: {
+    greeting: "Hi, {{name}}.",
+    greetingNoName: "Hi!",
+    today: "What's new with you and your car today.",
+    reminders: {
+      title: "Upcoming due dates",
+      seeGarage: "See garage",
+      setupTitle: "Set up your reminders",
+      setupBody: "Enter your state and your plate's last digit and we'll ring the bell before vehicle tax, licensing, service and insurance are due.",
+      setupCta: "Set up in the garage",
+      clearTitle: "Nothing due in the next 30 days",
+      clearBody: "When a due date gets close, it shows up here and in the bell.",
+    },
+    garage: {
+      title: "Your garage",
+      seeAll: "See garage",
+      owned: "In the garage",
+      goal: "Goal",
+      saved: "{{progress}}% saved",
+      more_one: "+{{count}} car",
+      more_other: "+{{count}} cars",
+      emptyTitle: "Your garage is empty",
+      emptyBody: "Add the car you own to get reminders, or the car you want to track your goal and see how much you need to earn.",
+      addCta: "Add a car",
+    },
+    services: {
+      title: "Services",
+      inboxTitle: "Requests in your area",
+      inboxCount_one: "{{count}} request waiting for a reply",
+      inboxCount_other: "{{count}} requests waiting for a reply",
+      inboxEmpty: "No new requests right now. We'll ring the bell when one arrives.",
+      inboxCta: "See requests",
+      monthCta: "My listings and this month's results",
+      pending: "Your listing is under review. Requests from your area show up here once it's approved.",
+    },
+    community: {
+      title: "Community",
+      postsTitle: "From the feed",
+      emptyPosts: "No photo posts yet. Why not be the first to post your car?",
+    },
+  },
   // Assinatura da marca (#WeAreEngine): em inglês em todos os idiomas, de propósito.
   brand: { signature: "We are Engine." },
   visitorHome: {
@@ -287,6 +369,47 @@ const enUS = {
 };
 
 const esES = {
+  memberHome: {
+    greeting: "Hola, {{name}}.",
+    greetingNoName: "¡Hola!",
+    today: "Lo nuevo contigo y con tu coche hoy.",
+    reminders: {
+      title: "Próximos vencimientos",
+      seeGarage: "Ver garaje",
+      setupTitle: "Configura los avisos",
+      setupBody: "Indica tu estado y el final de la matrícula y te avisamos en la campana antes del impuesto, la licencia, la revisión y el seguro.",
+      setupCta: "Configurar en el garaje",
+      clearTitle: "Nada vence en los próximos 30 días",
+      clearBody: "Cuando se acerque un vencimiento, aparecerá aquí y en la campana.",
+    },
+    garage: {
+      title: "Tu garaje",
+      seeAll: "Ver garaje",
+      owned: "En el garaje",
+      goal: "Meta",
+      saved: "{{progress}} % ahorrado",
+      more_one: "+{{count}} coche",
+      more_other: "+{{count}} coches",
+      emptyTitle: "Tu garaje está vacío",
+      emptyBody: "Añade el coche que tienes para recibir avisos, o el coche que quieres para seguir tu meta y ver cuánto necesitas ganar.",
+      addCta: "Añadir coche",
+    },
+    services: {
+      title: "Servicios",
+      inboxTitle: "Solicitudes en tu zona",
+      inboxCount_one: "{{count}} solicitud esperando respuesta",
+      inboxCount_other: "{{count}} solicitudes esperando respuesta",
+      inboxEmpty: "No hay solicitudes nuevas ahora. Te avisamos en la campana cuando llegue una.",
+      inboxCta: "Ver solicitudes",
+      monthCta: "Mis anuncios y los resultados del mes",
+      pending: "Tu anuncio está en revisión. Las solicitudes de tu zona aparecerán aquí cuando se apruebe.",
+    },
+    community: {
+      title: "Comunidad",
+      postsTitle: "Del feed",
+      emptyPosts: "Aún no hay posts con foto. ¿Por qué no eres el primero en publicar tu coche?",
+    },
+  },
   // Assinatura da marca (#WeAreEngine): em inglês em todos os idiomas, de propósito.
   brand: { signature: "We are Engine." },
   visitorHome: {

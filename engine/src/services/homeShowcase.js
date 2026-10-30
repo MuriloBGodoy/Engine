@@ -19,7 +19,7 @@ const POSTS_TO_READ = 16;
 const LISTINGS_TO_READ = 24;
 const EVENTS_TO_READ = 12;
 
-const fetchRecentPosts = async () => {
+export const fetchRecentPosts = async () => {
   const rows = must(
     await supabase
       .from("community_goals")
@@ -35,7 +35,7 @@ const fetchRecentPosts = async () => {
   return [...withImage, ...withoutImage];
 };
 
-const fetchApprovedListings = async () => {
+export const fetchApprovedListings = async () => {
   const rows = must(
     await supabase
       .from("service_listings")
@@ -56,7 +56,7 @@ const eventFromRow = (row) => ({
   country: row.data?.country || "BR",
 });
 
-const fetchUpcomingEvents = async () => {
+export const fetchUpcomingEvents = async () => {
   const rows = must(
     await supabase
       .from("events")
@@ -124,4 +124,44 @@ export async function fetchHomeShowcase() {
     events: settle(events),
     clubs: settle(clubs),
   };
+}
+
+/* ---------------------------------------------------------------------------
+ * Home de quem entrou (MemberHome). Leituras pequenas e com teto; cada uma
+ * falha sozinha. As de orçamento dependem da migration de pedidos: sem ela no
+ * banco, a chamada falha e a seção só mostra o vazio.
+ * ------------------------------------------------------------------------- */
+
+/** Anúncios da própria pessoa (só o que o card precisa). */
+export async function fetchMyListings(userId) {
+  if (!userId) return [];
+  const rows = must(
+    await supabase
+      .from("service_listings")
+      .select("id, slug, moderation_status, title:data->>title")
+      .eq("owner_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(5),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    slug: row.slug || "",
+    title: row.title || "",
+    approved: row.moderation_status === "approved",
+  }));
+}
+
+/** Pedidos abertos no alcance dos anúncios aprovados, sem os que já respondi. */
+export async function fetchOpenQuoteInbox() {
+  const rows = must(await supabase.rpc("quote_inbox").limit(20)) || [];
+  return rows
+    .filter((row) => (row.status || "open") === "open" && !row.my_reply)
+    .map((row) => ({
+      id: row.id,
+      category: row.category || "",
+      city: row.city || "",
+      state: row.state || "",
+      urgency: row.urgency || "week",
+      createdAt: row.created_at,
+    }));
 }

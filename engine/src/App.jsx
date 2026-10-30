@@ -562,7 +562,7 @@ function App() {
             />
           }
         >
-          <Route path="/" element={<Home user={user} />} />
+          <Route path="/" element={<Home user={user} cars={cars} settings={settings} />} />
           <Route
             path="/garagem"
             element={
