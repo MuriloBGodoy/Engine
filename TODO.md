@@ -16,6 +16,12 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
       `/moderacao`, conta suspensa não loga nem aparece; hoje só apaga conteúdo.
 - [ ] Link para `/moderacao` no menu, só para admin.
 
+**Depois do domínio:**
+- [ ] Tela do Google mostrar "Engine" em vez de `evaankeqxykcktxvesbf.supabase.co`:
+      verificar a marca no Google Cloud (tela de consentimento OAuth com
+      domínio verificado, página inicial e Privacidade no domínio) e/ou
+      domínio próprio no Supabase (`auth.enginegarage.com.br`, add-on pago).
+
 **Depois do lançamento:**
 - [ ] /anuncie para empresas do ramo (concessionárias, seminovos, garagens,
       oficinas, autopeças, estética, seguradoras, autoescolas). Pacotes fixos
