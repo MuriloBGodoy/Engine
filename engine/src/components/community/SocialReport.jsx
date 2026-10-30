@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Flag, X } from "lucide-react";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
@@ -18,7 +19,7 @@ import { engineDB } from "../../services/db";
  */
 const SOCIAL_REPORT_REASONS = ["spam", "scam", "offensive", "harassment", "nudity", "minor", "other"];
 
-export function SocialReportDialog({ target, onClose }) {
+function SocialReportDialogContent({ target, onClose }) {
   const { t } = useTranslation();
   const toast = useToast();
   const [reason, setReason] = useState("");
@@ -124,4 +125,10 @@ export function SocialReportDialog({ target, onClose }) {
       </form>
     </div>
   );
+}
+
+// Portal no body: aberto dentro de uma página com ancestral transformado ou com
+// backdrop-filter, `fixed` fica preso a ele e o modal abre fora do lugar.
+export function SocialReportDialog(props) {
+  return createPortal(<SocialReportDialogContent {...props} />, document.body);
 }

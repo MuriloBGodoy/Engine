@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, Send } from "lucide-react";
 import { ImageEditor } from "./ImageEditor";
@@ -12,7 +13,7 @@ import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
  * gesto de voltar fecha primeiro o editor (volta à prévia) e só depois
  * cancela a foto — antes saía da conversa nos dois casos.
  */
-export function ImagePreviewModal({
+function ImagePreviewModalContent({
   imageUrl,
   onSend,
   onCancel,
@@ -134,4 +135,10 @@ export function ImagePreviewModal({
       </div>
     </div>
   );
+}
+
+// Portal no body: aberto dentro de uma página com ancestral transformado ou com
+// backdrop-filter, `fixed` fica preso a ele e o modal abre fora do lugar.
+export function ImagePreviewModal(props) {
+  return createPortal(<ImagePreviewModalContent {...props} />, document.body);
 }
