@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -46,6 +47,8 @@ import { AchievementBadge } from "../components/achievements/AchievementBadge";
 import { InfoTip } from "../components/InfoTip";
 import { SpecSheetModal } from "../components/specsheet/SpecSheetModal";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
+import "../services/i18n-social-feed";
 import { useRequireAccount } from "../hooks/useRequireAccount";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -418,9 +421,55 @@ function PostVideo({ url, t }) {
   );
 }
 
-function PostGallery({ images, alt, t, onOpen }) {
+// Janela do toque duplo. Abaixo de ~250 ms muita gente não consegue; acima de
+// ~350 o toque simples (abrir o post) começa a parecer travado.
+const DOUBLE_TAP_MS = 300;
+
+function PostGallery({ images, alt, t, onOpen, onDoubleTap }) {
   const [index, setIndex] = useState(0);
   const dragStart = useRef(null);
+  const lastTap = useRef(0);
+  const tapTimer = useRef(null);
+  const heartRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(tapTimer.current), []);
+
+  const playHeart = () => {
+    const heart = heartRef.current;
+    if (!heart?.animate) return;
+    heart.animate(
+      [
+        { opacity: 0, transform: "scale(0.4)" },
+        { opacity: 1, transform: "scale(1.15)", offset: 0.25 },
+        { opacity: 1, transform: "scale(1)", offset: 0.6 },
+        { opacity: 0, transform: "scale(1)" },
+      ],
+      { duration: 850, easing: "ease-out" },
+    );
+  };
+
+  // Toque duplo na foto curte, como no Instagram — e só curte: tocar duas
+  // vezes num post já curtido não desfaz (quem quer descurtir usa o coração).
+  // Com toque duplo ligado, o toque simples espera a janela passar antes de
+  // abrir o post; sem ele, abre na hora.
+  const handleTap = () => {
+    const now = Date.now();
+    if (onDoubleTap && now - lastTap.current < DOUBLE_TAP_MS) {
+      clearTimeout(tapTimer.current);
+      lastTap.current = 0;
+      playHeart();
+      onDoubleTap();
+      return;
+    }
+    lastTap.current = now;
+    if (!onOpen) return;
+    if (!onDoubleTap) {
+      onOpen();
+      return;
+    }
+    clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(onOpen, DOUBLE_TAP_MS);
+  };
 
   const total = images.length;
   const current = Math.min(index, total - 1);
@@ -462,16 +511,28 @@ function PostGallery({ images, alt, t, onOpen }) {
         ))}
       </div>
 
-      {/* A foto é o "abrir publicação" — mesmo gesto de qualquer feed. */}
-      {onOpen && (
+      {/* A foto é o "abrir publicação" — mesmo gesto de qualquer feed — e o
+          toque duplo curte. `touch-manipulation` tira o zoom de toque duplo
+          do navegador, que comeria o gesto. */}
+      {onOpen ? (
         <button
           type="button"
-          onClick={onOpen}
+          onClick={handleTap}
           aria-label={t("community.openPost")}
           title={t("community.openPost")}
-          className="absolute inset-0"
+          className="absolute inset-0 touch-manipulation"
         />
-      )}
+      ) : onDoubleTap ? (
+        <div aria-hidden="true" onClick={handleTap} className="absolute inset-0 touch-manipulation" />
+      ) : null}
+
+      <span
+        ref={heartRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center text-white opacity-0 drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
+      >
+        <Heart size={92} fill="currentColor" strokeWidth={0} />
+      </span>
 
       {total > 1 && (
         <>
@@ -606,6 +667,7 @@ export function GoalCard({
   currentUserId,
   variant = "feed",
   initialCommentsOpen = false,
+  commentPreview = true,
 }) {
   const [draft, setDraft] = useState("");
   const [editingCommentId, setEditingCommentId] = useState("");
@@ -802,7 +864,10 @@ export function GoalCard({
           images={photos}
           alt={goal.title}
           t={t}
-          onOpen={onOpenPost ? () => onOpenPost(goal.id) : undefined}
+          onOpen={openable ? () => onOpenPost(goal.id) : undefined}
+          onDoubleTap={() => {
+            if (!liked) onLike(goal.id);
+          }}
         />
       )}
 
@@ -927,12 +992,19 @@ export function GoalCard({
           ))}
       </div>
 
+      {/* Prévia dos comentários, como no Instagram: "ver todos os N" e o
+          último comentário numa linha. A conversa inteira abre por cima, na
+          folha — o cartão não vira a thread. */}
+      {commentPreview && comments.length > 0 && (
+        <CommentPreview comments={comments} t={t} onOpen={showComments} />
+      )}
+
       {specsOpen && (
         <SpecSheetModal car={goal} onClose={() => setSpecsOpen(false)} />
       )}
 
       {commentsOpen && (
-        <CommentsModal
+        <CommentsSheet
           goal={goal}
           comments={comments}
           draft={draft}
@@ -1063,38 +1135,98 @@ function CommentsPanel({
   );
 }
 
-function CommentsModal({ goal, onClose, t, ...panelProps }) {
-  return (
-    <div className="engine-modal-overlay" onClick={onClose}>
+/**
+ * Folha de comentários: sobe de baixo no celular e encosta na direita no
+ * desktop (classes `engine-drawer`, as mesmas do painel de avisos). É o que o
+ * Instagram faz no app — o post fica atrás, à vista, e fechar devolve a
+ * pessoa exatamente onde ela estava.
+ *
+ * Vai para o `document.body` por portal: o cartão do feed mora dentro de
+ * ancestrais com `transform`/`backdrop-filter`, e um `position: fixed` ali
+ * dentro fica preso ao ancestral em vez da tela. O voltar do aparelho fecha a
+ * folha primeiro (useHistoryDismiss), em vez de sair da página.
+ */
+function CommentsSheet({ goal, onClose, t, ...panelProps }) {
+  useHistoryDismiss(true, onClose);
+  const count = panelProps.comments?.length || 0;
+
+  // O portal muda o DOM, não a árvore do React: o clique dentro da folha
+  // ainda sobe até o <article> do cartão, que abre o post ao ser clicado. O
+  // invólucro corta a subida (o fundo escuro fecha antes disso).
+  return createPortal(
+    <div onClick={(event) => event.stopPropagation()}>
+      <div className="engine-drawer-scrim" onClick={onClose} aria-hidden="true" />
       <section
         role="dialog"
         aria-modal="true"
-        className="engine-modal-panel engine-pop sm:max-w-2xl"
-        onClick={(event) => event.stopPropagation()}
+        aria-label={t("community.commentsAction")}
+        className="engine-drawer engine-safe-bottom"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3.5 sm:px-5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--engine-accent)]">
-              {t("community.commentsAction")}
-            </p>
-            <h2 className="mt-1 truncate text-base font-extrabold italic text-[var(--engine-text)]">
-              {getVehicleTitle(goal)}
-            </h2>
-          </div>
+        {/* Alça: diz "isto é uma folha" no celular. */}
+        <span
+          aria-hidden="true"
+          className="mx-auto mt-2 block h-1 w-10 shrink-0 rounded-full bg-[var(--engine-border-strong)] sm:hidden"
+        />
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-2.5 sm:py-3.5">
+          <h2 className="min-w-0 truncate text-[15px] font-extrabold text-[var(--engine-text)]">
+            {t("community.commentsAction")}
+            {count > 0 && (
+              <span className="ml-1.5 font-semibold tabular-nums text-[var(--engine-text-subtle)]">
+                {count}
+              </span>
+            )}
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
-            title={t("common.cancel")}
-            aria-label={t("common.cancel")}
+            className="-mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
+            title={t("socialFeed.closeComments")}
+            aria-label={t("socialFeed.closeComments")}
           >
             <X size={20} />
           </button>
         </div>
 
-        <CommentsPanel goal={goal} t={t} {...panelProps} />
+        {/* No celular a folha cresce com a lista até 78% da tela; sem uma
+            altura mínima, "sem comentários" virava uma tira de 200px. */}
+        <div className="flex min-h-[45dvh] flex-1 flex-col overflow-hidden sm:min-h-0">
+          <CommentsPanel goal={goal} t={t} {...panelProps} />
+        </div>
       </section>
-    </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Prévia dos comentários no cartão: o link "ver todos" e o comentário mais
+ * recente, cortado numa linha. Tudo é um botão só — a prévia não tem ação
+ * própria, ela é a porta da folha.
+ */
+function CommentPreview({ comments, t, onOpen }) {
+  const last = comments[comments.length - 1];
+  const text = typeof last === "string" ? last : last?.text || "";
+  const who =
+    typeof last === "string" ? "" : withoutAt(last?.username) || last?.author || "";
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="-mt-1.5 block w-full px-3 pb-3 text-left sm:px-4 sm:pb-4"
+    >
+      {comments.length > 1 && (
+        <span className="block text-[13px] font-medium text-[var(--engine-text-subtle)] transition hover:text-[var(--engine-text-muted)]">
+          {t("socialFeed.viewAllComments", { count: comments.length })}
+        </span>
+      )}
+      {text && (
+        <span className="mt-0.5 block truncate text-[13px] leading-5 text-[var(--engine-text-muted)]">
+          {who && <span className="mr-1.5 font-bold text-[var(--engine-text)]">{who}</span>}
+          {text}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -1970,9 +2102,11 @@ function CaptionModal({ goal, t, onClose, onSave }) {
  * notificações e o link de compartilhar abrem, em vez de só filtrar o feed.
  */
 function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
-  // No desktop os comentários ficam numa coluna ao lado do post (padrão do
-  // lightbox das redes). No celular não há espaço "ao lado", então o balão
-  // continua abrindo a folha de comentários.
+  // No desktop, post com foto vira o lightbox do Instagram: mídia à esquerda,
+  // comentários numa coluna ao lado. Fora disso (celular, ou post só de
+  // texto) o modal mostra SÓ o post, com a prévia dos comentários, e a
+  // conversa abre na folha pelo balão — até 30/10/2026 a thread inteira vinha
+  // colada embaixo do post, e o post virava cabeçalho dos comentários.
   const isWide = useMediaQuery("(min-width: 1024px)");
   // A coluna lateral de comentários só se justifica quando há mídia ocupando a
   // esquerda. Num post de texto ela deixava metade do modal vazia, com um
@@ -1987,13 +2121,13 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
 
   const comments = goal?.comments || [];
 
-  // Quem chega por notificação de comentário (`?comments=1`) cai no compositor
-  // já focado. Antes esse parâmetro abria a folha de comentários; agora a
-  // lista está sempre visível, então o que resta é levar a pessoa até ela.
+  // Quem chega por notificação de comentário (`?comments=1`): no lightbox o
+  // compositor já vem focado; fora dele, a folha de comentários abre direto
+  // (`initialCommentsOpen` no cartão), porque o comentário é o motivo da visita.
   useEffect(() => {
-    if (!openComments || !goal) return;
+    if (!openComments || !goal || !sideBySide) return;
     composerRef.current?.focus({ preventScroll: false });
-  }, [openComments, goal]);
+  }, [openComments, goal, sideBySide]);
 
   const submitComment = (event) => {
     event.preventDefault();
@@ -2061,42 +2195,27 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
         {goal ? (
           <div className="flex min-h-0 flex-1 lg:flex-row">
             <div className="engine-scroll engine-safe-bottom min-h-0 min-w-0 flex-1 overflow-y-auto lg:border-r lg:border-[var(--engine-border)]">
-              <GoalCard
-                {...cardProps}
-                goal={goal}
-                t={t}
-                variant="modal"
-                // O balão nunca abre outra folha por cima: a lista já está
-                // logo abaixo (coluna única) ou ao lado (desktop com mídia).
-                initialCommentsOpen={false}
-                onCommentClick={() => composerRef.current?.focus()}
-              />
-
-              {/* Comentários abrem junto com a publicação, no fluxo da mesma
-                  rolagem — antes era preciso tocar no balão e abrir um segundo
-                  modal empilhado sobre o primeiro. */}
-              {!sideBySide && (
-                <CommentsPanel
-                  inline
+              {sideBySide ? (
+                <GoalCard
+                  {...cardProps}
                   goal={goal}
-                  comments={comments}
-                  draft={draft}
-                  editingCommentId={editingCommentId}
-                  editingDraft={editingDraft}
-                  commentMenuId={commentMenuId}
-                  currentUserId={cardProps.currentUserId}
-                  composerRef={composerRef}
                   t={t}
-                  onDraftChange={setDraft}
-                  onSubmitComment={submitComment}
-                  onOpenProfile={cardProps.onOpenProfile}
-                  onStartEditComment={startEditComment}
-                  onEditingDraftChange={setEditingDraft}
-                  onSubmitEditComment={submitEditComment}
-                  onCancelEdit={cancelEdit}
-                  onDeleteComment={cardProps.onDeleteComment}
-                  onReportComment={cardProps.onReportComment}
-                  onCommentMenuChange={setCommentMenuId}
+                  variant="modal"
+                  // A lista já está ao lado: o balão só leva ao compositor.
+                  commentPreview={false}
+                  onCommentClick={() => composerRef.current?.focus()}
+                />
+              ) : (
+                <GoalCard
+                  // A chave troca com o post: `initialCommentsOpen` é estado
+                  // inicial, e o mesmo cartão reaproveitado não reabriria a
+                  // folha ao trocar de publicação.
+                  key={goal.id}
+                  {...cardProps}
+                  goal={goal}
+                  t={t}
+                  variant="modal"
+                  initialCommentsOpen={openComments}
                 />
               )}
             </div>

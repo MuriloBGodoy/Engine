@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Heart,
@@ -11,8 +11,15 @@ import {
   Mail,
   Flag,
   UserX,
+  ArrowLeft,
+  Copy,
+  Play,
 } from "lucide-react";
-import { engineDB } from "../services/db";
+import { engineDB, POST_KIND_POST } from "../services/db";
+import { GoalCard } from "./Community";
+import { ShareToChatModal } from "../components/ShareToChatModal";
+import { usePostActions } from "../hooks/usePostActions";
+import "../services/i18n-social-feed";
 import { auth } from "../services/supabase";
 import { EditProfileModal } from "../components/EditProfileModal";
 import { AchievementsTab } from "../components/achievements/AchievementsTab";
@@ -79,6 +86,84 @@ function UserListItem({ userId, profiles, fallback = {} }) {
   );
 }
 
+// Progresso da meta como o feed calcula: post dos outros traz só a
+// porcentagem (sem dinheiro).
+const goalProgress = (goal) =>
+  goal.targetValue
+    ? Math.min(100, (goal.savedValue / goal.targetValue) * 100)
+    : Math.min(100, Number(goal.progress) || 0);
+
+/**
+ * Um quadrado da grade de publicações, como no Instagram: a primeira foto
+ * recortada, um ícone no canto quando há mais fotos ou vídeo, e curtidas e
+ * comentários ao passar o mouse. Post só de texto vira o próprio texto.
+ * Meta (carro) ganha a barra fina de progresso no pé — é o que a diferencia
+ * de um post solto, e é a única coisa que o Instagram não tem.
+ */
+function ProfilePostTile({ goal, t, onOpen }) {
+  const image = goal.images?.[0] || goal.image || "";
+  const many = (goal.images?.length || 0) > 1;
+  const isGoal = goal.kind !== POST_KIND_POST;
+  const likes = Number(goal.likes) || 0;
+  const comments = goal.comments?.length || 0;
+  const text = goal.note || goal.title || [goal.brand, goal.model].filter(Boolean).join(" ");
+
+  return (
+    <button
+      type="button"
+      id={`profile-tile-${goal.id}`}
+      onClick={() => onOpen(goal.id)}
+      aria-label={`${text || t("community.openPost")} · ${t("socialFeed.tileStats", { likes, comments })}`}
+      className="group relative aspect-square overflow-hidden bg-[var(--engine-surface-2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--engine-accent)]"
+    >
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center p-2.5 sm:p-4">
+          <span className="line-clamp-5 text-center text-[11px] font-semibold leading-snug text-[var(--engine-text)] sm:text-[13px]">
+            {text}
+          </span>
+        </span>
+      )}
+
+      {(many || goal.videoUrl) && (
+        <span
+          className="absolute right-1.5 top-1.5 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]"
+          title={goal.videoUrl ? t("socialFeed.video") : t("socialFeed.multiplePhotos")}
+        >
+          {goal.videoUrl ? <Play size={16} fill="currentColor" /> : <Copy size={16} />}
+        </span>
+      )}
+
+      {isGoal && (
+        <span className="absolute inset-x-0 bottom-0 h-1 bg-black/35">
+          <span
+            className="block h-full bg-[var(--engine-accent)]"
+            style={{ width: `${goalProgress(goal)}%` }}
+          />
+        </span>
+      )}
+
+      {/* Só no desktop (no toque não existe "passar o mouse"). */}
+      <span className="pointer-events-none absolute inset-0 hidden items-center justify-center gap-4 bg-black/45 text-sm font-bold text-white opacity-0 transition group-hover:opacity-100 sm:flex">
+        <span className="inline-flex items-center gap-1.5">
+          <Heart size={17} fill="currentColor" />
+          {likes}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <MessageCircle size={17} fill="currentColor" />
+          {comments}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const { identifier } = useParams();
   const navigate = useNavigate();
@@ -112,6 +197,39 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   // vista e a tela parecia estar em Metas. Mesmo gesto de `Community.jsx`
   // (`activeSectionRef`).
   const activeTabRef = useRef(null);
+
+  // Grade → feed: `?p=<id>` abre o feed vertical das publicações desta pessoa
+  // já no post tocado, como o Instagram faz ao tocar num quadrado do perfil.
+  // Mora na URL para o voltar do aparelho devolver à grade, e para o link
+  // de um post do perfil abrir no mesmo lugar.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const feedPostId = searchParams.get("p") || "";
+  // Abrimos o feed com push? Então "voltar" é history.back(); se a pessoa
+  // chegou por link já com `?p=`, voltar só tira o parâmetro.
+  const feedPushed = useRef(false);
+  const lastOpenedTile = useRef("");
+  const scrolledToPost = useRef("");
+  const [postToShare, setPostToShare] = useState(null);
+  const viewer = user?.uid ? user : currentUserId ? { uid: currentUserId } : null;
+  const profileUserId = profile?.userId || "";
+
+  const reloadGoals = () => {
+    if (!profileUserId) return;
+    engineDB.getUserGoals(profileUserId).then((goals) => setUserGoals(goals || []));
+  };
+
+  const postActions = usePostActions({
+    user: viewer,
+    returnPath: (goalId) => `/community/${identifier}?p=${goalId}`,
+    onChanged: reloadGoals,
+    onRemoved: (goal, reason) => {
+      if (reason === "block") {
+        navigate("/community", { replace: true });
+        return;
+      }
+      setUserGoals((list) => list.filter((item) => item.id !== goal.id));
+    },
+  });
 
   useEffect(() => {
     const cleanUsername = identifier?.replace(/^@/, "").toLowerCase().trim() || "";
@@ -299,6 +417,45 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
     activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [activeTab]);
 
+  // Feed aberto: rola até o post tocado uma vez (a lista pode chegar depois,
+  // num link direto). De volta à grade: o quadrado de onde a pessoa saiu.
+  useEffect(() => {
+    if (!feedPostId) {
+      scrolledToPost.current = "";
+      const tile = lastOpenedTile.current;
+      if (tile) {
+        lastOpenedTile.current = "";
+        document.getElementById(`profile-tile-${tile}`)?.scrollIntoView({ block: "center" });
+      }
+      return;
+    }
+    if (scrolledToPost.current === feedPostId) return;
+    const target = document.getElementById(`profile-post-${feedPostId}`);
+    if (!target) return;
+    scrolledToPost.current = feedPostId;
+    target.scrollIntoView({ block: "start" });
+  }, [feedPostId, userGoals, loading]);
+
+  const openFeedAt = (goalId) => {
+    feedPushed.current = true;
+    lastOpenedTile.current = goalId;
+    const next = new URLSearchParams(searchParams);
+    next.set("p", goalId);
+    setSearchParams(next);
+  };
+
+  const closeFeed = () => {
+    if (feedPushed.current) {
+      feedPushed.current = false;
+      navigate(-1);
+      return;
+    }
+    lastOpenedTile.current = feedPostId;
+    const next = new URLSearchParams(searchParams);
+    next.delete("p");
+    setSearchParams(next, { replace: true });
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -350,6 +507,93 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
     .join("")
     .toUpperCase()
     .slice(0, 2) || "EN";
+
+  // As publicações com o nome e a foto ATUAIS do perfil (o post guarda o
+  // retrato do dia em que foi publicado) e sem comentário de quem eu bloqueei.
+  const profileGoals = userGoals.map((goal) =>
+    postActions.withoutBlocked({
+      ...goal,
+      author: profile.author || goal.author,
+      username: profile.username || goal.username,
+      avatar: profile.avatar || goal.avatar,
+      avatarInitials: profile.avatarInitials || goal.avatarInitials,
+      city: profile.city || goal.city,
+    }),
+  );
+  const cleanProfileUsername = String(profile.username || "").replace(/^@/, "");
+
+  if (feedPostId) {
+    return (
+      <div className="min-h-screen bg-[var(--engine-bg)]">
+        {/* Gruda logo abaixo da barra do app (64px + recorte do iPhone; a do
+            app é z-40 e cobriria esta se as duas usassem top-0). */}
+        <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:top-16">
+          <button
+            type="button"
+            onClick={closeFeed}
+            aria-label={t("socialFeed.backToProfile")}
+            title={t("socialFeed.backToProfile")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-[11px] font-bold uppercase tracking-wide text-[var(--engine-text-subtle)]">
+              {cleanProfileUsername ? `@${cleanProfileUsername}` : profile.author}
+            </p>
+            <h1 className="truncate text-base font-black text-[var(--engine-text)]">
+              {t("socialFeed.postsTitle")}
+            </h1>
+          </div>
+        </header>
+
+        {/* O mesmo cartão do feed da Comunidade, com todas as ações. Sem
+            `onOpenPost`: já estamos dentro do feed, tocar no post não leva a
+            lugar nenhum (o toque duplo ainda curte). */}
+        <div className="mx-auto w-full max-w-2xl border-y border-[var(--engine-border)] sm:space-y-5 sm:border-0 sm:py-5">
+          {profileGoals.map((goal) => (
+            <div key={goal.id} id={`profile-post-${goal.id}`} className="scroll-mt-[calc(8rem+env(safe-area-inset-top))] lg:scroll-mt-32">
+              <GoalCard
+                goal={goal}
+                t={t}
+                interactions={postActions.interactionsFor(goal)}
+                following={isFollowing ? [profile.userId] : []}
+                shared
+                currentUserId={currentUserId}
+                {...postActions.handlers}
+                onLike={(goalId) => postActions.handlers.onLike(goalId, goal)}
+                onFollow={handleFollow}
+                onSendToChat={currentUserId ? setPostToShare : undefined}
+                onOpenProfile={(_userId, person) => {
+                  const username = String(person?.username || "").replace(/^@/, "");
+                  if (!username) return;
+                  if (username.toLowerCase() === cleanProfileUsername.toLowerCase()) {
+                    closeFeed();
+                    return;
+                  }
+                  navigate(`/community/@${username}`);
+                }}
+              />
+            </div>
+          ))}
+          {!profileGoals.length && (
+            <p className="px-4 py-16 text-center text-sm font-semibold text-[var(--engine-text-muted)]">
+              {t("community.postMissing")}
+            </p>
+          )}
+        </div>
+
+        <ShareToChatModal
+          open={Boolean(postToShare)}
+          goal={postToShare}
+          user={user}
+          settings={settings}
+          onClose={() => setPostToShare(null)}
+        />
+        {postActions.reportDialog}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--engine-bg)]">
@@ -494,7 +738,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         <div className="border-b border-[var(--engine-border)]">
           <div className="flex gap-6 overflow-x-auto px-4 sm:px-6">
             {[
-              { id: "posts", label: t("profile.tabs.goals") },
+              { id: "posts", label: t("socialFeed.postsTab") },
               { id: "followers", label: t("profile.tabs.followers") },
               { id: "following", label: t("profile.tabs.following") },
               { id: "achievements", label: t("profile.tabs.achievements") },
@@ -524,46 +768,14 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         <div className="px-4 py-6 sm:px-6">
           {activeTab === "posts" && (
             <div>
-              {userGoals.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {userGoals.map((goal) => {
-                    // Post dos outros traz só a porcentagem (sem dinheiro).
-                    const progress = goal.targetValue
-                      ? (goal.savedValue / goal.targetValue) * 100
-                      : Number(goal.progress) || 0;
-                    return (
-                      <div
-                        key={goal.id}
-                        className="group overflow-hidden rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] transition hover:border-[var(--engine-accent)]"
-                      >
-                        {goal.image && (
-                          <div className="relative h-32 overflow-hidden bg-[var(--engine-surface)]">
-                            <img
-                              src={goal.image}
-                              alt={goal.title}
-                              className="h-full w-full object-cover transition group-hover:scale-105"
-                            />
-                          </div>
-                        )}
-                        <div className="p-3">
-                          <div className="mb-3">
-                            <p className="line-clamp-2 text-sm font-bold text-[var(--engine-text)]">
-                              {goal.title || `${goal.brand} ${goal.model}`}
-                            </p>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--engine-border)]">
-                            <div
-                              className="h-full bg-[var(--engine-accent)]"
-                              style={{ width: `${Math.min(progress, 100)}%` }}
-                            />
-                          </div>
-                          <p className="mt-2 text-xs font-bold text-[var(--engine-text)]">
-                            {Math.min(Math.round(progress), 100)}%
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {profileGoals.length ? (
+                /* Grade de 3 colunas encostada nas bordas, como no Instagram:
+                   até 30/10/2026 eram cartões com título e barra, que mostravam
+                   seis posts por tela e não abriam nada. */
+                <div className="-mx-4 -mt-6 grid grid-cols-3 gap-0.5 sm:-mx-6">
+                  {profileGoals.map((goal) => (
+                    <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
+                  ))}
                 </div>
               ) : (
                 <div className="flex min-h-64 flex-col items-center justify-center text-center">
@@ -662,6 +874,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         />
       )}
       {reportDialog}
+      {postActions.reportDialog}
     </div>
   );
 }

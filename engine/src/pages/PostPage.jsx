@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { engineDB } from "../services/db";
 import { GoalCard } from "./Community";
-import { trackEvent } from "../services/observability";
-import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { useRequireAccount } from "../hooks/useRequireAccount";
-import { useSocialReport } from "../hooks/useSocialReport";
-
-const emptyInteraction = { liked: false, rating: 0, comments: [] };
+import { usePostActions } from "../hooks/usePostActions";
 
 /**
  * Página de uma publicação, aberta por link direto: /post/:postId.
@@ -20,26 +16,30 @@ const emptyInteraction = { liked: false, rating: 0, comments: [] };
  * normalmente ainda não tem conta — é o mesmo motivo pelo qual a leitura da
  * comunidade é pública.
  *
- * No celular é para cá que tocar num post leva, então todo botão do card
- * precisa funcionar aqui (auditoria social de 25/10/2026: seguir, editar e
- * apagar comentário, denunciar e bloquear eram funções vazias).
+ * No celular é para cá que tocar num post leva. Até 30/10/2026 a página abria
+ * já com a folha de comentários por cima (`initialCommentsOpen`): tocar no
+ * post mostrava os comentários, e para ver o post era preciso voltar. Agora é
+ * como no Instagram — o post primeiro, os comentários só pelo balão ou pelo
+ * "ver todos os comentários". `?comments=1` (aviso de comentário) ainda abre a
+ * folha direto, porque ali o comentário é o motivo da visita.
  */
 export function PostPage({ user }) {
   const { postId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const confirm = useConfirm();
   const toast = useToast();
   const requireAccount = useRequireAccount(user);
-  const { openReport, reportDialog } = useSocialReport();
   const [goal, setGoal] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Só o que a pessoa acabou de fazer fica em estado; o resto é derivado do
-  // documento, que chega por snapshot.
-  const [pendingLike, setPendingLike] = useState(null);
-  const [pendingRating, setPendingRating] = useState(0);
-  const [blockedIds, setBlockedIds] = useState([]);
   const [following, setFollowing] = useState([]);
+  const openComments = searchParams.get("comments") === "1";
+
+  const { blockedIds, interactionsFor, withoutBlocked, handlers, reportDialog } = usePostActions({
+    user,
+    returnPath: (id) => `/post/${id}`,
+    onRemoved: () => navigate("/community", { replace: true }),
+  });
 
   useEffect(() => {
     if (!postId) return undefined;
@@ -51,17 +51,6 @@ export function PostPage({ user }) {
 
     return () => unsubscribe?.();
   }, [postId]);
-
-  useEffect(() => {
-    if (!user?.uid) return undefined;
-    let alive = true;
-    engineDB.getBlockedUsers(user.uid).then((ids) => {
-      if (alive) setBlockedIds(ids);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [user?.uid]);
 
   const ownerId = goal?.ownerId || "";
   useEffect(() => {
@@ -75,89 +64,10 @@ export function PostPage({ user }) {
     };
   }, [user?.uid, ownerId]);
 
-  // Comentário de quem eu bloqueei some aqui também, como no feed.
-  const visibleGoal = useMemo(() => {
-    if (!goal) return null;
-    const blocked = new Set(blockedIds);
-    return { ...goal, comments: (goal.comments || []).filter((c) => !blocked.has(c?.userId)) };
-  }, [goal, blockedIds]);
-
-  const interactions = goal
-    ? {
-        liked: pendingLike ?? Boolean(goal.likesBy?.[user?.uid]),
-        rating: pendingRating || goal.ratingsBy?.[user?.uid] || 0,
-        comments: [],
-      }
-    : emptyInteraction;
-
-  const here = `/post/${postId}`;
-
-  const fail = (error) => {
-    console.error(error);
-    const blocked = /blocked/.test(String(error?.message || error?.code || ""));
-    toast(t(blocked ? "socialFixes.blockedAction" : "socialFixes.writeError"), "error");
-  };
-
-  const handleLike = async () => {
-    if (requireAccount(here)) return;
-    const next = !interactions.liked;
-    setPendingLike(next);
-    try {
-      await engineDB.toggleCommunityLike(postId, next, user.uid);
-    } catch (error) {
-      setPendingLike(null);
-      fail(error);
-    }
-  };
-
-  const handleComment = async (_goalId, text) => {
-    if (requireAccount(here)) return;
-    try {
-      await engineDB.addCommunityComment(postId, text, user.uid);
-      toast(t("community.commentSaved"));
-    } catch (error) {
-      fail(error);
-    }
-  };
-
-  const handleRate = async (_goalId, value) => {
-    if (requireAccount(here)) return;
-    setPendingRating(value);
-    try {
-      await engineDB.rateCommunityGoal(postId, value, user.uid);
-      toast(t("community.ratingSaved"));
-    } catch (error) {
-      setPendingRating(0);
-      fail(error);
-    }
-  };
-
-  const handleEditComment = async (_goalId, commentId, text) => {
-    try {
-      await engineDB.updateCommunityComment(postId, commentId, text, user?.uid);
-      toast(t("socialFixes.commentUpdated"));
-    } catch (error) {
-      fail(error);
-    }
-  };
-
-  const handleDeleteComment = async (_goalId, commentId) => {
-    const ok = await confirm({
-      title: t("community.deleteCommentTitle"),
-      message: t("community.deleteCommentConfirm"),
-      confirmLabel: t("common.delete"),
-    });
-    if (!ok) return;
-    try {
-      await engineDB.deleteCommunityComment(postId, commentId, user?.uid);
-      toast(t("community.commentDeleted"));
-    } catch (error) {
-      fail(error);
-    }
-  };
+  const visibleGoal = withoutBlocked(goal);
 
   const handleFollow = async () => {
-    if (requireAccount(here) || !ownerId || ownerId === user.uid) return;
+    if (requireAccount(`/post/${postId}`) || !ownerId || ownerId === user.uid) return;
     const isFollowing = following.includes(ownerId);
     setFollowing((current) =>
       isFollowing ? current.filter((id) => id !== ownerId) : [...current, ownerId],
@@ -168,68 +78,8 @@ export function PostPage({ user }) {
       setFollowing((current) =>
         isFollowing ? [...current, ownerId] : current.filter((id) => id !== ownerId),
       );
-      fail(error);
-    }
-  };
-
-  const handleUnshare = async (item) => {
-    const ok = await confirm({
-      title: t("community.unshare"),
-      message: t("socialFixes.unshareConfirm"),
-      confirmLabel: t("common.delete"),
-    });
-    if (!ok) return;
-    try {
-      await engineDB.deleteCommunityGoal(item, user?.uid);
-      toast(t("community.unsharedNotice"));
-      navigate("/community", { replace: true });
-    } catch (error) {
       console.error(error);
-      toast(t("community.unshareError"), "error");
-    }
-  };
-
-  const handleReport = (item) => {
-    if (requireAccount(here)) return;
-    openReport({ targetType: "goal", targetId: item.id, reportedUserId: item.ownerId });
-  };
-
-  const handleReportComment = (item, comment) => {
-    if (requireAccount(here)) return;
-    openReport({
-      targetType: "comment",
-      targetId: `${item.id}#${comment.id}`,
-      reportedUserId: comment.userId || "",
-    });
-  };
-
-  const handleBlock = async (item) => {
-    if (requireAccount(here) || !item.ownerId) return;
-    const ok = await confirm({
-      title: t("community.blockTitle"),
-      message: t("community.blockMessage", { user: item.username || item.author }),
-      confirmLabel: t("community.block"),
-      cancelLabel: t("common.cancel"),
-    });
-    if (!ok) return;
-    try {
-      await engineDB.setUserBlocked(item.ownerId, true, user.uid);
-      toast(t("community.blockedNotice"));
-      navigate("/community", { replace: true });
-    } catch (error) {
-      console.error(error);
-      toast(t("community.blockError"), "error");
-    }
-  };
-
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      trackEvent("post_link_copiado", { postId });
-      toast(t("community.linkCopied"));
-    } catch {
-      // Navegador sem permissão de área de transferência: a URL já está na
-      // barra de endereço, então não vale interromper com um erro.
+      toast(t("socialFixes.writeError"), "error");
     }
   };
 
@@ -279,27 +129,19 @@ export function PostPage({ user }) {
         <GoalCard
           goal={visibleGoal}
           t={t}
-          interactions={interactions}
+          interactions={interactionsFor(visibleGoal)}
           following={following}
           shared
           currentUserId={user?.uid}
-          onLike={handleLike}
-          onComment={handleComment}
-          onRate={handleRate}
-          onShare={handleShare}
-          onUnshare={handleUnshare}
+          {...handlers}
+          onLike={(id) => handlers.onLike(id, visibleGoal)}
           onFollow={handleFollow}
           onOpenProfile={(profileUserId, person) => {
             const source = person || visibleGoal;
             const username = String(source?.username || "").replace(/^@/, "");
             if (username) navigate(`/community/@${username}`);
           }}
-          onEditComment={handleEditComment}
-          onDeleteComment={handleDeleteComment}
-          onReport={handleReport}
-          onReportComment={handleReportComment}
-          onBlock={handleBlock}
-          initialCommentsOpen
+          initialCommentsOpen={openComments}
         />
       </div>
       {reportDialog}
