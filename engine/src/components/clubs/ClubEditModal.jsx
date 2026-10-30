@@ -20,10 +20,9 @@ import {
   CLUB_STYLE_VALUES,
   DEFAULT_CLUB_COLOR,
   DEFAULT_CLUB_COLOR_SECONDARY,
-  DEFAULT_CLUB_ICON,
-  DEFAULT_CLUB_SHAPE,
   clubColorVars,
   clubStyleLabel,
+  normalizeEmblem,
 } from "../../services/clubStyles";
 
 /**
@@ -70,10 +69,7 @@ const fromClub = (club) => ({
     primary: club.colors?.primary || DEFAULT_CLUB_COLOR,
     secondary: club.colors?.secondary || DEFAULT_CLUB_COLOR_SECONDARY,
   },
-  emblem: {
-    shape: club.emblem?.shape || DEFAULT_CLUB_SHAPE,
-    icon: club.emblem?.icon || DEFAULT_CLUB_ICON,
-  },
+  emblem: normalizeEmblem(club.emblem),
 });
 
 const HTTPS = /^https:\/\/\S+$/i;

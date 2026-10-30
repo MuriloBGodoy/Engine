@@ -33,6 +33,9 @@ import { eventFromRow } from "./events";
 import { normalizeFipeBrand } from "./fipeVersion";
 import { isFileTooBig, isImageFile, uploadToStorage } from "./photos";
 import { getMySuspension } from "./suspension";
+// Só a normalização do emblema (listas fechadas, sem hex nem desenho): o
+// vocabulário visual continua morando em clubStyles.js.
+import { normalizeColors, normalizeEmblem } from "./clubStyles";
 
 const PAPEIS_DE_CARGO = ["founder", "captain"];
 
@@ -189,10 +192,10 @@ const normalizeClub = (id, dados = {}, derivados = {}) => ({
   tag: normalizeTag(dados.tag),
   motto: texto(dados.motto, 60),
   description: texto(dados.description, 500),
-  emblem: {
-    shape: texto(dados.emblem?.shape, 12) || "plate",
-    icon: texto(dados.emblem?.icon, 24) || "wheel",
-  },
+  // Forma, símbolo e o emblema com foto (símbolo por cima, cor, posição,
+  // fundo, borda): só chaves e valores das listas de clubStyles.js — as
+  // mesmas que o `club_emblem_ok` do banco aceita.
+  emblem: normalizeEmblem(dados.emblem),
   // NOME da paleta, nunca hex: o hex mora no tema, em clubStyles.js. É o que
   // permite trocar a paleta inteira depois sem tocar em dado nenhum. O padrão
   // é o mesmo `DEFAULT_CLUB_COLOR` de lá — nome de cor fora da paleta não
@@ -291,14 +294,8 @@ const normalizeClubParaEscrita = (form = {}) => {
     tag,
     motto: texto(form.motto, 60),
     description: texto(form.description, 500),
-    emblem: {
-      shape: texto(form.emblem?.shape, 12) || "plate",
-      icon: texto(form.emblem?.icon, 24) || "wheel",
-    },
-    colors: {
-      primary: texto(form.colors?.primary, 32) || "azul-mercosul",
-      secondary: texto(form.colors?.secondary, 32),
-    },
+    emblem: normalizeEmblem(form.emblem),
+    colors: normalizeColors(form.colors),
     logo: String(form.logo ?? ""),
     cover: String(form.cover ?? ""),
     country: texto(form.country, 4).toUpperCase() || "BR",

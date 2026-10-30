@@ -721,7 +721,27 @@ const clubCustomPtBR = {
       "removeLogo": "Tirar a logo",
       "firstTitle": "Ainda não existe nenhum clube",
       "firstCopy": "Funde o primeiro: escolha a foto, o símbolo e as cores, e chame a sua turma.",
-      "firstCta": "Fundar o primeiro clube"
+      "firstCta": "Fundar o primeiro clube",
+      "realSizes": "Prévia nos tamanhos reais",
+      "shapeClipsPhoto": "A foto da logo é recortada na forma escolhida.",
+      "symbolOnPhoto": "Mostrar símbolo sobre a foto",
+      "symbolPosition": "Posição do símbolo",
+      "positions": {
+        "center": "Centro",
+        "corner": "Canto"
+      },
+      "symbolBacking": "Fundo do símbolo",
+      "backings": {
+        "none": "Nenhum",
+        "disc": "Disco",
+        "scrim": "Sombra"
+      },
+      "symbolColor": "Cor do símbolo",
+      "symbolColorAuto": "Automática",
+      "symbolColorHint": "Se a cor sumir no fundo, o símbolo troca sozinho para branco ou escuro.",
+      "borderColor": "Borda",
+      "borderDefault": "Padrão",
+      "borderNone": "Sem borda"
     }
   }
 };
@@ -866,7 +886,27 @@ const clubCustomEnUS = {
       "removeLogo": "Remove logo",
       "firstTitle": "There are no clubs yet",
       "firstCopy": "Found the first one: pick a photo, a symbol and colors, and bring your crew.",
-      "firstCta": "Found the first club"
+      "firstCta": "Found the first club",
+      "realSizes": "Preview at real sizes",
+      "shapeClipsPhoto": "The logo photo is clipped to the chosen shape.",
+      "symbolOnPhoto": "Show symbol over the photo",
+      "symbolPosition": "Symbol position",
+      "positions": {
+        "center": "Center",
+        "corner": "Corner"
+      },
+      "symbolBacking": "Symbol backing",
+      "backings": {
+        "none": "None",
+        "disc": "Disc",
+        "scrim": "Shadow"
+      },
+      "symbolColor": "Symbol color",
+      "symbolColorAuto": "Automatic",
+      "symbolColorHint": "If the color disappears against its background, the symbol switches to white or dark on its own.",
+      "borderColor": "Border",
+      "borderDefault": "Default",
+      "borderNone": "No border"
     }
   }
 };
@@ -1011,7 +1051,27 @@ const clubCustomEsES = {
       "removeLogo": "Quitar el logo",
       "firstTitle": "Todavía no hay ningún club",
       "firstCopy": "Funda el primero: elige la foto, el símbolo y los colores, y llama a tu grupo.",
-      "firstCta": "Fundar el primer club"
+      "firstCta": "Fundar el primer club",
+      "realSizes": "Vista previa en tamaños reales",
+      "shapeClipsPhoto": "La foto del logo se recorta con la forma elegida.",
+      "symbolOnPhoto": "Mostrar símbolo sobre la foto",
+      "symbolPosition": "Posición del símbolo",
+      "positions": {
+        "center": "Centro",
+        "corner": "Esquina"
+      },
+      "symbolBacking": "Fondo del símbolo",
+      "backings": {
+        "none": "Ninguno",
+        "disc": "Disco",
+        "scrim": "Sombra"
+      },
+      "symbolColor": "Color del símbolo",
+      "symbolColorAuto": "Automático",
+      "symbolColorHint": "Si el color se pierde en el fondo, el símbolo cambia solo a blanco u oscuro.",
+      "borderColor": "Borde",
+      "borderDefault": "Predeterminado",
+      "borderNone": "Sin borde"
     }
   }
 };

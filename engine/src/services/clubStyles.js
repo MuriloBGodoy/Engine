@@ -191,6 +191,103 @@ export const CLUB_ICON_PATHS = {
 };
 
 export const DEFAULT_CLUB_ICON = "wheel";
+
+/**
+ * O emblema com foto (29/10/2026). A logo é recortada na FORMA escolhida, e
+ * por cima dela pode ir o símbolo, com cor, posição e fundo próprios. A borda
+ * da forma vale com e sem foto.
+ *
+ *   showSymbolOnPhoto  liga o símbolo por cima da foto (sem foto, ele sempre
+ *                      aparece no emblema gerado)
+ *   symbolColor        nome da paleta, ou "" = branco
+ *   symbolPosition     "center" | "corner" (selo no canto inferior direito)
+ *   symbolBacking      "none" | "disc" (disco na cor do clube) | "scrim"
+ *                      (sombra escura atrás do símbolo)
+ *   borderColor        nome da paleta, "none" = sem borda, "" = padrão
+ *                      (branco translúcido, o de sempre)
+ *
+ * As listas fechadas moram aqui e no `club_emblem_ok` do banco (migration
+ * 20261029150000) — o teste do PGlite confere que a paleta das duas bate.
+ */
+export const CLUB_SYMBOL_POSITIONS = ["center", "corner"];
+export const CLUB_SYMBOL_BACKINGS = ["none", "disc", "scrim"];
+export const DEFAULT_SYMBOL_POSITION = "corner";
+export const DEFAULT_SYMBOL_BACKING = "disc";
+export const CLUB_BORDER_WIDTH = 3.5; // no viewBox 100: 3,5% do lado
+
+const isPaletteId = (id) => CLUB_PALETTE.some((color) => color.id === id);
+
+/** As duas cores como gravar: nome fora da paleta (dado antigo) vira o padrão. */
+export const normalizeColors = (colors = {}) => ({
+  primary: isPaletteId(colors?.primary) ? colors.primary : DEFAULT_CLUB_COLOR,
+  secondary: isPaletteId(colors?.secondary) ? colors.secondary : "",
+});
+
+/** O emblema como gravar: só chaves conhecidas, só valores das listas. */
+export function normalizeEmblem(emblem = {}) {
+  const e = emblem && typeof emblem === "object" ? emblem : {};
+  return {
+    shape: CLUB_SHAPE_VALUES.includes(e.shape) ? e.shape : DEFAULT_CLUB_SHAPE,
+    icon: CLUB_ICON_VALUES.includes(e.icon) ? e.icon : DEFAULT_CLUB_ICON,
+    showSymbolOnPhoto: e.showSymbolOnPhoto === true,
+    symbolColor: isPaletteId(e.symbolColor) ? e.symbolColor : "",
+    symbolPosition: CLUB_SYMBOL_POSITIONS.includes(e.symbolPosition) ? e.symbolPosition : DEFAULT_SYMBOL_POSITION,
+    symbolBacking: CLUB_SYMBOL_BACKINGS.includes(e.symbolBacking) ? e.symbolBacking : DEFAULT_SYMBOL_BACKING,
+    borderColor: e.borderColor === "none" || isPaletteId(e.borderColor) ? e.borderColor : "",
+  };
+}
+
+const luminance = (hex) => {
+  const channels = [1, 3, 5]
+    .map((i) => parseInt(String(hex).slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+};
+/** Razão de contraste WCAG entre dois hex `#rrggbb`. */
+export const contrastRatio = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+const SYMBOL_LIGHT = "#ffffff";
+const SYMBOL_DARK = "#18202c";
+const SCRIM_TONE = "#2a2d33"; // o que a sombra escura vira sobre uma foto média
+
+/**
+ * Tudo que o desenho do emblema precisa, já resolvido em hex.
+ *
+ * Contraste: o símbolo é conferido contra o que está ATRÁS dele (a faixa da
+ * placa, o corpo da forma, o disco ou a sombra). Abaixo de 3:1 — o mínimo
+ * de WCAG para elemento gráfico — ele cai sozinho para branco ou grafite
+ * escuro, o que contrastar mais. É o caso "símbolo vinho num disco vinho".
+ * Sem fundo nenhum sobre a foto não há o que medir: o símbolo ganha sombra.
+ */
+export function resolveEmblem(club, { hasPhoto = false } = {}) {
+  const emblem = normalizeEmblem(club?.emblem);
+  const primary = paletteEntry(club?.colors?.primary || DEFAULT_CLUB_COLOR);
+  const secondary = paletteEntry(club?.colors?.secondary || DEFAULT_CLUB_COLOR_SECONDARY);
+  const symbolBase = emblem.symbolColor ? paletteEntry(emblem.symbolColor).hex : SYMBOL_LIGHT;
+
+  let behind = null;
+  if (!hasPhoto) behind = emblem.shape === "plate" ? secondary.hex : primary.hex;
+  else if (emblem.symbolBacking === "disc") behind = primary.hex;
+  else if (emblem.symbolBacking === "scrim") behind = SCRIM_TONE;
+
+  let symbolHex = symbolBase;
+  if (behind && contrastRatio(symbolBase, behind) < 3) {
+    symbolHex = contrastRatio(SYMBOL_LIGHT, behind) >= contrastRatio(SYMBOL_DARK, behind) ? SYMBOL_LIGHT : SYMBOL_DARK;
+  }
+
+  return {
+    ...emblem,
+    fill: primary.hex,
+    fill2: secondary.hex,
+    symbolHex,
+    symbolShadow: hasPhoto && emblem.symbolBacking === "none",
+    // null = sem borda; "" = a borda padrão (branco translúcido).
+    borderHex: emblem.borderColor === "none" ? null : emblem.borderColor ? paletteEntry(emblem.borderColor).hex : "",
+  };
+}
 export const clubIconLabel = (t, value) =>
   value ? t(`clubs.icons.${value}`, { defaultValue: value }) : "";
 
@@ -218,7 +315,7 @@ export function emptyClubDraft() {
     tag: "",
     motto: "",
     description: "",
-    emblem: { shape: DEFAULT_CLUB_SHAPE, icon: DEFAULT_CLUB_ICON },
+    emblem: normalizeEmblem({}),
     colors: { primary: DEFAULT_CLUB_COLOR, secondary: DEFAULT_CLUB_COLOR_SECONDARY },
     cover: "",
     country: "BR",

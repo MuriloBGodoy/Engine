@@ -19,6 +19,7 @@
  *   ?vazio=1                       estados vazios (clube sem nada, zero clubes)
  *   ?tela=editar                   o "Personalizar" (29/10/2026)
  *   ?fotos=1                       clube com capa e logo próprias
+ *   ?tela=emblemas                 combinações do emblema com foto, nos tamanhos reais
  */
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -28,6 +29,7 @@ import { ClubCard } from "./components/clubs/ClubCard";
 import { ClubHeader, ClubTabs } from "./components/clubs/ClubHeader";
 import { ClubWall, ClubGallery, ClubGarage, ClubMeetups, ClubMemberList, ClubAbout } from "./components/clubs/ClubPanels";
 import { ClubCreateModal } from "./components/clubs/ClubCreateModal";
+import { ClubEmblem } from "./components/clubs/ClubEmblem";
 import { ClubEditModal } from "./components/clubs/ClubEditModal";
 import { clubColorVars } from "./services/clubStyles";
 import "./index.css";
@@ -45,6 +47,8 @@ const FOTOS = QUERY.get("fotos") === "1";
 const svgUri = (w, h, body) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`)}`;
 const CAPA = svgUri(1200, 400, '<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#0b1d3a"/><stop offset="1" stop-color="#d92534"/></linearGradient></defs><rect width="1200" height="400" fill="url(#g)"/><circle cx="900" cy="330" r="60" fill="#111"/><circle cx="300" cy="330" r="60" fill="#111"/><rect x="200" y="200" width="800" height="110" rx="40" fill="#e9ebf0"/>');
+// Uma "foto" com textura e tons misturados, como foto de carro de verdade.
+const FOTO_LOGO = svgUri(400, 400, '<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc3e6"/><stop offset=".55" stop-color="#f3d9b1"/><stop offset=".56" stop-color="#555"/><stop offset="1" stop-color="#2b2b2b"/></linearGradient></defs><rect width="400" height="400" fill="url(#s)"/><rect x="60" y="170" width="280" height="80" rx="30" fill="#c0392b"/><rect x="110" y="130" width="170" height="60" rx="24" fill="#a93226"/><circle cx="120" cy="260" r="34" fill="#111"/><circle cx="290" cy="260" r="34" fill="#111"/>');
 const LOGO = svgUri(400, 400, '<rect width="400" height="400" fill="#111827"/><circle cx="200" cy="200" r="150" fill="none" stroke="#facc4b" stroke-width="24"/><text x="200" y="230" font-size="110" font-family="Arial" font-weight="900" text-anchor="middle" fill="#facc4b">CVC</text>');
 
 const emDias = (n) => {
@@ -215,11 +219,43 @@ function Descoberta() {
   );
 }
 
+// Foto + forma + símbolo + borda: as combinações que mais quebram.
+const COMBOS = [
+  { label: "placa, sem símbolo", photo: true, colors: { primary: "azul-mercosul", secondary: "grafite" }, emblem: { shape: "plate", icon: "car" } },
+  { label: "escudo, canto, disco", photo: true, colors: { primary: "vinho", secondary: "preto-fosco" }, emblem: { shape: "shield", icon: "flame", showSymbolOnPhoto: true, symbolPosition: "corner", symbolBacking: "disc", borderColor: "amarelo-pista" } },
+  { label: "círculo, centro, sombra", photo: true, colors: { primary: "verde-bandeira" }, emblem: { shape: "circle", icon: "turbo", showSymbolOnPhoto: true, symbolPosition: "center", symbolBacking: "scrim", symbolColor: "amarelo-pista", borderColor: "none" } },
+  { label: "hex, canto, sem fundo", photo: true, colors: { primary: "roxo-neon" }, emblem: { shape: "hex", icon: "trophy", showSymbolOnPhoto: true, symbolPosition: "corner", symbolBacking: "none", borderColor: "prata" } },
+  { label: "disco vinho + símbolo vinho (cai p/ branco)", photo: true, colors: { primary: "vinho" }, emblem: { shape: "circle", icon: "crown", showSymbolOnPhoto: true, symbolPosition: "center", symbolBacking: "disc", symbolColor: "vinho" } },
+  { label: "gerado, borda amarela, símbolo amarelo", photo: false, colors: { primary: "preto-fosco", secondary: "grafite" }, emblem: { shape: "shield", icon: "motorbike", symbolColor: "amarelo-pista", borderColor: "amarelo-pista" } },
+  { label: "gerado amarelo + símbolo amarelo (cai p/ escuro)", photo: false, colors: { primary: "amarelo-pista", secondary: "amarelo-pista" }, emblem: { shape: "plate", icon: "wheel", symbolColor: "amarelo-pista", borderColor: "none" } },
+];
+
+function Emblemas() {
+  return (
+    <div className="space-y-3">
+      {COMBOS.map((combo) => {
+        const c = clube({ colors: combo.colors, emblem: combo.emblem, logoUrl: combo.photo ? FOTO_LOGO : "" });
+        return (
+          <div key={combo.label} className="rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3">
+            <p className="mb-2 text-[12px] font-bold text-[var(--engine-text-muted)]">{combo.label}</p>
+            <div className="flex items-end gap-4">
+              {[84, 64, 40, 28].map((size) => (
+                <ClubEmblem key={size} club={c} size={size} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function App() {
   return (
     <div className="mx-auto w-full max-w-5xl p-4">
       {TELA === "clube" ? <PaginaDoClube /> : null}
       {TELA === "descoberta" ? <Descoberta /> : null}
+      {TELA === "emblemas" ? <Emblemas /> : null}
       {TELA === "editar" ? (
         <ClubEditModal
           club={clube({ coverUrl: "", logoUrl: "" })}
