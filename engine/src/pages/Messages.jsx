@@ -15,9 +15,16 @@ import {
   CheckCheck,
   Flag,
   UserX,
+  CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import {
   attachmentSummary,
+  chatErrorKey,
+  conversationTab,
+  conversationVisible,
+  isServiceConversation,
+  setServiceConversationStatus,
   conversationPartner,
   conversationUnread,
   dayKey,
@@ -43,9 +50,18 @@ import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { GiphyPicker } from "../components/GiphyPicker";
 import { compressImage, readFileAsDataUrl, blobToDataUrl } from "../services/imageCompression";
+import { QuoteBubbleBody, ServiceContextCard, ServiceStatusPill } from "../components/messages/ServiceThread";
+import { QUOTE_DEFAULT_LIMITS } from "../services/quotes";
 
-const matchesQuery = (person, term) =>
-  `${person.author || ""} ${person.username || ""} ${person.city || ""}`
+// Abas da caixa (migration 20261030120000). "Conversas" é a de sempre;
+// "Serviços" são os fios em que eu sou o cliente; "Clientes", os em que eu
+// sou o prestador. Como o Principal/Geral do Instagram para conta
+// profissional: o trabalho não se mistura com os amigos.
+const TABS = ["direct", "services", "clients"];
+const STATUS_FILTERS = ["all", "new", "replied", "closed"];
+
+const matchesQuery = (person, term, extra = "") =>
+  `${person.author || ""} ${person.username || ""} ${person.city || ""} ${extra}`
     .toLowerCase()
     .includes(term);
 
@@ -75,6 +91,9 @@ export function Messages({ user, settings }) {
   const [previewImage, setPreviewImage] = useState(null);
   const [compressing, setCompressing] = useState(false);
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
+  const [tab, setTab] = useState("direct");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusBusy, setStatusBusy] = useState(false);
   const fileInputRef = useRef(null);
 
   const userId = user?.uid || "";
@@ -102,6 +121,38 @@ export function Messages({ user, settings }) {
     [conversationId, conversations],
   );
 
+  // Fio de serviço que o cliente abriu e não mandou nada: só ele vê.
+  const visibleConversations = useMemo(
+    () =>
+      conversations.filter(
+        (item) => item.id === conversationId || conversationVisible(item, userId),
+      ),
+    [conversations, conversationId, userId],
+  );
+
+  // Não lidas e presença por aba. A aba só aparece quando tem conversa.
+  const tabStats = useMemo(() => {
+    const stats = Object.fromEntries(TABS.map((key) => [key, { count: 0, unread: 0 }]));
+    visibleConversations.forEach((item) => {
+      const key = conversationTab(item, userId);
+      stats[key].count += 1;
+      stats[key].unread += conversationUnread(item, userId);
+    });
+    return stats;
+  }, [visibleConversations, userId]);
+  const shownTabs = TABS.filter((key) => key === "direct" || tabStats[key].count > 0);
+
+  // Abrir um fio pelo link (aviso do sino, botão do anúncio) leva para a aba
+  // dele. Ajuste de estado durante o render, sem efeito: a aba segue a
+  // conversa aberta, e a pessoa ainda pode trocar de aba depois.
+  const activeTab = activeConversation ? conversationTab(activeConversation, userId) : "";
+  const [syncedFor, setSyncedFor] = useState("");
+  if (activeConversation && syncedFor !== activeConversation.id) {
+    setSyncedFor(activeConversation.id);
+    if (activeTab !== tab) setTab(activeTab);
+  }
+  const currentTab = shownTabs.includes(tab) ? tab : "direct";
+
   const partner = useMemo(
     () => (activeConversation ? conversationPartner(activeConversation, userId) : null),
     [activeConversation, userId],
@@ -124,16 +175,25 @@ export function Messages({ user, settings }) {
   });
 
   const filteredConversations = useMemo(() => {
-    if (!term) return conversations;
-    return conversations.filter((conversation) =>
-      matchesQuery(conversationPartner(conversation, userId), term),
+    let list = visibleConversations.filter((item) => conversationTab(item, userId) === currentTab);
+    if (currentTab === "clients" && statusFilter !== "all") {
+      list = list.filter((item) => (item.serviceStatus || "new") === statusFilter);
+    }
+    if (!term) return list;
+    return list.filter((conversation) =>
+      matchesQuery(
+        conversationPartner(conversation, userId),
+        term,
+        `${conversation.context?.listingTitle || ""} ${conversation.context?.car || ""}`,
+      ),
     );
-  }, [conversations, term, userId]);
+  }, [visibleConversations, currentTab, statusFilter, term, userId]);
 
   // Pessoas da comunidade que ainda não têm conversa aberta. Some quando já
   // existem conversas e nada foi buscado (a lista não é um diretório), mas
   // aparece de cara para quem ainda não conversou com ninguém.
   const suggestions = useMemo(() => {
+    if (currentTab !== "direct") return [];
     if (!term && conversations.length) return [];
 
     const known = new Set(
@@ -150,7 +210,7 @@ export function Messages({ user, settings }) {
         return true;
       })
       .slice(0, 8);
-  }, [conversations, foundProfiles, term, userId]);
+  }, [conversations, currentTab, foundProfiles, term, userId]);
 
   const openConversationWith = async (profile) => {
     try {
@@ -182,7 +242,12 @@ export function Messages({ user, settings }) {
       console.error(error);
       setDraft(text);
       // Bloqueio (de qualquer um dos lados) é recusado pelo banco.
-      toast(t(/blocked/.test(String(error?.message || error?.code || "")) ? "socialFixes.blockedAction" : "messages.sendError"));
+      toast(
+        t(
+          chatErrorKey(error) ||
+            (/blocked/.test(String(error?.message || error?.code || "")) ? "socialFixes.blockedAction" : "messages.sendError"),
+        ),
+      );
     } finally {
       setSending(false);
     }
@@ -269,7 +334,7 @@ export function Messages({ user, settings }) {
       });
     } catch (error) {
       console.error(error);
-      toast(t("messages.sendError"));
+      toast(t(chatErrorKey(error) || "messages.sendError"));
     } finally {
       setSending(false);
       setCompressing(false);
@@ -295,9 +360,34 @@ export function Messages({ user, settings }) {
       });
     } catch (error) {
       console.error(error);
-      toast(t("messages.sendError"));
+      toast(t(chatErrorKey(error) || "messages.sendError"));
     } finally {
       setSending(false);
+    }
+  };
+
+  // Prestador marca o fio como fechado (ou reabre).
+  const isService = isServiceConversation(activeConversation || {});
+  const iAmProvider = isService && activeConversation?.providerId === userId;
+  const awaitingProvider =
+    isService &&
+    !iAmProvider &&
+    activeConversation?.startedBy === userId &&
+    !activeConversation?.firstReplyAt &&
+    Boolean(activeConversation?.lastMessage);
+  const toggleClosed = async () => {
+    if (!iAmProvider || statusBusy) return;
+    setStatusBusy(true);
+    try {
+      await setServiceConversationStatus(
+        conversationId,
+        activeConversation.serviceStatus === "closed" ? "replied" : "closed",
+      );
+    } catch (error) {
+      console.error(error);
+      toast(t("serviceChat.status.error"));
+    } finally {
+      setStatusBusy(false);
     }
   };
 
@@ -331,6 +421,54 @@ export function Messages({ user, settings }) {
                   className="h-11 w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] pl-9 pr-3 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
                 />
               </div>
+              {shownTabs.length > 1 && (
+                <div
+                  role="tablist"
+                  aria-label={t("serviceChat.tabs.label")}
+                  className="mt-3 flex gap-1 rounded-xl bg-[var(--engine-surface-2)] p-1"
+                >
+                  {shownTabs.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={currentTab === key}
+                      onClick={() => setTab(key)}
+                      className={`flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-bold transition ${
+                        currentTab === key
+                          ? "bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-sm"
+                          : "text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+                      }`}
+                    >
+                      <span className="truncate">{t(`serviceChat.tabs.${key}`)}</span>
+                      {tabStats[key].unread > 0 && (
+                        <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-[var(--engine-accent)] px-1 text-[9px] font-black text-white">
+                          {tabStats[key].unread > 9 ? "9+" : tabStats[key].unread}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {currentTab === "clients" && (
+                <div className="engine-scroll -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+                  {STATUS_FILTERS.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={statusFilter === key}
+                      onClick={() => setStatusFilter(key)}
+                      className={`min-h-8 shrink-0 rounded-full border px-3 text-[11px] font-bold transition ${
+                        statusFilter === key
+                          ? "border-[var(--engine-accent)] bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
+                          : "border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+                      }`}
+                    >
+                      {t(`serviceChat.status.${key}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="engine-scroll min-h-0 flex-1 overflow-y-auto">
@@ -344,6 +482,7 @@ export function Messages({ user, settings }) {
                   active={conversation.id === conversationId}
                   youLabel={t("messages.you")}
                   emptyLabel={t("messages.noMessagesYet")}
+                  quoteLabel={t("serviceChat.quoteBubble")}
                   onClick={() => {
                     setSearch("");
                     navigate(`/messages/${conversation.id}`);
@@ -401,10 +540,22 @@ export function Messages({ user, settings }) {
                     <MessageCircle size={20} />
                   </div>
                   <p className="mt-4 text-sm font-bold text-[var(--engine-text)]">
-                    {term ? t("messages.noResults") : t("messages.empty")}
+                    {term
+                      ? t("messages.noResults")
+                      : currentTab === "services"
+                        ? t("serviceChat.emptyServices")
+                        : currentTab === "clients"
+                          ? t("serviceChat.emptyClients")
+                          : t("messages.empty")}
                   </p>
                   <p className="mt-2 max-w-xs text-xs font-medium leading-5 text-[var(--engine-text-muted)]">
-                    {term ? t("messages.noResultsHint") : t("messages.emptyHint")}
+                    {term
+                      ? t("messages.noResultsHint")
+                      : currentTab === "services"
+                        ? t("serviceChat.emptyServicesHint")
+                        : currentTab === "clients"
+                          ? t("serviceChat.emptyClientsHint")
+                          : t("messages.emptyHint")}
                   </p>
                 </div>
               )}
@@ -430,10 +581,24 @@ export function Messages({ user, settings }) {
                 <p className="truncate text-sm font-bold text-[var(--engine-text)]">
                   {partner?.author || t("messages.title")}
                 </p>
-                <p className="truncate text-xs font-medium text-[var(--engine-text-subtle)]">
-                  {partner?.username}
+                <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-[var(--engine-text-subtle)]">
+                  <span className="truncate">{partner?.username}</span>
+                  {iAmProvider && <ServiceStatusPill status={activeConversation?.serviceStatus} />}
                 </p>
               </div>
+
+              {iAmProvider && (
+                <button
+                  type="button"
+                  onClick={toggleClosed}
+                  disabled={statusBusy}
+                  title={activeConversation?.serviceStatus === "closed" ? t("serviceChat.status.reopen") : t("serviceChat.status.close")}
+                  aria-label={activeConversation?.serviceStatus === "closed" ? t("serviceChat.status.reopen") : t("serviceChat.status.close")}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
+                >
+                  {activeConversation?.serviceStatus === "closed" ? <RotateCcw size={18} /> : <CheckCircle2 size={19} />}
+                </button>
+              )}
 
               {partner?.username && (
                 <button
@@ -459,6 +624,8 @@ export function Messages({ user, settings }) {
               )}
             </header>
 
+            {isService && <ServiceContextCard conversation={activeConversation} locale={locale} />}
+
             <MessageList
               messages={messages}
               userId={userId}
@@ -470,6 +637,11 @@ export function Messages({ user, settings }) {
               onReport={handleReportMessage}
             />
 
+            {awaitingProvider && !partner?.deleted && (
+              <p className="shrink-0 border-t border-[var(--engine-border)] px-4 pt-2 text-[11px] font-medium text-[var(--engine-text-subtle)]">
+                {t("serviceChat.awaiting", { count: QUOTE_DEFAULT_LIMITS.maxMessagesBeforeReply })}
+              </p>
+            )}
             {partner?.deleted ? (
               <p className="shrink-0 border-t border-[var(--engine-border)] p-4 text-center text-sm text-[var(--engine-text-muted)]">
                 {t("messages.accountDeleted")}
@@ -582,13 +754,15 @@ function ConversationRow({
   active,
   youLabel,
   emptyLabel,
+  quoteLabel,
   onClick,
 }) {
   const partner = conversationPartner(conversation, userId);
   const unread = conversationUnread(conversation, userId);
   const last = conversation.lastMessage;
+  const service = isServiceConversation(conversation);
   const preview = last
-    ? `${last.senderId === userId ? `${youLabel}: ` : ""}${
+    ? `${last.senderId === userId ? `${youLabel}: ` : ""}${last.type === "quote" ? `${quoteLabel}: ` : ""}${
         last.text || attachmentSummary(null)
       }`
     : emptyLabel;
@@ -608,10 +782,19 @@ function ConversationRow({
           <span className="min-w-0 truncate text-sm font-bold text-[var(--engine-text)]">
             {partner.author}
           </span>
+          {service && conversation.providerId === userId && (
+            <ServiceStatusPill status={conversation.serviceStatus} className="ml-auto" />
+          )}
           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--engine-text-subtle)]">
             {formatConversationTime(conversation.updatedAt, locale, dayLabels)}
           </span>
         </span>
+        {service && conversation.context?.listingTitle && (
+          <span className="block truncate text-[11px] font-semibold text-[var(--engine-accent)]">
+            {conversation.context.listingTitle}
+            {conversation.context.car ? ` · ${conversation.context.car}` : ""}
+          </span>
+        )}
         <span className="mt-0.5 flex items-center gap-2">
           <span
             className={`min-w-0 flex-1 truncate text-[13px] ${
@@ -731,6 +914,8 @@ function MessageBubble({ message, mine, locale, t, onOpenPost, onDelete, onRepor
             className="mb-2 max-h-64 w-full rounded-lg object-cover"
           />
         )}
+
+        {message.type === "quote" && <QuoteBubbleBody quote={message.quote} mine={mine} locale={locale} />}
 
         {attachment && (
           <button

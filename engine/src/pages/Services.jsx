@@ -94,6 +94,7 @@ import { authPath } from "../services/authRedirect";
 import { BioLinkCard, ShareListingButton } from "../components/services/ShareListing";
 import { ListingMonthPanel } from "../components/services/ListingMonthPanel";
 import { QuoteEntryCard } from "../components/services/QuoteEntryCard";
+import { MessageProviderButton } from "../components/services/MessageProvider";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
@@ -385,7 +386,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
+function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
   const { t } = useTranslation();
   const ModeIcon = modeIcons[listing.serviceMode] || BriefcaseBusiness;
   const phone = normalizeWhatsApp(listing.whatsapp);
@@ -635,21 +636,10 @@ function ServiceCard({ listing, isMine, onEdit, onDelete, onOpen }) {
               <WhatsAppIcon className="shrink-0" size={16} />
               <span className="hidden sm:inline">{t("services.cardActions.chat")}</span>
             </a>
-            <a
-              href={listing.email ? `mailto:${listing.email}?subject=${encodeURIComponent(t("services.emailSubject", { title: listing.title }))}` : undefined}
-              onClick={stopAction}
-              aria-disabled={!listing.email}
-              aria-label={t("services.sendEmail")}
-              className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9 ${
-                listing.email
-                  ? "bg-[var(--engine-accent)] text-white hover:brightness-95"
-                  : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
-              }`}
-              title={t("services.sendEmail")}
-            >
-              <Mail className="shrink-0" size={16} />
-              <span className="hidden sm:inline">{t("services.cardActions.email")}</span>
-            </a>
+            {/* Mensagem pelo Engine no lugar do e-mail: a conversa fica em
+                Mensagens › Serviços, amarrada ao anúncio. O e-mail continua
+                no detalhe e na página pública. */}
+            <MessageProviderButton listing={listing} user={user} variant="card" />
             <a
               href={showMap ? getDirectionsUrl(listing) : undefined}
               onClick={stopAction}
@@ -892,6 +882,7 @@ function ServiceDetailModal({ listing, isMine, user, moderation = null, onClose,
             </div>
 
             <div className="grid gap-3">
+              {!isMine && <MessageProviderButton listing={listing} user={user} variant="block" />}
               <ContactButton
                 disabled={!phone}
                 href={getWhatsAppHref(listing, t)}
@@ -3152,6 +3143,7 @@ export function Services({ user, settings }) {
               <ServiceCard
                 listing={listing}
                 isMine={listing.ownerId === user?.uid}
+                user={user}
                 onEdit={openEditor}
                 onDelete={deleteListing}
                 onOpen={openDetail}

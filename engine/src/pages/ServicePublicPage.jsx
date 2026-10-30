@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   BriefcaseBusiness,
@@ -35,6 +35,7 @@ import { ShareListingButton } from "../components/services/ShareListing";
 import { ServiceReviews } from "../components/services/ServiceReviews";
 import { useToast } from "../components/ToastProvider";
 import { ReportListingButton } from "../components/services/ReportListing";
+import { MESSAGE_QUERY_FLAG, MessageProviderButton } from "../components/services/MessageProvider";
 
 /**
  * Página pública de um anúncio: /servicos/<slug>. O "link da bio".
@@ -214,6 +215,9 @@ export function ServicePublicPage({ user }) {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  // Volta do login pelo "Mensagem" (?mensagem=1): a folha abre sozinha.
+  const [searchParams] = useSearchParams();
+  const autoMessage = searchParams.get(MESSAGE_QUERY_FLAG) === "1";
   const [result, setResult] = useState({ slug: null, listing: null, failed: false });
   const loading = result.slug !== slug;
   const listing = loading ? null : result.listing;
@@ -310,7 +314,9 @@ export function ServicePublicPage({ user }) {
     ? `mailto:${listing.email}?subject=${encodeURIComponent(t("services.emailSubject", { title: listing.title }))}`
     : undefined;
 
-  const contactCard = (
+  // Função: o cartão aparece duas vezes (celular e lateral) e só a lateral
+  // pode abrir a folha sozinha.
+  const contactCard = (autoOpen = false) => (
     <div className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4 sm:p-5">
       <div className="flex min-w-0 items-center gap-3">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] font-display font-extrabold text-white">
@@ -334,6 +340,9 @@ export function ServicePublicPage({ user }) {
         </span>
       </div>
       <div className="mt-4 hidden gap-2 lg:grid">
+        {approved && !isOwner && (
+          <MessageProviderButton listing={listing} user={user} variant="block" autoOpen={autoOpen} />
+        )}
         {whatsappHref && (
           <a
             href={whatsappHref}
@@ -396,7 +405,7 @@ export function ServicePublicPage({ user }) {
                 </span>
               </p>
 
-              <div className="mt-5 lg:hidden">{contactCard}</div>
+              <div className="mt-5 lg:hidden">{contactCard()}</div>
 
               <section className="mt-7">
                 <SectionTitle>{t("services.publicPage.about")}</SectionTitle>
@@ -472,7 +481,7 @@ export function ServicePublicPage({ user }) {
           </div>
 
           <aside className="hidden lg:block">
-            <div className="sticky top-20">{contactCard}</div>
+            <div className="sticky top-20">{contactCard(autoMessage && isDesktopWidth())}</div>
           </aside>
         </div>
       </main>
@@ -481,7 +490,24 @@ export function ServicePublicPage({ user }) {
           polegar, acima da barra de gestos. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--engine-border)] bg-[var(--engine-surface)] px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-3 lg:hidden">
         <div className="mx-auto flex max-w-5xl gap-2">
-          {whatsappHref ? (
+          {approved && !isOwner ? (
+            <>
+              <MessageProviderButton listing={listing} user={user} variant="bar" autoOpen={autoMessage && !isDesktopWidth()} />
+              {whatsappHref && (
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onWhatsApp}
+                  aria-label={t("services.whatsapp")}
+                  title={t("services.whatsapp")}
+                  className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white transition hover:bg-emerald-700"
+                >
+                  <WhatsAppIcon size={18} />
+                </a>
+              )}
+            </>
+          ) : whatsappHref ? (
             <a
               href={whatsappHref}
               target="_blank"
@@ -505,7 +531,7 @@ export function ServicePublicPage({ user }) {
               {t("services.publicPage.noContact")}
             </p>
           )}
-          {whatsappHref && emailHref && (
+          {whatsappHref && emailHref && !(approved && !isOwner) && (
             <a
               href={emailHref}
               aria-label={t("services.sendEmail")}
@@ -528,6 +554,11 @@ export function ServicePublicPage({ user }) {
     </PageShell>
   );
 }
+
+// A folha de contato abre uma vez só: no cartão lateral (desktop) ou na
+// barra fixa (celular), conforme a largura em que a pessoa voltou do login.
+const isDesktopWidth = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(min-width: 1024px)").matches;
 
 function PortfolioSection({ listing, t }) {
   const has = listing.instagram || listing.tiktok || listing.website || listing.videoUrl;

@@ -28,6 +28,16 @@ const conversationFromRow = (row) => ({
   lastMessage: row.last_message || null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  // Fio de serviço (migration 20261030120000): amarrado a um anúncio.
+  kind: row.kind || "direct",
+  listingId: row.listing_id || "",
+  customerId: row.customer_id || "",
+  providerId: row.provider_id || "",
+  quoteRequestId: row.quote_request_id || "",
+  serviceStatus: row.service_status || "",
+  context: row.context || {},
+  startedBy: row.started_by || "",
+  firstReplyAt: row.first_reply_at || null,
 });
 
 const messageFromRow = (row) => ({
@@ -318,4 +328,87 @@ export const formatConversationTime = (value, locale = "pt-BR", labels = {}) => 
 export const dayKey = (value) => {
   const date = toDate(value);
   return date ? date.toDateString() : "";
+};
+
+/* ===== Conversa cliente ↔ prestador (fio de serviço) ===== */
+
+/**
+ * Um fio por anúncio e cliente: `svc__<anúncio>__<cliente>`. O banco monta o
+ * mesmo id em `start_service_conversation` e quando o prestador responde um
+ * orçamento, então dá para navegar direto sem perguntar.
+ */
+export const serviceConversationId = (listingId, customerId) =>
+  `svc__${listingId}__${customerId}`;
+
+export const isServiceConversation = (conversation = {}) => conversation.kind === "service";
+
+/**
+ * Aba da conversa em Mensagens:
+ *   direct   — amigos e comunidade;
+ *   services — eu sou o cliente (fios com prestadores);
+ *   clients  — eu sou o prestador.
+ */
+export const conversationTab = (conversation = {}, userId = "") => {
+  if (!isServiceConversation(conversation)) return "direct";
+  return conversation.providerId === userId ? "clients" : "services";
+};
+
+/**
+ * Fio aberto pelo cliente e ainda sem mensagem nenhuma: só ele vê na lista.
+ * Abrir a tela de contato e desistir não pode virar um "novo cliente" vazio
+ * na caixa do prestador.
+ */
+export const conversationVisible = (conversation = {}, userId = "") =>
+  Boolean(conversation.lastMessage) || !conversation.startedBy || conversation.startedBy === userId;
+
+// Códigos que o banco devolve e a tela sabe explicar (serviceChat.errors.*).
+const CHAT_ERRORS = new Set([
+  "not-signed-in", "not-found", "own-listing", "blocked", "too-many-open",
+  "rate-limited", "awaiting-reply", "invalid-status", "account-suspended",
+]);
+
+export const chatErrorKey = (error) => {
+  const code = String(error?.message || error?.code || "");
+  return CHAT_ERRORS.has(code) ? `serviceChat.errors.${code}` : "";
+};
+
+/**
+ * Abre (ou reabre) o fio com o prestador do anúncio. `car` é o rótulo do
+ * carro (marca, modelo, ano) quando o cliente escolhe mandar; vazio mantém o
+ * que já estava. `quoteRequestId` amarra um pedido de orçamento MEU ao fio.
+ */
+export const startServiceConversation = async (listingId, { car = "", quoteRequestId = null } = {}) =>
+  must(
+    await supabase.rpc("start_service_conversation", {
+      p_listing: String(listingId || ""),
+      p_car: String(car || "").trim().slice(0, 120),
+      p_quote_request: quoteRequestId || null,
+    }),
+  );
+
+/** Cartão fixado no topo do fio: anúncio, carro, pedido e resposta. Null fora de fio de serviço. */
+export const fetchServiceContext = async (conversationId) => {
+  if (!conversationId) return null;
+  return must(await supabase.rpc("service_conversation_context", { p_conversation: conversationId }));
+};
+
+/** Só o prestador: "new" | "replied" | "closed". */
+export const setServiceConversationStatus = async (conversationId, status) =>
+  must(
+    await supabase.rpc("set_service_conversation_status", {
+      p_conversation: conversationId,
+      p_status: status,
+    }),
+  );
+
+/** A conversa, se existe e eu sou dela (a RLS esconde o resto). Null se não. */
+export const findConversation = async (conversationId) => {
+  if (!conversationId) return null;
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? conversationFromRow(data) : null;
 };

@@ -38,7 +38,11 @@ export function ShareToChatModal({ open, goal, user, settings, onClose }) {
 
   useEffect(() => {
     if (!open || !userId) return undefined;
-    return subscribeConversations(userId, setConversations);
+    // Compartilhar post é coisa de amigo: os fios de serviço (cliente ↔
+    // prestador) ficam de fora da lista.
+    return subscribeConversations(userId, (list) =>
+      setConversations(list.filter((conversation) => conversation.kind !== "service")),
+    );
   }, [open, userId]);
 
   useEffect(() => {

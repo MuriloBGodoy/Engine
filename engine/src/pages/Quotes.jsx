@@ -28,7 +28,7 @@ import { useConfirm } from "../components/ConfirmProvider";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { useRegion } from "../hooks/RegionProvider";
-import { profileCardFromSettings, startConversation } from "../services/chat";
+import { serviceConversationId, startServiceConversation } from "../services/chat";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarName, formatFipeYear } from "../services/carDisplay";
 import { getCities, getStates } from "../services/locations";
@@ -642,28 +642,28 @@ function ReplyCard({ reply, request, chosen, busy, onChat, onChoose, onReport })
   );
 }
 
-function MyRequestSheet({ request, user, settings, onClose, onChanged, openReport }) {
+function MyRequestSheet({ request, user, onClose, onChanged, openReport }) {
   const { t } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
+  // A resposta já abriu o fio do anúncio comigo (migration 20261030120000):
+  // conversar é ir para ele. `start_service_conversation` só garante que ele
+  // existe e amarra este pedido; se o anúncio saiu do ar, o fio continua lá.
   const chat = async (reply) => {
     setBusy(true);
+    const fallback = serviceConversationId(reply.listingId, user?.uid || "");
     try {
-      const listing = reply.listing || {};
-      const id = await startConversation(profileCardFromSettings(settings, user), {
-        userId: reply.providerId,
-        author: reply.provider?.author || listing.providerName || listing.title || "",
-        username: reply.provider?.username || "",
-        avatar: reply.provider?.avatar || "",
+      const id = await startServiceConversation(reply.listingId, {
+        car: request.carLabel || "",
+        quoteRequestId: request.id,
       });
       navigate(`/messages/${id}`);
     } catch (error) {
-      console.error(error);
-      toast(t("quotes.errors.chat"), "error");
-      setBusy(false);
+      console.warn("[quotes] chat", error);
+      navigate(`/messages/${fallback}`);
     }
   };
 
@@ -767,7 +767,7 @@ function MyRequestSheet({ request, user, settings, onClose, onChanged, openRepor
 // Prestador: o pedido e a resposta
 // ---------------------------------------------------------------------------
 
-function InboxSheet({ request, user, settings, onClose, onReplied, openReport }) {
+function InboxSheet({ request, onClose, onReplied, openReport }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
@@ -796,22 +796,11 @@ function InboxSheet({ request, user, settings, onClose, onReplied, openReport })
     }
   };
 
-  const chat = async () => {
-    if (!request.customerId) return;
-    setBusy(true);
-    try {
-      const id = await startConversation(profileCardFromSettings(settings, user), {
-        userId: request.customerId,
-        author: request.customer?.author || t("quotes.inbox.anonymous"),
-        username: request.customer?.username || "",
-        avatar: request.customer?.avatar || "",
-      });
-      navigate(`/messages/${id}`);
-    } catch (error) {
-      console.error(error);
-      toast(t("quotes.errors.chat"), "error");
-      setBusy(false);
-    }
+  // O fio com o cliente nasceu quando eu respondi (mesmo id que o banco monta).
+  const chat = () => {
+    const listingId = request.myReply?.listingId || request.listingId;
+    if (!request.customerId || !listingId) return;
+    navigate(`/messages/${serviceConversationId(listingId, request.customerId)}`);
   };
 
   const outcome = request.myReply
@@ -1005,7 +994,7 @@ function EmptyState({ icon, title, copy, action }) {
   );
 }
 
-export function Quotes({ user, settings, cars = [] }) {
+export function Quotes({ user, cars = [] }) {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "inbox" ? "inbox" : "mine";
@@ -1212,7 +1201,6 @@ export function Quotes({ user, settings, cars = [] }) {
         <MyRequestSheet
           request={opened}
           user={user}
-          settings={settings}
           onClose={closeOpened}
           onChanged={load}
           openReport={openReport}
@@ -1222,7 +1210,6 @@ export function Quotes({ user, settings, cars = [] }) {
         <InboxSheet
           request={opened}
           user={user}
-          settings={settings}
           onClose={closeOpened}
           onReplied={load}
           openReport={openReport}
