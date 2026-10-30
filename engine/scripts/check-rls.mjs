@@ -216,6 +216,30 @@ try {
   const fundadorSigla = await a.client.rpc("update_club", { p_club_id: clubId, p_patch: { name: "Clube RLS 2", tag: "HACK" } });
   clube = (await anon.from("clubs").select("tag, name_lower").eq("id", clubId).single()).data;
   check("fundador renomeia, mas a sigla não muda", passed(fundadorSigla) && clube?.tag === tagA && clube?.name_lower === "clube rls 2");
+
+  // Personalização (migration 20261029150000): pasta `clubs/<id>/` só da
+  // direção, e logo/capa só com caminho de objeto que existe nessa pasta.
+  const pngClube = new Blob([Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
+  const logoClube = `clubs/${clubId}/logo-rls-${run}.png`;
+  check("capitão sobe foto na pasta do clube",
+    passed(await b.client.storage.from("photos").upload(logoClube, pngClube, { contentType: "image/png" })));
+  check("quem não é da direção não sobe na pasta do clube",
+    Boolean((await c.client.storage.from("photos").upload(`clubs/${clubId}/c-${run}.png`, pngClube, { contentType: "image/png" })).error));
+  const comLogo = await b.client.rpc("update_club", { p_club_id: clubId, p_patch: { logo: logoClube, colors: { primary: "vinho", secondary: "grafite" } } });
+  clube = (await anon.from("clubs").select("data").eq("id", clubId).single()).data;
+  check("capitão grava logo e cor (o valor muda de fato)",
+    passed(comLogo) && clube?.data?.logo === logoClube && clube?.data?.colors?.primary === "vinho", why(comLogo));
+  const logoExterna = await a.client.rpc("update_club", { p_club_id: clubId, p_patch: { cover: "https://example.com/x.jpg" } });
+  check("capa com link externo é recusada", logoExterna.error?.message === "invalid-image", why(logoExterna));
+  const logoFantasma = await a.client.rpc("update_club", { p_club_id: clubId, p_patch: { cover: `clubs/${clubId}/nao-existe-${run}.jpg` } });
+  check("capa de arquivo que não existe é recusada", logoFantasma.error?.message === "invalid-image", why(logoFantasma));
+  const corHex = await a.client.rpc("update_club", { p_club_id: clubId, p_patch: { colors: { primary: "#ff0000" } } });
+  check("cor fora do vocabulário é recusada", corHex.error?.message === "invalid-colors", why(corHex));
+  const criadoComCapa = await c.client.rpc("create_club", {
+    p_club: { name: "Capa RLS", tag: tag("K"), cover: "https://example.com/x.jpg", logo: "https://example.com/l.jpg" }, p_member: {},
+  });
+  const capaNaCriacao = (await admin.from("clubs").select("data").eq("id", criadoComCapa.data).single()).data;
+  check("create_club ignora logo e capa do formulário", capaNaCriacao?.data?.cover === "" && capaNaCriacao?.data?.logo === "", why(criadoComCapa));
   check("fundador não sai do clube", denied(await a.client.from("club_members").delete().eq("club_id", clubId).eq("uid", a.id).select()));
   check("post no mural de clube alheio é recusado", denied(await c.client.from("community_goals").insert({ id: `c-${run}`, owner_id: c.id, club_id: clubId })));
   check("membro posta no mural", passed(await b.client.from("community_goals").insert({ id: `b-${run}`, owner_id: b.id, club_id: clubId })));
@@ -456,6 +480,10 @@ try {
   const pngB = new Blob([Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
   check("suspensa não sobe foto",
     Boolean((await b.client.storage.from("photos").upload(`users/${b.id}/rls/${run}.png`, pngB, { contentType: "image/png" })).error));
+  check("capitã suspensa não sobe foto do clube",
+    Boolean((await b.client.storage.from("photos").upload(`clubs/${clubId}/susp-${run}.png`, pngB, { contentType: "image/png" })).error));
+  res = await b.client.rpc("update_club", { p_club_id: clubId, p_patch: { colors: { primary: "prata" } } });
+  check("capitã suspensa não muda a cor do clube", suspensa(res), why(res));
   res = await c.client.from("follows").insert({ follower_id: c.id, target_id: b.id });
   check("ninguém segue a suspensa", naoAchou(res), why(res));
   res = await c.client.rpc("start_conversation", { p_other: b.id, p_my_card: {}, p_other_card: {} });
@@ -495,6 +523,11 @@ try {
 } finally {
   // Limpeza: apagar as contas leva tudo que é delas em cascata. Clubes e
   // conversas criados aqui saem à mão.
+  const pastasDeClube = (await admin.from("clubs").select("id").in("founder_id", created)).data || [];
+  for (const { id } of pastasDeClube) {
+    const arquivos = (await admin.storage.from("photos").list(`clubs/${id}`)).data || [];
+    if (arquivos.length) await admin.storage.from("photos").remove(arquivos.map((f) => `clubs/${id}/${f.name}`));
+  }
   await admin.from("clubs").delete().in("founder_id", created);
   await admin.from("conversations").delete().like("id", `%${users.a?.id || "nada"}%`);
   for (const id of created) await admin.auth.admin.deleteUser(id).catch(() => {});
