@@ -3,7 +3,7 @@ import { ChevronDown, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useRegion } from "../hooks/RegionProvider";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
-import { regionShortLabel } from "../services/region";
+import { countryDisplayName, regionShortLabel } from "../services/region";
 import { countries, getStates } from "../services/locations";
 
 /**
@@ -14,7 +14,7 @@ import { countries, getStates } from "../services/locations";
  * `compact` deixa só o pin + rótulo curto (para o header do mobile).
  */
 export function RegionPicker({ compact = false, className = "" }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { region, setRegion } = useRegion();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -39,7 +39,7 @@ export function RegionPicker({ compact = false, className = "" }) {
     };
   }, [open]);
 
-  const label = regionShortLabel(region) || t("region.all");
+  const label = regionShortLabel(region, i18n.language) || t("region.all");
   const stateList = region.country !== "all" ? getStates(region.country) : [];
   const active = region.country !== "all";
 
@@ -77,7 +77,7 @@ export function RegionPicker({ compact = false, className = "" }) {
               <option value="all">{t("region.all")}</option>
               {countries.map((country) => (
                 <option key={country.code} value={country.code}>
-                  {country.flag} {country.name}
+                  {country.flag} {countryDisplayName(country.code, i18n.language)}
                 </option>
               ))}
             </select>

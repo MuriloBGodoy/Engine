@@ -625,9 +625,9 @@ function ProviderCard() {
 }
 
 function ServicesPillar({ state }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { region } = useRegion();
-  const regionName = regionShortLabel(region);
+  const regionName = regionShortLabel(region, i18n.language);
 
   const { items, widened } = useMemo(
     () =>

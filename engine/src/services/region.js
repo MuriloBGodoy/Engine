@@ -136,16 +136,42 @@ export async function fetchGeoRegion(signal) {
   }
 }
 
+// Nome do país no idioma da tela. O dataset (services/locations.js) guarda o
+// nome em pt-BR; até 30/10/2026 a pílula mostrava "Estados Unidos" com o app
+// em inglês. Intl.DisplayNames cobre os 12 países em qualquer idioma sem
+// chave de i18n nova; navegador sem ele (ou idioma inválido) cai no pt-BR.
+const displayNamesCache = new Map();
+export function countryDisplayName(code, lang) {
+  const country = getCountry(code);
+  if (!country) return "";
+  if (!lang || typeof Intl === "undefined" || typeof Intl.DisplayNames !== "function") {
+    return country.name;
+  }
+  try {
+    let names = displayNamesCache.get(lang);
+    if (!names) {
+      names = new Intl.DisplayNames([lang], { type: "region" });
+      displayNamesCache.set(lang, names);
+    }
+    return names.of(code) || country.name;
+  } catch {
+    return country.name;
+  }
+}
+
 // Rótulo curto para a UI (nome do estado ou do país). "all" é tratado na tela
-// (com i18n), por isso aqui devolve null. Sem dependência de i18n de propósito.
-export function regionShortLabel(region) {
+// (com i18n), por isso aqui devolve null. Sem depender do i18next: quem chama
+// passa o idioma (`i18n.language`). Estados ficam no nome nativo do dataset
+// (São Paulo, California, Cataluña) — são nomes próprios, não se traduzem.
+export function regionShortLabel(region, lang) {
   if (!region || region.country === "all") return null;
   const country = getCountry(region.country);
   if (!country) return null;
+  const countryName = countryDisplayName(region.country, lang);
   if (region.state && region.state !== "all") {
-    return getStateName(region.country, region.state) || country.name;
+    return getStateName(region.country, region.state) || countryName;
   }
-  return country.name;
+  return countryName;
 }
 
 // loc = { country?, state?, city? }. Regra LENIENTE: conteúdo sem localização
