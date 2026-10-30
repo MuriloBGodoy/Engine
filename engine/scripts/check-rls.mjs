@@ -437,6 +437,58 @@ try {
   await admin.from("reports").delete().eq("target_type", "quote_reply").eq("target_id", replyId);
   await admin.from("service_listings").delete().eq("id", qListing);
 
+  // Conversa cliente ↔ prestador (migration 20261030120000). A é o prestador,
+  // B o cliente, C terceiro.
+  console.log("\nconversa cliente ↔ prestador");
+  {
+    const sListing = `svc-${run}`;
+    await admin.from("service_listings").insert({
+      id: sListing, owner_id: a.id, moderation_status: "approved",
+      data: { title: "Oficina RLS chat", category: "mechanics", city: "Araraquara", state: "SP", country: "BR", whatsapp: "+55 16 99999-0000" },
+    });
+    check("visitante não abre fio de serviço", Boolean((await anon.rpc("start_service_conversation", { p_listing: sListing })).error));
+    const proprio = await a.client.rpc("start_service_conversation", { p_listing: sListing });
+    check("dono não abre fio com o próprio anúncio", proprio.error?.message === "own-listing", why(proprio));
+    const fio = await b.client.rpc("start_service_conversation", { p_listing: sListing, p_car: "Gol 2014" });
+    check("cliente abre o fio do anúncio", passed(fio) && fio.data === `svc__${sListing}__${b.id}`, why(fio));
+    const fioId = fio.data;
+    check("terceiro não lê o fio", (await c.client.from("conversations").select("id").eq("id", fioId)).data?.length === 0);
+    check("terceiro não lê o cartão do fio", (await c.client.rpc("service_conversation_context", { p_conversation: fioId })).data == null);
+    const cartaoB = (await b.client.rpc("service_conversation_context", { p_conversation: fioId })).data;
+    check("cliente vê anúncio, carro e o WhatsApp publicado",
+      Boolean(cartaoB?.listing?.whatsapp) && cartaoB?.car === "Gol 2014", JSON.stringify(cartaoB));
+    const cartaoA = (await a.client.rpc("service_conversation_context", { p_conversation: fioId })).data;
+    check("prestador vê o cartão sem telefone", cartaoA?.role === "provider" && !cartaoA?.listing?.whatsapp, JSON.stringify(cartaoA));
+    check("cliente não edita o fio direto",
+      denied(await b.client.from("conversations").update({ service_status: "closed", provider_id: b.id }).eq("id", fioId).select()));
+    const forjado = await b.client.rpc("send_message", { p_conversation: fioId, p_text: "R$ 1", p_type: "quote", p_data: {} });
+    check("ninguém forja cartão de orçamento", forjado.error?.message === "invalid-type", why(forjado));
+    const manda = (texto, quem = b) => quem.client.rpc("send_message", { p_conversation: fioId, p_text: texto, p_type: "text", p_data: {} });
+    for (let i = 1; i <= 5; i += 1) await manda(`oi ${i}`);
+    const sexta = await manda("oi 6");
+    check("6ª mensagem sem resposta do prestador é barrada", sexta.error?.message === "awaiting-reply", why(sexta));
+    const intruso = await manda("intruso", c);
+    check("terceiro não manda no fio", intruso.error?.message === "not-found", why(intruso));
+    const statusCliente = await b.client.rpc("set_service_conversation_status", { p_conversation: fioId, p_status: "closed" });
+    check("cliente não muda o status", statusCliente.error?.message === "not-found", why(statusCliente));
+    check("prestador responde", passed(await manda("Traz amanhã", a)));
+    check("resposta marca 'respondido'",
+      (await admin.from("conversations").select("service_status").eq("id", fioId).single()).data?.service_status === "replied");
+    check("prestador fecha o fio", passed(await a.client.rpc("set_service_conversation_status", { p_conversation: fioId, p_status: "closed" })));
+    await a.client.from("blocks").insert({ blocker_id: a.id, blocked_id: b.id });
+    const bloqueadoFio = await manda("e aí?");
+    check("bloqueado não manda no fio", bloqueadoFio.error?.message === "blocked", why(bloqueadoFio));
+    await a.client.from("blocks").delete().eq("blocker_id", a.id).eq("blocked_id", b.id);
+    const mensagemDoFio = (await admin.from("messages").select("id").eq("conversation_id", fioId).eq("sender_id", b.id).limit(1)).data?.[0]?.id;
+    check("terceiro não denuncia mensagem do fio",
+      denied(await c.client.from("reports").insert({ reporter_id: c.id, target_type: "message", target_id: mensagemDoFio })));
+    check("prestador denuncia mensagem do fio",
+      passed(await a.client.from("reports").insert({ reporter_id: a.id, target_type: "message", target_id: mensagemDoFio, reason: "spam" })));
+    await admin.from("reports").delete().eq("target_type", "message").eq("target_id", mensagemDoFio);
+    await admin.from("conversations").delete().eq("id", fioId);
+    await admin.from("service_listings").delete().eq("id", sListing);
+  }
+
   console.log("\ndenúncias");
   check("logado denuncia", passed(await a.client.from("reports").insert({ reporter_id: a.id, target_id: post, reason: "teste" })));
   check("tipo inventado é recusado", denied(await a.client.from("reports").insert({ reporter_id: a.id, target_type: "nada", target_id: post })));
@@ -542,6 +594,8 @@ try {
   }
   await admin.from("clubs").delete().in("founder_id", created);
   await admin.from("conversations").delete().like("id", `%${users.a?.id || "nada"}%`);
+  // Fios de serviço: o id leva o anúncio (com o `run`) e o cliente.
+  await admin.from("conversations").delete().like("id", `svc__%${run}%`);
   for (const id of created) await admin.auth.admin.deleteUser(id).catch(() => {});
   await admin.from("clubs").delete().is("founder_id", null).like("name_lower", "%rls%");
   await admin.from("clubs").delete().is("founder_id", null).eq("name_lower", "clube do c");
