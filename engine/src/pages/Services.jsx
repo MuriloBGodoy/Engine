@@ -2895,95 +2895,43 @@ export function Services({ user, settings }) {
     <section className="space-y-5 pb-28 sm:space-y-8 sm:pb-10">
 
       <header className="-mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
-        <div className="grid gap-6 p-5 sm:gap-8 sm:p-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-10">
-          <div className="flex flex-col justify-between gap-6 sm:gap-8">
-            <div>
-              <h1 className="max-w-4xl text-2xl font-extrabold uppercase italic leading-tight tracking-tight sm:text-3xl">
-                {t("services.title")}
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
-                {t("services.subtitle")}
-              </p>
-            </div>
-
-            {/* Contador zerado não aparece: "0 serviços ativos" no primeiro
-                dia é prova social contra. */}
-            {stats.total > 0 && (
-              <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
-                <HeroStat icon={BriefcaseBusiness} label={t("services.stats.active")} value={stats.total} tone="red" />
-                {stats.mobileCount > 0 && (
-                  <HeroStat icon={Navigation} label={t("services.stats.mobile")} value={stats.mobileCount} tone="sky" />
-                )}
-                {stats.cities > 0 && (
-                  <HeroStat icon={MapPin} label={t("services.stats.cities")} value={stats.cities} tone="emerald" />
-                )}
-              </div>
-            )}
+        <div className="grid gap-5 p-5 sm:gap-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-8">
+          <div>
+            <h1 className="max-w-4xl text-2xl font-extrabold uppercase italic leading-tight tracking-tight sm:text-3xl">
+              {t("services.title")}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+              {t("services.subtitle")}
+            </p>
           </div>
 
-          <aside className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 sm:p-5">
-            <button
-              type="button"
-              onClick={() => setSellerProfileOpen(true)}
-              className="group flex w-full items-center gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--engine-accent)]/60 hover:shadow-lg dark:shadow-none"
-            >
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--engine-accent)] text-lg font-bold uppercase text-white">
-                {sellerProfile.avatar ? (
-                  <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  getInitials(sellerProfile.displayName)
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--engine-accent)]">
-                  {t("services.sellerAccount")}
-                </p>
-                <h2 className="mt-1 truncate text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
-                  {t("settings.sections.profile")}
-                </h2>
-                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
-                  <ShieldCheck size={12} />
-                  {myListings.length ? t("services.activeSeller") : t("services.ready")}
-                </span>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => openEditor()}
-              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-4 text-sm font-bold uppercase text-white transition hover:brightness-95"
-            >
-              <Plus size={18} />
-              {t("services.createService")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSellerListingsOpen(true)}
-              className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-4 text-sm font-black uppercase tracking-widest text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white"
-            >
-              <BriefcaseBusiness size={17} />
-              {t("services.myListings")}
-              <span className="rounded-full bg-[var(--engine-surface-2)] px-2 py-0.5 text-[10px] text-[var(--engine-text-muted)]">
-                {myListings.length}
-              </span>
-            </button>
-            {myBioListing && (
-              <BioLinkCard listing={myBioListing} compact className="mt-3" />
-            )}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => navigate("/services/approvals")}
-                className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-black uppercase tracking-widest text-amber-700 transition hover:border-amber-500 hover:bg-amber-500/15 dark:text-amber-300"
-              >
-                <ShieldCheck size={17} />
-                {t("services.approvals")}
-                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px]">
-                  {pendingApprovalsCount}
-                </span>
-              </button>
-            )}
-          </aside>
+          {/* Contador zerado não aparece: "0 serviços ativos" no primeiro
+              dia é prova social contra. */}
+          {stats.total > 0 && (
+            <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 lg:w-[460px]">
+              <HeroStat icon={BriefcaseBusiness} label={t("services.stats.active")} value={stats.total} tone="red" />
+              {stats.mobileCount > 0 && (
+                <HeroStat icon={Navigation} label={t("services.stats.mobile")} value={stats.mobileCount} tone="sky" />
+              )}
+              {stats.cities > 0 && (
+                <HeroStat icon={MapPin} label={t("services.stats.cities")} value={stats.cities} tone="emerald" />
+              )}
+            </div>
+          )}
         </div>
+
+        <SellerBar
+          sellerProfile={sellerProfile}
+          listingCount={myListings.length}
+          bioListing={myBioListing}
+          isAdmin={isAdmin}
+          pendingApprovalsCount={pendingApprovalsCount}
+          storageKey={`engine:services:sellerPanel:${user?.uid || "anon"}`}
+          onOpenProfile={() => setSellerProfileOpen(true)}
+          onOpenListings={() => setSellerListingsOpen(true)}
+          onCreate={() => openEditor()}
+          onOpenApprovals={() => navigate("/services/approvals")}
+        />
       </header>
 
       <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
@@ -3433,6 +3381,177 @@ export function ServiceApprovals({ user }) {
   );
 }
 
+function readSellerPanelOpen(key) {
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Barra do vendedor no rodapé do hero. Por padrão é uma faixa só: quem é,
+ * o status, "Meus anúncios" e "Novo serviço". O link da bio e as aprovações
+ * (admin) ficam no "Painel do vendedor", que lembra se ficou aberto.
+ */
+function SellerBar({
+  sellerProfile,
+  listingCount,
+  bioListing,
+  isAdmin,
+  pendingApprovalsCount,
+  storageKey,
+  onOpenProfile,
+  onOpenListings,
+  onCreate,
+  onOpenApprovals,
+}) {
+  const { t } = useTranslation();
+  const [panelOpen, setPanelOpen] = useState(() => readSellerPanelOpen(storageKey));
+  const hasPanel = Boolean(bioListing) || isAdmin;
+  const showPending = isAdmin && pendingApprovalsCount > 0;
+  const expanded = hasPanel && panelOpen;
+
+  const togglePanel = () => {
+    const next = !panelOpen;
+    setPanelOpen(next);
+    try {
+      window.localStorage.setItem(storageKey, next ? "1" : "0");
+    } catch {
+      // Sem localStorage (aba privada): só não lembra.
+    }
+  };
+
+  const toggleClass =
+    "min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 text-xs font-bold text-[var(--engine-text)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-ring)] dark:text-white";
+
+  const toggleInner = (labelClass) => (
+    <>
+      <span className={labelClass}>{t("services.sellerPanel")}</span>
+      {showPending && (
+        <span
+          className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-black text-amber-700 dark:text-amber-300"
+          title={t("services.approvals")}
+        >
+          {pendingApprovalsCount}
+        </span>
+      )}
+      <ChevronDown
+        size={16}
+        aria-hidden="true"
+        className={`transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+      />
+    </>
+  );
+
+  return (
+    <div className="border-t border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
+      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:px-8">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            title={t("services.editProfile")}
+            className="group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-ring)]"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-sm font-bold uppercase text-white">
+              {sellerProfile.avatar ? (
+                <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
+              ) : (
+                getInitials(sellerProfile.displayName)
+              )}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-extrabold text-[var(--engine-text)] transition-colors group-hover:text-[var(--engine-accent)] dark:text-white">
+                {sellerProfile.displayName || t("services.sellerProfile")}
+              </span>
+              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
+                <ShieldCheck size={12} aria-hidden="true" />
+                {listingCount ? t("services.activeSeller") : t("services.ready")}
+              </span>
+            </span>
+          </button>
+
+          {/* No celular o painel abre do lado do nome (só o ícone, para o nome
+              caber); no desktop, ao fim da barra. */}
+          {hasPanel && (
+            <button
+              type="button"
+              onClick={togglePanel}
+              aria-expanded={expanded}
+              aria-controls="seller-panel"
+              aria-label={t("services.sellerPanel")}
+              title={t("services.sellerPanel")}
+              className={`inline-flex sm:hidden ${toggleClass}`}
+            >
+              {toggleInner("sr-only")}
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:shrink-0 sm:items-center">
+          <button
+            type="button"
+            onClick={onOpenListings}
+            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 text-xs font-black uppercase tracking-normal text-[var(--engine-text)] sm:gap-2 sm:tracking-wider transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white sm:px-4"
+          >
+            <BriefcaseBusiness size={16} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">{t("services.myListings")}</span>
+            <span className="rounded-full bg-[var(--engine-surface-2)] px-2 py-0.5 text-[10px] text-[var(--engine-text-muted)]">
+              {listingCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onCreate}
+            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-3 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-95 sm:px-4"
+          >
+            <Plus size={16} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">{t("services.newService")}</span>
+          </button>
+          {hasPanel && (
+            <button
+              type="button"
+              onClick={togglePanel}
+              aria-expanded={expanded}
+              aria-controls="seller-panel"
+              aria-label={t("services.sellerPanel")}
+              title={t("services.sellerPanel")}
+              className={`hidden sm:inline-flex ${toggleClass}`}
+            >
+              {toggleInner("hidden lg:inline")}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <div
+          id="seller-panel"
+          className={`grid gap-3 border-t border-[var(--engine-border)] p-4 sm:px-8 sm:pb-6 ${
+            bioListing && isAdmin ? "md:grid-cols-[minmax(0,1fr)_280px] md:items-start" : ""
+          }`}
+        >
+          {bioListing && <BioLinkCard listing={bioListing} compact />}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onOpenApprovals}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-black uppercase tracking-widest text-amber-700 transition hover:border-amber-500 hover:bg-amber-500/15 dark:text-amber-300"
+            >
+              <ShieldCheck size={17} aria-hidden="true" />
+              {t("services.approvals")}
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px]">
+                {pendingApprovalsCount}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HeroStat({ icon, value, label, tone }) {
   const Icon = icon;
   const tones = {
@@ -3451,3 +3570,4 @@ function HeroStat({ icon, value, label, tone }) {
     </div>
   );
 }
+
