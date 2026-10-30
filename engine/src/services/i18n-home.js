@@ -28,9 +28,8 @@ const ptBR = {
   visitorHome: {
     sloganLead: "Todo sonho precisa de",
     sloganAccent: "um motor.",
-    lead: "Do carro que você tem ao carro que você sonha. Tudo num lugar só.",
-    subtitle:
-      "Sua garagem com lembretes de IPVA e revisão, a conta de quanto ganhar para chegar no carro dos sonhos, os serviços de quem você já segue no Insta e no TikTok e uma comunidade com clubes, encontros e conquistas.",
+    lead: "Do carro que você tem ao carro que você sonha.",
+    subtitle: "Sua garagem, quem cuida do seu carro e quem anda com você. Num lugar só.",
     ctaRegister: "Criar conta grátis",
     ctaServices: "Explorar serviços",
     haveAccount: "Já tem conta?",
@@ -161,9 +160,8 @@ const enUS = {
   visitorHome: {
     sloganLead: "Every dream needs",
     sloganAccent: "an engine.",
-    lead: "From the car you have to the car you dream of. All in one place.",
-    subtitle:
-      "Your garage with tax and service reminders, the math on how much you need to earn to reach your dream car, services from people you already follow on Instagram and TikTok, and a community with clubs, meets and achievements.",
+    lead: "From the car you have to the car you dream of.",
+    subtitle: "Your garage, the people who look after your car and the people you ride with. All in one place.",
     ctaRegister: "Create a free account",
     ctaServices: "Explore services",
     haveAccount: "Already have an account?",
@@ -294,9 +292,8 @@ const esES = {
   visitorHome: {
     sloganLead: "Todo sueño necesita",
     sloganAccent: "un motor.",
-    lead: "Del coche que tienes al coche que sueñas. Todo en un solo lugar.",
-    subtitle:
-      "Tu garaje con avisos de impuestos y revisiones, la cuenta de cuánto necesitas ganar para llegar al coche de tus sueños, los servicios de quienes ya sigues en Instagram y TikTok, y una comunidad con clubes, quedadas y logros.",
+    lead: "Del coche que tienes al coche que sueñas.",
+    subtitle: "Tu garaje, quien cuida tu coche y con quien sales a rodar. Todo en un solo lugar.",
     ctaRegister: "Crear cuenta gratis",
     ctaServices: "Explorar servicios",
     haveAccount: "¿Ya tienes cuenta?",

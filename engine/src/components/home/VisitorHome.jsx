@@ -178,7 +178,7 @@ function Hero() {
           <span className="text-[var(--engine-accent)]">{t("visitorHome.sloganAccent")}</span>
         </h1>
         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--engine-text-muted)] sm:text-base">
-          <strong className="font-semibold text-[var(--engine-text)]">{t("visitorHome.lead")}</strong>{" "}
+          <strong className="block font-semibold text-[var(--engine-text)]">{t("visitorHome.lead")}</strong>
           {t("visitorHome.subtitle")}
         </p>
 
