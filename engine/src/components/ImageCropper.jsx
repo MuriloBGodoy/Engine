@@ -4,6 +4,7 @@ import Cropper from "react-easy-crop";
 import { useTranslation } from "react-i18next";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { cleanFileFrom, encodeCanvas } from "../services/cleanImage";
+import { drawCroppedImage } from "../services/cropImage";
 
 /**
  * `aspect` e `cropShape` são opcionais: o padrão (16:9, retângulo) é o da foto
@@ -30,7 +31,7 @@ export function ImageCropper({ imageFile, isOpen, onClose, onSave, aspect = 16 /
   };
 
   const handleRotate = (degrees) => {
-    setRotation((prev) => (prev + degrees) % 360);
+    setRotation((prev) => (((prev + degrees) % 360) + 360) % 360);
   };
 
   const handleReset = () => {
@@ -39,47 +40,22 @@ export function ImageCropper({ imageFile, isOpen, onClose, onSave, aspect = 16 /
     setCrop({ x: 0, y: 0 });
   };
 
+  // A geometria do recorte girado mora em services/cropImage.js (ver lá o bug
+  // de rotação que existia aqui até 30/10/2026). A foto é recarregada por um
+  // <img>, o mesmo caminho do preview, para o EXIF ser aplicado igual nos dois.
   const generateCroppedImage = async () => {
     if (!imageSrc || !croppedAreaPixels) return null;
 
     return new Promise((resolve) => {
       const image = new Image();
-      image.src = imageSrc;
-
       image.onload = () => {
         const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        const { width, height } = croppedAreaPixels;
-        const maxSize = 1600;
-        const scale = Math.min(1, maxSize / Math.max(width, height));
-        const finalWidth = Math.round(width * scale);
-        const finalHeight = Math.round(height * scale);
-
-        canvas.width = finalWidth;
-        canvas.height = finalHeight;
-
-        if (rotation) {
-          ctx.translate(finalWidth / 2, finalHeight / 2);
-          ctx.rotate((rotation * Math.PI) / 180);
-          ctx.translate(-finalWidth / 2, -finalHeight / 2);
-        }
-
-        ctx.drawImage(
-          image,
-          croppedAreaPixels.x,
-          croppedAreaPixels.y,
-          croppedAreaPixels.width,
-          croppedAreaPixels.height,
-          0,
-          0,
-          finalWidth,
-          finalHeight,
-        );
-
+        drawCroppedImage(canvas, image, image.naturalWidth, image.naturalHeight, croppedAreaPixels, rotation);
         // Mesma codificação de toda foto que sobe: JPEG sem metadados.
         encodeCanvas(canvas, 0.82).then(resolve, () => resolve(null));
       };
+      image.onerror = () => resolve(null);
+      image.src = imageSrc;
     });
   };
 
