@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Bold, Italic, Pen, Type, Palette, RotateCw, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import {
+  fitEditorCanvas,
+  isSideways,
+  quarterTurnScale,
+  rotatePointClockwise,
+} from "../services/imageEditorGeometry";
 
 const FILTERS = [
   { name: "Original", css: "none" },
@@ -292,14 +298,22 @@ export function ImageEditor({ imageUrl, onClose, onSave }) {
     const image = imageRef.current;
     if (!canvas || !image) return;
 
+    // O tamanho manda o estado; o canvas acompanha (girar troca largura e altura).
+    if (canvas.width !== canvasSize.width) canvas.width = canvasSize.width;
+    if (canvas.height !== canvasSize.height) canvas.height = canvasSize.height;
+
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // A foto é desenhada no tamanho dela (de lado, as medidas do canvas se
+    // invertem) e girada em volta do centro: nunca esticada para caber.
+    const drawW = isSideways(rotation) ? canvas.height : canvas.width;
+    const drawH = isSideways(rotation) ? canvas.width : canvas.height;
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.filter = FILTERS.find((f) => f.name === filter)?.css || "none";
-    ctx.drawImage(image, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH);
     ctx.restore();
     ctx.filter = "none";
 
@@ -310,28 +324,63 @@ export function ImageEditor({ imageUrl, onClose, onSave }) {
     }
   }
 
+  // Caixa onde o canvas tem que caber na tela.
+  const editorBox = () => [Math.min(500, window.innerWidth - 48), window.innerHeight * 0.5];
+
+  // Gira 90° no sentido horário. O canvas troca largura e altura (re-encaixado
+  // na tela) e traços e textos giram junto com a foto, para continuarem em
+  // cima do mesmo ponto dela. O texto em si continua de pé, como nos stories.
+  const rotateClockwise = () => {
+    const image = imageRef.current;
+    if (!image) return;
+    const next = (rotation + 90) % 360;
+    const from = canvasSize;
+    const to = fitEditorCanvas(image.naturalWidth, image.naturalHeight, next, ...editorBox());
+    const scale = quarterTurnScale(from, to);
+
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.type === "line") {
+          const points = [];
+          for (let i = 0; i < el.points.length; i += 2) {
+            const p = rotatePointClockwise(el.points[i], el.points[i + 1], from, to);
+            points.push(p.x, p.y);
+          }
+          return { ...el, points, size: Math.max(1, el.size * scale) };
+        }
+        if (el.type === "text") {
+          const before = measureText(el);
+          const center = rotatePointClockwise(
+            el.x + before.width / 2,
+            el.y + (before.descent - before.ascent) / 2,
+            from,
+            to,
+          );
+          const resized = { ...el, fontSize: Math.round(clamp(el.fontSize * scale, MIN_TEXT, MAX_TEXT)) };
+          const after = measureText(resized);
+          // Girar não deve empurrar o texto para fora da foto: se ele cabe
+          // inteiro no quadro novo, fica inteiro dentro.
+          let x = center.x - after.width / 2;
+          let y = center.y - (after.descent - after.ascent) / 2;
+          if (after.width <= to.width) x = clamp(x, 0, to.width - after.width);
+          if (after.ascent + after.descent <= to.height) y = clamp(y, after.ascent, to.height - after.descent);
+          return { ...resized, ...clampTextPosition(resized, x, y, to.width, to.height) };
+        }
+        return el;
+      }),
+    );
+    setRotation(next);
+    setCanvasSize(to);
+  };
+
   // Carrega a imagem e dimensiona o canvas para caber na tela.
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const maxWidth = Math.min(500, window.innerWidth - 48);
-      const maxHeight = window.innerHeight * 0.5;
-      const aspectRatio = img.height / img.width;
-
-      let displayWidth = maxWidth;
-      let displayHeight = maxWidth * aspectRatio;
-      if (displayHeight > maxHeight) {
-        displayHeight = maxHeight;
-        displayWidth = maxHeight / aspectRatio;
-      }
-
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
+      if (!canvasRef.current) return;
       imageRef.current = img;
-      setCanvasSize({ width: canvas.width, height: canvas.height });
+      setRotation(0);
+      setCanvasSize(fitEditorCanvas(img.naturalWidth, img.naturalHeight, 0, ...editorBox()));
       setImageReady(true);
     };
     img.src = imageUrl;
@@ -565,7 +614,7 @@ export function ImageEditor({ imageUrl, onClose, onSave }) {
             {toolButton("filters", Palette, t("imageEditor.filters"))}
             <button
               type="button"
-              onClick={() => setRotation((rotation + 90) % 360)}
+              onClick={rotateClockwise}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
               title={t("imageEditor.rotate")}
               aria-label={t("imageEditor.rotate")}
