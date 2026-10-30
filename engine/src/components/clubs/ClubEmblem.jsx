@@ -32,6 +32,7 @@ const CORNER = { plate: [79, 71], shield: [66, 63], circle: [73, 73], hex: [70, 
 // O lugar do símbolo no emblema gerado (x, y, lado).
 const GENERATED_SLOT = { plate: [7, 14, 17], shield: [36, 22, 28], circle: [37, 20, 26], hex: [37, 22, 26] };
 const DEFAULT_BORDER = "rgba(255,255,255,.55)";
+const DARK_OUTLINE = "rgba(255,255,255,.3)";
 
 /** O símbolo sozinho, para o seletor: desenho à mão (preenchido) ou lucide (traço). */
 export function ClubIconGlyph({ icon, size = 21, className = "" }) {
@@ -75,16 +76,32 @@ export function ClubEmblem({ club, size = 64, className = "", forceGenerated = f
   const look = resolveEmblem(club, { hasPhoto });
   const outline = OUTLINE[look.shape] || OUTLINE.plate;
   const tag = String(club?.tag || "").toUpperCase() || "—";
-  const border =
-    look.borderHex === null ? null : (
-      <path
-        d={outline}
-        fill="none"
-        stroke={look.borderHex || DEFAULT_BORDER}
-        strokeWidth={CLUB_BORDER_WIDTH}
-        strokeLinejoin="round"
-      />
-    );
+  const border = (
+    <>
+      {look.borderHex === null ? null : (
+        <path
+          d={outline}
+          fill="none"
+          stroke={look.borderHex || DEFAULT_BORDER}
+          strokeWidth={CLUB_BORDER_WIDTH}
+          strokeLinejoin="round"
+        />
+      )}
+      {/* Emblema escuro sem borda que leia (preto-fosco) sumia no tema
+          escuro: um traço fino e translúcido devolve a silhueta. Só aparece
+          com a classe `dark` no <html>; no claro fica `display: none`. */}
+      {look.darkOutline ? (
+        <path
+          d={outline}
+          fill="none"
+          stroke={DARK_OUTLINE}
+          strokeWidth={1.6}
+          strokeLinejoin="round"
+          className="hidden dark:inline"
+        />
+      ) : null}
+    </>
+  );
 
   let body;
   if (hasPhoto) {

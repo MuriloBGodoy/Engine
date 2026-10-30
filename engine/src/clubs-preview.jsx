@@ -227,6 +227,8 @@ const COMBOS = [
   { label: "hex, canto, sem fundo", photo: true, colors: { primary: "roxo-neon" }, emblem: { shape: "hex", icon: "trophy", showSymbolOnPhoto: true, symbolPosition: "corner", symbolBacking: "none", borderColor: "prata" } },
   { label: "disco vinho + símbolo vinho (cai p/ branco)", photo: true, colors: { primary: "vinho" }, emblem: { shape: "circle", icon: "crown", showSymbolOnPhoto: true, symbolPosition: "center", symbolBacking: "disc", symbolColor: "vinho" } },
   { label: "gerado, borda amarela, símbolo amarelo", photo: false, colors: { primary: "preto-fosco", secondary: "grafite" }, emblem: { shape: "shield", icon: "motorbike", symbolColor: "amarelo-pista", borderColor: "amarelo-pista" } },
+  { label: "gerado preto-fosco sem borda (contorno automático no escuro)", photo: false, colors: { primary: "preto-fosco", secondary: "preto-fosco" }, emblem: { shape: "shield", icon: "flame", borderColor: "none" } },
+  { label: "placa preto-fosco, borda preto-fosco (contorno no escuro)", photo: false, colors: { primary: "preto-fosco", secondary: "grafite" }, emblem: { shape: "plate", icon: "wheel", borderColor: "preto-fosco" } },
   { label: "gerado amarelo + símbolo amarelo (cai p/ escuro)", photo: false, colors: { primary: "amarelo-pista", secondary: "amarelo-pista" }, emblem: { shape: "plate", icon: "wheel", symbolColor: "amarelo-pista", borderColor: "none" } },
 ];
 

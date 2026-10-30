@@ -28,6 +28,45 @@ function Section({ title, hint, clubs, onOpen, onJoined }) {
 }
 
 /**
+ * O convite grande para fundar um clube: capa na cor do app, ícone, título e
+ * o botão largo. Serve à Descobrir sem clube nenhum no app e à "Meus clubes"
+ * vazia — as duas eram o mesmo momento ("não tenho crew") com pesos
+ * diferentes, e na Meus clubes o convite era um botão miúdo numa caixa
+ * tracejada. `children` entra embaixo do botão (o "descobrir clubes").
+ */
+export function ClubFoundHero({ title, copy, ctaLabel, onCreate, children = null }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)]">
+      <div className="relative h-28 bg-[linear-gradient(135deg,var(--engine-accent)_0%,color-mix(in_srgb,var(--engine-accent)_45%,#000)_100%)]">
+        <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
+        <span className="absolute -bottom-7 left-4 grid h-14 w-14 place-items-center rounded-2xl border-2 border-[var(--engine-surface)] bg-[var(--engine-elevated)] text-[var(--engine-accent)] shadow-[var(--engine-shadow-sm)]">
+          <Users size={26} aria-hidden="true" />
+        </span>
+      </div>
+      <div className="px-4 pb-5 pt-9">
+        <h2 className="font-display text-[20px] font-extrabold leading-tight tracking-tight text-[var(--engine-text)]">
+          {title}
+        </h2>
+        <p className="mt-1.5 max-w-[48ch] text-[13.5px] leading-relaxed text-[var(--engine-text-muted)]">
+          {copy}
+        </p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={onCreate}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-[15px] font-bold text-white transition hover:opacity-90 sm:w-auto"
+          >
+            <Plus size={18} />
+            {ctaLabel}
+          </button>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * A descoberta, nas quatro seções do contrato (§3): pro seu carro, em alta,
  * perto de você, todos.
  *
@@ -72,30 +111,12 @@ export function ClubDiscoveryTab({ onSelectClub, onCreate }) {
 
   if (noClubsAtAll) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)]">
-        <div className="relative h-28 bg-[linear-gradient(135deg,var(--engine-accent)_0%,color-mix(in_srgb,var(--engine-accent)_45%,#000)_100%)]">
-          <span className="absolute inset-0 bg-[repeating-linear-gradient(115deg,rgba(255,255,255,0.10)_0_2px,transparent_2px_26px)]" />
-          <span className="absolute -bottom-7 left-4 grid h-14 w-14 place-items-center rounded-2xl border-2 border-[var(--engine-surface)] bg-[var(--engine-elevated)] text-[var(--engine-accent)] shadow-[var(--engine-shadow-sm)]">
-            <Users size={26} aria-hidden="true" />
-          </span>
-        </div>
-        <div className="px-4 pb-5 pt-9">
-          <h2 className="font-display text-[20px] font-extrabold leading-tight tracking-tight text-[var(--engine-text)]">
-            {t("clubs.custom.firstTitle")}
-          </h2>
-          <p className="mt-1.5 max-w-[48ch] text-[13.5px] leading-relaxed text-[var(--engine-text-muted)]">
-            {t("clubs.custom.firstCopy")}
-          </p>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-[15px] font-bold text-white transition hover:opacity-90 sm:w-auto"
-          >
-            <Plus size={18} />
-            {t("clubs.custom.firstCta")}
-          </button>
-        </div>
-      </div>
+      <ClubFoundHero
+        title={t("clubs.custom.firstTitle")}
+        copy={t("clubs.custom.firstCopy")}
+        ctaLabel={t("clubs.custom.firstCta")}
+        onCreate={onCreate}
+      />
     );
   }
 

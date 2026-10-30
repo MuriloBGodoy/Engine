@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { SubTabsHeader } from "./SubTabsHeader";
 import { useToast } from "../ToastProvider";
 import { ClubCard } from "../clubs/ClubCard";
 import { ClubCreateModal } from "../clubs/ClubCreateModal";
-import { ClubDiscoveryTab } from "../clubs/ClubDiscoveryTab";
+import { ClubDiscoveryTab, ClubFoundHero } from "../clubs/ClubDiscoveryTab";
 import { ClubDetailModal } from "../clubs/ClubDetailModal";
 import { useMyClubs, useCreateClub, clubErrorMessage } from "../clubs/clubsDataSource";
 
@@ -92,31 +92,22 @@ export function ClubsTab({ searchParams, setSearchParams, user = null }) {
               {t("clubs.loading")}
             </div>
           ) : !clubs.length ? (
-            <div className="rounded-2xl border border-dashed border-[var(--engine-border-strong)] px-4 py-8 text-center">
-              <p className="text-[14px] font-bold text-[var(--engine-text)]">
-                {t("clubs.emptyTitle")}
-              </p>
-              <p className="mx-auto mt-1 max-w-[42ch] text-[12.5px] text-[var(--engine-text-muted)]">
-                {t("clubs.emptyCopy")}
-              </p>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveSubTab("discover")}
-                  className="inline-flex min-h-11 items-center rounded-xl border border-[var(--engine-border-strong)] px-4 text-[13.5px] font-bold text-[var(--engine-text)]"
-                >
-                  {t("clubs.emptyDiscover")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(true)}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--engine-accent)] px-4 text-[13.5px] font-bold text-white"
-                >
-                  <Plus size={16} />
-                  {t("clubs.create")}
-                </button>
-              </div>
-            </div>
+            /* Mesmo convite grande da Descobrir vazia: quem ainda não tem
+               clube está no mesmo momento, e o botão miúdo de antes se perdia. */
+            <ClubFoundHero
+              title={t("clubs.emptyTitle")}
+              copy={t("clubs.emptyCopy")}
+              ctaLabel={t("clubs.custom.firstCta")}
+              onCreate={() => setShowCreateModal(true)}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveSubTab("discover")}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-[var(--engine-border-strong)] px-5 text-[14px] font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:w-auto"
+              >
+                {t("clubs.emptyDiscover")}
+              </button>
+            </ClubFoundHero>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {clubs.map((club) => (

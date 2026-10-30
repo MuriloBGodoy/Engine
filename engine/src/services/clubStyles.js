@@ -250,6 +250,14 @@ export const contrastRatio = (a, b) => {
 };
 
 const SYMBOL_LIGHT = "#ffffff";
+// Contorno automático no tema escuro. Medido contra --engine-elevated escuro
+// (#14171d, o fundo mais claro em que o emblema aparece; sobre --engine-bg a
+// conta só piora). Abaixo de 1,5:1 a forma se perde no fundo: em 30/10/2026
+// só o preto-fosco (1,10) cai aqui. Grafite (1,83) fica de fora de propósito
+// — é a cor secundária padrão e ainda se lê; vinho dá 2,05.
+const DARK_SURFACE = "#14171d";
+const OUTLINE_MIN_CONTRAST = 1.5;
+const fadesOnDark = (hex) => contrastRatio(hex, DARK_SURFACE) < OUTLINE_MIN_CONTRAST;
 const SYMBOL_DARK = "#18202c";
 const SCRIM_TONE = "#2a2d33"; // o que a sombra escura vira sobre uma foto média
 
@@ -278,14 +286,25 @@ export function resolveEmblem(club, { hasPhoto = false } = {}) {
     symbolHex = contrastRatio(SYMBOL_LIGHT, behind) >= contrastRatio(SYMBOL_DARK, behind) ? SYMBOL_LIGHT : SYMBOL_DARK;
   }
 
+  // null = sem borda; "" = a borda padrão (branco translúcido, sempre lê).
+  const borderHex =
+    emblem.borderColor === "none" ? null : emblem.borderColor ? paletteEntry(emblem.borderColor).hex : "";
+  // Sem borda visível, o que desenha a silhueta é o corpo da forma. Com foto
+  // não dá para medir a borda da imagem (logo preta em fundo preto é o caso
+  // comum), então com foto e sem borda o contorno entra sempre.
+  const borderReads = borderHex === "" || (borderHex !== null && !fadesOnDark(borderHex));
+  const darkOutline = !borderReads && (hasPhoto || fadesOnDark(primary.hex));
+
   return {
     ...emblem,
     fill: primary.hex,
     fill2: secondary.hex,
     symbolHex,
     symbolShadow: hasPhoto && emblem.symbolBacking === "none",
-    // null = sem borda; "" = a borda padrão (branco translúcido).
-    borderHex: emblem.borderColor === "none" ? null : emblem.borderColor ? paletteEntry(emblem.borderColor).hex : "",
+    borderHex,
+    // Contorno fino só no tema escuro (a classe `dark:` decide), para a forma
+    // não sumir no fundo. No claro nenhuma cor da paleta some.
+    darkOutline,
   };
 }
 export const clubIconLabel = (t, value) =>
