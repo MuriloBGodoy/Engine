@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   Bell,
   BellOff,
+  CalendarClock,
+  CarFront,
   Check,
   ChevronRight,
   Download,
@@ -1044,6 +1046,25 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                     onChange={(value) => updateSetting("notifications", key, value)}
                   />
                 ))}
+              </Group>
+              <Group
+                title={t("settings.notifications.garage.title")}
+                footer={t("settings.notifications.garage.footer")}
+              >
+                <SwitchRow
+                  icon={CalendarClock}
+                  label={t("settings.notifications.garage.toggle")}
+                  hint={t("settings.notifications.garage.toggleHint")}
+                  checked={notif.garageReminders !== false}
+                  onChange={(value) => updateSetting("notifications", "garageReminders", value)}
+                />
+                <Row
+                  icon={CarFront}
+                  label={t("settings.notifications.garage.perCar")}
+                  hint={t("settings.notifications.garage.perCarHint")}
+                  chevron
+                  onClick={() => navigate("/garagem")}
+                />
               </Group>
             </>
           )}

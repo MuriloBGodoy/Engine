@@ -44,6 +44,10 @@ const defaultSettings = {
     follows: true,
     messages: true,
     achievements: true,
+    // Lembretes da garagem (IPVA, licenciamento, revisão, seguro). Diferente
+    // dos outros, este é lido também pelo SERVIDOR: `run_garage_reminders()`
+    // pula quem tem `false` aqui e nem grava o aviso.
+    garageReminders: true,
   },
   privacy: {
     showEmailInSidebar: true,

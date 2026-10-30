@@ -1661,6 +1661,14 @@ const resources = {
             messages: "Quando chega mensagem nova.",
             achievements: "Quando você desbloqueia um selo.",
           },
+          garage: {
+            title: "Garagem",
+            toggle: "Lembretes da garagem",
+            toggleHint: "IPVA, licenciamento, revisão e seguro no sino, a 30, 7 e 1 dia do vencimento e no dia.",
+            footer: "Vale para todos os seus carros. Desligado, o Engine não envia mais esses avisos; as datas continuam visíveis na Garagem.",
+            perCar: "Ajustar por carro",
+            perCarHint: "Estado, final da placa e datas de cada carro ficam no próprio carro, na Garagem.",
+          },
         },
         privacy: {
           title: "Privacidade",
@@ -3409,6 +3417,14 @@ const resources = {
             follows: "When someone starts following you.",
             messages: "When a new message arrives.",
             achievements: "When you unlock a badge.",
+          },
+          garage: {
+            title: "Garage",
+            toggle: "Garage reminders",
+            toggleHint: "IPVA, registration, service and insurance in the bell, 30, 7 and 1 day before the due date and on the day.",
+            footer: "Applies to all your cars. When off, Engine stops sending these alerts; the dates stay visible in the Garage.",
+            perCar: "Adjust per car",
+            perCarHint: "State, plate's last digit and dates for each car live on the car itself, in the Garage.",
           },
         },
         privacy: {
@@ -5164,6 +5180,14 @@ const resources = {
             follows: "Cuando alguien empieza a seguirte.",
             messages: "Cuando llega un mensaje nuevo.",
             achievements: "Cuando desbloqueas una insignia.",
+          },
+          garage: {
+            title: "Garaje",
+            toggle: "Recordatorios del garaje",
+            toggleHint: "IPVA, licencia, revisión y seguro en la campana, a 30, 7 y 1 día del vencimiento y el mismo día.",
+            footer: "Vale para todos tus autos. Desactivado, Engine deja de enviar estos avisos; las fechas siguen visibles en el Garaje.",
+            perCar: "Ajustar por auto",
+            perCarHint: "Estado, último dígito de la placa y fechas de cada auto están en el propio auto, en el Garaje.",
           },
         },
         privacy: {

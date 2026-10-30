@@ -173,6 +173,9 @@ const notificationPreferenceByType = {
   follow: "follows",
   message: "messages",
   achievement: "achievements",
+  // O job do servidor já não manda para quem desligou; isto esconde os que
+  // chegaram antes de desligar.
+  garage_reminder: "garageReminders",
 };
 
 export const NOTIFICATION_PREFERENCES = [

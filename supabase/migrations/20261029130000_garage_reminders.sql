@@ -12,6 +12,10 @@
 --   garage_reminder_deliveries  — o que já foi avisado (só o servidor vê);
 --   run_garage_reminders()      — o job diário (pg_cron, 08:00 de Brasília).
 --
+-- Desligar: Configurações → Notificações → "Lembretes da garagem" grava
+-- `notifications.garageReminders = false` em user_private 'settings', e o job
+-- pula a conta inteira.
+--
 -- E-mail: ainda não há SMTP. Cada aviso enviado vira uma linha em
 -- `garage_reminder_deliveries` com `email_sent_at` nulo — quando o e-mail
 -- existir, o remetente lê dali (linhas com email_sent_at nulo e criadas há
@@ -134,6 +138,17 @@ begin
      where g.due_date between v_today and v_today + 30
        -- Carro que voltou a ser meta não tem IPVA a lembrar.
        and coalesce(c.data ->> 'type', 'goal') = 'owned'
+       -- Quem desligou "Lembretes da garagem" em Configurações não recebe.
+       -- A chave mora no mesmo documento das outras preferências do sino
+       -- (user_private 'settings' → notifications.garageReminders); só o
+       -- `false` explícito desliga, ausente = ligado (o padrão do app).
+       -- Não grava entrega para quem está desligado: religar volta a avisar
+       -- a partir do próximo marco, sem disparar o atrasado.
+       and not exists (
+         select 1 from public.user_private p
+          where p.user_id = g.user_id and p.doc_id = 'settings'
+            and p.data -> 'notifications' -> 'garageReminders' = 'false'::jsonb
+       )
   loop
     continue when r.stage is null;
     continue when exists (
