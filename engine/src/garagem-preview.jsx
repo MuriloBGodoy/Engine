@@ -21,6 +21,10 @@ import { Garagem } from "./pages/Garagem";
 import { CAR_TYPE_OWNED, FalhaDeLeitura } from "./services/db";
 import "./index.css";
 import "./services/i18n";
+import "./services/i18n-garage-fixes";
+import "./services/i18n-reminders";
+import "./services/i18n-garage-v2";
+import { MemoryRouter } from "react-router-dom";
 
 const QUERY = new URLSearchParams(window.location.search);
 if (QUERY.get("dark") === "1") document.documentElement.classList.add("dark");
@@ -139,6 +143,6 @@ export function Prova() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {QUERY.get("erro") === "1" ? <ProvaDeErro /> : <Prova />}
+    <MemoryRouter>{QUERY.get("erro") === "1" ? <ProvaDeErro /> : <Prova />}</MemoryRouter>
   </React.StrictMode>,
 );

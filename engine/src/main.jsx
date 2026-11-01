@@ -15,6 +15,7 @@ import "./services/i18n-quotes";
 import "./services/i18n-service-chat";
 import "./services/i18n-services-extra";
 import "./services/i18n-garage-fixes";
+import "./services/i18n-garage-v2";
 import "./services/i18n-reminders";
 import "./services/i18n-general-fixes";
 import "./services/i18n-social-fixes";

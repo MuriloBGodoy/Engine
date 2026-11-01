@@ -40,6 +40,7 @@ import { getMySuspension } from "./services/suspension";
 const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
 const ContributionModal = lazyNamed(() => import("./components/ContributionModal"), "ContributionModal");
 const ExpensesModal = lazyNamed(() => import("./components/ExpensesModal"), "ExpensesModal");
+const CarPage = lazyNamed(() => import("./pages/CarPage"), "CarPage");
 const Terms = lazyNamed(() => import("./pages/Terms"), "Terms");
 const Privacy = lazyNamed(() => import("./pages/Privacy"), "Privacy");
 const PostPage = lazyNamed(() => import("./pages/PostPage"), "PostPage");
@@ -115,6 +116,7 @@ function App() {
   const [settingsFailed, setSettingsFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [carToEdit, setCarToEdit] = useState(null);
+  const [newCarType, setNewCarType] = useState(null);
   const [ownershipCar, setOwnershipCar] = useState(null);
   const [contributionCar, setContributionCar] = useState(null);
   const [expenseCar, setExpenseCar] = useState(null);
@@ -268,8 +270,9 @@ function App() {
     }
   };
 
-  const handleOpenModal = (car = null) => {
+  const handleOpenModal = (car = null, options = {}) => {
     setCarToEdit(car);
+    setNewCarType(options.type || null);
     setIsModalOpen(true);
   };
 
@@ -566,6 +569,7 @@ function App() {
               onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
               isModalOpen={isModalOpen}
               carToEdit={carToEdit}
+              newCarType={newCarType}
               onCloseModal={handleCloseModal}
               onSaveCar={saveCarAction}
               cars={cars}
@@ -604,6 +608,27 @@ function App() {
                   onRetry={recarregarCarros}
                   accountEmail={user?.email || ""}
                   userId={userId || ""}
+                />
+              </RequireAuth>
+            }
+          />
+          {/* Página do carro (Garagem 2.0). Rota, e não modal: o voltar do
+              celular funciona sozinho e o carro tem endereço próprio. */}
+          <Route
+            path="/garagem/:carId"
+            element={
+              <RequireAuth user={user}>
+                <CarPage
+                  cars={cars}
+                  hideValues={settings.privacy.lockSensitiveValues}
+                  userId={userId || ""}
+                  onOpenModal={handleOpenModal}
+                  onOpenDelete={openDeleteConfirmation}
+                  onOpenOwnership={setOwnershipCar}
+                  onAddContribution={setContributionCar}
+                  onAddExpense={setExpenseCar}
+                  onMarkAchieved={markCarAchieved}
+                  onOpenSpecs={setSpecsCar}
                   onSaveReminders={saveRemindersAction}
                 />
               </RequireAuth>
@@ -741,6 +766,7 @@ function AppLayout({
   onToggleSidebar,
   isModalOpen,
   carToEdit,
+  newCarType,
   onCloseModal,
   onSaveCar,
   cars,
@@ -846,6 +872,7 @@ function AppLayout({
           onClose={onCloseModal}
           onSave={onSaveCar}
           carToEdit={carToEdit}
+          initialType={newCarType}
         />
       )}
 

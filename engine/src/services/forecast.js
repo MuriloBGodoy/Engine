@@ -41,8 +41,21 @@ export function forecastCompletion(car) {
 
   if (!target || remaining <= 0) return null;
 
-  const pace = monthlyPace(car?.contributions);
-  if (pace <= 0) return null;
+  return forecastAtPace(car, monthlyPace(car?.contributions));
+}
+
+/**
+ * A mesma conta do `forecastCompletion`, com o ritmo dado de fora: é o "e se
+ * eu guardar R$ X por mês" da página da meta. Mesma fórmula, mesmo teto —
+ * a data que o controle mostra no ritmo atual é a mesma do card.
+ */
+export function forecastAtPace(car, pace) {
+  const target = Number(car?.targetValue) || 0;
+  const saved = Number(car?.savedValue) || 0;
+  const remaining = target - saved;
+
+  if (!target || remaining <= 0) return null;
+  if (!(pace > 0)) return null;
 
   const months = Math.ceil(remaining / pace);
   // Acima de 50 anos a conta deixa de significar coisa alguma.

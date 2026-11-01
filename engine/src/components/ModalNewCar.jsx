@@ -37,7 +37,7 @@ const fieldClass =
 const fieldLabelClass =
   "ml-1 text-[10px] font-bold uppercase tracking-widest";
 
-export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
+export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initialType = null }) {
   const { i18n, t } = useTranslation();
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
@@ -64,7 +64,10 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null }) {
   // recebia o preço da anterior.
   const requestRef = useRef(0);
   const confirm = useConfirm();
-  const [carType, setCarType] = useState(carToEdit?.type || CAR_TYPE_GOAL);
+  // `initialType` vem das duas portas da Garagem vazia ("tenho" / "quero").
+  const [carType, setCarType] = useState(
+    carToEdit?.type || (initialType === CAR_TYPE_OWNED ? CAR_TYPE_OWNED : CAR_TYPE_GOAL),
+  );
   const isOwned = carType === CAR_TYPE_OWNED;
   // Lembretes: UF e SÓ o último dígito da placa (o resto mora no modal de
   // lembretes da Garagem). Opcionais e só para carro que a pessoa tem.
