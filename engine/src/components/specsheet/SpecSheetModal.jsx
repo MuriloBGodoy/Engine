@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { canEditSpecSheet, resolveVehicleSpecSheet } from "../../services/carSpecSheet";
 import { SpecSheetEditor } from "./SpecSheetEditor";
 import { SpecSheetView } from "./SpecSheetView";
-import { formatFipeYear } from "../../services/carDisplay";
+import { formatCarName, formatFipeYear } from "../../services/carDisplay";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 
 /**
@@ -46,7 +46,9 @@ export function SpecSheetModal({ car, onClose, onSave }) {
   if (!car || !resolved) return null;
 
   const canEdit = canEditSpecSheet(car) && Boolean(onSave);
-  const versionString = `${car.brand || ""} ${car.model || ""}`.trim();
+  // Marca normalizada como no card ("Volkswagen", não o "VW - VolksWagen"
+  // cru da FIPE). O modelo segue inteiro: é aqui que a versão se lê toda.
+  const versionString = formatCarName(car);
 
   const submit = async (sheet) => {
     setSaving(true);
