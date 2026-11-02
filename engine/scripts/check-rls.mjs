@@ -730,13 +730,21 @@ try {
   check("outro não tira salvo alheio", denied(await a.client.from("saved_posts").delete().eq("user_id", b.id).select()));
   check("dono tira o salvo", (await b.client.from("saved_posts").delete().eq("user_id", b.id).eq("post_id", post).select()).data?.length === 1);
   const conversaAB = (await a.client.rpc("start_conversation", { p_other: b.id, p_my_card: { author: "A" }, p_other_card: { author: "B" } })).data;
-  const msgA = (await a.client.rpc("send_message", { p_conversation: conversaAB, p_text: "oi", p_type: "text", p_data: {} })).data;
+  // A conversa A↔B já tem histórico dos testes de cima (é o caso real): o
+  // que se confere é que apagar a última devolve a prévia e o não lido ao
+  // estado de antes dela.
+  await b.client.rpc("mark_conversation_read", { p_conversation: conversaAB });
+  const conversaAntes = (await a.client.from("conversations").select("last_message, unread").eq("id", conversaAB).single()).data;
+  const msgA = (await a.client.rpc("send_message", { p_conversation: conversaAB, p_text: `oi ${run}`, p_type: "text", p_data: {} })).data;
   check("outro não edita mensagem alheia", Boolean((await b.client.rpc("edit_message", { p_message: msgA, p_text: "hack" })).error));
   check("autor edita a própria mensagem", passed(await a.client.rpc("edit_message", { p_message: msgA, p_text: "oi, editado" })));
   check("outro não apaga mensagem alheia", denied(await b.client.from("messages").delete().eq("id", msgA).select()));
   await a.client.from("messages").delete().eq("id", msgA);
   const conversaDepois = (await a.client.from("conversations").select("last_message, unread").eq("id", conversaAB).single()).data;
-  check("apagar a última limpa a prévia e o não lido", conversaDepois?.last_message === null && conversaDepois?.unread?.[b.id] === 0);
+  check("apagar a última devolve a prévia anterior e o não lido",
+    (conversaDepois?.last_message?.text ?? null) === (conversaAntes?.last_message?.text ?? null)
+      && (conversaDepois?.unread?.[b.id] ?? 0) === (conversaAntes?.unread?.[b.id] ?? 0),
+    JSON.stringify({ antes: conversaAntes, depois: conversaDepois }));
 } catch (error) {
   failures += 1;
   console.log(`\n  FALHA erro inesperado: ${error?.message || error}`);
