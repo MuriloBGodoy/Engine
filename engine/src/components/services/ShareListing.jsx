@@ -8,8 +8,8 @@ import {
   serviceListingDisplayUrl,
   serviceListingPath,
   serviceListingUrl,
-  shareOrCopyLink,
 } from "../../services/serviceListingPublic";
+import { openShareSheet } from "../../services/shareLinks";
 
 /**
  * Compartilhar um anúncio: o menu nativo no celular, copiar o link no resto.
@@ -28,24 +28,19 @@ export function ShareListingButton({
   label,
 }) {
   const { t } = useTranslation();
-  const toast = useToast();
 
-  const share = async (event) => {
+  const share = (event) => {
     event?.stopPropagation?.();
-    const url = serviceListingUrl(listing);
-    const result = await shareOrCopyLink({
-      url,
+    // A folha de compartilhar (DM do Engine + WhatsApp, X, copiar...).
+    openShareSheet({
+      url: serviceListingUrl(listing),
       title: listing.title,
       text: asOwner
         ? t("services.share.ownerText", { title: listing.title })
         : t("services.share.visitorText", { title: listing.title }),
+      kind: listing.kind === "product" ? "product" : "service",
     });
-    trackEvent("servico_link_compartilhado", { result, asOwner, source });
-    if (result === "copied") {
-      toast(asOwner ? t("services.share.copiedOwner") : t("services.share.copied"));
-    } else if (result === "failed") {
-      toast(t("services.share.copyFailed", { url }), "error");
-    }
+    trackEvent("servico_link_compartilhado", { result: "sheet", asOwner, source });
   };
 
   const text = label || t("services.share.action");

@@ -21,6 +21,7 @@ import {
   clubErrorMessage,
 } from "./clubsDataSource";
 import { useToast } from "../ToastProvider";
+import { openShareSheet } from "../../services/shareLinks";
 import { clubColorVars, clubMatchesCar } from "../../services/clubStyles";
 import { useIsDark } from "../../hooks/useIsDark";
 import { auth } from "../../services/supabase";
@@ -175,15 +176,11 @@ export function ClubDetail({ clubId, onClose }) {
     }
   };
 
-  const handleShare = async () => {
-    // Link de membro leva o convite: quem entrar por ele ganha padrinho.
+  const handleShare = () => {
+    // Link de membro leva o convite: quem entrar por ele ganha padrinho
+    // (o `ref` do convite tem prioridade sobre o `ref=share`).
     const url = `${window.location.origin}/clubs/${clubId}${isMember && uid ? `?ref=${uid}` : ""}`;
-    try {
-      if (navigator.share) await navigator.share({ title: club?.name, url });
-      else await navigator.clipboard.writeText(url);
-    } catch {
-      /* cancelar o compartilhamento não é erro */
-    }
+    openShareSheet({ url, title: club?.name || "Engine", kind: "club" });
   };
 
   if (loading && !club) {

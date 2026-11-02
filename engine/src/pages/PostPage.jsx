@@ -7,6 +7,7 @@ import { GoalCard } from "./Community";
 import { useToast } from "../components/ToastProvider";
 import { useRequireAccount } from "../hooks/useRequireAccount";
 import { usePostActions } from "../hooks/usePostActions";
+import { openShareSheet, shareUrls } from "../services/shareLinks";
 
 /**
  * Página de uma publicação, aberta por link direto: /post/:postId.
@@ -136,6 +137,10 @@ export function PostPage({ user }) {
           {...handlers}
           onLike={(id) => handlers.onLike(id, visibleGoal)}
           onFollow={handleFollow}
+          // O aviãozinho abre a folha de compartilhar (DM + fora do Engine).
+          onSendToChat={(item) =>
+            openShareSheet({ url: shareUrls.post(item.id), title: item.title || String(item.note || "").slice(0, 80) || item.author || "Engine", goal: item, kind: "post" })
+          }
           onOpenProfile={(profileUserId, person) => {
             const source = person || visibleGoal;
             const username = String(source?.username || "").replace(/^@/, "");

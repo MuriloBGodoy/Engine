@@ -20,6 +20,7 @@ import { GoalCard } from "./Community";
 import { ShareToChatModal } from "../components/ShareToChatModal";
 import { usePostActions } from "../hooks/usePostActions";
 import { fetchSavedPosts } from "../services/savedPosts";
+import { openShareSheet, shareUrls } from "../services/shareLinks";
 import "../services/i18n-social-posts";
 import "../services/i18n-social-feed";
 import { auth } from "../services/supabase";
@@ -585,7 +586,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 {...postActions.handlers}
                 onLike={(goalId) => postActions.handlers.onLike(goalId, goal)}
                 onFollow={handleFollow}
-                onSendToChat={currentUserId ? setPostToShare : undefined}
+                onSendToChat={setPostToShare}
                 onOpenProfile={(_userId, person) => {
                   const username = String(person?.username || "").replace(/^@/, "");
                   if (!username) return;
@@ -759,6 +760,22 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 )}
               </>
             )}
+            {/* Compartilhar o perfil (dentro e fora do Engine). */}
+            <button
+              type="button"
+              onClick={() =>
+                openShareSheet({
+                  url: shareUrls.profile(profile.username),
+                  title: `${profile.author}${profile.username ? ` (${profile.username})` : ""}`,
+                  kind: "profile",
+                })
+              }
+              title={t("socialPosts.share.action")}
+              aria-label={t("socialPosts.share.action")}
+              className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+            >
+              <Share2 size={16} />
+            </button>
           </div>
         </div>
 

@@ -26,6 +26,8 @@ import { useSocialReport } from "../hooks/useSocialReport";
 import { authPath } from "../services/authRedirect";
 import { EventTeamBadge, EventTeamPanel } from "../components/events/EventTeamPanel";
 import { EventEditModal } from "../components/events/EventEditModal";
+import { openShareSheet, shareUrls } from "../services/shareLinks";
+import "../services/i18n-social-posts";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -224,6 +226,16 @@ export function EventDetails() {
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-3xl font-bold text-[var(--engine-text)] flex-1 truncate">{event.title}</h1>
+        {/* Compartilhar o evento (DM do Engine, WhatsApp, X, copiar...). */}
+        <button
+          type="button"
+          onClick={() => openShareSheet({ url: shareUrls.event(event.id || eventId), title: event.title, kind: "event" })}
+          title={t("socialPosts.share.action")}
+          aria-label={t("socialPosts.share.action")}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+        >
+          <Share2 size={20} />
+        </button>
         {!isOwner && (
           <button
             type="button"

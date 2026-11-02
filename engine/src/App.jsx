@@ -10,6 +10,7 @@ import { InstallPrompt } from "./components/InstallPrompt";
 import { ConsentBanner } from "./components/ConsentBanner";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { CountryPrompt } from "./components/CountryPrompt";
+import { ShareSheetHost } from "./components/social/ShareSheet";
 import { readCountryAsked } from "./services/countryPrompt";
 import "./index.css";
 
@@ -521,6 +522,8 @@ function App() {
       <UpdateBanner />
       <InstallPrompt />
       <ConsentBanner />
+      {/* Folha de compartilhar única (openShareSheet, services/shareLinks.js). */}
+      <ShareSheetHost user={user} settings={settings} />
       {showCountryPrompt && (
         <CountryPrompt
           user={user}

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bookmark, Clapperboard, Heart, Link2, Loader2, MessageCircle } from "lucide-react";
+import { Bookmark, Clapperboard, Heart, Loader2, MessageCircle, Send } from "lucide-react";
 import { engineDB } from "../../services/db";
 import { fetchVideoPage } from "../../services/socialPosts";
+import { openShareSheet, shareUrls } from "../../services/shareLinks";
 import { trackEvent } from "../../services/observability";
 import { useRequireAccount } from "../../hooks/useRequireAccount";
 import { useSavedPosts } from "../../hooks/useSavedPosts";
@@ -109,14 +110,11 @@ export function ReelsFeed({ user, blockedIds = [] }) {
     }
   };
 
-  const share = async (goal) => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/post/${goal.id}`);
-      trackEvent("post_link_copiado", { postId: goal.id, origem: "reels" });
-      toast(t("socialPosts.reels.linkCopied"));
-    } catch {
-      // Sem permissão de área de transferência: não vale um erro.
-    }
+  // A folha de compartilhar: DM do Engine em cima, WhatsApp/X/copiar embaixo.
+  const share = (goal) => {
+    const title = String(goal.note || "").replace(/\s+/g, " ").trim().slice(0, 80) || goal.author || "Engine";
+    openShareSheet({ url: shareUrls.post(goal.id), title, goal, kind: "post" });
+    trackEvent("post_compartilhar_aberto", { origem: "reels" });
   };
 
   if (status === "loading") {
@@ -227,7 +225,7 @@ export function ReelsFeed({ user, blockedIds = [] }) {
               </button>
               <button type="button" onClick={() => share(goal)} aria-label={t("socialPosts.reels.share")} className={action}>
                 <span className={actionIcon}>
-                  <Link2 size={21} />
+                  <Send size={20} />
                 </span>
               </button>
             </div>

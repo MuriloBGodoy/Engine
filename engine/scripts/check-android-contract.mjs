@@ -39,7 +39,11 @@ const OVERLAYS = [
   "src/components/ExpensesModal.jsx",
   "src/components/ContributionModal.jsx",
   "src/components/CreateFeedPostModal.jsx",
-  "src/components/ShareToChatModal.jsx",
+  // Desde 02/11/2026 o "enviar" do post é a folha de compartilhar; o
+  // ShareToChatModal só a embrulha.
+  "src/components/social/ShareSheet.jsx",
+  "src/components/social/VideoEditor.jsx",
+  "src/components/social/CaptionEditor.jsx",
   "src/components/DeleteModal.jsx",
   "src/components/EditProfileModal.jsx",
   "src/components/ModalNewCar.jsx",

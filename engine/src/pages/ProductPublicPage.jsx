@@ -15,7 +15,7 @@ import {
   setProductSaleStatus,
 } from "../services/shops";
 import { normalizeWhatsApp } from "../services/serviceListingDisplay";
-import { shareOrCopyLink } from "../services/serviceListingPublic";
+import { openShareSheet } from "../services/shareLinks";
 import { ProductDetail } from "../components/shop/ProductDetail";
 import { ContactSheet } from "../components/shop/ContactSheet";
 import { ReportListingButton } from "../components/services/ReportListing";
@@ -121,12 +121,7 @@ export function ProductPublicPage({ user }) {
   const phone = normalizeWhatsApp(product.whatsapp);
   const photos = product.photos;
 
-  const share = async () => {
-    const url = productUrl(product);
-    const outcome = await shareOrCopyLink({ url, title: product.title });
-    if (outcome === "copied") toast(t("services.share.copied"));
-    if (outcome === "failed") toast(t("services.share.copyFailed", { url }), "error");
-  };
+  const share = () => openShareSheet({ url: productUrl(product), title: product.title, kind: "product" });
 
   const toggleSold = async () => {
     try {

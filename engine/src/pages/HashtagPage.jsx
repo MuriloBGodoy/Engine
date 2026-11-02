@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Hash, Loader2 } from "lucide-react";
+import { ArrowLeft, Hash, Loader2, Share2 } from "lucide-react";
 import { GoalCard } from "./Community";
 import { engineDB } from "../services/db";
 import { fetchHashtagCount, fetchHashtagPage } from "../services/socialPosts";
 import { normalizeTag } from "../services/socialText";
+import { openShareSheet, shareUrls } from "../services/shareLinks";
 import { usePostActions } from "../hooks/usePostActions";
 import { TrendingTags } from "../components/social/TrendingTags";
 import { ShareToChatModal } from "../components/ShareToChatModal";
@@ -127,6 +128,17 @@ export function HashtagPage({ user, settings }) {
             </p>
           )}
         </div>
+        {tag && (
+          <button
+            type="button"
+            onClick={() => openShareSheet({ url: shareUrls.hashtag(tag), title: `#${tag} no Engine`, kind: "hashtag" })}
+            aria-label={t("socialPosts.share.action")}
+            title={t("socialPosts.share.action")}
+            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+          >
+            <Share2 size={18} />
+          </button>
+        )}
       </header>
 
       <div className="mx-auto w-full max-w-2xl sm:py-5">
@@ -160,7 +172,7 @@ export function HashtagPage({ user, settings }) {
                 {...handlers}
                 onLike={(goalId) => handlers.onLike(goalId, goal)}
                 onFollow={handleFollow}
-                onSendToChat={user?.uid ? setPostToShare : undefined}
+                onSendToChat={setPostToShare}
                 onOpenPost={(goalId) => navigate(`/post/${goalId}`)}
                 onOpenProfile={(_userId, person) => {
                   const username = String(person?.username || "").replace(/^@/, "");

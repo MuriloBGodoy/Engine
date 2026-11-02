@@ -6,12 +6,11 @@ import { engineDB } from "../services/db";
 import { fetchProProfileByHandle, proDisplay, proProfilePath } from "../services/proProfiles";
 import { fetchProfileListings } from "../services/shops";
 import { getServiceCategoryLabel, normalizeWhatsApp } from "../services/serviceListingDisplay";
-import { shareOrCopyLink } from "../services/serviceListingPublic";
+import { openShareSheet } from "../services/shareLinks";
 import { ProPageHeader } from "../components/shop/ProPageHeader";
 import { profileInitials } from "../services/shopFormat";
 import { ProVitrine } from "../components/pro/ProVitrine";
 import { PublicMissing, PublicShell } from "../components/pro/PublicShell";
-import { useToast } from "../components/ToastProvider";
 
 /**
  * Página pública do perfil profissional: /p/<@>. Serve para a página
@@ -22,7 +21,6 @@ import { useToast } from "../components/ToastProvider";
 export function ProPage({ user }) {
   const { handle = "" } = useParams();
   const { t, i18n } = useTranslation();
-  const toast = useToast();
   const [state, setState] = useState({ handle: null, value: null, rows: [], failed: false });
   const [cars, setCars] = useState([]);
   const loading = state.handle !== handle;
@@ -108,11 +106,7 @@ export function ProPage({ user }) {
     ? { count: ratingCount, avg: rated.reduce((sum, row) => sum + Number(row.rating_avg) * Number(row.rating_count), 0) / ratingCount }
     : null;
 
-  const share = async () => {
-    const result = await shareOrCopyLink({ url, title: display.name });
-    if (result === "copied") toast(t("services.share.copied"));
-    if (result === "failed") toast(t("services.share.copyFailed", { url }), "error");
-  };
+  const share = () => openShareSheet({ url, title: display.name, kind: "page" });
 
   return (
     <PublicShell
