@@ -419,7 +419,7 @@ const clampMediaRatio = (width, height) =>
     ? Math.min(Math.max(width / height, MEDIA_MIN_RATIO), MEDIA_MAX_RATIO)
     : 1;
 
-function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null }) {
+function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null, onRatio }) {
   const [index, setIndex] = useState(0);
   const [ratio, setRatio] = useState(1);
   const dragStart = useRef(null);
@@ -511,13 +511,14 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null }) {
             draggable={false}
             onLoad={
               position === 0
-                ? (event) =>
-                    setRatio(
-                      clampMediaRatio(
-                        event.currentTarget.naturalWidth,
-                        event.currentTarget.naturalHeight,
-                      ),
-                    )
+                ? (event) => {
+                    const next = clampMediaRatio(
+                      event.currentTarget.naturalWidth,
+                      event.currentTarget.naturalHeight,
+                    );
+                    setRatio(next);
+                    onRatio?.(next);
+                  }
                 : undefined
             }
             onError={(event) => {
@@ -1096,7 +1097,7 @@ export function GoalCard({
                   value={goal.createdAt}
                   editedAt={goal.editedAt}
                   short
-                  className="hover:text-[var(--engine-text)]"
+                  className="shrink-0 hover:text-[var(--engine-text)]"
                 />
               ) : null}
               {isModal && goal.city ? (
@@ -1112,7 +1113,8 @@ export function GoalCard({
               na aba de Conquistas do perfil (decisão da sessão de
               22/08/2026). Sem faixa batida, nada aparece. */}
           {/* Abaixo de 360px o selo empurrava o horário para baixo dele. */}
-          {postLikeTier && (
+          {/* Na coluna de 380px do lightbox o selo espremia o nome. */}
+          {postLikeTier && !isModal && (
             <span className="hidden min-[360px]:flex">
               <AchievementBadge tier={postLikeTier} state="unlocked" />
             </span>
@@ -2217,7 +2219,7 @@ function PeopleSearchModal({
  * Todo post agora tem endereço próprio (`/community?goal=<id>`): é o que as
  * notificações e o link de compartilhar abrem, em vez de só filtrar o feed.
  */
-function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
+export function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
   // No desktop, post com foto vira o lightbox do Instagram: mídia à esquerda,
   // comentários numa coluna ao lado. Fora disso (celular, ou post só de
   // texto) o modal mostra SÓ o post, com a prévia dos comentários, e a
@@ -2237,15 +2239,30 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
 
   const comments = goal?.comments || [];
   const gallery = goal?.images?.length ? goal.images : goal?.image ? [goal.image] : [];
-  // Caixa da mídia no lightbox: o que sobra da tela depois da coluna de 380px
-  // e do cabeçalho. Lido no render (a troca de tamanho de tela já re-renderiza
-  // pelo useMediaQuery); a moldura final sai da proporção da foto.
-  const mediaBox = sideBySide
-    ? {
-        maxWidth: Math.min(window.innerWidth * 0.95, 1400) - 380,
-        maxHeight: Math.min(window.innerHeight * 0.92, 960) - 54,
-      }
-    : null;
+  // Lightbox como o do Instagram: o modal tem a largura da mídia + a coluna
+  // de 380px, nada mais. A mídia sai da proporção do 1o item (presa entre
+  // 4:5 e 1,91:1) dentro de uma caixa de no máximo min(90vh - cabeçalho,
+  // 860px) de altura. Antes o painel herdava `width: 100%` do
+  // .engine-modal-panel e sobrava uma faixa vazia à direita da coluna.
+  // A proporção fica guardada por post: trocar de publicação não herda a
+  // moldura da anterior.
+  const [ratioByPost, setRatioByPost] = useState({});
+  const fallbackRatio = goal?.video
+    ? clampMediaRatio(goal.video.width, goal.video.height)
+    : gallery.length
+      ? 1
+      : 16 / 9;
+  const mediaRatio = (goal && ratioByPost[goal.id]) || fallbackRatio;
+  const lightbox = (() => {
+    if (!sideBySide) return null;
+    const maxHeight = Math.min(window.innerHeight * 0.9 - 54, 860);
+    // Paisagem larga para em 1080px: o modal não vira a tela inteira.
+    const maxWidth = Math.min(window.innerWidth * 0.95 - 383, 1080);
+    const height = Math.round(Math.min(maxHeight, maxWidth / mediaRatio));
+    const width = Math.round(height * mediaRatio);
+    // +380 da coluna, +1 da borda dela, +2 das bordas do painel.
+    return { width, height, panelWidth: width + 383 };
+  })();
 
   // Quem chega por notificação de comentário (`?comments=1`): no lightbox o
   // compositor já vem focado; fora dele, a folha de comentários abre direto
@@ -2288,7 +2305,10 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
         role="dialog"
         aria-modal="true"
         aria-label={t("community.postTitle")}
-        className={`engine-modal-panel engine-pop ${sideBySide ? "sm:w-auto sm:max-w-[95vw]" : "sm:max-w-xl"}`}
+        className={`engine-modal-panel engine-pop ${sideBySide ? "" : "sm:max-w-xl"}`}
+        // Estilo em linha de propósito: a regra `.engine-modal-panel` (fora de
+        // camada) ganha de qualquer utilitário do Tailwind 4.
+        style={lightbox ? { width: lightbox.panelWidth, maxWidth: "none" } : undefined}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] py-1.5 pl-4 pr-2">
@@ -2307,25 +2327,35 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
         </header>
 
         {goal && sideBySide ? (
-          <div className="flex min-h-0 flex-1">
+          // Altura = a da mídia: a coluna rola por dentro, em vez de esticar o
+          // modal e deixar faixa vazia embaixo de foto paisagem.
+          <div className="flex min-h-0 flex-none" style={{ height: lightbox.height }}>
             {/* Mídia à esquerda, do tamanho da proporção dela. */}
-            <div className="flex min-w-0 items-center justify-center bg-[var(--engine-surface-2)]">
+            <div
+              className="flex shrink-0 items-center justify-center overflow-hidden bg-[var(--engine-surface-2)]"
+              style={{ width: lightbox.width, height: lightbox.height }}
+            >
               {gallery.length > 0 ? (
                 <PostGallery
                   images={gallery}
                   alt={goal.title}
                   t={t}
-                  box={mediaBox}
+                  box={{ maxWidth: lightbox.width, maxHeight: lightbox.height }}
+                  onRatio={(value) =>
+                    setRatioByPost((current) =>
+                      current[goal.id] === value ? current : { ...current, [goal.id]: value },
+                    )
+                  }
                   onDoubleTap={() => {
                     if (!cardProps.interactions?.liked) cardProps.onLike(goal.id);
                   }}
                 />
               ) : goal.video ? (
-                <div className="w-[min(560px,50vw)]">
+                <div className="w-full">
                   <PostVideoPlayer video={goal.video} autoPlay={false} />
                 </div>
               ) : (
-                <div className="w-[min(640px,50vw)]">
+                <div className="w-full">
                   <PostVideo url={goal.videoUrl} t={t} />
                 </div>
               )}

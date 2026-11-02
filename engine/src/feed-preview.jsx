@@ -8,13 +8,13 @@
  *
  * Não entra no build: o Vite só empacota o index.html. Vive no `npm run dev`,
  * em /feed-preview.html (`?dark=1` para o tema escuro, `?modal=1` para o
- * cartão no formato da publicação aberta).
+ * cartão no formato da publicação aberta, `?lightbox=p1` para o modal).
  */
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { GoalCard } from "./pages/Community";
+import { GoalCard, PostModal } from "./pages/Community";
 import { ConfirmProvider } from "./components/ConfirmProvider";
 import { ToastProvider } from "./components/ToastProvider";
 import "./index.css";
@@ -26,6 +26,9 @@ if (QUERY.get("dark") === "1") {
   document.documentElement.dataset.theme = "dark";
 }
 const MODAL = QUERY.get("modal") === "1";
+// `?lightbox=p1` abre a publicação no formato do desktop (p1 retrato, p2
+// paisagem, p5 quadrada, p4 só texto).
+const LIGHTBOX = QUERY.get("lightbox") || "";
 
 // Foto de mentira com o tamanho de câmera de verdade: o cartão lê a
 // proporção do `naturalWidth/Height`, então o SVG declara largura e altura.
@@ -146,12 +149,49 @@ const POSTS = [
       { id: "c3", text: "Peça original sai uns R$ 900, com 3h de serviço fica bem abaixo disso.", author: "Oficina Moema", username: "@oficina.moema" },
     ],
   },
+  {
+    ...base,
+    id: "p5",
+    kind: "post",
+    author: "Juliana Reis",
+    username: "@ju.drift",
+    avatar: "JR",
+    clubTag: "DRIFT-RS",
+    ownerId: "u-ju",
+    likes: 4812,
+    createdAt: hoursAgo(72),
+    images: [photo(1080, 1080, "#1a1a1a", "#d9480f")],
+    note: "Treino de quinta em Tarumã, segunda volta limpa da noite #drift",
+  },
 ];
 
 function Feed() {
   const { t } = useTranslation();
   const [likes, setLikes] = useState({});
   const noop = () => {};
+  const cardProps = {
+    interactions: { liked: false, comments: [], rating: 0 },
+    following: [],
+    shared: true,
+    currentUserId: "u-me",
+    onLike: noop,
+    onComment: noop,
+    onRate: noop,
+    onShare: noop,
+    onUnshare: noop,
+    onFollow: noop,
+    onOpenProfile: noop,
+    onEditComment: noop,
+    onDeleteComment: noop,
+    onSendToChat: noop,
+  };
+  const open = POSTS.find((post) => post.id === LIGHTBOX);
+
+  if (open) {
+    return (
+      <PostModal goal={open} loading={false} openComments={false} t={t} onClose={noop} cardProps={cardProps} />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[var(--engine-bg)] py-0 sm:py-6">
