@@ -37,7 +37,7 @@ import { interestMessage, productPath } from "../../services/shops";
 export const MESSAGE_QUERY_FLAG = "mensagem";
 
 const VARIANT_CLASS = {
-  card: "flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9",
+  card: "flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-xs font-bold transition",
   block: "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition",
   bar: "inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition",
 };
@@ -112,7 +112,18 @@ export function MessageProviderButton({ listing, user, variant = "block", autoOp
         ) : (
           <MessageCircle className="shrink-0" size={variant === "card" ? 16 : 18} aria-hidden="true" />
         )}
-        <span className={variant === "card" ? "hidden sm:inline" : "truncate"}>{label}</span>
+        {variant === "card" ? (
+          <span className="truncate">{label}</span>
+        ) : variant === "bar" ? (
+          // Na barra fixa do celular de 320px o rótulo longo corta; ali
+          // entra o curto ("Mensagem").
+          <>
+            <span className="truncate min-[360px]:hidden">{t("serviceChat.contact.button")}</span>
+            <span className="hidden truncate min-[360px]:inline">{label}</span>
+          </>
+        ) : (
+          <span className="truncate">{label}</span>
+        )}
       </button>
       {open && <ContactSheet listing={listing} user={user} onClose={() => setOpen(false)} />}
     </>

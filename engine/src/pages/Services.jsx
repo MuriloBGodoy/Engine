@@ -446,7 +446,7 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
          grid), e o `justify-between` la embaixo prende o rodape no fim. Com
          `h-[420px]` o conteudo nao cabia e o flex cobrava a diferenca da unica
          parte que podia encolher — a foto. */
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] transition hover:-translate-y-0.5 hover:border-[var(--engine-accent)]/50 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:shadow-none"
+      className="@container group flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] transition hover:-translate-y-0.5 hover:border-[var(--engine-accent)]/50 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:shadow-none"
     >
       {/* `shrink-0`: sem ele a faixa de 160px media 120px num card e 96px no
           outro, conforme o texto de cada anuncio. Foto de tamanho diferente em
@@ -538,34 +538,6 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
               </p>
               <ServiceRatingBadge listing={listing} />
             </div>
-            {isMine && (
-              <div className="flex shrink-0 gap-1">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    stopAction(event);
-                    onEdit(listing);
-                  }}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white sm:h-9 sm:w-9"
-                  title={t("services.editListing")}
-                  aria-label={t("services.editListing")}
-                >
-                  <Edit3 size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    stopAction(event);
-                    onDelete(listing);
-                  }}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white sm:h-9 sm:w-9"
-                  title={t("services.deleteListing")}
-                  aria-label={t("services.deleteListing")}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            )}
           </div>
 
           <p className="mt-2 line-clamp-2 text-xs font-medium leading-4 text-[var(--engine-text-muted)]">
@@ -620,49 +592,78 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
             ))}
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 pt-1 sm:gap-2">
-            <a
-              href={getWhatsAppHref(listing, t)}
-              onClick={(event) => {
-                stopAction(event);
-                if (phone && !isMine) engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search");
-              }}
-              target="_blank"
-              rel="noreferrer"
-              aria-disabled={!phone}
-              aria-label={t("services.whatsapp")}
-              className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9 ${
-                phone
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
-              }`}
-              title={t("services.whatsapp")}
-            >
-              <WhatsAppIcon className="shrink-0" size={16} />
-              <span className="hidden sm:inline">{t("services.cardActions.chat")}</span>
-            </a>
-            {/* Mensagem pelo Engine no lugar do e-mail: a conversa fica em
-                Mensagens › Serviços, amarrada ao anúncio. O e-mail continua
-                no detalhe e na página pública. */}
-            <MessageProviderButton listing={listing} user={user} variant="card" />
-            <a
-              href={showMap ? getDirectionsUrl(listing) : undefined}
-              onClick={stopAction}
-              target="_blank"
-              rel="noreferrer"
-              aria-disabled={!showMap}
-              aria-label={t("services.viewRoute")}
-              className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg text-xs font-black transition sm:h-9 ${
-                showMap
-                  ? "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                  : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
-              }`}
-              title={t("services.viewRouteShort")}
-            >
-              <Map className="shrink-0" size={16} />
-              <span className="hidden sm:inline">{t("services.cardActions.map")}</span>
-            </a>
-          </div>
+          {/* Dono: no lugar de WhatsApp/Mensagem (que seriam para ele mesmo)
+              entram as ações dele. Rótulo some quando o card fica estreito
+              (container query), nunca corta no meio. */}
+          {isMine ? (
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={(event) => {
+                  stopAction(event);
+                  onEdit(listing);
+                }}
+                className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--engine-border-strong)] px-2 text-xs font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-text-muted)]"
+              >
+                <Edit3 className="shrink-0" size={15} aria-hidden="true" />
+                <span className="truncate">{t("services.editListing")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  stopAction(event);
+                  onDelete(listing);
+                }}
+                className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--engine-border-strong)] px-2 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+              >
+                <Trash2 className="shrink-0" size={15} aria-hidden="true" />
+                <span className="truncate">{t("services.deleteListing")}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-1.5 pt-1 @[20rem]:gap-2">
+              <a
+                href={getWhatsAppHref(listing, t)}
+                onClick={(event) => {
+                  stopAction(event);
+                  if (phone && !isMine) engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search");
+                }}
+                target="_blank"
+                rel="noreferrer"
+                aria-disabled={!phone}
+                aria-label={t("services.whatsapp")}
+                className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-xs font-bold transition ${
+                  phone
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
+                }`}
+                title={t("services.whatsapp")}
+              >
+                <WhatsAppIcon className="shrink-0" size={16} />
+                <span className="truncate">{t("services.cardActions.chat")}</span>
+              </a>
+              {/* Mensagem pelo Engine no lugar do e-mail: a conversa fica em
+                  Mensagens › Serviços, amarrada ao anúncio. O e-mail continua
+                  no detalhe e na página pública. */}
+              <MessageProviderButton listing={listing} user={user} variant="card" />
+              <a
+                href={showMap ? getDirectionsUrl(listing) : undefined}
+                onClick={stopAction}
+                target="_blank"
+                rel="noreferrer"
+                aria-disabled={!showMap}
+                aria-label={t("services.viewRoute")}
+                className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-xs font-bold transition ${
+                  showMap
+                    ? "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                    : "pointer-events-none bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
+                }`}
+                title={t("services.viewRouteShort")}
+              >
+                <Map className="shrink-0" size={16} />
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </article>
@@ -3131,7 +3132,7 @@ export function Services({ user, settings }) {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
         {filteredListings.length ? (
           filteredListings.map((listing, index) => (
             <Fragment key={listing.id}>
@@ -3501,7 +3502,7 @@ function SellerBar({
           )}
         </div>
 
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:shrink-0 sm:items-center">
+        <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-[minmax(0,1fr)_auto] sm:flex sm:shrink-0 sm:items-center">
           <button
             type="button"
             onClick={onOpenListings}

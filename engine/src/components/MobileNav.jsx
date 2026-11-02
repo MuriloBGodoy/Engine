@@ -178,7 +178,7 @@ export function MobileNav({
               key={item.path}
               to={item.path}
               aria-current={active ? "page" : undefined}
-              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[11px] font-semibold leading-tight tracking-tight transition-colors ${
+              className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0 min-[360px]:px-0.5 py-1.5 text-[11px] font-semibold leading-tight tracking-tighter min-[360px]:tracking-tight transition-colors ${
                 active
                   ? "text-[var(--engine-accent)]"
                   : "text-[var(--engine-text-subtle)]"
