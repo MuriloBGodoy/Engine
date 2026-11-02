@@ -149,10 +149,10 @@ function SectionTitle({ children }) {
 function Fact({ icon, label, value }) {
   const Icon = icon;
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-xl bg-[var(--engine-surface-2)] p-3">
-      <Icon size={18} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" aria-hidden="true" />
+    <div className="flex min-w-0 items-start gap-3 border-b border-[var(--engine-border)] py-3 last:border-b-0 sm:[&:nth-last-child(2):nth-child(odd)]:border-b-0">
+      <Icon size={17} className="mt-0.5 shrink-0 text-[var(--engine-text-muted)]" aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]">{label}</p>
+        <p className="text-xs font-semibold text-[var(--engine-text-muted)]">{label}</p>
         <p className="mt-0.5 break-words text-sm font-bold text-[var(--engine-text)]">{value}</p>
       </div>
     </div>
@@ -426,7 +426,7 @@ export function ServicePublicPage({ user }) {
                 )}
               </section>
 
-              <section className="mt-7 grid gap-2 sm:grid-cols-2">
+              <section className="mt-7 grid gap-x-6 rounded-xl border border-[var(--engine-border)] px-4 sm:grid-cols-2">
                 <Fact icon={Clock} label={t("services.schedule")} value={listing.availability || t("services.toArrange")} />
                 {listing.experience && (
                   <Fact icon={Gauge} label={t("services.experience")} value={listing.experience} />
@@ -441,7 +441,7 @@ export function ServicePublicPage({ user }) {
                   <SectionTitle>{t("services.publicPage.where")}</SectionTitle>
                   <p className="mt-2 text-sm font-semibold text-[var(--engine-text)]">{mapQuery(listing)}</p>
                   <div className="mt-3">
-                    <MapPreview listing={listing} compact />
+                    <MapPreview listing={listing} ratio />
                   </div>
                 </section>
               )}

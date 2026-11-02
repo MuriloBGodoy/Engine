@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   BarChart3,
   BriefcaseBusiness,
   ChevronDown,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -78,6 +79,7 @@ import { PublishSignInGate } from "../components/services/PublishSignInGate";
 import { InviteProviderCard } from "../components/services/InviteProvider";
 import { ReportListingButton } from "../components/services/ReportListing";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import {
   APPROVAL_SLA_HOURS,
@@ -675,8 +677,12 @@ function ServiceDetailModal({ listing, isMine, user, moderation = null, onClose,
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [section, setSection] = useState("about");
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  // Voltar do celular fecha o detalhe (antes saía da página de Serviços).
+  useHistoryDismiss(Boolean(listing), onClose);
 
-  // Zerar foto, lightbox e zoom ao trocar de anúncio é feito remontando:
+  // Zerar foto, lightbox, zoom e aba ao trocar de anúncio é feito remontando:
   // quem abre este modal passa `key` com o id do anúncio.
 
   if (!listing) return null;
@@ -686,29 +692,69 @@ function ServiceDetailModal({ listing, isMine, user, moderation = null, onClose,
   const photos = listing.photos || [];
   const activePhoto = photos[activePhotoIndex] || photos[0];
   const showMap = hasMapAddress(listing);
+  const approved = listing.moderationStatus === "approved";
+  const place = mapQuery(listing) || listing.serviceArea || t("services.remoteFallback");
+  const trackWhatsApp = isMine ? undefined : () => engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search");
   const movePhoto = (direction) => {
-    setActivePhotoIndex((current) =>
-      (current + direction + photos.length) % photos.length,
-    );
+    setActivePhotoIndex((current) => (current + direction + photos.length) % photos.length);
     setZoom(1);
   };
 
+  // Detalhes numa lista só (antes eram 4 cartões grandes). Status só para
+  // quem pode agir sobre ele: o dono e a moderação.
+  const facts = [
+    { icon: ModeIcon, label: t("services.serviceMode"), value: t(modeLabelKeys[listing.serviceMode] || modeLabelKeys.hybrid) },
+    { icon: Clock, label: t("services.schedule"), value: listing.availability || t("services.toArrange") },
+    listing.experience ? { icon: Gauge, label: t("services.experience"), value: listing.experience } : null,
+    { icon: MapPin, label: t("services.location"), value: listing.city || listing.serviceArea || t("services.online") },
+    isMine || moderation
+      ? { icon: ShieldCheck, label: t("services.statusLabel"), value: t(statusLabelKeys[listing.moderationStatus] || statusLabelKeys.pending) }
+      : null,
+  ].filter(Boolean);
+
+  const sections = [
+    { id: "about", label: t("listingDetail.about") },
+    { id: "reviews", label: t("listingDetail.reviews"), count: approved ? listing.ratingCount || 0 : null, hidden: !approved },
+    { id: "place", label: t("listingDetail.place") },
+  ].filter((item) => !item.hidden);
+
+  const whatsappLink = (className, compact = false) =>
+    phone ? (
+      <a
+        href={getWhatsAppHref(listing, t)}
+        target="_blank"
+        rel="noreferrer"
+        onClick={trackWhatsApp}
+        className={className}
+      >
+        <WhatsAppIcon size={18} className="shrink-0" />
+        <span className="truncate">{compact ? "WhatsApp" : t("services.whatsapp")}</span>
+      </a>
+    ) : null;
+
+  const actionBase =
+    "inline-flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5">
-      <section className="h-[100dvh] w-full max-w-6xl overflow-y-auto rounded-none border-0 border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:border dark:text-white">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-surface)]/95 px-3 py-3 backdrop-blur sm:gap-4 sm:px-6 sm:py-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-5" onClick={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`detail-${listing.id}`}
+        onClick={(event) => event.stopPropagation()}
+        className="relative flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden rounded-none border-0 border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:border"
+      >
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:gap-4 sm:px-6 sm:py-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[var(--engine-accent)]">
+            <p className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-[var(--engine-accent)]">
               {getServiceCategoryLabel(listing.category, t)}
             </p>
-            <h2 className="mt-1 line-clamp-2 text-lg font-extrabold italic tracking-tight sm:truncate sm:text-2xl">
+            <h2 id={`detail-${listing.id}`} className="mt-1 line-clamp-2 text-lg font-extrabold italic leading-tight tracking-tight sm:text-2xl">
               {listing.title}
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {listing.moderationStatus === "approved" && (
-              <ShareListingButton listing={listing} variant="icon" asOwner={isMine} source="detalhe" />
-            )}
+            {approved && <ShareListingButton listing={listing} variant="icon" asOwner={isMine} source="detalhe" />}
             <button
               type="button"
               onClick={onClose}
@@ -719,249 +765,300 @@ function ServiceDetailModal({ listing, isMine, user, moderation = null, onClose,
               <X size={20} />
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className="grid gap-5 p-3 pb-28 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
-          <div className="min-w-0 space-y-5">
-            {!photos.length && (
-              <ListingPhotoPlaceholder
-                listing={listing}
-                size="lg"
-                className="aspect-[4/3] w-full rounded-xl sm:aspect-[16/9]"
-              />
-            )}
-            {photos.length > 0 && (
-            <div className="relative overflow-hidden rounded-xl bg-[var(--engine-surface-2)]">
-              <button
-                type="button"
-                onClick={() => setLightboxOpen(true)}
-                className="block w-full cursor-zoom-in"
-                title={t("services.enlargePhoto")}
-              >
-                <ListingPhoto
-                  key={activePhoto}
-                  src={activePhoto}
-                  listing={listing}
-                  alt={listing.title}
-                  placeholderSize="lg"
-                  className="aspect-[4/3] w-full object-cover sm:aspect-[16/9]"
-                />
-              </button>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/75 to-transparent" />
-              <button
-                type="button"
-                onClick={() => setLightboxOpen(true)}
-                className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-[var(--engine-accent)] sm:right-4 sm:top-4 sm:h-10 sm:w-10"
-                title={t("services.openPreview")}
-              >
-                <Maximize2 size={18} />
-              </button>
-              {photos.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => movePhoto(-1)}
-                    className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-[var(--engine-accent)] sm:left-4"
-                    title={t("services.previousPhoto")}
-                  >
-                    <ChevronLeft size={22} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => movePhoto(1)}
-                    className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-[var(--engine-accent)] sm:right-4"
-                    title={t("services.nextPhoto")}
-                  >
-                    <ChevronRight size={22} />
-                  </button>
-                  <div className="absolute bottom-4 right-4 rounded-full bg-black/65 px-3 py-1 text-xs font-black uppercase tracking-widest text-white backdrop-blur">
-                    {activePhotoIndex + 1}/{photos.length}
-                  </div>
-                </>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="grid gap-5 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            <div className="min-w-0 space-y-4">
+              {!photos.length && (
+                <ListingPhotoPlaceholder listing={listing} size="lg" className="aspect-[16/10] w-full rounded-xl" />
               )}
-            </div>
-            )}
-
-            {photos.length > 1 && (
-              <div className="engine-chip-scroll -mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
-                {photos.map((photo, index) => (
-                  <button
-                    key={`${listing.id}-detail-photo-${photo}-${index}`}
-                    type="button"
-                    onClick={() => {
-                      setActivePhotoIndex(index);
-                      setZoom(1);
+              {photos.length > 0 && (
+                <div className="relative overflow-hidden rounded-xl bg-[var(--engine-surface-2)]">
+                  {/* Celular: desliza entre as fotos (snap); desktop: setas. */}
+                  <div
+                    className="engine-chip-scroll flex snap-x snap-mandatory overflow-x-auto lg:overflow-hidden"
+                    onScroll={(event) => {
+                      const node = event.currentTarget;
+                      const index = Math.round(node.scrollLeft / Math.max(1, node.clientWidth));
+                      if (index !== activePhotoIndex) setActivePhotoIndex(index);
                     }}
-                    className={`relative h-18 w-24 shrink-0 overflow-hidden rounded-lg border transition sm:h-24 sm:w-36 ${
-                      index === activePhotoIndex
-                        ? "border-[var(--engine-accent)] ring-2 ring-red-500/25"
-                        : "border-transparent opacity-70 hover:opacity-100"
-                    }`}
-                    title={t("services.viewPhoto", { value: index + 1 })}
                   >
-                    <img
-                      src={photo}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    {(isDesktop ? [activePhoto] : photos).map((photo, index) => (
+                      <button
+                        key={`${photo}-${index}`}
+                        type="button"
+                        onClick={() => setLightboxOpen(true)}
+                        className="block w-full shrink-0 snap-center cursor-zoom-in"
+                        title={t("services.enlargePhoto")}
+                      >
+                        <ListingPhoto
+                          src={photo}
+                          listing={listing}
+                          alt={index === 0 ? listing.title : ""}
+                          placeholderSize="lg"
+                          className="aspect-[16/10] max-h-[360px] w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxOpen(true)}
+                    className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-[var(--engine-accent)] sm:h-10 sm:w-10"
+                    title={t("services.openPreview")}
+                    aria-label={t("services.openPreview")}
+                  >
+                    <Maximize2 size={18} />
                   </button>
-                ))}
-              </div>
-            )}
+                  {photos.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(-1)}
+                        className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-[var(--engine-accent)] lg:flex"
+                        title={t("services.previousPhoto")}
+                        aria-label={t("services.previousPhoto")}
+                      >
+                        <ChevronLeft size={22} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(1)}
+                        className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-[var(--engine-accent)] lg:flex"
+                        title={t("services.nextPhoto")}
+                        aria-label={t("services.nextPhoto")}
+                      >
+                        <ChevronRight size={22} />
+                      </button>
+                      <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-xs font-black text-white backdrop-blur">
+                        {activePhotoIndex + 1}/{photos.length}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                {t("services.description")}
-              </p>
-              <p className="mt-2 whitespace-pre-line text-sm font-medium leading-7 text-[var(--engine-text-muted)]">
-                {listing.description}
-              </p>
-            </div>
+              {photos.length > 1 && (
+                <div className="engine-chip-scroll hidden gap-2 overflow-x-auto pb-1 lg:flex">
+                  {photos.map((photo, index) => (
+                    <button
+                      key={`${listing.id}-detail-photo-${photo}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setActivePhotoIndex(index);
+                        setZoom(1);
+                      }}
+                      className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border transition ${
+                        index === activePhotoIndex
+                          ? "border-[var(--engine-accent)] ring-2 ring-[var(--engine-ring)]"
+                          : "border-transparent opacity-70 hover:opacity-100"
+                      }`}
+                      title={t("services.viewPhoto", { value: index + 1 })}
+                    >
+                      <img src={photo} alt="" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
 
-            {(listing.tags || []).length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {listing.tags.map((tag) => (
-                  <span
-                    key={`${listing.id}-detail-${tag}`}
-                    className="rounded-full border border-[var(--engine-border)] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {showMap && <MapPreview listing={listing} />}
-          </div>
-
-          <aside className={`min-w-0 space-y-4 ${isMine || moderation ? "order-first lg:order-none" : ""}`}>
-            {/* Moderação decide daqui mesmo, sem voltar para a fila. */}
-            {moderation && <ModerationPanel listing={listing} actions={moderation} />}
-            {/* Para o dono, o topo do detalhe é o que ele mais usa: o link da
-                bio e o retorno do mês. O resto é o anúncio como o cliente vê. */}
-            {isMine && (
-              <>
-                <BioLinkCard listing={listing} />
-                <ListingMonthPanel listing={listing} />
-              </>
-            )}
-
-            <div className="rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4">
-              <div className="flex min-w-0 gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] font-black italic text-white">
+              {/* Celular: quem faz e quanto custa logo abaixo das fotos. */}
+              <div className="flex items-center gap-3 lg:hidden">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-sm font-black italic text-white">
                   {getInitials(listing.providerName || listing.title)}
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold italic">
-                    {listing.providerName || t("services.engineProfessional")}
-                  </p>
-                  <p className="mt-1 truncate text-xs font-medium text-[var(--engine-text-subtle)]">
-                    {listing.city || t("services.online")}
-                  </p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{listing.providerName || t("services.engineProfessional")}</p>
+                  <p className="truncate text-xs font-medium text-[var(--engine-text-muted)]">{listing.city || t("services.online")}</p>
                 </div>
+                <p className="shrink-0 text-xl font-black italic text-[var(--engine-accent)]">{listing.price || t("services.quoteFallback")}</p>
               </div>
 
-              <p className="mt-5 text-2xl font-black italic text-[var(--engine-accent)]">
-                {listing.price || t("services.quoteFallback")}
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              <InfoPill icon={ModeIcon} label={t("services.serviceMode")} value={t(modeLabelKeys[listing.serviceMode] || modeLabelKeys.hybrid)} tone="red" />
-              <InfoPill icon={Clock} label={t("services.schedule")} value={listing.availability || t("services.toArrange")} tone="amber" />
-              {listing.experience && (
-                <InfoPill icon={Gauge} label={t("services.experience")} value={listing.experience} tone="sky" />
-              )}
-              <InfoPill icon={ShieldCheck} label={t("services.statusLabel")} value={t(statusLabelKeys[listing.moderationStatus] || statusLabelKeys.pending)} tone="emerald" />
-            </div>
-
-            <div className="rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                {t("services.location")}
-              </p>
-              <p className="mt-2 flex items-start gap-2 text-sm font-black">
-                <MapPin className="mt-0.5 shrink-0 text-[var(--engine-accent)]" size={17} />
-                <span>
-                  {mapQuery(listing) || listing.serviceArea || t("services.remoteFallback")}
-                </span>
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              {!isMine && <MessageProviderButton listing={listing} user={user} variant="block" />}
-              <ContactButton
-                disabled={!phone}
-                href={getWhatsAppHref(listing, t)}
-                icon={WhatsAppIcon}
-                label={t("services.whatsapp")}
-                value={listing.whatsapp || t("services.noPhone")}
-                onActivate={
-                  isMine
-                    ? undefined
-                    : () => engineDB.trackServiceListingMetric(listing.id, "whatsapp", "search")
-                }
-              />
-              <ContactButton
-                disabled={!listing.email}
-                href={listing.email ? `mailto:${listing.email}?subject=${encodeURIComponent(t("services.emailSubject", { title: listing.title }))}` : undefined}
-                icon={Mail}
-                label={t("services.sendEmail")}
-                value={listing.email || t("services.noEmail")}
-              />
-              <ContactButton
-                disabled={!showMap}
-                href={showMap ? getDirectionsUrl(listing) : undefined}
-                icon={Map}
-                label={t("services.openMap")}
-                value={showMap ? t("services.googleRoute") : t("services.noAddress")}
-              />
-            </div>
-
-            <PortfolioLinks listing={listing} t={t} />
-
-            {listing.moderationStatus === "approved" && (
-              <ServiceReviews listing={listing} user={user} />
-            )}
-
-            {!isMine && listing.moderationStatus === "approved" && (
-              <a
-                href={serviceListingPath(listing)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent)]"
+              <div
+                role="tablist"
+                aria-label={listing.title}
+                className="sticky top-0 z-10 -mx-3 flex border-b border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 sm:mx-0 sm:px-0"
               >
-                <ExternalLink size={15} aria-hidden="true" />
-                {t("services.share.openPage")}
-              </a>
-            )}
-
-            {!isMine && listing.moderationStatus === "approved" && (
-              <div className="flex justify-center">
-                <ReportListingButton listing={listing} user={user} />
+                {sections.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={section === item.id}
+                    onClick={() => setSection(item.id)}
+                    className={`-mb-px min-h-12 flex-1 whitespace-nowrap border-b-2 px-2 text-sm font-bold transition sm:flex-none sm:px-5 ${
+                      section === item.id
+                        ? "border-[var(--engine-text)] text-[var(--engine-text)]"
+                        : "border-transparent text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+                    }`}
+                  >
+                    {item.label}
+                    {item.count != null && <span className="ml-1 font-semibold text-[var(--engine-text-muted)]">{item.count}</span>}
+                  </button>
+                ))}
               </div>
-            )}
 
-            {isMine && (
-              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => onEdit(listing)}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] text-xs font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                >
-                  <Edit3 size={16} />
-                  {t("services.edit")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(listing)}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--engine-accent)]/30 text-xs font-black uppercase tracking-widest text-[var(--engine-accent)] transition hover:bg-[var(--engine-accent)] hover:text-white"
-                >
-                  <Trash2 className="shrink-0" size={18} />
-                  {t("common.delete")}
-                </button>
+              {section === "about" && (
+                <div className="space-y-4">
+                  {listing.description && (
+                    <p className="whitespace-pre-line text-sm leading-7 text-[var(--engine-text)]">{listing.description}</p>
+                  )}
+                  {(listing.tags || []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {listing.tags.map((tag) => (
+                        <span
+                          key={`${listing.id}-detail-${tag}`}
+                          className="rounded-full border border-[var(--engine-border)] px-3 py-1 text-[11px] font-bold text-[var(--engine-text-muted)]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <dl className="grid gap-x-6 rounded-xl border border-[var(--engine-border)] px-4 sm:grid-cols-2">
+                    {facts.map((fact) => {
+                      const Icon = fact.icon;
+                      return (
+                        <div key={fact.label} className="flex items-start gap-3 border-b border-[var(--engine-border)] py-3 last:border-b-0 sm:[&:nth-last-child(2):nth-child(odd)]:border-b-0">
+                          <Icon size={17} aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--engine-text-muted)]" />
+                          <div className="min-w-0">
+                            <dt className="text-xs font-semibold text-[var(--engine-text-muted)]">{fact.label}</dt>
+                            <dd className="break-words text-sm font-bold text-[var(--engine-text)]">{fact.value}</dd>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                  {(listing.email || listing.instagram || listing.tiktok || listing.website || listing.videoUrl) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {listing.email && (
+                        <a
+                          href={`mailto:${listing.email}?subject=${encodeURIComponent(t("services.emailSubject", { title: listing.title }))}`}
+                          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 text-sm font-semibold text-[var(--engine-text)] hover:border-[var(--engine-border-strong)]"
+                        >
+                          <Mail size={16} aria-hidden="true" />
+                          <span className="max-w-[14rem] truncate">{listing.email}</span>
+                        </a>
+                      )}
+                      <PortfolioLinks listing={listing} t={t} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {section === "reviews" && approved && <ServiceReviews listing={listing} user={user} hideTitle />}
+
+              {section === "place" && (
+                <div className="space-y-3">
+                  <p className="flex items-start gap-2 text-sm font-bold text-[var(--engine-text)]">
+                    <MapPin className="mt-0.5 shrink-0 text-[var(--engine-accent)]" size={17} aria-hidden="true" />
+                    <span>{place}</span>
+                  </p>
+                  {showMap ? (
+                    <MapPreview listing={listing} ratio />
+                  ) : (
+                    <p className="text-sm text-[var(--engine-text-muted)]">{t("services.noAddress")}</p>
+                  )}
+                </div>
+              )}
+
+              {!isMine && approved && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--engine-border)] pt-3 text-xs">
+                  <a
+                    href={serviceListingPath(listing)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+                  >
+                    <ExternalLink size={14} aria-hidden="true" />
+                    {t("listingDetail.openPage")}
+                  </a>
+                  <ReportListingButton listing={listing} user={user} />
+                </div>
+              )}
+            </div>
+
+            <aside className={`min-w-0 space-y-3 lg:sticky lg:top-0 ${isMine || moderation ? "" : "hidden lg:block"}`}>
+              <div className="hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 lg:block">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] font-black italic text-white">
+                    {getInitials(listing.providerName || listing.title)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{listing.providerName || t("services.engineProfessional")}</p>
+                    <p className="truncate text-xs font-medium text-[var(--engine-text-muted)]">{listing.city || t("services.online")}</p>
+                  </div>
+                  {isMine && (
+                    <span className="shrink-0 rounded-full bg-[var(--engine-surface)] px-2 py-1 text-[11px] font-bold text-[var(--engine-text-muted)]">
+                      {t("listingDetail.owner")}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-4 text-2xl font-black italic text-[var(--engine-accent)]">
+                  {listing.price || t("services.quoteFallback")}
+                </p>
+
+                {/* Ações: abaixo de lg ficam na barra fixa de baixo. */}
+                {isMine ? (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => onEdit(listing)} className={`${actionBase} border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text)]`}>
+                      <Edit3 size={16} aria-hidden="true" />
+                      {t("services.edit")}
+                    </button>
+                    <button type="button" onClick={() => onDelete(listing)} className={`${actionBase} border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)]`}>
+                      <Trash2 size={16} aria-hidden="true" />
+                      {t("common.delete")}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-2">
+                    <MessageProviderButton listing={listing} user={user} variant="block" />
+                    <div className={`grid gap-2 ${phone ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {whatsappLink(`${actionBase} bg-emerald-600 text-white hover:bg-emerald-700`, true)}
+                      <Link
+                        to="/services/orcamentos?new=1"
+                        className={`${actionBase} border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text)]`}
+                      >
+                        <ClipboardList size={16} aria-hidden="true" />
+                        {t("listingDetail.quote")}
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </aside>
+
+              {moderation && <ModerationPanel listing={listing} actions={moderation} />}
+              {isMine && (
+                <>
+                  <BioLinkCard listing={listing} />
+                  <ListingMonthPanel listing={listing} />
+                </>
+              )}
+            </aside>
+          </div>
+        </div>
+
+        {/* Barra fixa do celular: o que se faz neste anúncio, sempre à mão. */}
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5 sm:px-6 lg:hidden">
+          {isMine ? (
+            <>
+              <button type="button" onClick={() => onEdit(listing)} className={`${actionBase} border border-[var(--engine-border-strong)] text-[var(--engine-text)]`}>
+                <Edit3 size={16} aria-hidden="true" />
+                {t("services.edit")}
+              </button>
+              <button type="button" onClick={() => onDelete(listing)} className={`${actionBase} border border-[var(--engine-border-strong)] text-[var(--engine-text-muted)]`}>
+                <Trash2 size={16} aria-hidden="true" />
+                {t("common.delete")}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className={phone ? "" : "col-span-2"}>
+                <MessageProviderButton listing={listing} user={user} variant="block" short />
+              </div>
+              {whatsappLink(`${actionBase} bg-emerald-600 text-white`, true)}
+            </>
+          )}
         </div>
       </section>
 
@@ -1924,11 +2021,11 @@ function ModerationPanel({ listing, actions }) {
   const { t, i18n } = useTranslation();
   const waiting = listing.moderationStatus === "pending" ? waitingInfo(listing, i18n.language) : null;
   return (
-    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-      <p className="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-300">
-        {t("services.moderation.panelTitle")}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-300">
+          {t("services.moderation.panelTitle")}
+        </p>
         <StatusBadge status={listing.moderationStatus} />
         {waiting?.label && (
           <span
@@ -1943,7 +2040,7 @@ function ModerationPanel({ listing, actions }) {
           {listing.moderationNote}
         </p>
       )}
-      <div className="mt-3">
+      <div className="mt-2">
         <ModerationActions listing={listing} actions={actions} />
       </div>
     </div>

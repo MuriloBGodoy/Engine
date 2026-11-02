@@ -321,7 +321,7 @@ function ReviewItem({ review, isOwner, isMine, canReport, onReply, onReport, bus
   );
 }
 
-export function ServiceReviews({ listing, user }) {
+export function ServiceReviews({ listing, user, hideTitle = false }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
@@ -338,6 +338,8 @@ export function ServiceReviews({ listing, user }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [myReview, setMyReview] = useState(null);
   const [editing, setEditing] = useState(false);
+  // O formulário fica atrás do "Avaliar": aberto ele tomava metade do detalhe.
+  const [composerOpen, setComposerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState("");
 
@@ -404,6 +406,7 @@ export function ServiceReviews({ listing, user }) {
       await saveServiceReview(listingId, { rating, comment, reviewId: myReview?.id || "" });
       toast(myReview ? t("serviceReviews.toast.updated") : t("serviceReviews.toast.saved"));
       setEditing(false);
+      setComposerOpen(false);
       await load();
     } catch (error) {
       toast(errorText(error), "error");
@@ -522,6 +525,8 @@ export function ServiceReviews({ listing, user }) {
         )}
       </div>
     );
+  } else if (status === "ready" && !editing && !myReview && !composerOpen && !tooNew) {
+    composer = null; // o botão "Avaliar" fica no resumo
   } else if (status === "ready" && (editing || !myReview)) {
     composer =
       tooNew && !myReview ? (
@@ -534,35 +539,41 @@ export function ServiceReviews({ listing, user }) {
           initial={myReview}
           saving={saving}
           onSubmit={submitReview}
-          onCancel={editing ? () => setEditing(false) : null}
+          onCancel={() => {
+            setEditing(false);
+            setComposerOpen(false);
+          }}
         />
       );
   }
 
   return (
     <section aria-labelledby={`reviews-${listingId}`} className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <h2 id={`reviews-${listingId}`} className="text-lg font-black text-[var(--engine-text)]">
-          {t("serviceReviews.title")}
-        </h2>
-      </div>
+      <h2 id={`reviews-${listingId}`} className={hideTitle ? "sr-only" : "text-lg font-black text-[var(--engine-text)]"}>
+        {t("serviceReviews.title")}
+      </h2>
 
-      <div className="grid gap-4 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4 sm:grid-cols-[auto,1fr] sm:items-center">
-        <div className="flex flex-col items-start gap-1 sm:items-center sm:pr-4">
-          {summary.count > 0 ? (
-            <>
-              <p className="text-4xl font-black leading-none text-[var(--engine-text)]" aria-hidden="true">
-                {averageText}
-              </p>
-              <StarRow value={summary.average} size={18} label={t("serviceReviews.average", { value: averageText })} />
-              <p className="text-xs font-semibold text-[var(--engine-text-subtle)]">{countLabel}</p>
-            </>
-          ) : (
-            <p className="text-sm font-bold text-[var(--engine-text-muted)]">{t("serviceReviews.noRating")}</p>
-          )}
-        </div>
+      {/* Resumo e convite numa linha só. Sem avaliação, não repete o vazio
+          embaixo: este é o estado vazio. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
+        {summary.count > 0 ? (
+          <div className="flex items-center gap-3">
+            <p className="text-3xl font-black leading-none text-[var(--engine-text)]" aria-hidden="true">
+              {averageText}
+            </p>
+            <div>
+              <StarRow value={summary.average} size={16} label={t("serviceReviews.average", { value: averageText })} />
+              <p className="mt-0.5 text-xs font-semibold text-[var(--engine-text-subtle)]">{countLabel}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-[var(--engine-text)]">{t("serviceReviews.empty")}</p>
+            {!isOwner && <p className="mt-0.5 text-xs text-[var(--engine-text-muted)]">{t("serviceReviews.emptyCta")}</p>}
+          </div>
+        )}
         {distribution && summary.count > 0 && (
-          <ul className="space-y-1">
+          <ul className="min-w-[10rem] flex-1 space-y-1">
             {[5, 4, 3, 2, 1].map((stars) => {
               const n = distribution[stars] || 0;
               const pct = summary.count ? Math.round((n / summary.count) * 100) : 0;
@@ -573,10 +584,10 @@ export function ServiceReviews({ listing, user }) {
                     {stars}
                   </span>
                   <Star size={12} aria-hidden="true" className="fill-amber-400 text-amber-400" />
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--engine-surface-2)]" aria-hidden="true">
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--engine-surface-2)]" aria-hidden="true">
                     <span className="block h-full rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
                   </span>
-                  <span className="w-8 text-right tabular-nums" aria-hidden="true">
+                  <span className="w-6 text-right tabular-nums" aria-hidden="true">
                     {n}
                   </span>
                 </li>
@@ -584,12 +595,18 @@ export function ServiceReviews({ listing, user }) {
             })}
           </ul>
         )}
+        {uid && !isOwner && !tooNew && status === "ready" && !myReview && !composerOpen && (
+          <button type="button" className={`${BUTTON_PRIMARY} ml-auto`} onClick={() => setComposerOpen(true)}>
+            <Star size={15} aria-hidden="true" />
+            {t("serviceReviews.rate")}
+          </button>
+        )}
       </div>
 
-      <p className="text-xs leading-5 text-[var(--engine-text-subtle)]">
-        {t("serviceReviews.disclaimer")}{" "}
+      <p className="truncate text-xs text-[var(--engine-text-subtle)]">
+        {t("serviceReviews.disclaimerShort")}{" "}
         <Link to="/termos" className="font-semibold underline underline-offset-2 hover:text-[var(--engine-text)]">
-          {t("serviceReviews.rulesLink")}
+          {t("serviceReviews.rulesShort")}
         </Link>
       </p>
 
@@ -607,13 +624,6 @@ export function ServiceReviews({ listing, user }) {
           <button type="button" className={BUTTON_GHOST} onClick={load}>
             {t("serviceReviews.retry")}
           </button>
-        </div>
-      )}
-
-      {status === "ready" && reviews.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-[var(--engine-border)] p-6 text-center">
-          <p className="text-sm font-bold text-[var(--engine-text)]">{t("serviceReviews.empty")}</p>
-          {!isOwner && <p className="mt-1 text-xs text-[var(--engine-text-muted)]">{t("serviceReviews.emptyCta")}</p>}
         </div>
       )}
 

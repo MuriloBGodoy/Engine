@@ -42,7 +42,7 @@ const VARIANT_CLASS = {
   bar: "inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition",
 };
 
-export function MessageProviderButton({ listing, user, variant = "block", autoOpen = false, className = "", own = false }) {
+export function MessageProviderButton({ listing, user, variant = "block", autoOpen = false, className = "", own = false, short = false }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -91,7 +91,7 @@ export function MessageProviderButton({ listing, user, variant = "block", autoOp
   }, [autoOpen, user?.uid, disabled]);
 
   if (!listing) return null;
-  const label = variant === "card" ? t("serviceChat.contact.button") : t("serviceChat.contact.buttonLong");
+  const label = variant === "card" || short ? t("serviceChat.contact.button") : t("serviceChat.contact.buttonLong");
 
   return (
     <>

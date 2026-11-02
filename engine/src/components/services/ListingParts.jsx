@@ -103,7 +103,7 @@ export function PortfolioLinks({ listing, t, large = false }) {
   );
 }
 
-export function MapPreview({ listing, compact = false }) {
+export function MapPreview({ listing, compact = false, ratio = false }) {
   const { t } = useTranslation();
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
@@ -111,7 +111,7 @@ export function MapPreview({ listing, compact = false }) {
         title={t("services.mapTitle", { title: listing.title || t("services.service") })}
         src={getMapUrl(listing)}
         loading="lazy"
-        className={`${compact ? "h-44" : "h-64"} w-full border-0`}
+        className={`${ratio ? "aspect-video max-h-72" : compact ? "h-44" : "h-64"} w-full border-0`}
       />
       <a
         href={getDirectionsUrl(listing)}

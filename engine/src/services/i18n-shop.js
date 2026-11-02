@@ -251,6 +251,8 @@ const ptBR = {
       page: "Oi! Vi a página de vocês no Engine.",
     },
   },
+  serviceReviews: { rate: "Avaliar", disclaimerShort: "Só quem contratou deve avaliar.", rulesShort: "Regras" },
+  listingDetail: { about: "Sobre", reviews: "Avaliações", place: "Local", details: "Detalhes", openPage: "Abrir página do anúncio", quote: "Orçamento", owner: "Seu anúncio", openMaps: "Abrir no Maps" },
 };
 
 const enUS = {
@@ -492,6 +494,8 @@ const enUS = {
       page: "Hi! I saw your page on Engine.",
     },
   },
+  serviceReviews: { rate: "Review", disclaimerShort: "Only customers should leave a review.", rulesShort: "Rules" },
+  listingDetail: { about: "About", reviews: "Reviews", place: "Location", details: "Details", openPage: "Open listing page", quote: "Quote", owner: "Your listing", openMaps: "Open in Maps" },
 };
 
 const esES = {
@@ -733,6 +737,8 @@ const esES = {
       page: "¡Hola! Vi vuestra página en Engine.",
     },
   },
+  serviceReviews: { rate: "Valorar", disclaimerShort: "Solo quien contrató debería valorar.", rulesShort: "Normas" },
+  listingDetail: { about: "Información", reviews: "Reseñas", place: "Ubicación", details: "Detalles", openPage: "Abrir página del anuncio", quote: "Presupuesto", owner: "Tu anuncio", openMaps: "Abrir en Maps" },
 };
 
 i18n.addResourceBundle("pt-BR", "translation", ptBR, true, true);
