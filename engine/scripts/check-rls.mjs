@@ -187,43 +187,6 @@ try {
   linha = (await anon.from("community_goals").select("likes_count").eq("id", post).single()).data;
   check("descurtir desconta", linha?.likes_count === 0);
 
-  console.log("\nlegenda, hashtags, menções, vídeo, salvos e mensagens");
-  // Desde 20261102150000. Valor que muda de verdade (no-op passa em qualquer regra).
-  const nomeB = `rlsb${run}`.slice(0, 24);
-  await b.client.rpc("reserve_username", { p_username: nomeB });
-  const tagRls = `rls${run}`.toLowerCase();
-  await a.client.from("community_goals").update({ data: { title: "Golf GTI", note: `#${tagRls} com @${nomeB}` } }).eq("id", post);
-  linha = (await anon.from("community_goals").select("edited_at").eq("id", post).single()).data;
-  check("legenda nova ganha 'editado' do banco", Boolean(linha?.edited_at));
-  check("cliente não apaga o 'editado'",
-    (await a.client.from("community_goals").update({ edited_at: null }).eq("id", post).select("edited_at")).data?.[0]?.edited_at !== null);
-  check("tag da legenda vira linha pública", (await anon.from("post_hashtags").select("tag").eq("post_id", post)).data?.[0]?.tag === tagRls);
-  check("feed da tag acha o post", (await anon.rpc("hashtag_feed", { p_tag: `#${tagRls}` })).data?.some((g) => g.id === post));
-  check("ninguém grava tag direto", denied(await b.client.from("post_hashtags").insert({ post_id: post, tag: "falsa", owner_id: a.id, created_at: new Date().toISOString() }).select()));
-  check("31 hashtags são recusadas",
-    denied(await a.client.from("community_goals").update({ data: { title: "Golf GTI", note: Array.from({ length: 31 }, (_, i) => `#t${i}${run}`).join(" ") } }).eq("id", post).select()));
-  const avisoMencao = (await admin.from("notifications").select("data").eq("user_id", b.id).eq("type", "mention")).data || [];
-  check("@ na legenda avisa a pessoa", avisoMencao.some((n) => n.data?.mentionKind === "post" && n.data?.goalId === post));
-  await a.client.from("community_goals").update({ data: { title: "Golf GTI", note: "vídeo", video: { path: `users/${b.id}/posts/x.mp4`, duration: 10 } } }).eq("id", post);
-  linha = (await anon.from("community_goals").select("data").eq("id", post).single()).data;
-  check("vídeo de pasta alheia some do post", !linha?.data?.video);
-  check("não sobe vídeo na pasta alheia",
-    Boolean((await b.client.storage.from("videos").upload(`users/${a.id}/posts/${run}.mp4`, new Blob(["x"], { type: "video/mp4" }), { contentType: "video/mp4" })).error));
-  check("salvar post visível passa", passed(await b.client.from("saved_posts").insert({ user_id: b.id, post_id: post })));
-  check("salvar em nome de outro é recusado", denied(await c.client.from("saved_posts").insert({ user_id: b.id, post_id: post }).select()));
-  check("salvos são privados", (await c.client.from("saved_posts").select("*").eq("user_id", b.id)).data?.length === 0
-    && (await anon.from("saved_posts").select("*")).data?.length !== 1);
-  check("outro não tira salvo alheio", denied(await c.client.from("saved_posts").delete().eq("user_id", b.id).select()));
-  check("dono tira o salvo", (await b.client.from("saved_posts").delete().eq("user_id", b.id).eq("post_id", post).select()).data?.length === 1);
-  const conversaAB = (await a.client.rpc("start_conversation", { p_other: b.id, p_my_card: { author: "A" }, p_other_card: { author: "B" } })).data;
-  const msgA = (await a.client.rpc("send_message", { p_conversation: conversaAB, p_text: "oi", p_type: "text", p_data: {} })).data;
-  check("outro não edita mensagem alheia", Boolean((await b.client.rpc("edit_message", { p_message: msgA, p_text: "hack" })).error));
-  check("autor edita a própria mensagem", passed(await a.client.rpc("edit_message", { p_message: msgA, p_text: "oi, editado" })));
-  check("outro não apaga mensagem alheia", denied(await b.client.from("messages").delete().eq("id", msgA).select()));
-  await a.client.from("messages").delete().eq("id", msgA);
-  const conversaDepois = (await a.client.from("conversations").select("last_message, unread").eq("id", conversaAB).single()).data;
-  check("apagar a última limpa a prévia e o não lido", conversaDepois?.last_message === null && conversaDepois?.unread?.[b.id] === 0);
-
   console.log("\nclubes");
   const tagA = tag("A");
   const criado = await a.client.rpc("create_club", {
@@ -734,6 +697,46 @@ try {
   await admin.from("service_listings").delete().eq("id", `pb-${run}`);
   check("dona apaga a página", passed(await a.client.from("pro_profiles").delete().eq("id", pageId).select()));
   check("@ volta a ficar livre", (await anon.rpc("handle_available", { p_handle: handlePage })).data === "available");
+
+  console.log("\nlegenda, hashtags, menções, vídeo, salvos e mensagens");
+  // Desde 20261102150000. No FIM de propósito: a menção a B e a conversa A↔B
+  // daqui geram avisos legítimos (mention de post, message) que os checks de
+  // contagem lá de cima (menção na bio, primeira mensagem) não esperam.
+  // Valor que muda de verdade (no-op passa em qualquer regra).
+  const nomeB = `rlsb${run}`.slice(0, 24);
+  await b.client.rpc("reserve_username", { p_username: nomeB });
+  const tagRls = `rls${run}`.toLowerCase();
+  await a.client.from("community_goals").update({ data: { title: "Golf GTI", note: `#${tagRls} com @${nomeB}` } }).eq("id", post);
+  linha = (await anon.from("community_goals").select("edited_at").eq("id", post).single()).data;
+  check("legenda nova ganha 'editado' do banco", Boolean(linha?.edited_at));
+  check("cliente não apaga o 'editado'",
+    (await a.client.from("community_goals").update({ edited_at: null }).eq("id", post).select("edited_at")).data?.[0]?.edited_at !== null);
+  check("tag da legenda vira linha pública", (await anon.from("post_hashtags").select("tag").eq("post_id", post)).data?.[0]?.tag === tagRls);
+  check("feed da tag acha o post", (await anon.rpc("hashtag_feed", { p_tag: `#${tagRls}` })).data?.some((g) => g.id === post));
+  check("ninguém grava tag direto", denied(await b.client.from("post_hashtags").insert({ post_id: post, tag: "falsa", owner_id: a.id, created_at: new Date().toISOString() }).select()));
+  check("31 hashtags são recusadas",
+    denied(await a.client.from("community_goals").update({ data: { title: "Golf GTI", note: Array.from({ length: 31 }, (_, i) => `#t${i}${run}`).join(" ") } }).eq("id", post).select()));
+  const avisoMencao = (await admin.from("notifications").select("data").eq("user_id", b.id).eq("type", "mention")).data || [];
+  check("@ na legenda avisa a pessoa", avisoMencao.some((n) => n.data?.mentionKind === "post" && n.data?.goalId === post));
+  await a.client.from("community_goals").update({ data: { title: "Golf GTI", note: "vídeo", video: { path: `users/${b.id}/posts/x.mp4`, duration: 10 } } }).eq("id", post);
+  linha = (await anon.from("community_goals").select("data").eq("id", post).single()).data;
+  check("vídeo de pasta alheia some do post", !linha?.data?.video);
+  check("não sobe vídeo na pasta alheia",
+    Boolean((await b.client.storage.from("videos").upload(`users/${a.id}/posts/${run}.mp4`, new Blob(["x"], { type: "video/mp4" }), { contentType: "video/mp4" })).error));
+  check("salvar post visível passa", passed(await b.client.from("saved_posts").insert({ user_id: b.id, post_id: post })));
+  check("salvar em nome de outro é recusado", denied(await a.client.from("saved_posts").insert({ user_id: b.id, post_id: post }).select()));
+  check("salvos são privados", (await a.client.from("saved_posts").select("*").eq("user_id", b.id)).data?.length === 0
+    && (await anon.from("saved_posts").select("*")).data?.length !== 1);
+  check("outro não tira salvo alheio", denied(await a.client.from("saved_posts").delete().eq("user_id", b.id).select()));
+  check("dono tira o salvo", (await b.client.from("saved_posts").delete().eq("user_id", b.id).eq("post_id", post).select()).data?.length === 1);
+  const conversaAB = (await a.client.rpc("start_conversation", { p_other: b.id, p_my_card: { author: "A" }, p_other_card: { author: "B" } })).data;
+  const msgA = (await a.client.rpc("send_message", { p_conversation: conversaAB, p_text: "oi", p_type: "text", p_data: {} })).data;
+  check("outro não edita mensagem alheia", Boolean((await b.client.rpc("edit_message", { p_message: msgA, p_text: "hack" })).error));
+  check("autor edita a própria mensagem", passed(await a.client.rpc("edit_message", { p_message: msgA, p_text: "oi, editado" })));
+  check("outro não apaga mensagem alheia", denied(await b.client.from("messages").delete().eq("id", msgA).select()));
+  await a.client.from("messages").delete().eq("id", msgA);
+  const conversaDepois = (await a.client.from("conversations").select("last_message, unread").eq("id", conversaAB).single()).data;
+  check("apagar a última limpa a prévia e o não lido", conversaDepois?.last_message === null && conversaDepois?.unread?.[b.id] === 0);
 } catch (error) {
   failures += 1;
   console.log(`\n  FALHA erro inesperado: ${error?.message || error}`);
