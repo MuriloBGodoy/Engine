@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { localISODate } from "./reminders";
 import { reminderNotificationCopy } from "./reminderLabels";
+import "./i18n-social-posts";
 
 /**
  * Rótulos, ícones e textos das notificações — fora do componente para que o
@@ -146,8 +147,11 @@ export const getNotificationCopy = (notification, t, nameOf, locale = "pt-BR") =
         (notification.teamRole ? t(`eventTeam.roles.${notification.teamRole}`) : ""),
     };
     // Menção de clube tem texto próprio ("mencionou o seu clube X").
+    // Menção em post/comentário (20261102150000) também.
     const key =
-      notification.type === "mention" && notification.mentionKind === "club" ? "mention_club" : notification.type;
+      notification.type === "mention" && ["club", "post", "comment"].includes(notification.mentionKind)
+        ? `mention_${notification.mentionKind}`
+        : notification.type;
     return {
       title: t(`notifications.types.${key}.title`, vars),
       body: t(`notifications.types.${key}.body`, vars),

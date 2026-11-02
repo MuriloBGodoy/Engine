@@ -1,5 +1,7 @@
 import { get, set, del } from "idb-keyval";
 import { auth, must, nowIso, supabase, watchTable } from "./supabase";
+import { normalizePostVideo, removePostVideoFiles } from "./postVideo";
+import { MAX_HASHTAGS, captionProblem } from "./socialText";
 import { grantOwn, garageAchievementIds, syncOwnMilestones } from "./achievements";
 import { inferLocation } from "./locations";
 import { listingEditNeedsReview, PRICE_MAX_LENGTH } from "./serviceListingRules";
@@ -100,7 +102,7 @@ const omitKeys = (object, keys) =>
 
 const GOAL_COLUMN_KEYS = [
   "id", "ownerId", "userId", "kind", "clubId", "likesCount", "likesBy", "comments",
-  "ratingsBy", "createdAt", "updatedAt",
+  "ratingsBy", "createdAt", "updatedAt", "editedAt",
 ];
 
 const goalFromRow = (row) => ({
@@ -115,6 +117,8 @@ const goalFromRow = (row) => ({
   ratingsBy: row.ratings_by || {},
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  // Carimbado pelo banco quando a legenda muda (20261102150000).
+  editedAt: row.edited_at || "",
 });
 
 /** Só o conteúdo: curtida, comentário e avaliação o banco não deixa o dono escrever. */
@@ -774,6 +778,9 @@ const communityCarPatch = (car) => ({
 export const POST_KIND_GOAL = "goal";
 export const POST_KIND_POST = "post";
 
+/** Tamanho da legenda: o mesmo na criação e na edição. */
+export const captionLimit = (kind) => (kind === POST_KIND_POST ? 1000 : 280);
+
 // Exportado porque o mural do clube É esta coleção, filtrada por `clubId`: a
 // camada de Clubes precisa entregar ao GoalCard exatamente a mesma forma que o
 // feed entrega. Normalizador duplicado seria um segundo lugar para esquecer de
@@ -790,6 +797,12 @@ export const normalizeCommunityGoal = (goal = {}) => {
     // Sem `kind` é publicação de meta: é o que existia antes dos posts.
     kind: goal.kind === POST_KIND_POST ? POST_KIND_POST : POST_KIND_GOAL,
     videoUrl: goal.videoUrl || "",
+    // Vídeo enviado (bucket `videos`), com corte/sem som/capa — ver
+    // services/postVideo.js. `null` quando o post não tem.
+    video: normalizePostVideo(goal.video),
+    // Horário do post e da última edição da legenda (o banco carimba as duas).
+    createdAt: goal.createdAt || "",
+    editedAt: goal.editedAt || "",
     author,
     username: goal.username || "@engine",
     avatar:
@@ -1867,6 +1880,8 @@ export const engineDB = {
     text,
     images = [],
     videoUrl = "",
+    // `data.video` já enviado por `uploadPostVideo` (caminho + corte).
+    video = null,
     car = null,
     // Carimbo de clube: post do mural de um clube é um post da Comunidade
     // marcado, não uma tabela paralela. O banco exige ser MEMBRO para gravar.
@@ -1877,8 +1892,11 @@ export const engineDB = {
 
     const content = String(text || "").trim().slice(0, 1000);
     const photos = images.map((item) => String(item || "").trim()).filter(Boolean);
-    if (!content && !photos.length && !videoUrl) {
+    if (!content && !photos.length && !videoUrl && !video?.path) {
       throw new Error("Escreva algo ou adicione uma foto.");
+    }
+    if (captionProblem(content)) {
+      throw Object.assign(new Error(`Use no máximo ${MAX_HASHTAGS} hashtags.`), { code: "too-many-hashtags" });
     }
 
     const settings = await this.getSettings();
@@ -1897,7 +1915,8 @@ export const engineDB = {
       note: content,
       images: photos.slice(0, MAX_CAR_PHOTOS),
       image: photos[0] || "",
-      videoUrl: String(videoUrl || "").trim().slice(0, 300),
+      videoUrl: video?.path ? "" : String(videoUrl || "").trim().slice(0, 300),
+      ...(video?.path ? { video } : {}),
       // Quando o post nasce de um carro da garagem, guarda a identificação
       // dele: é o que deixa o perfil virar linha do tempo daquele veículo.
       carId: car?.id ? String(car.id) : "",
@@ -1916,15 +1935,23 @@ export const engineDB = {
     return id;
   },
 
-  /** Edita só a legenda de uma publicação já no ar. */
+  /**
+   * Edita só a legenda de uma publicação já no ar. O limite é o da criação:
+   * post livre nasce com até 1000 caracteres e meta com 280 — até 02/11/2026
+   * a edição cortava tudo em 280, e editar um post comprido apagava o fim.
+   * O "editado" é carimbado pelo banco (`edited_at`).
+   */
   async updateCommunityGoalNote(goalId, note, userId = currentUserId) {
     if (!userId || !goalId) return;
 
-    const text = String(note || "").trim().slice(0, 280);
     const row = must(
-      await supabase.from("community_goals").select("data").eq("id", String(goalId)).maybeSingle(),
+      await supabase.from("community_goals").select("data, kind").eq("id", String(goalId)).maybeSingle(),
     );
     if (!row) return;
+    const text = String(note || "").trim().slice(0, captionLimit(row.kind));
+    if (captionProblem(text)) {
+      throw Object.assign(new Error(`Use no máximo ${MAX_HASHTAGS} hashtags.`), { code: "too-many-hashtags" });
+    }
     must(
       await supabase
         .from("community_goals")
@@ -1935,13 +1962,15 @@ export const engineDB = {
 
   async deleteCommunityGoal(goal, userId = currentUserId) {
     if (!userId) return;
-    // Curtidas saem junto, em cascata no banco.
+    // Curtidas, tags e salvos saem junto, em cascata no banco.
     must(
       await supabase
         .from("community_goals")
         .delete()
         .in("id", [communityGoalId(goal, userId), legacyCommunityGoalId(goal, userId)]),
     );
+    // O arquivo do vídeo não é linha do banco: sai à parte, sem travar.
+    if (goal?.video?.path) removePostVideoFiles(goal.video);
   },
 
   async resetMyCommunityPublications(userId = currentUserId) {

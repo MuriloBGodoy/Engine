@@ -14,7 +14,23 @@ import { MentionKindIcon } from "./MentionKindIcon";
  */
 const TRIGGER = /(^|\s)@([^\s@[\]]{0,30})$/;
 
-export function MentionTextarea({ id, value, mentions, onChange, maxLength, placeholder, className = "" }) {
+// `kinds`: quem o @ procura. A bio aceita pessoa, clube, evento e página
+// (marcador com id); legenda e comentário de post só pessoa, gravada como
+// `@usuario` em texto puro (services/socialText.js).
+export function MentionTextarea({
+  id,
+  value,
+  mentions = [],
+  onChange,
+  maxLength,
+  placeholder,
+  className = "",
+  kinds,
+  rows,
+  autoFocus,
+  onKeyDown,
+  inputRef,
+}) {
   const { t } = useTranslation();
   const ref = useRef(null);
   const [query, setQuery] = useState(null); // { term, start }
@@ -33,7 +49,7 @@ export function MentionTextarea({ id, value, mentions, onChange, maxLength, plac
     let alive = true;
     setLoading(true);
     const timer = setTimeout(() => {
-      searchMentionTargets(query.term)
+      searchMentionTargets(query.term, kinds ? { kinds } : undefined)
         .then((list) => {
           if (!alive) return;
           const taken = new Set(live.map((m) => `${m.kind}:${m.id}`));
@@ -83,7 +99,10 @@ export function MentionTextarea({ id, value, mentions, onChange, maxLength, plac
   };
 
   const handleKeyDown = (event) => {
-    if (!query || !results.length) return;
+    if (!query || !results.length) {
+      onKeyDown?.(event);
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActive((i) => (i + 1) % results.length);
@@ -107,7 +126,12 @@ export function MentionTextarea({ id, value, mentions, onChange, maxLength, plac
     <div className="relative">
       <textarea
         id={id}
-        ref={ref}
+        ref={(node) => {
+          ref.current = node;
+          if (inputRef) inputRef.current = node;
+        }}
+        rows={rows}
+        autoFocus={autoFocus}
         value={value}
         placeholder={placeholder}
         onChange={handleChange}
