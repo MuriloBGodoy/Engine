@@ -843,7 +843,7 @@ function AppLayout({
       )}
 
       <main
-        className={`engine-scroll flex min-h-0 min-w-0 flex-1 flex-col px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8 ${
+        className={`engine-app-main engine-scroll flex min-h-0 min-w-0 flex-1 flex-col px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8 ${
           isTopNav ? "" : "lg:h-[100dvh] lg:overflow-y-auto"
         }`}
       >

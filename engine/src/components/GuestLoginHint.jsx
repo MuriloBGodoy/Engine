@@ -72,7 +72,7 @@ export function GuestLoginHint({ placement = "top" }) {
           <p className="text-[13px] font-bold leading-tight text-[var(--engine-text)]">
             {t("guest.hint.title")}
           </p>
-          <p className="mt-0.5 line-clamp-1 text-[12px] leading-tight text-[var(--engine-text-muted)]">
+          <p className="mt-0.5 line-clamp-1 text-[12px] leading-tight text-[var(--engine-text-muted)] max-[359px]:hidden">
             {t("guest.hint.desc")}
           </p>
         </div>

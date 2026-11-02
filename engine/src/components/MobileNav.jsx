@@ -88,7 +88,7 @@ export function MobileNav({
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)]/85 px-4 pb-2.5 pt-[calc(0.625rem+env(safe-area-inset-top))] backdrop-blur-xl lg:hidden">
+      <header className="engine-mobile-header sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-[var(--engine-border)] bg-[var(--engine-bg)]/85 px-3 pb-2.5 min-[380px]:gap-3 min-[380px]:px-4 pt-[calc(0.625rem+env(safe-area-inset-top))] backdrop-blur-xl lg:hidden">
         {/* 44px de largura: o logo tem 36 e o link media 36x44 (HIG pede 44). */}
         <Link to="/" aria-label="Engine" className="-ml-1 flex h-11 w-11 items-center justify-center">
           <Logo markSize={36} collapsed />

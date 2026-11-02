@@ -9,14 +9,14 @@ import {
   isNotificationMuted,
 } from "../services/notifications";
 
-function TopbarIconButton({ onClick, title, active = false, children }) {
+function TopbarIconButton({ className = "", onClick, title, active = false, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
+      className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${className} ${
         active
           ? "bg-[var(--engine-accent)] text-white"
           : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
@@ -97,7 +97,10 @@ export function Topbar({ settings, onSettingsUpdate, user }) {
           )}
         </TopbarIconButton>
 
+        {/* Abaixo de 380px o header logado não cabe (medido em 320px: 309px de
+            ícones em 288px). O tema continua em Configurações. */}
         <TopbarIconButton
+          className="engine-theme-toggle"
           onClick={handleToggleTheme}
           title={
             currentTheme === "dark"

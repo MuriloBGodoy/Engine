@@ -69,7 +69,10 @@ const loadMyTeamProfiles = async (userId) => {
  * página em que estou na equipe — o prestador (mesma regra do
  * `conversation_actor` do banco).
  */
-export const conversationActor = (conversation = {}, userId = "") => {
+export const conversationActor = (conversation, userId = "") => {
+  // `null` chega quando as mensagens carregam antes da conversa (abrir
+  // /messages/<id> direto): sem conversa, quem age sou eu.
+  if (!conversation) return userId;
   if ((conversation.memberIds || []).includes(userId)) return userId;
   if (
     conversation.kind === "service" &&

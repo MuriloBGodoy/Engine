@@ -98,17 +98,19 @@ export function EngineBlock({ userId, isOwn = false }) {
                 <Link to={`/events/${event.id}`} className={chip}>
                   <CalendarDays size={16} aria-hidden="true" className="shrink-0 text-[var(--engine-accent)]" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-bold text-[var(--engine-text)]">{event.title}</span>
-                    <span className="block text-[11px] text-[var(--engine-text-muted)]">
+                    <span className="line-clamp-2 text-[12.5px] font-bold leading-snug text-[var(--engine-text)]">{event.title}</span>
+                    <span className="block whitespace-nowrap text-[11px] text-[var(--engine-text-muted)]">
                       {event.date
                         ? new Date(event.date).toLocaleDateString(i18n.language || "pt-BR", { day: "numeric", month: "short" })
                         : ""}
                     </span>
                   </span>
                   {event.role === "going" ? (
-                    <span className="text-[10.5px] font-bold text-[var(--engine-text-muted)]">{t("engineBlock.going")}</span>
+                    <span className="shrink-0 whitespace-nowrap text-[10.5px] font-bold text-[var(--engine-text-muted)]">{t("engineBlock.going")}</span>
                   ) : (
-                    <EventTeamBadge role={event.role} />
+                    <span className="shrink-0">
+                      <EventTeamBadge role={event.role} />
+                    </span>
                   )}
                 </Link>
               </li>

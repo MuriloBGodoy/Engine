@@ -1084,6 +1084,12 @@ h5 {
   body:has(.engine-install-prompt) .engine-guest-dock {
     display: none;
   }
+
+  /* Com a dica de visitante pousada acima da barra inferior, o fim da página
+     precisa de mais respiro, senão o último card fica atrás dela. */
+  body:has(.engine-guest-dock) .engine-app-main {
+    padding-bottom: calc(10rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* Faixa horizontal rolável (abas/chips) — vale só abaixo de lg; a partir daí
@@ -1264,6 +1270,19 @@ h5 {
 .region-pill:hover {
   background: var(--engine-surface-2);
   color: var(--engine-text);
+}
+
+/* Header logado em celular de 320–379px: o pino da região perde a seta e
+   o botão de tema sai (fica em Configurações) para tudo caber sem rolar. */
+@media (max-width: 379px) {
+  .engine-mobile-header .region-pill {
+    gap: 4px;
+    padding: 0 10px;
+  }
+  .engine-mobile-header .region-pill-caret,
+  .engine-mobile-header .engine-theme-toggle {
+    display: none;
+  }
 }
 
 .region-pill-active {

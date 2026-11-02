@@ -635,7 +635,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
                     {userGoals.length}
                   </p>
-                  <p className="text-[10px] font-bold uppercase text-[var(--engine-text-muted)] sm:text-[11px]">
+                  <p className="whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]">
                     {t("socialFixes.profile.goals")}
                   </p>
                 </div>
@@ -643,7 +643,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
                     {followCounts.followers}
                   </p>
-                  <p className="text-[10px] font-bold uppercase text-[var(--engine-text-muted)] sm:text-[11px]">
+                  <p className="whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]">
                     {t("socialFixes.profile.followers")}
                   </p>
                 </div>
@@ -651,7 +651,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
                     {followCounts.following}
                   </p>
-                  <p className="text-[10px] font-bold uppercase text-[var(--engine-text-muted)] sm:text-[11px]">
+                  <p className="whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]">
                     {t("socialFixes.profile.following")}
                   </p>
                 </div>
@@ -743,7 +743,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
 
         {/* Tabs */}
         <div className="border-b border-[var(--engine-border)]">
-          <div className="flex gap-6 overflow-x-auto px-4 sm:px-6">
+          <div className="flex gap-6 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
             {[
               { id: "posts", label: t("socialFeed.postsTab") },
               { id: "followers", label: t("profile.tabs.followers") },
@@ -758,7 +758,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   // tira rola na horizontal (ver `activeTabRef` acima).
                   ref={isActive ? activeTabRef : undefined}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`whitespace-nowrap border-b-2 py-4 text-sm font-bold uppercase tracking-wide transition ${
+                  className={`shrink-0 whitespace-nowrap border-b-2 py-4 text-sm font-bold uppercase tracking-wide transition ${
                     isActive
                       ? "border-[var(--engine-accent)] text-[var(--engine-accent)]"
                       : "border-transparent text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"

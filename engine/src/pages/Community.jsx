@@ -3051,7 +3051,9 @@ export function Community({ cars = [], settings, user }) {
                 medido em 21/08/2026 davam 51px por aba e viravam "F.", "V.",
                 "R.". A tira rola na horizontal (o mesmo que YouTube e X fazem
                 quando passa de quatro) e no desktop volta a dividir igual. */}
-            <div className="engine-scroll-x flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-full bg-[var(--engine-surface-2)] p-1 sm:gap-0 sm:overflow-visible">
+            {/* A borda direita esmaece no celular: é o sinal de que a tira rola
+                (em 320px só cabem ~1,5 abas ao lado dos botões). */}
+            <div className="engine-scroll-x flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-full bg-[var(--engine-surface-2)] p-1 pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] sm:gap-0 sm:overflow-visible sm:pr-1 sm:[mask-image:none]">
               {sections.map((section) => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
