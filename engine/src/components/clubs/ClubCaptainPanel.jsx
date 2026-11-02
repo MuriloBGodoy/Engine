@@ -11,14 +11,16 @@ import { useToast } from "../ToastProvider";
  * Botão que aparece e não funciona ensina a pessoa a ignorar a tela, e o
  * contrato (§4) trata `not-allowed` como "esse botão não devia ter aparecido".
  */
-export function ClubCaptainPanel({ clubId, role, onChanged }) {
+export function ClubCaptainPanel({ clubId, role, canApprove, onChanged }) {
   const { t } = useTranslation();
   const showToast = useToast();
   const { listRequests, approveRequest, rejectRequest, loading } = useClubAdmin(clubId);
   const [requests, setRequests] = useState([]);
   const [busyUid, setBusyUid] = useState("");
 
-  const canManage = role === "captain" || role === "founder";
+  // Quem aprova é quem tem approve_requests no cargo (o banco confere). Sem
+  // a informação do cargo, vale o papel antigo.
+  const canManage = canApprove ?? (role === "captain" || role === "founder");
 
   useEffect(() => {
     if (!canManage || !clubId) return;

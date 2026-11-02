@@ -181,15 +181,47 @@ export const engineEvents = {
   async updateEvent(eventId, updates) {
     if (!auth.currentUser) throw new Error("Usuário não autenticado.");
 
+    // Quem pode editar é o banco que decide (20261101150000): quem criou,
+    // co-organizador e, em encontro de clube, a direção com manage_events.
+    // `createdBy` e o clube não mudam por aqui.
     const event = await this.getEventById(eventId);
-    if (event.createdBy !== auth.currentUser.uid) {
-      throw new Error("Permissão negada. Apenas o criador pode editar.");
-    }
-
-    const normalized = normalizeEvent({ ...event, ...updates });
-    must(await supabase.from("events").update(eventToRow(normalized)).eq("id", String(eventId)));
+    const normalized = normalizeEvent({ ...event, ...updates, createdBy: event.createdBy, clubId: event.clubId });
+    const rows = must(
+      await supabase.from("events").update(eventToRow(normalized)).eq("id", String(eventId)).select("id"),
+    );
+    if (!rows.length) throw new Error("Permissão negada. Só a organização do evento edita.");
 
     return { id: eventId, ...normalized };
+  },
+
+  /**
+   * Equipe do evento: co-organizador (edita), staff e convidado (selo).
+   * Lista para quem tem conta, como a de presença. O cartão (nome, foto)
+   * vem do perfil público.
+   */
+  async getEventTeam(eventId) {
+    if (!auth.currentUser) return [];
+    const { data, error } = await supabase
+      .from("event_team")
+      .select("uid, role, created_at")
+      .eq("event_id", String(eventId))
+      .order("created_at", { ascending: true });
+    if (error) return [];
+    return (data || []).map((row) => ({ uid: row.uid, role: row.role }));
+  },
+
+  async setEventTeamRole(eventId, uid, role) {
+    const { error } = await supabase.rpc("event_team_set", {
+      p_event: String(eventId),
+      p_uid: String(uid),
+      p_role: role,
+    });
+    if (error) throw Object.assign(new Error(error.message), { code: error.message });
+  },
+
+  async removeFromEventTeam(eventId, uid) {
+    const { error } = await supabase.rpc("event_team_remove", { p_event: String(eventId), p_uid: String(uid) });
+    if (error) throw Object.assign(new Error(error.message), { code: error.message });
   },
 
   async deleteEvent(eventId) {

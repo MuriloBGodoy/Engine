@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Flag,
+  Pencil,
 } from "lucide-react";
 import { auth } from "../services/supabase";
 import { engineEvents } from "../services/events";
@@ -23,6 +24,8 @@ import { eventTypeLabel } from "../services/eventTypes";
 import { formatEventDay, formatEventEndDay } from "../services/eventTime";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { authPath } from "../services/authRedirect";
+import { EventTeamBadge, EventTeamPanel } from "../components/events/EventTeamPanel";
+import { EventEditModal } from "../components/events/EventEditModal";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -44,6 +47,9 @@ export function EventDetails() {
   const [isRsvped, setIsRsvped] = useState(false);
   const [showRsvpForm, setShowRsvpForm] = useState(false);
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  // Equipe (20261101150000): co-organizador edita; staff e convidado são selo.
+  const [team, setTeam] = useState([]);
+  const [editing, setEditing] = useState(false);
 
   const [rsvpForm, setRsvpForm] = useState({
     carBrand: "",
@@ -74,6 +80,14 @@ export function EventDetails() {
   useEffect(() => {
     loadEvent();
   }, [loadEvent]);
+
+  const loadTeam = useCallback(() => {
+    engineEvents.getEventTeam(eventId).then(setTeam).catch(() => setTeam([]));
+  }, [eventId]);
+
+  useEffect(() => {
+    loadTeam();
+  }, [loadTeam]);
 
   const handleRsvp = async (e) => {
     e.preventDefault();
@@ -184,6 +198,18 @@ export function EventDetails() {
     : null;
 
   const isOwner = auth.currentUser?.uid === event.createdBy;
+  const myTeamRole = team.find((member) => member.uid === auth.currentUser?.uid)?.role || "";
+  const canEdit = isOwner || myTeamRole === "co_organizer";
+  const editButton = canEdit ? (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-[var(--engine-border)] rounded-xl font-semibold text-[var(--engine-text)] hover:bg-[var(--engine-surface-2)] transition"
+    >
+      <Pencil size={18} />
+      {t("eventTeam.edit.title")}
+    </button>
+  ) : null;
 
   const typeLabel = eventTypeLabel(t, event.type);
 
@@ -299,6 +325,10 @@ export function EventDetails() {
             </div>
           )}
 
+          {auth.currentUser ? (
+            <EventTeamPanel event={event} team={team} myUid={auth.currentUser.uid} onChanged={loadTeam} />
+          ) : null}
+
           {/* Localização - Mapa Links */}
           <div className="engine-card p-6 space-y-3">
             <div className="flex items-center gap-2 mb-4">
@@ -357,6 +387,15 @@ export function EventDetails() {
 
         {/* Coluna lateral - RSVP */}
         <div className="space-y-6">
+          {!isOwner && myTeamRole ? (
+            <div className="engine-card p-6 space-y-3">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--engine-text)]">
+                {t("eventTeam.youAre")}
+                <EventTeamBadge role={myTeamRole} />
+              </p>
+              {editButton}
+            </div>
+          ) : null}
           {isOwner ? (
             <div className="engine-card p-6 space-y-3">
               <div className="flex items-center gap-2 p-3 bg-blue-500/10 rounded-xl border border-blue-500/30">
@@ -365,6 +404,7 @@ export function EventDetails() {
                   {t("events.details.youAreOrganizer")}
                 </p>
               </div>
+              {editButton}
               <button
                 onClick={handleDelete}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/30 rounded-xl font-semibold hover:bg-red-500/20 transition"
@@ -479,6 +519,7 @@ export function EventDetails() {
           )}
         </div>
       </div>
+      <EventEditModal event={event} isOpen={editing} onClose={() => setEditing(false)} onSaved={loadEvent} />
       {reportDialog}
     </div>
   );

@@ -22,6 +22,7 @@ import "./services/i18n-general-fixes";
 import "./services/i18n-social-fixes";
 import "./services/i18n-intl";
 import "./services/i18n-home";
+import "./services/i18n-social-roles";
 import "./services/languageChoice";
 
 // Antes do render: erro que acontece na montagem também precisa ser visto.

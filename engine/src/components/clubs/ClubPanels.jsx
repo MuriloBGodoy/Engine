@@ -6,6 +6,8 @@ import { Calendar, ChevronLeft, ChevronRight, Lock, MapPin, Link2, Loader2, Pin,
 // o projeto já usa `react-icons` para o WhatsApp pelo mesmo motivo.
 import { FaInstagram } from "react-icons/fa6";
 import { ClubTag } from "./ClubEmblem";
+import { ClubRoleBadge } from "./ClubRoleBadge";
+import { assignableRoles, canManageMember, roleLabel } from "../../services/clubRoles";
 import { ClubEmptyState } from "./ClubHeader";
 import { clubPlaceLabel, clubStyleLabel } from "../../services/clubStyles";
 import { formatFipeYear } from "../../services/carDisplay";
@@ -60,7 +62,7 @@ const Loading = () => (
 );
 
 /* ------------------------------- Mural ------------------------------- */
-export function ClubWall({ club, posts, loading, canPost, onCreatePost }) {
+export function ClubWall({ club, posts, loading, canPost, onCreatePost, canPin = false, onTogglePin }) {
   const { t, i18n } = useTranslation();
   if (loading && !posts.length) return <Loading />;
 
@@ -119,6 +121,23 @@ export function ClubWall({ club, posts, loading, canPost, onCreatePost }) {
                     : ""}
                 </p>
               </div>
+              {/* Fixar aviso: quem tem post_announcements (o banco confere). */}
+              {canPin ? (
+                <button
+                  type="button"
+                  onClick={() => onTogglePin?.(post)}
+                  aria-pressed={Boolean(post.pinned)}
+                  title={post.pinned ? t("clubRoles.wall.unpin") : t("clubRoles.wall.pin")}
+                  aria-label={post.pinned ? t("clubRoles.wall.unpin") : t("clubRoles.wall.pin")}
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors ${
+                    post.pinned
+                      ? "text-[var(--club-ink)]"
+                      : "text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+                  }`}
+                >
+                  <Pin size={15} aria-hidden="true" />
+                </button>
+              ) : null}
             </header>
             {post.image ? (
               <img
@@ -418,66 +437,74 @@ export function ClubMeetups({ club, events, pastEvents, loading, canCreate, onCr
 }
 
 /* ------------------------------ Membros ------------------------------ */
-export function ClubMemberList({ club, members, total, loading, canManage, onPromote, onDemote, onRemove }) {
+/**
+ * A lista em ordem de hierarquia, com o selo do cargo. Quem tem
+ * manage_members vê, em quem está abaixo dele, a troca de cargo (só os
+ * cargos que ele pode dar) e o remover. Quem decide é o banco.
+ */
+export function ClubMemberList({ club, members, total, loading, roles = [], myRole = null, myUid = "", onAssign, onRemove }) {
   const { t } = useTranslation();
   if (loading && !members.length) return <Loading />;
   if (!members.length) return <ClubEmptyState title={t("clubs.members.emptyTitle")} />;
+  const options = assignableRoles(roles, myRole);
 
   return (
     <div className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3.5">
-      {members.map((member) => (
-        <div
-          key={member.uid}
-          className="flex items-center gap-2.5 border-b border-[var(--engine-border)] py-2.5 last:border-b-0"
-        >
-          <Avatar
-            name={member.displayName}
-            avatar={member.avatar}
-            ring={member.role === "founder"}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-bold text-[var(--engine-text)]">
-              {member.displayName}
-              <ClubTag tag={club?.tag} />
-              {member.role !== "member" ? (
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide ${
-                    member.role === "founder"
-                      ? "bg-[var(--club)] text-[var(--club-on)]"
-                      : "border border-[color-mix(in_srgb,var(--club)_40%,transparent)] bg-[color-mix(in_srgb,var(--club)_18%,transparent)] text-[var(--club-ink)]"
-                  }`}
-                >
-                  {t(`clubs.roles.${member.role}`)}
-                </span>
-              ) : null}
-            </p>
-            <p className="truncate text-[11.5px] text-[var(--engine-text-muted)]">
-              {[member.username, member.carLabel].filter(Boolean).join(" · ")}
-            </p>
-          </div>
-          {canManage && member.role !== "founder" ? (
-            <div className="flex shrink-0 gap-1">
-              <button
-                type="button"
-                onClick={() =>
-                  member.role === "captain" ? onDemote?.(member) : onPromote?.(member)
-                }
-                className="min-h-9 rounded-lg px-2 text-[11.5px] font-semibold text-[var(--engine-text-muted)] transition-colors hover:text-[var(--engine-text)]"
-              >
-                {member.role === "captain" ? t("clubs.captain.demote") : t("clubs.captain.promote")}
-              </button>
-              <button
-                type="button"
-                onClick={() => onRemove?.(member)}
-                aria-label={t("clubs.captain.remove")}
-                className="min-h-9 rounded-lg px-2 text-[11.5px] font-semibold text-[var(--engine-accent)]"
-              >
-                ×
-              </button>
+      {members.map((member) => {
+        const role = member.roleInfo;
+        const manageable = canManageMember(myRole, myUid, member, role);
+        const choices = manageable
+          ? options.some((option) => option.id === member.roleId)
+            ? options
+            : [...(role ? [role] : []), ...options]
+          : [];
+        return (
+          <div
+            key={member.uid}
+            className="flex flex-wrap items-center gap-2.5 border-b border-[var(--engine-border)] py-2.5 last:border-b-0"
+          >
+            <Avatar name={member.displayName} avatar={member.avatar} ring={member.roleId === "founder"} />
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-bold text-[var(--engine-text)]">
+                {member.displayName}
+                <ClubTag tag={club?.tag} />
+                <ClubRoleBadge role={role} />
+              </p>
+              <p className="truncate text-[11.5px] text-[var(--engine-text-muted)]">
+                {[member.username, member.carLabel].filter(Boolean).join(" · ")}
+              </p>
             </div>
-          ) : null}
-        </div>
-      ))}
+            {manageable ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <label className="sr-only" htmlFor={`role-${member.uid}`}>
+                  {t("clubRoles.assignLabel", { name: member.displayName })}
+                </label>
+                <select
+                  id={`role-${member.uid}`}
+                  value={member.roleId}
+                  onChange={(event) => onAssign?.(member, event.target.value)}
+                  className="min-h-9 max-w-[9.5rem] rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-2 text-[12px] font-semibold text-[var(--engine-text)]"
+                >
+                  {choices.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {roleLabel(t, option)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => onRemove?.(member)}
+                  aria-label={t("clubs.captain.remove")}
+                  title={t("clubs.captain.remove")}
+                  className="grid min-h-9 min-w-9 place-items-center rounded-lg px-2 text-[13px] font-semibold text-[var(--engine-accent)]"
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
       {total && total > members.length ? (
         <p className="py-2.5 text-[12px] text-[var(--engine-text-muted)]">
           {t("clubs.members.showing", { shown: members.length, total })}

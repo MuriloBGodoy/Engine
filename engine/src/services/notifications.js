@@ -1,9 +1,11 @@
 import {
+  AtSign,
   BadgeDollarSign,
   Bell,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
+  Crown,
   Heart,
   MessageCircle,
   RotateCcw,
@@ -48,6 +50,9 @@ export const notificationStyles = {
   quote_request: { icon: ClipboardList, iconClass: "text-[var(--engine-accent)]" },
   quote_reply: { icon: BadgeDollarSign, iconClass: "text-emerald-500" },
   pro_invite: { icon: UserPlus, iconClass: "text-[var(--engine-accent)]" },
+  mention: { icon: AtSign, iconClass: "text-sky-500" },
+  club_role: { icon: Crown, iconClass: "text-amber-500" },
+  event_team: { icon: CalendarClock, iconClass: "text-[var(--engine-accent)]" },
 };
 
 export const defaultNotificationStyle = {
@@ -100,6 +105,9 @@ const TRANSLATED_TYPES = new Set([
   "follow", "like", "comment", "rating", "message", "achievement",
   "service_approved", "service_changes_requested", "service_rejected", "service_suspended",
   "quote_request", "quote_reply", "pro_invite",
+  // Menção na bio, cargo novo no clube, entrada na equipe de evento
+  // (20261101150000 / 20261101160000).
+  "mention", "club_role", "event_team",
 ]);
 
 // Pedido de orçamento: o aviso traz o id da categoria ("body-paint"); o
@@ -130,10 +138,19 @@ export const getNotificationCopy = (notification, t, nameOf, locale = "pt-BR") =
           : "",
       category: quoteCategoryLabel(notification.quoteCategory, t),
       city: notification.quoteCity || "",
+      club: notification.clubName || "",
+      event: notification.eventTitle || "",
+      role:
+        notification.roleName ||
+        (notification.rolePreset ? t(`clubRoles.presets.${notification.rolePreset}`) : "") ||
+        (notification.teamRole ? t(`eventTeam.roles.${notification.teamRole}`) : ""),
     };
+    // Menção de clube tem texto próprio ("mencionou o seu clube X").
+    const key =
+      notification.type === "mention" && notification.mentionKind === "club" ? "mention_club" : notification.type;
     return {
-      title: t(`notifications.types.${notification.type}.title`, vars),
-      body: t(`notifications.types.${notification.type}.body`, vars),
+      title: t(`notifications.types.${key}.title`, vars),
+      body: t(`notifications.types.${key}.body`, vars),
     };
   }
 

@@ -29,6 +29,7 @@ export {
   checkTagAvailable,
   clubImageUrl,
   CAMPOS_DO_CAPITAO,
+  getClubTree,
 } from "../../services/clubs";
 
 /**
@@ -58,6 +59,12 @@ export function clubErrorMessage(error, t) {
     "invalid-colors": "clubs.custom.errors.generic",
     "invalid-emblem": "clubs.custom.errors.generic",
     "invalid-link": "clubs.custom.errors.invalidLink",
+    // Cargos (01/11/2026).
+    "invalid-role": "clubRoles.errors.invalidRole",
+    "invalid-role-name": "clubRoles.errors.invalidName",
+    "too-many-roles": "clubRoles.errors.tooMany",
+    "too-many-pinned": "clubRoles.errors.tooManyPinned",
+    "club-archived": "clubs.errors.generic",
   };
   if (code && known[code]) return t(known[code]);
   return error?.message || t("clubs.errors.generic");

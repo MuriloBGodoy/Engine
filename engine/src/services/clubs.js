@@ -36,6 +36,7 @@ import { getMySuspension } from "./suspension";
 // Só a normalização do emblema (listas fechadas, sem hex nem desenho): o
 // vocabulário visual continua morando em clubStyles.js.
 import { normalizeColors, normalizeEmblem } from "./clubStyles";
+import { roleFromRow, sortRoles } from "./clubRoles";
 
 const PAPEIS_DE_CARGO = ["founder", "captain"];
 
@@ -66,6 +67,8 @@ const clubFromRow = (row) => ({
 
 const memberFromRow = (row) => ({
   role: row.role,
+  roleId: row.role_id,
+  sponsorId: row.sponsor_id,
   joinedAt: row.joined_at,
   displayName: row.display_name,
   username: row.username,
@@ -222,6 +225,8 @@ const normalizeClub = (id, dados = {}, derivados = {}) => ({
     styles: lista(dados.focus?.styles, 3, 24),
   },
   rules: lista(dados.rules, 5, 120),
+  // Cargo com que quem entra começa ('' = Membro). Do Fundador.
+  entryRoleId: texto(dados.entryRoleId, 40),
   links: {
     instagram: texto(dados.links?.instagram, 60),
     whatsapp: texto(dados.links?.whatsapp, 200),
@@ -249,6 +254,10 @@ const normalizeClub = (id, dados = {}, derivados = {}) => ({
 const normalizeMember = (uid, dados = {}) => ({
   uid: String(uid),
   role: PAPEIS_DE_CARGO.includes(dados.role) ? dados.role : "member",
+  // Cargo personalizável (20261101150000). `role` acima é o papel antigo,
+  // derivado dele pelo banco — continua valendo para o que já o lia.
+  roleId: texto(dados.roleId, 40) || (dados.role === "founder" ? "founder" : "member"),
+  sponsorId: dados.sponsorId ? String(dados.sponsorId) : "",
   joinedAt: paraIso(dados.joinedAt),
   displayName: texto(dados.displayName, 60) || "Usuário Engine",
   username: texto(dados.username, 32),
@@ -439,7 +448,7 @@ export async function getClub(clubId) {
 
   const uid = auth.currentUser?.uid || null;
 
-  const [meuDoc, meuPedido, encontro, contagem, realizados] = await Promise.all([
+  const [meuDoc, meuPedido, encontro, contagem, realizados, cargos] = await Promise.all([
     minhaLinha("club_members", clubId, uid),
     minhaLinha("club_requests", clubId, uid),
     proximoEncontro(clubId),
@@ -453,6 +462,7 @@ export async function getClub(clubId) {
         .eq("club_id", String(clubId))
         .lt("event_date", hojeISO()),
     ).catch(() => 0),
+    getClubRoles(clubId).catch(() => []),
   ]);
 
   // Em clube `contentVisibility: members`, quem é de fora não enxerga a lista
@@ -460,8 +470,11 @@ export async function getClub(clubId) {
   // para contar; aí a tela cai no `memberCount` de vitrine.
   const fechadoParaMim = row.content_visibility === "members" && !meuDoc;
 
+  const meu = meuDoc ? normalizeMember(uid, memberFromRow(meuDoc)) : null;
   return normalizeClub(row.id, clubFromRow(row), {
-    myRole: meuDoc ? normalizeMember(uid, memberFromRow(meuDoc)).role : null,
+    myRole: meu ? meu.role : null,
+    roles: cargos,
+    myRoleInfo: meu ? cargos.find((cargo) => cargo.id === meu.roleId) || null : null,
     myRequestPending: Boolean(meuPedido),
     nextMeetup: encontro,
     memberCountLive: fechadoParaMim ? null : contagem,
@@ -653,10 +666,42 @@ export async function getClubMembers(clubId, { limit: teto = 50 } = {}) {
   );
   if (!rows) return [];
 
-  const peso = { founder: 0, captain: 1, member: 2 };
+  const cargos = await getClubRoles(clubId).catch(() => []);
+  const porId = new Map(cargos.map((cargo) => [cargo.id, cargo]));
+  const peso = { founder: 0, captain: 50, member: 90 };
+  // Ordem da hierarquia do clube (o Discord lista por cargo também); dentro
+  // do cargo, por entrada.
   return rows
-    .map((row) => normalizeMember(row.uid, memberFromRow(row)))
-    .sort((a, b) => (peso[a.role] ?? 2) - (peso[b.role] ?? 2));
+    .map((row) => {
+      const membro = normalizeMember(row.uid, memberFromRow(row));
+      return { ...membro, roleInfo: porId.get(membro.roleId) || null };
+    })
+    .sort(
+      (a, b) =>
+        (a.roleInfo?.position ?? peso[a.role] ?? 90) - (b.roleInfo?.position ?? peso[b.role] ?? 90),
+    );
+}
+
+/** Cargos do clube, do mais alto para o mais baixo. */
+export async function getClubRoles(clubId) {
+  if (!clubId) return [];
+  const rows = must(
+    await supabase.from("club_roles").select("*").eq("club_id", String(clubId)).order("position"),
+  );
+  return sortRoles(rows.map(roleFromRow));
+}
+
+/**
+ * Membros para a árvore (organograma e linhagem): todos, até 500. A lista
+ * de membros de clube fechado continua escondida de quem é de fora — quem
+ * garante é a política do banco.
+ */
+export async function getClubTree(clubId) {
+  const [members, roles] = await Promise.all([
+    getClubMembers(clubId, { limit: 500 }),
+    getClubRoles(clubId).catch(() => []),
+  ]);
+  return { members, roles };
 }
 
 /**
@@ -675,7 +720,11 @@ export async function getClubPosts(clubId, { limit: teto = 20 } = {}) {
       .limit(teto),
   );
   if (!rows) return [];
-  return rows.map((row) => normalizeCommunityGoal(goalFromRow(row)));
+  // Aviso fixado (post_announcements) vem primeiro. `pinned` só o banco
+  // escreve (`club_pin_post`); o dono do post não se fixa sozinho.
+  return rows
+    .map((row) => ({ ...normalizeCommunityGoal(goalFromRow(row)), pinned: row.data?.pinned === true }))
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
 /** Encontros do clube. `past: true` traz os que já foram, do mais recente. */
@@ -860,7 +909,7 @@ export async function createClub(form, { logoFile = null, coverFile = null } = {
  * Entrar. Clube aberto entra na hora; clube de aprovação cria o pedido e
  * espera. O contador de membros quem soma é o banco.
  */
-export async function joinClub(clubId) {
+export async function joinClub(clubId, { ref = "" } = {}) {
   const uid = exigeLogin();
   const row = must(await supabase.from("clubs").select("*").eq("id", String(clubId)).maybeSingle());
   if (!row) throw erroDeClube("not-found", "Clube não encontrado.");
@@ -883,11 +932,23 @@ export async function joinClub(clubId) {
     if (pedido) {
       throw erroDeClube("already-requested", "Seu pedido já está na fila.");
     }
-    must(await supabase.from("club_requests").insert({ club_id: String(clubId), uid, message: "", ...cartao }));
+    // Convite (`?ref=`): o banco só guarda se quem convidou é membro.
+    const convite = isUserId(ref) && ref !== uid ? { invited_by: ref } : {};
+    must(
+      await supabase
+        .from("club_requests")
+        .insert({ club_id: String(clubId), uid, message: "", ...cartao, ...convite }),
+    );
     return "pending";
   }
 
-  must(await supabase.from("club_members").insert({ club_id: String(clubId), uid, role: "member", ...cartao }));
+  // Padrinho = quem mandou o convite, se ainda é membro (o banco confere).
+  const padrinho = isUserId(ref) && ref !== uid ? { sponsor_id: ref } : {};
+  must(
+    await supabase
+      .from("club_members")
+      .insert({ club_id: String(clubId), uid, role: "member", ...cartao, ...padrinho }),
+  );
 
   grantOwn("club_joined");
   return "member";
@@ -985,6 +1046,54 @@ export async function removeMember(clubId, alvoUid) {
     await supabase.from("club_members").delete().eq("club_id", String(clubId)).eq("uid", String(alvoUid)),
   );
 }
+
+/**
+ * Atribuir cargo. A hierarquia (só abaixo de mim, só permissões que eu
+ * tenho, nunca o Fundador, nunca a mim mesmo) é do banco.
+ */
+export async function assignMemberRole(clubId, alvoUid, roleId) {
+  exigeLogin();
+  const { data, error } = await supabase
+    .from("club_members")
+    .update({ role_id: String(roleId) })
+    .eq("club_id", String(clubId))
+    .eq("uid", String(alvoUid))
+    .select("uid");
+  if (error || !data?.length) throw erroDeClube("not-allowed", "Esta ação é da direção do clube.");
+}
+
+const rpcDeCargo = async (nome, args) => {
+  const { data, error } = await supabase.rpc(nome, args);
+  if (error) throw erroDeClube(error.message || "generic", error.message || "Não deu para salvar.");
+  return data;
+};
+
+/** Criar (sem `id`) ou editar um cargo. Só o Fundador. */
+export const saveClubRole = (clubId, role) =>
+  rpcDeCargo("club_save_role", {
+    p_club: String(clubId),
+    p_role: {
+      ...(role.id ? { id: role.id } : {}),
+      name: texto(role.name, 24),
+      color: String(role.color || ""),
+      permissions: Array.isArray(role.permissions) ? role.permissions : [],
+    },
+  });
+
+export const deleteClubRole = (clubId, roleId) =>
+  rpcDeCargo("club_delete_role", { p_club: String(clubId), p_role: String(roleId) });
+
+/** A ordem inteira, sem o Fundador (que é sempre o primeiro). */
+export const reorderClubRoles = (clubId, ids) =>
+  rpcDeCargo("club_reorder_roles", { p_club: String(clubId), p_ids: ids.filter((id) => id !== "founder") });
+
+/** Cargo de entrada ('' = Membro; só cargo sem permissão). Só o Fundador. */
+export const setClubEntryRole = (clubId, roleId) =>
+  rpcDeCargo("update_club", { p_club_id: String(clubId), p_patch: { entryRoleId: String(roleId || "") } });
+
+/** Fixar/desafixar um aviso no mural (post_announcements). Até 3. */
+export const pinClubPost = (postId, pinned) =>
+  rpcDeCargo("club_pin_post", { p_post_id: String(postId), p_pinned: Boolean(pinned) });
 
 /**
  * Editar. O que cada cargo pode mudar é filtrado AQUI e conferido de novo no
@@ -1245,7 +1354,7 @@ export const useClubMembership = (clubId) => {
     }
   }, []);
 
-  const join = useCallback(() => agir(() => joinClub(clubId)), [agir, clubId]);
+  const join = useCallback((opcoes) => agir(() => joinClub(clubId, opcoes)), [agir, clubId]);
   const leave = useCallback(() => agir(() => leaveClub(clubId)), [agir, clubId]);
 
   return { join, leave, refresh, status, loading, error };
@@ -1293,6 +1402,15 @@ export const useClubAdmin = (clubId) => {
       [correr, clubId],
     ),
     removeMember: useCallback((uid) => correr(() => removeMember(clubId, uid)), [correr, clubId]),
+    assignRole: useCallback(
+      (uid, roleId) => correr(() => assignMemberRole(clubId, uid, roleId)),
+      [correr, clubId],
+    ),
+    saveRole: useCallback((role) => correr(() => saveClubRole(clubId, role)), [correr, clubId]),
+    deleteRole: useCallback((roleId) => correr(() => deleteClubRole(clubId, roleId)), [correr, clubId]),
+    reorderRoles: useCallback((ids) => correr(() => reorderClubRoles(clubId, ids)), [correr, clubId]),
+    pinPost: useCallback((postId, pinned) => correr(() => pinClubPost(postId, pinned)), [correr]),
+    setEntryRole: useCallback((roleId) => correr(() => setClubEntryRole(clubId, roleId)), [correr, clubId]),
     archiveClub: useCallback(() => correr(() => archiveClub(clubId)), [correr, clubId]),
     uploadImage: useCallback(
       (kind, file) => correr(() => uploadClubImage(clubId, kind, file)),
