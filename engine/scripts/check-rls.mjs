@@ -454,10 +454,13 @@ try {
   // aprovado de mecânica em Araraquara), B pede, C é terceiro.
   console.log("\npedido de orçamento");
   const qListing = `q-${run}`;
-  await admin.from("service_listings").insert({
+  const fixtureQ = await admin.from("service_listings").insert({
     id: qListing, owner_id: a.id, moderation_status: "approved",
     data: { title: "Oficina RLS", category: "mechanics", city: "Araraquara", state: "SP", country: "BR", serviceMode: "place" },
-  });
+  }).select("profile_id");
+  // Desde 20261101170000: escrita do servidor sem perfil ganha o perfil
+  // pessoal profissional do autor (antes falhava no NOT NULL).
+  check("servidor cria anúncio sem perfil (cai no perfil pessoal)", Boolean(fixtureQ.data?.[0]?.profile_id), why(fixtureQ));
   const pedido = { category: "mechanics", carLabel: "Gol 2014", description: "Barulho na suspensão dianteira (teste RLS)", city: "Araraquara", state: "SP", country: "BR" };
   check("visitante não pede orçamento", Boolean((await anon.rpc("create_quote_request", { p_request: pedido })).error));
   check("ninguém insere pedido direto na tabela",
