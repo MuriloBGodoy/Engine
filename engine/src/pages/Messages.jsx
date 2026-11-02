@@ -17,10 +17,15 @@ import {
   UserX,
   CheckCircle2,
   RotateCcw,
+  Pencil,
+  X,
 } from "lucide-react";
 import {
   attachmentSummary,
+  canEditMessage,
   chatErrorKey,
+  editMessage,
+  localizedPreview,
   conversationTab,
   conversationVisible,
   iAmProviderOf,
@@ -54,6 +59,8 @@ import { GiphyPicker } from "../components/GiphyPicker";
 import { compressImage, readFileAsDataUrl, blobToDataUrl } from "../services/imageCompression";
 import { QuoteBubbleBody, ServiceContextCard, ServiceStatusPill } from "../components/messages/ServiceThread";
 import { QUOTE_DEFAULT_LIMITS } from "../services/quotes";
+import { formatAbsoluteTime } from "../services/socialTime";
+import "../services/i18n-social-posts";
 
 // Abas da caixa (migration 20261030120000). "Conversas" é a de sempre;
 // "Serviços" são os fios em que eu sou o cliente; "Clientes", os em que eu
@@ -96,7 +103,12 @@ export function Messages({ user, settings }) {
   const [tab, setTab] = useState("direct");
   const [statusFilter, setStatusFilter] = useState("all");
   const [statusBusy, setStatusBusy] = useState(false);
+  // Mensagem em edição: o texto dela vai para o compositor, como no WhatsApp.
+  const [editingState, setEditing] = useState(null);
+  // Trocar de conversa larga a edição (a mensagem é de outra conversa).
+  const editing = editingState?.conversationId === conversationId ? editingState : null;
   const fileInputRef = useRef(null);
+  const composerRef = useRef(null);
 
   const userId = user?.uid || "";
   const locale = i18n.language || "pt-BR";
@@ -231,10 +243,41 @@ export function Messages({ user, settings }) {
     }
   };
 
+  const startEdit = (message) => {
+    setEditing({ ...message, conversationId });
+    setDraft(message.text || "");
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setDraft("");
+  };
+
   const handleSend = async (event) => {
     event.preventDefault();
     const text = draft.trim();
     if (!text || sending || !conversationId) return;
+
+    if (editing) {
+      setSending(true);
+      try {
+        if (text !== editing.text) await editMessage(editing.id, text);
+        cancelEdit();
+      } catch (error) {
+        console.error(error);
+        toast(
+          t(
+            String(error?.code || error?.message) === "edit-window-closed"
+              ? "socialPosts.messages.editWindowClosed"
+              : "socialPosts.messages.editError",
+          ),
+        );
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
 
     setSending(true);
     setDraft("");
@@ -483,6 +526,7 @@ export function Messages({ user, settings }) {
                   locale={locale}
                   dayLabels={dayLabels}
                   active={conversation.id === conversationId}
+                  t={t}
                   youLabel={t("messages.you")}
                   emptyLabel={t("messages.noMessagesYet")}
                   quoteLabel={t("serviceChat.quoteBubble")}
@@ -638,6 +682,7 @@ export function Messages({ user, settings }) {
               t={t}
               onOpenPost={(goalId) => navigate(`/community?goal=${encodeURIComponent(goalId)}`)}
               onDelete={handleDeleteMessage}
+              onEdit={startEdit}
               onReport={handleReportMessage}
             />
 
@@ -651,6 +696,24 @@ export function Messages({ user, settings }) {
                 {t("messages.accountDeleted")}
               </p>
             ) : (
+              <>
+              {editing && (
+                <div className="flex shrink-0 items-center gap-2 border-t border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-2 text-xs">
+                  <Pencil size={13} className="shrink-0 text-[var(--engine-accent)]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-bold text-[var(--engine-text)]">{t("socialPosts.messages.editing")}</span>
+                    <span className="block truncate text-[var(--engine-text-muted)]">{editing.text}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    aria-label={t("socialPosts.messages.cancelEdit")}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface)]"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
               <form
                 onSubmit={handleSend}
                 className="flex shrink-0 items-stretch gap-2 border-t border-[var(--engine-border)] p-3"
@@ -661,16 +724,16 @@ export function Messages({ user, settings }) {
                   accept="image/*,image/gif"
                   onChange={handleImageSelected}
                   className="hidden"
-                  aria-label="Upload image"
+                  aria-label={t("socialPosts.messages.chooseImage")}
                 />
   
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={sending || compressing}
-                    title="Foto"
-                    aria-label="Foto"
+                    disabled={sending || compressing || Boolean(editing)}
+                    title={t("socialPosts.messages.photo")}
+                    aria-label={t("socialPosts.messages.photo")}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
                   >
                     <Image size={18} />
@@ -679,9 +742,9 @@ export function Messages({ user, settings }) {
                   <button
                     type="button"
                     onClick={() => setShowGiphyPicker(true)}
-                    disabled={sending}
-                    title="GIF"
-                    aria-label="GIF"
+                    disabled={sending || Boolean(editing)}
+                    title={t("socialPosts.messages.gif")}
+                    aria-label={t("socialPosts.messages.gif")}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 font-black text-xs"
                   >
                     GIF
@@ -691,10 +754,16 @@ export function Messages({ user, settings }) {
                 </div>
   
                 <textarea
+                  ref={composerRef}
                   value={draft}
                   rows={1}
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={(event) => {
+                    if (event.key === "Escape" && editing) {
+                      event.preventDefault();
+                      cancelEdit();
+                      return;
+                    }
                     if (event.key === "Enter" && !event.shiftKey && isDesktop) {
                       handleSend(event);
                     }
@@ -706,13 +775,14 @@ export function Messages({ user, settings }) {
                 <button
                   type="submit"
                   disabled={!draft.trim() || sending}
-                  title={t("messages.send")}
-                  aria-label={t("messages.send")}
+                  title={editing ? t("socialPosts.messages.saveEdit") : t("messages.send")}
+                  aria-label={editing ? t("socialPosts.messages.saveEdit") : t("messages.send")}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95 disabled:opacity-40"
                 >
                   <Send size={18} />
                 </button>
               </form>
+              </>
             )}
 
             {previewImage && (
@@ -751,6 +821,7 @@ export function Messages({ user, settings }) {
 }
 
 function ConversationRow({
+  t,
   conversation,
   userId,
   locale,
@@ -767,7 +838,7 @@ function ConversationRow({
   const service = isServiceConversation(conversation);
   const preview = last
     ? `${last.senderId === userId ? `${youLabel}: ` : ""}${last.type === "quote" ? `${quoteLabel}: ` : ""}${
-        last.text || attachmentSummary(null)
+        localizedPreview(last.text, t) || attachmentSummary(null)
       }`
     : emptyLabel;
 
@@ -789,7 +860,10 @@ function ConversationRow({
           {service && iAmProviderOf(conversation, userId) && (
             <ServiceStatusPill status={conversation.serviceStatus} className="ml-auto" />
           )}
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--engine-text-subtle)]">
+          <span
+            title={formatAbsoluteTime(conversation.updatedAt, locale)}
+            className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--engine-text-subtle)]"
+          >
             {formatConversationTime(conversation.updatedAt, locale, dayLabels)}
           </span>
         </span>
@@ -820,7 +894,7 @@ function ConversationRow({
   );
 }
 
-function MessageList({ messages, conversation, userId, locale, dayLabels, t, onOpenPost, onDelete, onReport }) {
+function MessageList({ messages, conversation, userId, locale, dayLabels, t, onOpenPost, onDelete, onEdit, onReport }) {
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -866,6 +940,8 @@ function MessageList({ messages, conversation, userId, locale, dayLabels, t, onO
               message={message}
               mine={isMyMessage(conversation, message, userId)}
               deletable={message.senderId === userId}
+              editable={canEditMessage(message, userId)}
+              onEdit={onEdit}
               locale={locale}
               t={t}
               onOpenPost={onOpenPost}
@@ -878,20 +954,34 @@ function MessageList({ messages, conversation, userId, locale, dayLabels, t, onO
   );
 }
 
-function MessageBubble({ message, mine, deletable = mine, locale, t, onOpenPost, onDelete, onReport }) {
+function MessageBubble({ message, mine, deletable = mine, editable = false, locale, t, onOpenPost, onDelete, onEdit, onReport }) {
   const attachment = message.attachment;
   const imageData = message.imageData;
   const gifData = message.gifData;
 
   return (
     <div className={`group flex items-end gap-1.5 ${mine ? "justify-end" : "justify-start"}`}>
+      {/* No celular não existe hover: com `opacity-0` o apagar ficava
+          invisível ao toque (só aparecia com foco de teclado). Agora fica
+          esmaecido no celular e aparece no hover a partir de sm. */}
+      {editable && (
+        <button
+          type="button"
+          onClick={() => onEdit(message)}
+          title={t("socialPosts.messages.edit")}
+          aria-label={t("socialPosts.messages.edit")}
+          className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-subtle)] opacity-60 transition hover:text-[var(--engine-accent)] focus:opacity-100 group-hover:opacity-100 sm:opacity-0"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
       {deletable && (
         <button
           type="button"
           onClick={() => onDelete(message)}
           title={t("messages.deleteTitle")}
           aria-label={t("messages.deleteTitle")}
-          className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-subtle)] opacity-0 transition hover:text-[var(--engine-accent)] focus:opacity-100 group-hover:opacity-100"
+          className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-subtle)] opacity-60 transition hover:text-[var(--engine-accent)] focus:opacity-100 group-hover:opacity-100 sm:opacity-0"
         >
           <Trash2 size={13} />
         </button>
@@ -907,7 +997,7 @@ function MessageBubble({ message, mine, deletable = mine, locale, t, onOpenPost,
         {gifData && (
           <img
             src={gifData}
-            alt="GIF enviado"
+            alt={t("socialPosts.messages.sentGif")}
             className="mb-2 max-h-64 w-full rounded-lg object-cover"
           />
         )}
@@ -915,7 +1005,7 @@ function MessageBubble({ message, mine, deletable = mine, locale, t, onOpenPost,
         {imageData && (
           <img
             src={imageData}
-            alt="Imagem enviada"
+            alt={t("socialPosts.messages.sentImage")}
             className="mb-2 max-h-64 w-full rounded-lg object-cover"
           />
         )}
@@ -963,7 +1053,13 @@ function MessageBubble({ message, mine, deletable = mine, locale, t, onOpenPost,
             mine ? "text-white/70" : "text-[var(--engine-text-subtle)]"
           }`}
         >
-          <span>{formatMessageTime(message.createdAt, locale)}</span>
+          {message.editedAt && <span>{t("socialPosts.messages.edited")} ·</span>}
+          <time
+            dateTime={message.createdAt || undefined}
+            title={formatAbsoluteTime(message.createdAt, locale)}
+          >
+            {formatMessageTime(message.createdAt, locale)}
+          </time>
           {mine && (
             <>
               {message.status === "seen" && (

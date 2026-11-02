@@ -183,11 +183,13 @@ export const attachmentFromGoal = (goal = {}) => {
     ownerId: goal.ownerId || "",
     author: goal.author || "",
     username: goal.username || "",
-    title: goal.title || "",
+    // Post livre não tem título: a prévia na conversa usa o começo do texto
+    // (antes chegava um cartão em branco).
+    title: goal.title || String(goal.note || "").replace(/\s+/g, " ").trim().slice(0, 80),
     brand: goal.brand || "",
     model: goal.model || "",
     year: goal.year || "",
-    image: goal.image || "",
+    image: goal.image || goal.images?.[0] || goal.video?.poster || "",
     progress: Number(progress.toFixed(1)),
   };
 };
@@ -322,10 +324,47 @@ export const markConversationRead = async (conversationId, userId) => {
   if (error) console.warn("[chat] markConversationRead", error);
 };
 
+/**
+ * Apaga a própria mensagem. A prévia da conversa e o contador de não lidas o
+ * banco acerta sozinho (`messages_after_delete`, 20261102150000) — antes a
+ * lista continuava mostrando o texto apagado. `select()` para saber se a
+ * linha saiu de fato: RLS que recusa não dá erro, só apaga zero linhas.
+ */
 export const deleteMessage = async (conversationId, messageId) => {
   if (!conversationId || !messageId) return;
-  must(await supabase.from("messages").delete().eq("id", messageId));
+  const rows = must(await supabase.from("messages").delete().eq("id", messageId).select("id"));
+  if (!rows?.length) throw Object.assign(new Error("not-found"), { code: "not-found" });
 };
+
+/** Editar vale para texto próprio, até 15 minutos depois (o banco confere). */
+export const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
+
+export const canEditMessage = (message = {}, userId = "", now = Date.now()) =>
+  Boolean(userId) &&
+  message.senderId === userId &&
+  (message.type || "text") === "text" &&
+  Boolean(message.text) &&
+  now - toMillis(message.createdAt) < MESSAGE_EDIT_WINDOW_MS;
+
+export const editMessage = async (messageId, text) =>
+  must(
+    await supabase.rpc("edit_message", {
+      p_message: messageId,
+      p_text: String(text || "").trim().slice(0, MESSAGE_MAX_LENGTH),
+    }),
+  );
+
+/**
+ * Prévia da lista no idioma de quem lê: o banco grava "📷 Imagem" etc. em
+ * pt-BR quando a mensagem não tem texto.
+ */
+const SERVER_PREVIEWS = {
+  "📷 Imagem": "socialPosts.messages.previewImage",
+  "🎬 GIF": "socialPosts.messages.previewGif",
+  "📷 Publicação": "socialPosts.messages.previewPost",
+};
+export const localizedPreview = (text = "", t) =>
+  t && SERVER_PREVIEWS[text] ? t(SERVER_PREVIEWS[text]) : text;
 
 /* ===== Formatação ===== */
 
