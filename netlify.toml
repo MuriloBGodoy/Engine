@@ -31,3 +31,26 @@
 [[edge_functions]]
   path = "/produtos/*"
   function = "service-og"
+
+# Cartão de pré-visualização do que se compartilha da Comunidade: post,
+# perfil e hashtag, página profissional, clube e evento. Mesmo critério do
+# service-og: só robô consulta o banco, como visitante. Ver social-og.js.
+[[edge_functions]]
+  path = "/post/*"
+  function = "social-og"
+
+[[edge_functions]]
+  path = "/community/*"
+  function = "social-og"
+
+[[edge_functions]]
+  path = "/p/*"
+  function = "social-og"
+
+[[edge_functions]]
+  path = "/clubs/*"
+  function = "social-og"
+
+[[edge_functions]]
+  path = "/events/*"
+  function = "social-og"
