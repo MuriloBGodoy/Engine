@@ -16,8 +16,27 @@ import "../../services/i18n-shop";
  *   carName "Civic Touring 2019"
  *   seller  { name, handle, logo, initials, meta }
  *   onBack, onShare, onSeller, onMessage, onWhatsApp (abre a folha de contato)
+ *   sellerSlot / messageSlot  trocam o cartão de quem vende e o botão de
+ *                             Mensagem pelos da tela (que já sabem buscar o
+ *                             perfil e abrir a conversa)
+ *   afterNote                 o que vem depois do aviso (ex.: denunciar)
+ *   hideContact               a equipe vendo o próprio produto
  */
-export function ProductDetail({ product, fit = null, carName, seller, onBack, onShare, onSeller, onMessage, onWhatsApp }) {
+export function ProductDetail({
+  product,
+  fit = null,
+  carName,
+  seller,
+  onBack,
+  onShare,
+  onSeller,
+  onMessage,
+  onWhatsApp,
+  sellerSlot = null,
+  messageSlot = null,
+  afterNote = null,
+  hideContact = false,
+}) {
   const { t } = useTranslation();
   const photos = product.photos || [];
   const [index, setIndex] = useState(0);
@@ -143,7 +162,8 @@ export function ProductDetail({ product, fit = null, carName, seller, onBack, on
           <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-[var(--engine-text)]">{product.description}</p>
         )}
 
-        {seller && (
+        {sellerSlot && <div className="mt-4">{sellerSlot}</div>}
+        {!sellerSlot && seller && (
           <button
             type="button"
             onClick={onSeller}
@@ -166,16 +186,20 @@ export function ProductDetail({ product, fit = null, carName, seller, onBack, on
           {product.sold ? t("shop.product.soldNote") : t("shop.product.note")}
         </p>
 
-        {!product.sold && (
-          <div className="sticky bottom-0 z-10 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-[var(--engine-border)] bg-[var(--engine-bg)]/90 px-4 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur-xl lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-            <button
-              type="button"
-              onClick={onMessage}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-4 text-[15px] font-bold text-white"
-            >
-              <MessageCircle size={18} aria-hidden="true" />
-              {t("shop.profile.message")}
-            </button>
+        {afterNote}
+
+        {!product.sold && !hideContact && (
+          <div className={`sticky bottom-0 z-10 -mx-4 mt-4 grid ${onWhatsApp ? "grid-cols-2" : "grid-cols-1"} gap-2 border-t border-[var(--engine-border)] bg-[var(--engine-bg)]/90 px-4 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur-xl lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none`}>
+            {messageSlot || (
+              <button
+                type="button"
+                onClick={onMessage}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-4 text-[15px] font-bold text-white"
+              >
+                <MessageCircle size={18} aria-hidden="true" />
+                {t("shop.profile.message")}
+              </button>
+            )}
             {onWhatsApp ? (
               <button
                 type="button"
@@ -185,9 +209,7 @@ export function ProductDetail({ product, fit = null, carName, seller, onBack, on
                 <WhatsAppIcon size={18} />
                 {t("shop.profile.whatsapp")}
               </button>
-            ) : (
-              <span />
-            )}
+            ) : null}
           </div>
         )}
       </div>

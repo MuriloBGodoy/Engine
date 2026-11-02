@@ -16,9 +16,11 @@ import "../../services/i18n-shop";
  *   page   { name, handle, category, logo, cover, verified, rating, ratingCount,
  *            place, productCount, serviceCount, followerCount (número),
  *            team: [{ id, name, avatar?, initials }], initials }
- *   onMessage / whatsappHref / onFollow / following
+ *   onMessage / whatsappHref / onFollow / following  — sem onMessage, o
+ *   WhatsApp vira o botão vermelho; `actions` entra ao lado (ex.: e-mail);
+ *   `children` vai embaixo dos números (bio, horário, links).
  */
-export function ProPageHeader({ page, onMessage, whatsappHref, onWhatsApp, onFollow, following = false }) {
+export function ProPageHeader({ page, onMessage, whatsappHref, onWhatsApp, onFollow, following = false, actions = null, children = null }) {
   const { t, i18n } = useTranslation();
   const team = page.team || [];
   const teamNames = team.slice(0, 3).map((member) => member.name.split(" ")[0]);
@@ -61,8 +63,12 @@ export function ProPageHeader({ page, onMessage, whatsappHref, onWhatsApp, onFol
             </p>
           )}
           <dl className="mt-3.5 flex gap-5">
-            <Stat value={page.productCount ?? 0} label={t("shop.profile.products", { count: Number(page.productCount) || 0 })} />
-            <Stat value={page.serviceCount ?? 0} label={t("shop.profile.services", { count: Number(page.serviceCount) || 0 })} />
+            {page.productCount != null && (
+              <Stat value={page.productCount} label={t("shop.profile.products", { count: Number(page.productCount) || 0 })} />
+            )}
+            {page.serviceCount != null && (
+              <Stat value={page.serviceCount} label={t("shop.profile.services", { count: Number(page.serviceCount) || 0 })} />
+            )}
             {page.followerCount != null && (
               <Stat
                 value={compactCount(page.followerCount, i18n.language)}
@@ -88,37 +94,43 @@ export function ProPageHeader({ page, onMessage, whatsappHref, onWhatsApp, onFol
               </span>
             </p>
           )}
+          {children}
         </div>
-        <div className="mt-4 grid grid-cols-[1fr_1fr_48px] gap-2 lg:col-start-3 lg:row-span-2 lg:mt-3.5 lg:grid-cols-[auto_auto_48px] lg:self-start">
-          <button
-            type="button"
-            onClick={onMessage}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-3 text-sm font-bold text-white lg:px-[18px]"
-          >
-            <MessageCircle size={18} aria-hidden="true" />
-            {t("shop.profile.message")}
-          </button>
-          {whatsappHref ? (
+        <div className="mt-4 flex gap-2 lg:col-start-3 lg:row-span-2 lg:mt-3.5 lg:self-start">
+          {onMessage && (
+            <button
+              type="button"
+              onClick={onMessage}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-3 text-sm font-bold text-white lg:flex-none lg:px-[18px]"
+            >
+              <MessageCircle size={18} aria-hidden="true" />
+              {t("shop.profile.message")}
+            </button>
+          )}
+          {whatsappHref && (
             <a
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
               onClick={onWhatsApp}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-3 text-sm font-bold text-[var(--engine-text)] lg:px-[18px]"
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[14px] px-3 text-sm font-bold lg:flex-none lg:px-[18px] ${
+                onMessage
+                  ? "border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text)]"
+                  : "bg-[var(--engine-accent)] text-white"
+              }`}
             >
               <WhatsAppIcon size={18} />
               {t("shop.profile.whatsapp")}
             </a>
-          ) : (
-            <span />
           )}
+          {actions}
           {onFollow && (
             <button
               type="button"
               onClick={onFollow}
               aria-pressed={following}
               aria-label={following ? t("shop.profile.following") : t("shop.profile.follow")}
-              className={`grid min-h-11 place-items-center rounded-[14px] border ${
+              className={`grid min-h-11 w-12 shrink-0 place-items-center rounded-[14px] border ${
                 following
                   ? "border-[var(--engine-text)] bg-[var(--engine-text)] text-[var(--engine-bg)]"
                   : "border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text)]"

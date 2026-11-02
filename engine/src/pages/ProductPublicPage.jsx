@@ -1,21 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { CarFront, CheckCircle2, Package, Pencil } from "lucide-react";
+import { CheckCircle2, Pencil } from "lucide-react";
 import { engineDB } from "../services/db";
 import {
   fitLabel,
   fittingCar,
   formatProductPrice,
   getProductByHandle,
+  interestMessage,
   productCategoryLabel,
   productPath,
   productUrl,
   setProductSaleStatus,
 } from "../services/shops";
-import { getWhatsAppHref } from "../services/serviceListingDisplay";
+import { normalizeWhatsApp } from "../services/serviceListingDisplay";
 import { shareOrCopyLink } from "../services/serviceListingPublic";
-import { WhatsAppIcon } from "../components/services/ListingParts";
+import { ProductDetail } from "../components/shop/ProductDetail";
+import { ContactSheet } from "../components/shop/ContactSheet";
 import { ReportListingButton } from "../components/services/ReportListing";
 import { MESSAGE_QUERY_FLAG, MessageProviderButton } from "../components/services/MessageProvider";
 import { ProfileLinkCard, PublicMissing, PublicShell } from "../components/pro/PublicShell";
@@ -41,8 +43,7 @@ export function ProductPublicPage({ user }) {
   const [result, setResult] = useState({ slug: null, product: null, failed: false });
   const [cars, setCars] = useState([]);
   const [editing, setEditing] = useState(false);
-  const [photoIndex, setPhotoIndex] = useState(0);
-  const scroller = useRef(null);
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
   const pro = useMyPro(user?.uid);
   const loading = result.slug !== slug;
   const product = loading ? null : result.product;
@@ -117,7 +118,7 @@ export function ProductPublicPage({ user }) {
   const approved = product.moderationStatus === "approved";
   const sold = product.saleStatus === "sold";
   const myCar = fittingCar(product, cars);
-  const whatsappHref = sold ? undefined : getWhatsAppHref(product, t);
+  const phone = normalizeWhatsApp(product.whatsapp);
   const photos = product.photos;
 
   const share = async () => {
@@ -164,103 +165,43 @@ export function ProductPublicPage({ user }) {
         </div>
       )}
 
-      <main className="mx-auto grid max-w-5xl gap-6 pb-28 sm:px-6 sm:py-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0">
-          <div className="relative overflow-hidden bg-[var(--engine-surface-2)] sm:rounded-2xl">
-            {photos.length ? (
-              <div
-                ref={scroller}
-                onScroll={(event) => {
-                  const node = event.currentTarget;
-                  setPhotoIndex(Math.round(node.scrollLeft / Math.max(1, node.clientWidth)));
-                }}
-                className="engine-chip-scroll flex snap-x snap-mandatory overflow-x-auto"
-              >
-                {photos.map((photo, index) => (
-                  <img
-                    key={`${photo}-${index}`}
-                    src={photo}
-                    alt={index === 0 ? product.title : ""}
-                    loading={index === 0 ? "eager" : "lazy"}
-                    className={`aspect-square w-full shrink-0 snap-center object-cover sm:aspect-[4/3] ${sold ? "opacity-70" : ""}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex aspect-square items-center justify-center text-[var(--engine-text-subtle)]">
-                <Package size={40} aria-hidden="true" />
-              </div>
-            )}
-            {photos.length > 1 && (
-              <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/65 px-3 py-1 text-xs font-black text-white">
-                {photoIndex + 1}/{photos.length}
-              </span>
-            )}
-          </div>
-
-          <section className="space-y-4 px-4 pt-5 sm:px-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--engine-accent)]">
-              {productCategoryLabel(product.category, t)} · {t(`shops.condition.${product.condition}`)}
-            </p>
-            <h1 className="font-display text-2xl font-extrabold tracking-tight">{product.title}</h1>
-            <p className="font-display text-3xl font-extrabold">
-              {formatProductPrice(product, t, i18n.language)}
-              {product.acceptsOffers && !product.priceNegotiable && (
-                <span className="ml-2 align-middle text-xs font-bold uppercase tracking-wider text-[var(--engine-text-subtle)]">{t("shops.price.offers")}</span>
-              )}
-            </p>
-            {sold && (
-              <p className="rounded-xl bg-[var(--engine-surface-2)] p-3 text-sm font-bold text-[var(--engine-text)]">{t("shops.status.soldHint")}</p>
-            )}
-            {myCar && (
-              <p className="flex items-center gap-2 rounded-xl border border-emerald-600/30 bg-emerald-500/10 p-3 text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                <CarFront size={16} aria-hidden="true" />
-                {t("shops.fitsYour", { car: [myCar.brand, myCar.model].filter(Boolean).join(" ") })}
-              </p>
-            )}
-            {product.fits.length > 0 && (
-              <div>
-                <h2 className="text-[11px] font-black uppercase text-[var(--engine-text-muted)]">
-                  <span className="tracking-widest">{t("shops.fits.title")}</span>
-                </h2>
-                <ul className="mt-2 flex flex-wrap gap-2">
-                  {product.fits.map((fit, index) => (
-                    <li key={index} className="rounded-full border border-[var(--engine-border)] px-3 py-1 text-xs font-bold">
-                      {fitLabel(fit)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {product.description && (
-              <p className="whitespace-pre-line text-sm font-medium leading-6 text-[var(--engine-text)]">{product.description}</p>
-            )}
-          </section>
-        </div>
-
-        <aside className="space-y-3 px-4 sm:px-0">
-          <ProfileLinkCard profileId={product.profileId} fallbackName={product.providerName} />
-          {!team && (
-            <div className="space-y-2 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
-              <MessageProviderButton listing={product} user={user} autoOpen={autoMessage} />
-              {whatsappHref && (
-                <a
-                  href={whatsappHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => approved && engineDB.trackServiceListingMetric(product.id, "whatsapp", "link")}
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:brightness-95"
-                >
-                  <WhatsAppIcon size={18} />
-                  WhatsApp
-                </a>
-              )}
-              <p className="text-[11px] font-medium leading-4 text-[var(--engine-text-subtle)]">{t("shops.public.noPayments")}</p>
-            </div>
-          )}
-          {!team && approved && <ReportListingButton listing={product} user={user} />}
-        </aside>
+      <main className="mx-auto max-w-[1280px] pb-6">
+        <ProductDetail
+          product={{
+            title: product.title,
+            price: formatProductPrice(product, t, i18n.language),
+            photos,
+            sold,
+            badges: [
+              t(`shops.condition.${product.condition}`),
+              productCategoryLabel(product.category, t),
+              product.acceptsOffers && !product.priceNegotiable ? t("shop.product.offers") : "",
+            ].filter(Boolean),
+            description: product.description,
+            fitsLabels: product.fits.map(fitLabel),
+          }}
+          fit={product.fits.length && cars.length ? Boolean(myCar) : null}
+          carName={myCar ? [myCar.model || myCar.brand, myCar.year].filter(Boolean).join(" ") : ""}
+          onBack={() => (window.history.length > 1 ? navigate(-1) : navigate("/services?aba=lojas"))}
+          onShare={share}
+          sellerSlot={<ProfileLinkCard profileId={product.profileId} fallbackName={product.providerName} />}
+          hideContact={Boolean(team)}
+          messageSlot={<MessageProviderButton listing={product} user={user} autoOpen={autoMessage} variant="bar" className="rounded-[14px] text-[15px]" />}
+          onWhatsApp={phone && !sold ? () => setWhatsappOpen(true) : undefined}
+          afterNote={!team && approved ? <div className="mt-3"><ReportListingButton listing={product} user={user} /></div> : null}
+        />
       </main>
+
+      <ContactSheet
+        key={whatsappOpen ? "open" : "closed"}
+        open={whatsappOpen}
+        channel="whatsapp"
+        initialMessage={[interestMessage(product, t), productUrl(product)].join("\n")}
+        phone={phone}
+        phoneLabel={phone ? `+${phone}` : ""}
+        onWhatsApp={() => approved && engineDB.trackServiceListingMetric(product.id, "whatsapp", "link")}
+        onClose={() => setWhatsappOpen(false)}
+      />
 
       {editing && team && (
         <ProductEditor

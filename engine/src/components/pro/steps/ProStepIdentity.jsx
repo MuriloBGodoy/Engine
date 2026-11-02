@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { serviceCategories } from "../../../services/serviceListingDisplay";
 import { PRO_HANDLE_PATTERN, checkHandle, cleanHandle } from "../../../services/proProfiles";
-import { PhotoPickButton, ProAvatar, SelectField, TextAreaField, TextField } from "../ProUi";
+import { SelectField, TextAreaField, TextField } from "../ProUi";
+import { ProfileLogo } from "../../shop/ShopPrimitives";
+import { handleFromName, profileInitials } from "../../../services/shopFormat";
 
 /**
  * Passo 1 — quem é. Página: @ próprio (com "está livre?" enquanto digita),
@@ -44,21 +46,21 @@ export function ProStepIdentity({ value, onChange, onUpload, uploading = "", edi
 
   return (
     <div className="space-y-4">
-      {isPage && (
-        <div className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
-          <div className="relative h-28 bg-[var(--engine-surface)]">
-            {data.cover && <img src={data.cover} alt="" className="h-full w-full object-cover" />}
-          </div>
-          <div className="flex flex-wrap items-end gap-3 px-3 pb-3">
-            <div className="-mt-8 rounded-2xl border-4 border-[var(--engine-surface-2)]">
-              <ProAvatar src={data.logo} name={value.name} size={64} square />
-            </div>
-            <PhotoPickButton id="pro-logo" label={t("pro.fields.logo")} busy={uploading === "logo"} onFiles={([file]) => onUpload(file, "logo")} />
-            <PhotoPickButton id="pro-cover" label={t("pro.fields.cover")} busy={uploading === "cover"} onFiles={([file]) => onUpload(file, "cover")} />
-          </div>
-        </div>
-      )}
-
+      <TextField
+        id="pro-name"
+        label={isPage ? t("pro.fields.pageName") : t("pro.fields.proName")}
+        value={value.name}
+        onChange={(next) =>
+          onChange({
+            ...value,
+            name: next,
+            // Página nova: o @ acompanha o nome até a pessoa mexer nele.
+            handle: isPage && !editing && (!value.handle || value.handle === handleFromName(value.name)) ? handleFromName(next) : value.handle,
+          })
+        }
+        maxLength={80}
+        hint={isPage ? "" : t("pro.hints.proName")}
+      />
       {isPage && (
         <div>
           <TextField
@@ -77,7 +79,7 @@ export function ProStepIdentity({ value, onChange, onUpload, uploading = "", edi
             <p
               aria-live="polite"
               className={`mt-1 flex items-center gap-1.5 text-xs font-bold ${
-                status === "available" ? "text-emerald-600" : status === "checking" ? "text-[var(--engine-text-subtle)]" : "text-red-500"
+                status === "available" || status === "checking" ? "text-[var(--engine-text-muted)]" : "text-[var(--engine-accent)]"
               }`}
             >
               {status === "checking" ? (
@@ -93,14 +95,18 @@ export function ProStepIdentity({ value, onChange, onUpload, uploading = "", edi
         </div>
       )}
 
-      <TextField
-        id="pro-name"
-        label={isPage ? t("pro.fields.pageName") : t("pro.fields.proName")}
-        value={value.name}
-        onChange={(next) => onChange({ ...value, name: next })}
-        maxLength={80}
-        hint={isPage ? "" : t("pro.hints.proName")}
-      />
+      {isPage && (
+        <div className="grid grid-cols-2 gap-2.5">
+          <PhotoTile id="pro-logo" busy={uploading === "logo"} onFile={(file) => onUpload(file, "logo")} label={data.logo ? t("shop.page.logoChange") : t("shop.page.logo")}>
+            <ProfileLogo src={data.logo} initials={profileInitials(value.name)} className="h-11 w-11 rounded-xl text-[13px]" />
+          </PhotoTile>
+          <PhotoTile id="pro-cover" busy={uploading === "cover"} onFile={(file) => onUpload(file, "cover")} label={data.cover ? t("shop.page.coverChange") : t("shop.page.coverUpload")}>
+            <span className="block h-11 w-full overflow-hidden rounded-xl bg-[var(--engine-surface-2)]">
+              {data.cover && <img src={data.cover} alt="" className="h-full w-full object-cover" />}
+            </span>
+          </PhotoTile>
+        </div>
+      )}
       <SelectField
         id="pro-category"
         label={t("pro.fields.category")}
@@ -122,5 +128,30 @@ export function ProStepIdentity({ value, onChange, onUpload, uploading = "", edi
         placeholder={t("pro.placeholders.bio")}
       />
     </div>
+  );
+}
+
+/** Tile tracejado de enviar logo/capa, com a miniatura do que já foi. */
+function PhotoTile({ id, label, busy, onFile, children }) {
+  return (
+    <label
+      htmlFor={id}
+      className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-3 py-3 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-text-muted)]"
+    >
+      {busy ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : children}
+      {label}
+      <input
+        id={id}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        disabled={busy}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) onFile(file);
+        }}
+      />
+    </label>
   );
 }

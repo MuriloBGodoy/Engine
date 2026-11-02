@@ -172,7 +172,7 @@ export function BigPriceInput({ value, onChange, currencySymbol = "R$", label, l
  * "Mais" até o limite. `photos` = [{ id, url }]. `onAdd(files)` recebe os
  * arquivos do seletor; comprimir e subir é com a tela.
  */
-export function PhotoGrid({ photos = [], max = 10, onAdd, onRemove, busy = false }) {
+export function PhotoGrid({ photos = [], max = 10, onAdd, onRemove, onMakeCover, busy = false }) {
   const { t } = useTranslation();
   const inputRef = useRef(null);
   const open = () => inputRef.current?.click();
@@ -220,7 +220,13 @@ export function PhotoGrid({ photos = [], max = 10, onAdd, onRemove, busy = false
               index === 0 ? "col-span-2 row-span-2" : ""
             }`}
           >
-            <img src={photo.url} alt="" className="h-full w-full object-cover" />
+            {onMakeCover && index > 0 ? (
+              <button type="button" onClick={() => onMakeCover(index)} aria-label={t("shop.photos.makeCover")} className="block h-full w-full">
+                <img src={photo.url} alt="" className="h-full w-full object-cover" />
+              </button>
+            ) : (
+              <img src={photo.url} alt="" className="h-full w-full object-cover" />
+            )}
             {index === 0 && <PhotoTag>{t("shop.photos.cover")}</PhotoTag>}
             {onRemove && (
               <button

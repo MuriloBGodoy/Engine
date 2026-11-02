@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BadgeCheck, Building2, ExternalLink, Package, Pencil, Plus, Trash2, UserRound, Users } from "lucide-react";
+import { ExternalLink, Package, Pencil, Plus, Store, Trash2, UserRound, Users } from "lucide-react";
+import { ChoiceCard } from "../shop/ShopPrimitives";
 import { deleteProProfile, proErrorKey, proProfilePath, respondInvite } from "../../services/proProfiles";
 import { useConfirm } from "../ConfirmProvider";
 import { useToast } from "../ToastProvider";
@@ -91,13 +92,12 @@ export function ProAccountHub({ user, pro, seed, username = "", onClose, onNewSe
     const path = proProfilePath(profile, username);
     const canEdit = role === "owner" || role === "admin";
     return (
-      <li key={profile.id} className="space-y-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
+      <li key={profile.id} className="space-y-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3.5">
         <div className="flex items-center gap-3">
           <ProAvatar src={page ? profile.data.logo : seed?.avatar} name={profile.name || seed?.name} size={48} square={page} />
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1 truncate text-sm font-bold text-[var(--engine-text)]">
               {profile.name || seed?.name}
-              {page && <BadgeCheck size={14} className="shrink-0 text-[var(--engine-accent)]" aria-hidden="true" />}
             </p>
             <p className="truncate text-xs font-medium text-[var(--engine-text-muted)]">
               {page ? `@${profile.handle}` : username}
@@ -136,7 +136,7 @@ export function ProAccountHub({ user, pro, seed, username = "", onClose, onNewSe
             </button>
           )}
           {role === "owner" && (
-            <button type="button" onClick={() => remove(entry)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 text-xs font-bold text-[var(--engine-text-muted)] hover:text-red-500">
+            <button type="button" onClick={() => remove(entry)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 text-xs font-bold text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)]">
               <Trash2 size={14} aria-hidden="true" />
               {t(page ? "pro.deletePage" : "pro.disable")}
             </button>
@@ -173,27 +173,27 @@ export function ProAccountHub({ user, pro, seed, username = "", onClose, onNewSe
         {pro.pages.map(card)}
       </ul>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        {!pro.personal && (
-          <button
-            type="button"
-            onClick={() => setEditor({ kind: "person" })}
-            className="rounded-2xl border border-[var(--engine-border)] p-4 text-left transition hover:border-[var(--engine-accent)]"
-          >
-            <UserRound className="text-[var(--engine-accent)]" size={22} aria-hidden="true" />
-            <p className="mt-2 text-sm font-bold text-[var(--engine-text)]">{t("pro.asYouTitle")}</p>
-            <p className="mt-1 text-xs font-medium leading-5 text-[var(--engine-text-muted)]">{t("pro.asYouCopy")}</p>
-          </button>
+      <section className="space-y-3">
+        {!pro.personal && !pro.pages.length && (
+          <div>
+            <h3 className="font-display text-xl font-bold text-[var(--engine-text)]">{t("shop.mode.title")}</h3>
+            <p className="mt-1 text-sm text-[var(--engine-text-muted)]">{t("shop.mode.sub")}</p>
+          </div>
         )}
-        <button
-          type="button"
+        {!pro.personal && (
+          <ChoiceCard
+            onClick={() => setEditor({ kind: "person" })}
+            icon={<UserRound size={24} aria-hidden="true" />}
+            title={t("shop.mode.asYou")}
+            hint={username ? t("shop.mode.asYouHint", { handle: username.replace(/^@/, "") }) : t("pro.asYouCopy")}
+          />
+        )}
+        <ChoiceCard
           onClick={() => setEditor({ kind: "page" })}
-          className="rounded-2xl border border-[var(--engine-border)] p-4 text-left transition hover:border-[var(--engine-accent)]"
-        >
-          <Building2 className="text-[var(--engine-accent)]" size={22} aria-hidden="true" />
-          <p className="mt-2 text-sm font-bold text-[var(--engine-text)]">{t("pro.createPageTitle")}</p>
-          <p className="mt-1 text-xs font-medium leading-5 text-[var(--engine-text-muted)]">{t("pro.createPageCopy")}</p>
-        </button>
+          icon={<Store size={24} aria-hidden="true" />}
+          title={t("shop.mode.page")}
+          hint={t("shop.mode.pageHint")}
+        />
       </section>
     </Sheet>
   );

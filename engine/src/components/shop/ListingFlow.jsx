@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronUp, X } from "lucide-react";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
@@ -41,6 +42,8 @@ export function ListingFlow({
   previewMini,
   previewLabel,
   previewNote,
+  startLabel,
+  nextLabel,
 }) {
   const { t } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -61,7 +64,7 @@ export function ListingFlow({
   ) : null;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--engine-bg)]">
+    <div className="flex min-h-full flex-col bg-[var(--engine-bg)]">
       <header className="sticky top-0 z-20 bg-[var(--engine-bg)] px-2 pb-2.5 pt-[calc(0.375rem+env(safe-area-inset-top))] lg:px-6 lg:pb-3.5 lg:pt-3">
         <div className="flex items-center gap-1.5">
           <button
@@ -73,7 +76,7 @@ export function ListingFlow({
             <X size={20} aria-hidden="true" />
           </button>
           <span className="flex-1 text-center text-[13px] font-bold text-[var(--engine-text-muted)]" aria-live="polite">
-            {index === 0 ? t("shop.flow.start") : t("shop.flow.stepOf", { current: index + 1, total })}
+            {index === 0 ? startLabel || t("shop.flow.start") : t("shop.flow.stepOf", { current: index + 1, total })}
           </span>
           {onSaveExit ? (
             <button
@@ -156,7 +159,7 @@ export function ListingFlow({
             disabled={!canNext || busy}
             className="inline-flex min-h-12 min-w-[150px] items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-5 text-[15px] font-bold text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? t("shop.flow.publishing") : isLast ? t("shop.flow.publish") : t("shop.flow.next")}
+            {busy ? t("shop.flow.publishing") : isLast ? nextLabel || t("shop.flow.publish") : t("shop.flow.next")}
           </button>
         </div>
       </footer>
@@ -185,7 +188,7 @@ export function ListingFlow({
 export function ListingFlowDone({ pending = false, body, card, onSeeShowcase, onAnother, onExit }) {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--engine-bg)]">
+    <div className="flex min-h-full flex-col bg-[var(--engine-bg)]">
       <div className="px-2 pt-[calc(0.375rem+env(safe-area-inset-top))]">
         <button
           type="button"
@@ -203,7 +206,7 @@ export function ListingFlowDone({ pending = false, body, card, onSeeShowcase, on
         <h1 className="font-display text-[26px] font-bold text-[var(--engine-text)]">
           {pending ? t("shop.done.pendingTitle") : t("shop.done.title")}
         </h1>
-        <p className="max-w-xs text-[var(--engine-text-muted)]">{pending ? t("shop.done.bodyPending") : body}</p>
+        <p className="max-w-xs text-[var(--engine-text-muted)]">{pending ? body || t("shop.done.bodyPending") : body}</p>
         {card && <div className="my-2 w-[200px]">{card}</div>}
         <div className="flex flex-wrap justify-center gap-2.5">
           {onSeeShowcase && (
@@ -253,4 +256,19 @@ export function ReviewRow({ label, children, onEdit }) {
 /** Caixa que agrupa as ReviewRow. */
 export function ReviewList({ children }) {
   return <div className="engine-card px-3.5">{children}</div>;
+}
+
+/**
+ * Põe o fluxo por cima do app (tela cheia, fora do layout), com o voltar do
+ * celular fechando. É como as telas do Han abrem o Anunciar e o "Monte sua
+ * página" a partir de qualquer lugar.
+ */
+export function FlowOverlay({ onDismiss, label, children }) {
+  useHistoryDismiss(true, onDismiss);
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={label} className="fixed inset-0 z-[110] overflow-y-auto overscroll-contain bg-[var(--engine-bg)] text-[var(--engine-text)]">
+      {children}
+    </div>,
+    document.body,
+  );
 }

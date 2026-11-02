@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { SearchX, Store } from "lucide-react";
+import { ChevronRight, SearchX } from "lucide-react";
 import { fetchProProfileById, proDisplay, proProfilePath } from "../../services/proProfiles";
 import { ProAvatar } from "./ProUi";
 
@@ -67,24 +67,19 @@ export function ProfileLinkCard({ profileId, fallbackName = "" }) {
   const path = value ? proProfilePath(value.profile, value.person?.username) : "";
   const body = (
     <>
-      <ProAvatar src={display.logo} name={display.name} size={44} square={value?.profile.kind === "page"} />
+      <ProAvatar src={display.logo} name={display.name} size={48} square={value?.profile.kind === "page"} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-bold text-[var(--engine-text)]">{display.name || fallbackName}</span>
-        <span className="block truncate text-xs font-medium text-[var(--engine-text-muted)]">{display.handle}</span>
+        <span className="block truncate text-xs font-semibold text-[var(--engine-text-muted)]">{display.handle}</span>
       </span>
-      {path && (
-        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--engine-accent)]">
-          <Store size={14} aria-hidden="true" />
-          {t("pro.seeShowcase")}
-        </span>
-      )}
+      {path && <ChevronRight size={18} aria-label={t("pro.seeShowcase")} className="shrink-0 text-[var(--engine-text-muted)]" />}
     </>
   );
   return path ? (
-    <Link to={path} className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] p-3 transition hover:border-[var(--engine-accent)]">
+    <Link to={path} className="flex items-center gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 transition hover:border-[var(--engine-border-strong)]">
       {body}
     </Link>
   ) : (
-    <div className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] p-3">{body}</div>
+    <div className="flex items-center gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3">{body}</div>
   );
 }

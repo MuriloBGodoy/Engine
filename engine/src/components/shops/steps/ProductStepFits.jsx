@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { fipeService } from "../../../services/fipeService";
 import { PRODUCT_MAX_FITS, fitLabel, modelFamily } from "../../../services/shops";
 import { GhostButton, SelectField, TextField } from "../../pro/ProUi";
@@ -62,22 +62,22 @@ export function ProductStepFits({ value, onChange }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-medium leading-5 text-[var(--engine-text-muted)]">{t("shops.fits.hint")}</p>
+      <p className="text-[13px] font-medium leading-5 text-[var(--engine-text-muted)]">{t("shops.fits.hint")}</p>
       {fits.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="flex flex-wrap gap-2">
           {fits.map((fit, index) => (
-            <li key={`${fit.brandCode}-${fit.model}-${index}`} className="flex items-center gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--engine-text)]">
+            <li key={`${fit.brandCode}-${fit.model}-${index}`} className="flex min-h-11 items-center gap-2 rounded-full bg-[var(--engine-text)] py-1 pl-4 pr-1 text-[var(--engine-bg)]">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
                 {fitLabel(fit) || fit.brand}
-                {!fit.model && <span className="ml-1 font-medium text-[var(--engine-text-subtle)]">({t("shops.fits.anyModel")})</span>}
+                {!fit.model && <span className="ml-1 font-medium opacity-70">({t("shops.fits.anyModel")})</span>}
               </span>
               <button
                 type="button"
                 onClick={() => onChange({ ...value, fits: fits.filter((_, i) => i !== index) })}
                 aria-label={t("shops.fits.remove")}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--engine-text-muted)] hover:text-red-500"
+                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/15"
               >
-                <Trash2 size={15} />
+                <X size={15} />
               </button>
             </li>
           ))}
@@ -85,8 +85,8 @@ export function ProductStepFits({ value, onChange }) {
       )}
 
       {fits.length < PRODUCT_MAX_FITS && (
-        <div className="space-y-3 rounded-xl border border-[var(--engine-border)] p-3">
-          {brandError && <p className="text-xs font-bold text-red-500">{t("shops.fits.catalogError")}</p>}
+        <div className="space-y-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3.5">
+          {brandError && <p className="text-xs font-bold text-[var(--engine-accent)]">{t("shops.fits.catalogError")}</p>}
           <SelectField
             id="fit-brand"
             label={t("shops.fits.brand")}

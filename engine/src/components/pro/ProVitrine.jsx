@@ -1,22 +1,26 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Store } from "lucide-react";
 import { getServiceCategoryLabel } from "../../services/serviceListingDisplay";
 import { serviceListingPath } from "../../services/serviceListingPublic";
 import { fittingCar, productFromRow, productPath } from "../../services/shops";
-import { ChoiceChips } from "./ProUi";
 import { ProductCard } from "../shops/ProductCard";
+import { ProductGrid, ShopEmpty } from "../shop/ProductCard";
+import { ProPageBody, ProPageTabs } from "../shop/ProPageHeader";
+import { ServiceRow } from "../shop/ShopBrowse";
+import { Chip, ChipRow } from "../shop/ShopPrimitives";
+import "../../services/i18n-shop";
 
 /**
- * Vitrine do perfil: grade dos serviços e produtos dele. `rows` são linhas
+ * Vitrine do perfil: abas Produtos | Serviços (protótipo aprovado em
+ * 01/11/2026), com o "Serve no meu carro" nos produtos. `rows` são linhas
  * cruas de `service_listings` (a RLS já entregou só o que esta pessoa vê:
  * aprovados para todos, e os pendentes para a equipe). Para a equipe, o que
- * não está no ar leva o selo do status.
+ * não está no ar leva o status embaixo do cartão.
  */
-export function ProVitrine({ rows = [], cars = [], showStatus = false }) {
+export function ProVitrine({ rows = [], cars = [], showStatus = false, handle = "" }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState("all");
+  const navigate = useNavigate();
   const items = useMemo(
     () =>
       rows
@@ -24,77 +28,92 @@ export function ProVitrine({ rows = [], cars = [], showStatus = false }) {
         .map((row) => (row.kind === "product" ? { kind: "product", product: productFromRow(row), row } : { kind: "service", row })),
     [rows],
   );
-  const services = items.filter((item) => item.kind === "service").length;
-  const products = items.length - services;
-  const shown = items.filter((item) => tab === "all" || item.kind === tab);
+  const products = items.filter((item) => item.kind === "product");
+  const services = items.filter((item) => item.kind === "service");
+  const [picked, setPicked] = useState(null);
+  const [fitOnly, setFitOnly] = useState(false);
+  const tab = picked || (products.length || !services.length ? "products" : "services");
+  const carName = cars.length === 1 ? String(cars[0].model || cars[0].brand || "").split(/\s+/)[0] : "";
+  const shownProducts = fitOnly ? products.filter((item) => fittingCar(item.product, cars)) : products;
 
-  if (!items.length) {
-    return (
-      <div className="engine-card flex flex-col items-center gap-2 p-8 text-center">
-        <Store size={26} className="text-[var(--engine-text-subtle)]" aria-hidden="true" />
-        <p className="text-sm font-bold text-[var(--engine-text)]">{t("pro.vitrine.empty")}</p>
-      </div>
-    );
-  }
+  const status = (row) =>
+    showStatus && row.moderation_status !== "approved" ? (
+      <p className="text-xs font-bold text-[var(--engine-text-muted)]">
+        {t(`services.status.${row.moderation_status === "changes_requested" ? "changesRequested" : row.moderation_status}`, {
+          defaultValue: row.moderation_status,
+        })}
+      </p>
+    ) : null;
 
   return (
-    <div className="space-y-3">
-      {services > 0 && products > 0 && (
-        <ChoiceChips
-          label={t("pro.vitrine.title")}
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "all", label: t("pro.vitrine.all", { count: items.length }) },
-            { value: "service", label: t("pro.vitrine.services", { count: services }) },
-            { value: "product", label: t("pro.vitrine.products", { count: products }) },
-          ]}
-        />
-      )}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {shown.map((item) => {
-          const status = item.row.moderation_status;
-          const badge = showStatus && status !== "approved" && (
-            <p className="px-3 pb-3 text-[10px] font-black uppercase tracking-wider text-amber-600">
-              {t(`services.status.${status === "changes_requested" ? "changesRequested" : status}`, { defaultValue: status })}
-            </p>
-          );
-          if (item.kind === "product") {
-            return (
-              <Link key={item.row.id} to={productPath(item.product)} className="block">
-                <ProductCard product={item.product} fitsCar={fittingCar(item.product, cars)} footer={badge} />
-              </Link>
-            );
-          }
-          const data = item.row.data || {};
-          return (
-            <Link key={item.row.id} to={serviceListingPath({ slug: item.row.slug, id: item.row.id })} className="engine-card flex flex-col overflow-hidden">
-              <div className="aspect-square w-full bg-[var(--engine-surface-2)]">
-                {data.photos?.[0] ? (
-                  <img src={data.photos[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-[var(--engine-text-subtle)]">
-                    <Store size={30} aria-hidden="true" />
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-1 flex-col gap-1 p-3">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[var(--engine-accent)]">
-                  {t("pro.vitrine.serviceTag")} · {getServiceCategoryLabel(data.category, t)}
-                </p>
-                <p className="line-clamp-2 text-sm font-bold leading-5 text-[var(--engine-text)]">{data.title}</p>
-                {data.price && (
-                  <p className="text-sm font-extrabold text-[var(--engine-text)]">
-                    {data.priceFrom ? `${t("pro.priceFrom")} ` : ""}
-                    {data.price}
-                  </p>
-                )}
-              </div>
-              {badge}
-            </Link>
-          );
-        })}
-      </div>
-    </div>
+    <>
+      <ProPageTabs
+        active={tab}
+        onChange={setPicked}
+        stickyTop="top-14"
+        tabs={[
+          { id: "products", label: t("shop.profile.tabs.products"), count: products.length },
+          { id: "services", label: t("shop.profile.tabs.services"), count: services.length },
+        ]}
+      />
+      <ProPageBody>
+        {tab === "products" && (
+          <>
+            {cars.length > 0 && products.length > 0 && (
+              <ChipRow className="mb-4">
+                <Chip selected={fitOnly} onClick={() => setFitOnly((value) => !value)}>
+                  {carName ? t("shop.profile.fitsMine", { car: carName }) : t("shops.onlyMyCar")}
+                </Chip>
+              </ChipRow>
+            )}
+            {shownProducts.length ? (
+              <ProductGrid>
+                {shownProducts.map((item) => (
+                  <ProductCard
+                    key={item.row.id}
+                    product={item.product}
+                    fitsCar={fittingCar(item.product, cars)}
+                    seller={false}
+                    onOpen={() => navigate(productPath(item.product))}
+                    footer={status(item.row)}
+                  />
+                ))}
+              </ProductGrid>
+            ) : fitOnly ? (
+              <ShopEmpty
+                title={t("shop.profile.emptyFit", { car: carName || t("shops.onlyMyCar") })}
+                body={t("shop.profile.emptyFitBody")}
+                actionLabel={t("shop.profile.clearFilter")}
+                onAction={() => setFitOnly(false)}
+              />
+            ) : (
+              <ShopEmpty title={t("shop.profile.emptyProducts")} body={handle ? t("shop.profile.emptyProductsBody", { handle }) : ""} />
+            )}
+          </>
+        )}
+        {tab === "services" &&
+          (services.length ? (
+            <div className="grid gap-2.5 lg:grid-cols-2">
+              {services.map(({ row }) => {
+                const data = row.data || {};
+                return (
+                  <div key={row.id}>
+                    <ServiceRow
+                      photo={data.photos?.[0]}
+                      title={data.title}
+                      meta={getServiceCategoryLabel(data.category, t)}
+                      price={data.price ? `${data.priceFrom ? `${t("pro.priceFrom")} ` : ""}${data.price}` : ""}
+                      onClick={() => navigate(serviceListingPath({ slug: row.slug, id: row.id }))}
+                    />
+                    {status(row)}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <ShopEmpty title={t("shop.profile.emptyServices")} />
+          ))}
+      </ProPageBody>
+    </>
   );
 }

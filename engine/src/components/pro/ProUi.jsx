@@ -2,10 +2,12 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ImagePlus, Loader2, Store, X } from "lucide-react";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
+import { SwitchKnob } from "../shop/ShopPrimitives";
 
 /**
  * Peças de tela da conta profissional e de Lojas. Versão funcional, nos
- * tokens --engine-*: o Jesse redesenha por cima. Cada passo dos formulários
+ * tokens --engine-*. Visual do protótipo aprovado em 01/11/2026 (Jesse):
+ * campos de 52px, pílulas preto/branco, interruptor no lugar do checkbox. Cada passo dos formulários
  * é um componente próprio (components/pro/steps, components/shops/steps) e
  * recebe só `value` + `onChange` — dá para trocar o visual sem tocar na
  * lógica de salvar.
@@ -58,18 +60,18 @@ export function FieldLabel({ htmlFor, label, hint = "", optional = false, childr
   const { t } = useTranslation();
   return (
     <div>
-      <label htmlFor={htmlFor} className="flex items-baseline gap-2 text-xs font-bold text-[var(--engine-text)]">
+      <label htmlFor={htmlFor} className="flex items-baseline gap-2 text-[13px] font-bold text-[var(--engine-text)]">
         {label}
         {optional && <span className="font-medium text-[var(--engine-text-subtle)]">{t("pro.optional")}</span>}
       </label>
-      <div className="mt-1.5">{children}</div>
-      {hint && <p className="mt-1 text-[11px] font-medium leading-4 text-[var(--engine-text-subtle)]">{hint}</p>}
+      <div className="mt-2">{children}</div>
+      {hint && <p className="mt-1.5 text-xs font-medium leading-4 text-[var(--engine-text-muted)]">{hint}</p>}
     </div>
   );
 }
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2.5 text-sm font-medium text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]";
+  "w-full rounded-[14px] border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3.5 py-3 text-base font-semibold text-[var(--engine-text)] outline-none transition placeholder:font-medium placeholder:text-[var(--engine-text-muted)] focus:border-[var(--engine-accent)] focus:shadow-[0_0_0_3px_var(--engine-ring)] disabled:opacity-60";
 
 export function TextField({ id, label, value, onChange, hint, optional, maxLength = 120, ...rest }) {
   return (
@@ -79,7 +81,7 @@ export function TextField({ id, label, value, onChange, hint, optional, maxLengt
         value={value ?? ""}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
-        className={`${inputClass} min-h-11`}
+        className={`${inputClass} min-h-[52px]`}
         {...rest}
       />
     </FieldLabel>
@@ -105,7 +107,7 @@ export function TextAreaField({ id, label, value, onChange, hint, optional, maxL
 export function SelectField({ id, label, value, onChange, options, hint, optional }) {
   return (
     <FieldLabel htmlFor={id} label={label} hint={hint} optional={optional}>
-      <select id={id} value={value ?? ""} onChange={(event) => onChange(event.target.value)} className={`${inputClass} min-h-11`}>
+      <select id={id} value={value ?? ""} onChange={(event) => onChange(event.target.value)} className={`${inputClass} min-h-[52px]`}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -118,18 +120,23 @@ export function SelectField({ id, label, value, onChange, options, hint, optiona
 
 export function Toggle({ id, label, hint = "", checked, onChange }) {
   return (
-    <label htmlFor={id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
+    <label
+      htmlFor={id}
+      className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-[var(--engine-border)] bg-[var(--engine-surface)] px-4 py-2"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold text-[var(--engine-text)]">{label}</span>
+        {hint && <span className="mt-0.5 block text-xs font-medium text-[var(--engine-text-muted)]">{hint}</span>}
+      </span>
       <input
         id={id}
         type="checkbox"
+        role="switch"
         checked={Boolean(checked)}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--engine-accent)]"
+        className="peer sr-only"
       />
-      <span className="min-w-0">
-        <span className="block text-sm font-bold text-[var(--engine-text)]">{label}</span>
-        {hint && <span className="mt-0.5 block text-xs font-medium text-[var(--engine-text-muted)]">{hint}</span>}
-      </span>
+      <SwitchKnob on={Boolean(checked)} />
     </label>
   );
 }
@@ -146,10 +153,10 @@ export function ChoiceChips({ options, value, onChange, label = "" }) {
             role="radio"
             aria-checked={active}
             onClick={() => onChange(option.value)}
-            className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-xs font-bold transition ${
+            className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[13px] font-semibold transition ${
               active
-                ? "border-[var(--engine-accent)] bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
-                : "border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)]"
+                ? "border-[var(--engine-text)] bg-[var(--engine-text)] text-[var(--engine-bg)]"
+                : "border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text)] hover:border-[var(--engine-text-muted)]"
             }`}
           >
             {option.icon}
@@ -186,7 +193,7 @@ export function PrimaryButton({ children, busy = false, className = "", ...rest 
   return (
     <button
       type="button"
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-50 ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-5 text-[15px] font-bold text-white transition hover:brightness-95 disabled:opacity-50 ${className}`}
       disabled={busy || rest.disabled}
       {...rest}
     >
@@ -200,7 +207,7 @@ export function GhostButton({ children, className = "", ...rest }) {
   return (
     <button
       type="button"
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-4 text-sm font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50 ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-4 text-[15px] font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-text-muted)] disabled:opacity-50 ${className}`}
       {...rest}
     >
       {children}
@@ -220,8 +227,8 @@ export function ProAvatar({ src = "", name = "", size = 48, square = false }) {
   return (
     <span
       style={{ width: size, height: size }}
-      className={`flex shrink-0 items-center justify-center overflow-hidden bg-[var(--engine-accent)] text-sm font-bold text-white ${
-        square ? "rounded-xl" : "rounded-full"
+      className={`flex shrink-0 items-center justify-center overflow-hidden bg-[var(--engine-text)] font-display text-sm font-extrabold text-[var(--engine-bg)] ${
+        square ? "rounded-[28%]" : "rounded-full"
       }`}
     >
       {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : initials || <Store size={size / 2.5} aria-hidden="true" />}
@@ -234,7 +241,7 @@ export function PhotoPickButton({ id, label, busy = false, onFiles, multiple = f
   return (
     <label
       htmlFor={id}
-      className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--engine-border)] px-4 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+      className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-4 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
     >
       {busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <ImagePlus size={16} aria-hidden="true" />}
       {label}

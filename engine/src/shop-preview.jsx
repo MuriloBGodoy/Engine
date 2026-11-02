@@ -43,6 +43,17 @@ import { ServiceRow, ShopBrowseHeader, ShopSection, StoreCard, StoreRow } from "
 import { Chip as CategoryChip, ChipRow } from "./components/shop/ShopPrimitives";
 import { handleFromName, maskBrPhone, prefilledMessage, profileInitials } from "./services/shopFormat";
 import { getServiceCategoryLabel } from "./services/serviceListingDisplay";
+import { BrowserRouter } from "react-router-dom";
+import { ToastProvider } from "./components/ToastProvider";
+import { ConfirmProvider } from "./components/ConfirmProvider";
+import { ProductEditor } from "./components/shops/ProductEditor";
+import { ProductCard as RealProductCard } from "./components/shops/ProductCard";
+import { ProProfileEditor } from "./components/pro/ProProfileEditor";
+import { ProVitrine } from "./components/pro/ProVitrine";
+import { ShopSegment } from "./components/shop/ShopBrowse";
+import { proProfileFromRow } from "./services/proProfiles";
+import { fittingCar, productFromRow } from "./services/shops";
+import "./services/i18n-pro";
 import "./index.css";
 import "./services/i18n";
 import "./services/i18n-shop";
@@ -694,11 +705,131 @@ function Shell({ children }) {
   return <main className="mx-auto min-h-dvh max-w-[1280px] bg-[var(--engine-bg)]">{children}</main>;
 }
 
-const SCREENS = { anunciar: AnunciarScreen, pagina: PaginaScreen, produto: ProdutoScreen, lojas: LojasScreen };
+/* ===== Telas DE VERDADE do Han, com dados de exemplo (?tela=editor|criarpagina|vitrine) ===== */
+const FAKE_USER = { uid: "preview-user" };
+const PAGE_ROW = {
+  id: "page-1",
+  kind: "page",
+  handle: "garagem47",
+  name: "Garagem 47 Performance",
+  data: { category: "shop", city: "São Paulo", state: "SP", cover: COVERS[0], whatsapp: "11987654321", whatsappCountry: "+55", bio: "Suspensão, rodas e som. Instalação na hora." },
+};
+const PERSON_ROW = { id: "person-1", kind: "person", user_id: "preview-user", name: "Murilo Godoy", data: { city: "São Paulo" } };
+const PRO_ENTRIES = [
+  { profile: proProfileFromRow(PERSON_ROW), role: "owner", status: "active" },
+  { profile: proProfileFromRow(PAGE_ROW), role: "owner", status: "active" },
+];
+const GARAGE = [{ brand: "Honda", model: "Civic Touring", year: "2019", fipe: { brandCode: "25" } }];
+const LISTING_ROWS = PRODUCTS.map((p) => ({
+  id: p.id,
+  kind: "product",
+  slug: p.id,
+  moderation_status: "approved",
+  profile_id: "page-1",
+  data: {
+    title: p.title,
+    description: p.description || "",
+    photos: p.photos,
+    category: p.data.category,
+    condition: p.data.condition,
+    priceAmount: p.data.priceAmount,
+    acceptsOffers: Boolean(p.data.acceptsOffers),
+    saleStatus: p.saleStatus || "available",
+    fits: p.data.fits,
+  },
+})).concat(
+  SERVICES.map((s, i) => ({
+    id: s.id,
+    kind: "service",
+    slug: s.id,
+    moderation_status: i === 2 ? "pending" : "approved",
+    profile_id: "page-1",
+    data: { title: s.title, photos: [s.photo], category: "mechanics", price: s.price.replace(/^a partir de /, ""), priceFrom: s.price.startsWith("a partir") },
+  })),
+);
+
+function RealEditorScreen() {
+  return (
+    <ProductEditor
+      user={FAKE_USER}
+      profiles={PRO_ENTRIES}
+      profileId={QUERY.get("passo") ? "page-1" : ""}
+      onClose={() => (window.location.search = "?tela=vitrine")}
+      onSaved={() => {}}
+    />
+  );
+}
+
+function RealPageEditorScreen() {
+  return <ProProfileEditor kind="page" seed={{ name: "" }} user={FAKE_USER} onClose={() => {}} onSaved={() => {}} />;
+}
+
+function RealVitrineScreen() {
+  const { t } = useTranslation();
+  const profile = proProfileFromRow(PAGE_ROW);
+  return (
+    <main className="mx-auto min-h-dvh max-w-[1280px] bg-[var(--engine-bg)] pb-16">
+      <ProPageHeader
+        page={{
+          name: profile.name,
+          handle: profile.handle,
+          category: t("pro.categories.shop"),
+          cover: profile.data.cover,
+          initials: "G47",
+          rating: "4,8",
+          ratingCount: 127,
+          place: "São Paulo, SP",
+          productCount: PRODUCTS.length,
+          serviceCount: SERVICES.length,
+        }}
+        whatsappHref="https://wa.me/5511987654321"
+      >
+        <p className="mt-3.5 max-w-2xl text-sm leading-6 text-[var(--engine-text)]">{profile.data.bio}</p>
+      </ProPageHeader>
+      <ProVitrine rows={EMPTY ? [] : LISTING_ROWS} cars={GARAGE} handle={profile.handle} />
+    </main>
+  );
+}
+
+function RealShopCardsScreen() {
+  return (
+    <main className="mx-auto min-h-dvh max-w-[1280px] bg-[var(--engine-bg)] px-4 py-4 lg:px-12">
+      <ShopSegment value="shops" onChange={() => {}} />
+      <div className="mt-4">
+        <ProductGrid>
+          {LISTING_ROWS.filter((row) => row.kind === "product").map((row) => {
+            const product = { ...productFromRow(row), providerName: "Garagem 47 Performance", city: "São Paulo" };
+            return <RealProductCard key={row.id} product={product} fitsCar={fittingCar(product, GARAGE)} onOpen={() => {}} />;
+          })}
+        </ProductGrid>
+      </div>
+    </main>
+  );
+}
+
+const SCREENS = {
+  anunciar: AnunciarScreen,
+  pagina: PaginaScreen,
+  produto: ProdutoScreen,
+  lojas: LojasScreen,
+  editor: RealEditorScreen,
+  criarpagina: RealPageEditorScreen,
+  vitrine: RealVitrineScreen,
+  cartoes: RealShopCardsScreen,
+};
 const Screen = SCREENS[QUERY.get("tela")] || AnunciarScreen;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Screen />
+    <BrowserRouter>
+      <ToastProvider>
+        <ConfirmProvider>
+          {/* O fluxo ocupa a altura da caixa em que está (min-h-full). */}
+          <div className="h-dvh overflow-y-auto">
+            <Screen />
+          </div>
+        </ConfirmProvider>
+      </ToastProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );

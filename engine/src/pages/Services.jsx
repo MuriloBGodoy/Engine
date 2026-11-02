@@ -97,6 +97,7 @@ import { QuoteEntryCard } from "../components/services/QuoteEntryCard";
 import { MessageProviderButton } from "../components/services/MessageProvider";
 import { ProAccountHub } from "../components/pro/ProAccountHub";
 import { ShopsTab } from "../components/shops/ShopsTab";
+import { ShopSegment } from "../components/shop/ShopBrowse";
 import { ProductEditor } from "../components/shops/ProductEditor";
 import { useMyPro } from "../hooks/useMyPro";
 
@@ -2912,27 +2913,8 @@ export function Services({ user, settings }) {
         />
       </header>
 
-      <div role="tablist" aria-label={t("shops.tabsLabel")} className="flex gap-2">
-        {[
-          ["services", t("shops.tabServices")],
-          ["shops", t("shops.tabShops")],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            onClick={() => switchTab(key)}
-            className={`min-h-11 flex-1 rounded-xl border px-4 text-sm font-bold transition sm:flex-none ${
-              tab === key
-                ? "border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
-                : "border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Serviços | Lojas no segmento do protótipo aprovado (01/11/2026). */}
+      <ShopSegment value={tab === "shops" ? "shops" : "services"} onChange={switchTab} />
 
       {tab === "shops" && <ShopsTab user={user} region={region} onNewProduct={() => openProductEditor()} />}
 

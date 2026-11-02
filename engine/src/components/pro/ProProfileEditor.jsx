@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
   PRO_HANDLE_PATTERN,
   cleanHandle,
@@ -12,7 +11,10 @@ import {
 } from "../../services/proProfiles";
 import { uploadListingPhoto } from "../../services/shops";
 import { useToast } from "../ToastProvider";
-import { GhostButton, PrimaryButton, Sheet, StepHeader } from "./ProUi";
+import { FlowOverlay, ListingFlow } from "../shop/ListingFlow";
+import { ProPagePreviewCard } from "../shop/ProPageHeader";
+import { ProfileLogo } from "../shop/ShopPrimitives";
+import { profileInitials } from "../../services/shopFormat";
 import { ProStepIdentity } from "./steps/ProStepIdentity";
 import { ProStepContact } from "./steps/ProStepContact";
 import { ProStepPlace } from "./steps/ProStepPlace";
@@ -103,42 +105,50 @@ export function ProProfileEditor({ kind, profile = null, seed = {}, user, onClos
 
   const { key, Component } = STEPS[step];
   const last = step === STEPS.length - 1;
+  const isPage = kind === "page";
+  const shownHandle = isPage ? cleanHandle(value.handle) || "…" : seed.username || "";
+  const initials = profileInitials(value.name);
+  const titles = {
+    identity: isPage ? t("shop.page.title") : t(editing ? "pro.editTitle" : "pro.asYouTitle"),
+    contact: t("pro.steps.contact"),
+    place: t("pro.steps.place"),
+  };
 
   return (
-    <Sheet
-      onClose={onClose}
-      eyebrow={t(kind === "page" ? "pro.page" : "pro.personal")}
-      title={t(editing ? "pro.editTitle" : kind === "page" ? "pro.createPageTitle" : "pro.asYouTitle")}
-      footer={
-        <>
-          {step > 0 && (
-            <GhostButton onClick={() => setStep((current) => current - 1)}>
-              <ArrowLeft size={16} aria-hidden="true" />
-              {t("pro.back")}
-            </GhostButton>
-          )}
-          <span className="flex-1" />
-          {editing && !last && (
-            <GhostButton onClick={save} disabled={saving}>
-              {t("pro.saveNow")}
-            </GhostButton>
-          )}
-          {last ? (
-            <PrimaryButton onClick={save} busy={saving}>
-              <Check size={16} aria-hidden="true" />
-              {t(editing ? "pro.save" : kind === "page" ? "pro.createPage" : "pro.enable")}
-            </PrimaryButton>
-          ) : (
-            <PrimaryButton onClick={next}>
-              {t("pro.next")}
-              <ArrowRight size={16} aria-hidden="true" />
-            </PrimaryButton>
-          )}
-        </>
-      }
-    >
-      <StepHeader index={step} total={STEPS.length} title={t(`pro.steps.${key}`)} />
-      <Component value={value} onChange={setValue} onUpload={upload} uploading={uploading} editing={editing} />
-    </Sheet>
+    <FlowOverlay onDismiss={onClose} label={titles.identity}>
+      <ListingFlow
+        startLabel={t(isPage ? "pro.page" : "pro.personal")}
+        step={{
+          title: titles[key],
+          sub: key === "identity" && isPage ? t("shop.page.sub") : "",
+          content: <Component value={value} onChange={setValue} onUpload={upload} uploading={uploading} editing={editing} />,
+        }}
+        index={step}
+        total={STEPS.length}
+        canNext={!uploading}
+        isLast={last}
+        busy={saving}
+        nextLabel={t(editing ? "pro.save" : isPage ? "pro.createPage" : "pro.enable")}
+        onBack={() => setStep((current) => Math.max(0, current - 1))}
+        onNext={last ? save : next}
+        onExit={onClose}
+        onSaveExit={editing && !last ? save : undefined}
+        previewLabel={t("shop.flow.previewPage")}
+        preview={
+          isPage ? (
+            <ProPagePreviewCard name={value.name || t("shop.flow.previewPage")} handle={shownHandle} logo={value.data.logo} cover={value.data.cover} initials={initials} />
+          ) : null
+        }
+        previewMini={
+          isPage
+            ? {
+                thumb: <ProfileLogo src={value.data.logo} initials={initials} className="h-full w-full rounded-[10px] text-[13px]" />,
+                title: value.name || t("shop.flow.previewPage"),
+                sub: `@${shownHandle}`,
+              }
+            : null
+        }
+      />
+    </FlowOverlay>
   );
 }
