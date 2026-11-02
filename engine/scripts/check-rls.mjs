@@ -282,6 +282,76 @@ try {
   const totalPublico = (await anon.rpc("event_participant_counts", { p_event_ids: [evento.data.id] })).data;
   check("visitante lê só o total", Number(totalPublico?.[0]?.total) === 1, JSON.stringify(totalPublico));
 
+  // Cargos, padrinho, aviso fixado e equipe do evento (20261101150000).
+  console.log("\ncargos do clube e equipe do evento");
+  await b.client.from("public_profiles").upsert({ user_id: b.id, username: `@rlsb${run}`, author: "RLS B" });
+  await c.client.from("public_profiles").upsert({ user_id: c.id, username: `@rlsc${run}`, author: "RLS C" });
+  const cargos = (await anon.from("club_roles").select("id").eq("club_id", clubId).order("position")).data || [];
+  check("clube tem os 7 cargos-padrão", cargos.map((r) => r.id).join(",") === "founder,president,vice,director,moderator,member,prospect", JSON.stringify(cargos));
+  let linhaB = (await admin.from("club_members").select("role, role_id").eq("club_id", clubId).eq("uid", b.id).single()).data;
+  check("capitão de antes é Diretor", linhaB?.role_id === "director" && linhaB?.role === "captain", JSON.stringify(linhaB));
+  const entraC = await c.client.from("club_members").insert({ club_id: clubId, uid: c.id, role: "member", sponsor_id: b.id });
+  const linhaC = (await admin.from("club_members").select("role_id, sponsor_id").eq("club_id", clubId).eq("uid", c.id).single()).data;
+  check("entrar por convite grava o padrinho", passed(entraC) && linhaC?.sponsor_id === b.id && linhaC?.role_id === "member", why(entraC) + JSON.stringify(linhaC));
+  check("ninguém muda o próprio cargo", denied(await c.client.from("club_members").update({ role_id: "president" }).eq("club_id", clubId).eq("uid", c.id).select()));
+  check("diretor não dá cargo acima do dele", denied(await b.client.from("club_members").update({ role_id: "vice" }).eq("club_id", clubId).eq("uid", c.id).select()));
+  const virouMod = await b.client.from("club_members").update({ role_id: "moderator" }).eq("club_id", clubId).eq("uid", c.id).select("role_id");
+  check("diretor põe membro como Moderador (valor muda)", passed(virouMod) && virouMod.data?.[0]?.role_id === "moderator", why(virouMod));
+  const avisoCargo = (await c.client.from("notifications").select("type").eq("type", "club_role")).data;
+  check("subir de cargo vira aviso", avisoCargo?.length === 1, JSON.stringify(avisoCargo));
+  check("moderador não remove o diretor", denied(await c.client.from("club_members").delete().eq("club_id", clubId).eq("uid", b.id).select()));
+  const cargoPorDiretor = await b.client.rpc("club_save_role", { p_club: clubId, p_role: { name: "Tesoureiro" } });
+  check("só o Fundador cria cargo", cargoPorDiretor.error?.message === "not-allowed", why(cargoPorDiretor));
+  const tesoureiro = await a.client.rpc("club_save_role", { p_club: clubId, p_role: { name: "Tesoureiro", color: "verde-limao", permissions: ["post_announcements"] } });
+  check("Fundador cria cargo", passed(tesoureiro) && Boolean(tesoureiro.data), why(tesoureiro));
+  const corRuim = await a.client.rpc("club_save_role", { p_club: clubId, p_role: { name: "X", color: "#ff0000" } });
+  check("cargo com cor fora da paleta é recusado", corRuim.error?.message === "invalid-colors", why(corRuim));
+  const postMural = `b-${run}`;
+  await b.client.from("community_goals").update({ data: { pinned: true, title: "x" } }).eq("id", postMural);
+  let mural = (await anon.from("community_goals").select("data").eq("id", postMural).single()).data;
+  check("dono do post não se fixa sozinho", mural?.data?.pinned !== true, JSON.stringify(mural));
+  const fixa = await c.client.rpc("club_pin_post", { p_post_id: postMural, p_pinned: true });
+  mural = (await anon.from("community_goals").select("data").eq("id", postMural).single()).data;
+  check("moderador (post_announcements) fixa o aviso", passed(fixa) && mural?.data?.pinned === true, why(fixa));
+  check("moderador não cria encontro do clube", denied(await c.client.from("events").insert({ created_by: c.id, club_id: clubId })));
+
+  const timeSet = await a.client.rpc("event_team_set", { p_event: evento.data.id, p_uid: c.id, p_role: "co_organizer" });
+  check("organizador põe co-organizador", passed(timeSet), why(timeSet));
+  const coEdita = await c.client.from("events").update({ data: { title: "RLS co", maxParticipants: 1 } }).eq("id", evento.data.id).select("data, created_by");
+  check("co-organizador edita (valor muda) e o dono continua o mesmo",
+    passed(coEdita) && coEdita.data?.[0]?.data?.title === "RLS co" && coEdita.data?.[0]?.created_by === a.id, why(coEdita));
+  check("co-organizador não apaga o evento", denied(await c.client.from("events").delete().eq("id", evento.data.id).select()));
+  const coNomeia = await c.client.rpc("event_team_set", { p_event: evento.data.id, p_uid: b.id, p_role: "co_organizer" });
+  check("co-organizador não nomeia co-organizador", coNomeia.error?.message === "not-allowed", why(coNomeia));
+  const bStaff = await c.client.rpc("event_team_set", { p_event: evento.data.id, p_uid: b.id, p_role: "staff" });
+  check("co-organizador põe staff", passed(bStaff), why(bStaff));
+  check("staff não edita o evento", denied(await b.client.from("events").update({ data: { title: "hack" } }).eq("id", evento.data.id).select()));
+  check("ninguém escreve na equipe direto", denied(await b.client.from("event_team").insert({ event_id: evento.data.id, uid: b.id, role: "co_organizer" })));
+  check("visitante não lê a equipe", (await anon.from("event_team").select("*").eq("event_id", evento.data.id)).data?.length === 0);
+
+  // @menções na bio (20261101160000).
+  console.log("\nmenções na bio");
+  const mencao = await a.client.rpc("set_bio_mentions", { p_refs: [{ kind: "person", id: b.id }, { kind: "club", id: clubId }, { kind: "person", id: a.id }] });
+  check("menção a pessoa e clube passa; a si mesmo vai para skipped",
+    passed(mencao) && mencao.data?.accepted?.length === 2 && mencao.data?.skipped?.length === 1, why(mencao));
+  const avisoMencao = (await b.client.from("notifications").select("type").eq("type", "mention")).data;
+  check("mencionado recebe um aviso", avisoMencao?.length === 1, JSON.stringify(avisoMencao));
+  await a.client.rpc("set_bio_mentions", { p_refs: [{ kind: "person", id: b.id }, { kind: "club", id: clubId }] });
+  check("regravar não avisa de novo", (await b.client.from("notifications").select("type").eq("type", "mention")).data?.length === 1);
+  check("ninguém grava menção direto", denied(await a.client.from("profile_mentions").insert({ owner_id: a.id, kind: "person", target_id: c.id })));
+  const muitas = await a.client.rpc("set_bio_mentions", { p_refs: Array.from({ length: 11 }, (_, i) => ({ kind: "event", id: `x${i}` })) });
+  check("mais de 10 menções é recusado", muitas.error?.message === "too-many-mentions", why(muitas));
+  const cartoes = (await anon.rpc("profile_mentions_for", { p_user: a.id })).data;
+  check("visitante vê os cartões vivos", cartoes?.length === 2, JSON.stringify(cartoes));
+  const terceiro = await c.client.rpc("remove_mention", { p_owner: a.id, p_kind: "person", p_target: b.id });
+  check("terceiro não tira menção alheia", terceiro.error?.message === "not-allowed", why(terceiro));
+  const sai = await b.client.rpc("remove_mention", { p_owner: a.id, p_kind: "person", p_target: b.id });
+  const devolta = await a.client.rpc("set_bio_mentions", { p_refs: [{ kind: "person", id: b.id }] });
+  check("mencionado sai e o dono não põe de volta",
+    passed(sai) && devolta.data?.skipped?.[0]?.reason === "removed", why(sai) + JSON.stringify(devolta.data));
+  const bloco = (await anon.rpc("profile_engine_presence", { p_user: a.id })).data;
+  check("bloco No Engine: visitante vê só o clube aberto", bloco?.clubs?.length === 1 && bloco.clubs[0].id === clubId, JSON.stringify(bloco));
+
   console.log("\nmensagens");
   const conversa = await a.client.rpc("start_conversation", { p_other: b.id, p_my_card: { author: "A" }, p_other_card: { author: "B" } });
   check("abrir conversa passa", passed(conversa), why(conversa));
