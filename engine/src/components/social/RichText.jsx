@@ -48,7 +48,7 @@ export function RichText({
               target="_blank"
               rel="noopener noreferrer nofollow ugc"
               onClick={stop}
-              className={`${linkClassName} break-all`}
+              className={`${linkClassName} [overflow-wrap:anywhere]`}
             >
               {part.value.replace(/^https?:\/\//, "")}
             </a>

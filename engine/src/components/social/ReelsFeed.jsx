@@ -151,7 +151,7 @@ export function ReelsFeed({ user, blockedIds = [] }) {
   return (
     <div
       ref={listRef}
-      className="-mx-4 h-[calc(100dvh-12rem)] min-h-[420px] snap-y snap-mandatory overflow-y-auto overscroll-contain bg-black [scrollbar-width:none] sm:mx-0 sm:rounded-2xl [&::-webkit-scrollbar]:hidden"
+      className="-mx-4 h-[calc(100dvh-15.5rem-env(safe-area-inset-bottom))] min-h-[380px] lg:h-[calc(100dvh-12rem)] snap-y snap-mandatory overflow-y-auto overscroll-contain bg-black [scrollbar-width:none] sm:mx-0 sm:rounded-2xl [&::-webkit-scrollbar]:hidden"
     >
       {visible.map((goal) => {
         const isLiked = liked[goal.id] ?? Boolean(goal.likesBy?.[uid]);
@@ -193,7 +193,7 @@ export function ReelsFeed({ user, blockedIds = [] }) {
               />
             </div>
 
-            <div className="absolute bottom-4 right-2 flex flex-col items-center gap-3">
+            <div className="absolute bottom-16 right-2 flex flex-col items-center gap-3">
               <button type="button" onClick={() => like(goal)} aria-pressed={isLiked} aria-label={t("socialPosts.reels.like")} className={action}>
                 <span className={actionIcon}>
                   <Heart size={22} fill={isLiked ? "currentColor" : "none"} className={isLiked ? "text-[var(--engine-accent)]" : ""} />
