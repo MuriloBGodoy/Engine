@@ -9,6 +9,8 @@ import i18n from "./i18n";
 const ptBR = {
   pro: {
     eyebrow: "Conta profissional",
+    guestSeller: "Anuncie no Engine",
+    guestSellerHint: "Serviço ou produto, de graça. Entre para publicar.",
     hubTitle: "Anunciar no Engine",
     personal: "Conta pessoal",
     page: "Página profissional",
@@ -254,6 +256,8 @@ const ptBR = {
 const enUS = {
   pro: {
     eyebrow: "Professional account",
+    guestSeller: "Sell on Engine",
+    guestSellerHint: "Services or products, free. Sign in to post.",
     hubTitle: "Sell on Engine",
     personal: "Personal account",
     page: "Business page",
@@ -499,6 +503,8 @@ const enUS = {
 const esES = {
   pro: {
     eyebrow: "Cuenta profesional",
+    guestSeller: "Anuncia en Engine",
+    guestSellerHint: "Servicios o productos, gratis. Entra para publicar.",
     hubTitle: "Anunciar en Engine",
     personal: "Cuenta personal",
     page: "Página profesional",

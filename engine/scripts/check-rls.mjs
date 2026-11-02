@@ -376,7 +376,10 @@ try {
   check("terceiro não lê as mensagens", (await c.client.from("messages").select("*").eq("conversation_id", conversa.data)).data?.length === 0);
 
   console.log("\nserviços");
-  check("anúncio nasce pendente", passed(await a.client.from("service_listings").insert({ id: `s-${run}`, owner_id: a.id, data: { title: "Funilaria" } })));
+  // Com o RETURNING, como o app grava: o 1º anúncio de conta nova cria o
+  // perfil profissional no mesmo comando (20261102160000).
+  const primeiroAnuncio = await a.client.from("service_listings").insert({ id: `s-${run}`, owner_id: a.id, data: { title: "Funilaria" } }).select("id, moderation_status");
+  check("anúncio nasce pendente (1º anúncio, com RETURNING)", primeiroAnuncio.data?.[0]?.moderation_status === "pending", why(primeiroAnuncio));
   // Desde 20261025150000 a RLS aceita 'approved' do dono (edição leve fica no
   // ar) e o gatilho decide o status: o que importa é o que fica gravado.
   const status = async (id) => (await admin.from("service_listings").select("moderation_status").eq("id", id).maybeSingle()).data?.moderation_status;

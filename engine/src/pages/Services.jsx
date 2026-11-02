@@ -1320,6 +1320,13 @@ function ListingEditorModal({
   const formCities = getCities(form.country, form.state);
   const cityListId = "listing-city-suggestions";
   const photos = form.photos || [];
+  // "Publicado como": a página escolhida (logo, nome, @) ou a própria pessoa.
+  // Até 02/11/2026 o seletor mudava e o cartão continuava mostrando a pessoa.
+  const pageOptions = proOptions.filter((entry) => entry.profile.kind === "page");
+  const chosenPage = pageOptions.find((entry) => entry.profile.id === form.profileId)?.profile || null;
+  const publishName = chosenPage ? chosenPage.name : sellerProfile?.displayName;
+  const publishHandle = chosenPage ? `@${chosenPage.handle}` : sellerProfile?.username;
+  const publishAvatar = chosenPage ? chosenPage.data?.logo : sellerProfile?.avatar;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-0 backdrop-blur-sm sm:p-6">
@@ -1344,10 +1351,10 @@ function ListingEditorModal({
             {!submitted && (
               <div className="mt-4 flex max-w-xl items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-sm font-bold uppercase text-white">
-                  {sellerProfile?.avatar ? (
-                    <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
+                  {publishAvatar ? (
+                    <img src={publishAvatar} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    getInitials(sellerProfile?.displayName)
+                    getInitials(publishName)
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1356,7 +1363,7 @@ function ListingEditorModal({
                   </p>
                   {/* Anunciar como você ou como uma página em que estou na
                       equipe. Perfil não muda depois de publicado. */}
-                  {proOptions.length > 1 && !form.id && (
+                  {pageOptions.length > 0 && !form.id && (
                     <select
                       aria-label={t("pro.publishAs")}
                       value={form.profileId || ""}
@@ -1364,9 +1371,7 @@ function ListingEditorModal({
                       className="mt-1 min-h-10 w-full rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface)] px-2 text-xs font-bold text-[var(--engine-text)]"
                     >
                       <option value="">{t("pro.personal")}</option>
-                      {proOptions
-                        .filter((entry) => entry.profile.kind === "page")
-                        .map((entry) => (
+                      {pageOptions.map((entry) => (
                           <option key={entry.profile.id} value={entry.profile.id}>
                             {entry.profile.name} (@{entry.profile.handle})
                           </option>
@@ -1374,10 +1379,10 @@ function ListingEditorModal({
                     </select>
                   )}
                   <p className="truncate text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
-                    {sellerProfile?.displayName || t("services.engineUser")}
+                    {publishName || t("services.engineUser")}
                   </p>
                   <p className="truncate text-xs font-bold text-[var(--engine-text-muted)]">
-                    {sellerProfile?.username || t("services.engineAccount")}
+                    {publishHandle || t("services.engineAccount")}
                   </p>
                 </div>
               </div>
@@ -3009,7 +3014,8 @@ export function Services({ user, settings }) {
           isAdmin={isAdmin}
           pendingApprovalsCount={pendingApprovalsCount}
           storageKey={`engine:services:sellerPanel:${user?.uid || "anon"}`}
-          onOpenProfile={() => setSellerProfileOpen(true)}
+          guest={!user?.uid}
+          onOpenProfile={() => (user?.uid ? setSellerProfileOpen(true) : setGateOpen(true))}
           onOpenListings={() => setSellerListingsOpen(true)}
           onCreate={() => openEditor()}
           onOpenApprovals={() => navigate("/services/approvals")}
@@ -3520,6 +3526,7 @@ function SellerBar({
   onOpenListings,
   onCreate,
   onOpenApprovals,
+  guest = false,
 }) {
   const { t } = useTranslation();
   const [panelOpen, setPanelOpen] = useState(() => readSellerPanelOpen(storageKey));
@@ -3578,12 +3585,19 @@ function SellerBar({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-sm font-extrabold text-[var(--engine-text)] transition-colors group-hover:text-[var(--engine-accent)] dark:text-white">
-                {sellerProfile.displayName || t("services.sellerProfile")}
+                {/* Visitante não é "Usuario Engine · pronto": é um convite. */}
+                {guest ? t("pro.guestSeller") : sellerProfile.displayName || t("services.sellerProfile")}
               </span>
-              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
-                <ShieldCheck size={12} aria-hidden="true" />
-                {listingCount ? t("services.activeSeller") : t("services.ready")}
-              </span>
+              {guest ? (
+                <span className="mt-0.5 block truncate text-xs font-medium text-[var(--engine-text-muted)]">
+                  {t("pro.guestSellerHint")}
+                </span>
+              ) : (
+                <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
+                  <ShieldCheck size={12} aria-hidden="true" />
+                  {listingCount ? t("services.activeSeller") : t("services.ready")}
+                </span>
+              )}
             </span>
           </button>
 
@@ -3605,6 +3619,7 @@ function SellerBar({
         </div>
 
         <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-[minmax(0,1fr)_auto] sm:flex sm:shrink-0 sm:items-center">
+          {!guest && (
           <button
             type="button"
             onClick={onOpenListings}
@@ -3616,6 +3631,7 @@ function SellerBar({
               {listingCount}
             </span>
           </button>
+          )}
           <button
             type="button"
             onClick={onCreate}
