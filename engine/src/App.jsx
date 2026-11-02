@@ -44,6 +44,7 @@ const CarPage = lazyNamed(() => import("./pages/CarPage"), "CarPage");
 const Terms = lazyNamed(() => import("./pages/Terms"), "Terms");
 const Privacy = lazyNamed(() => import("./pages/Privacy"), "Privacy");
 const PostPage = lazyNamed(() => import("./pages/PostPage"), "PostPage");
+const HashtagPage = lazyNamed(() => import("./pages/HashtagPage"), "HashtagPage");
 const ModalNewCar = lazyNamed(() => import("./components/ModalNewCar"), "ModalNewCar");
 const OwnershipModal = lazyNamed(() => import("./components/OwnershipModal"), "OwnershipModal");
 const SpecSheetModal = lazyNamed(() => import("./components/specsheet/SpecSheetModal"), "SpecSheetModal");
@@ -670,6 +671,11 @@ function App() {
           <Route
             path="/community"
             element={<Community cars={cars} settings={settings} user={user} />}
+          />
+          {/* Página de uma #hashtag: aberta a visitante, como o feed. */}
+          <Route
+            path="/community/tag/:tag"
+            element={<HashtagPage user={user} settings={settings} />}
           />
           <Route
             path="/community/:identifier"

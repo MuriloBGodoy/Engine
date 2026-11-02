@@ -19,6 +19,8 @@ import { engineDB, POST_KIND_POST } from "../services/db";
 import { GoalCard } from "./Community";
 import { ShareToChatModal } from "../components/ShareToChatModal";
 import { usePostActions } from "../hooks/usePostActions";
+import { fetchSavedPosts } from "../services/savedPosts";
+import "../services/i18n-social-posts";
 import "../services/i18n-social-feed";
 import { auth } from "../services/supabase";
 import { EditProfileModal } from "../components/EditProfileModal";
@@ -103,7 +105,9 @@ const goalProgress = (goal) =>
  * de um post solto, e é a única coisa que o Instagram não tem.
  */
 function ProfilePostTile({ goal, t, onOpen }) {
-  const image = goal.images?.[0] || goal.image || "";
+  // Vídeo enviado entra na grade pela capa (como no Instagram).
+  const image = goal.images?.[0] || goal.image || goal.video?.poster || "";
+  const hasVideo = Boolean(goal.videoUrl || goal.video);
   const many = (goal.images?.length || 0) > 1;
   const isGoal = goal.kind !== POST_KIND_POST;
   const likes = Number(goal.likes) || 0;
@@ -133,12 +137,12 @@ function ProfilePostTile({ goal, t, onOpen }) {
         </span>
       )}
 
-      {(many || goal.videoUrl) && (
+      {(many || hasVideo) && (
         <span
           className="absolute right-1.5 top-1.5 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]"
-          title={goal.videoUrl ? t("socialFeed.video") : t("socialFeed.multiplePhotos")}
+          title={hasVideo ? t("socialFeed.video") : t("socialFeed.multiplePhotos")}
         >
-          {goal.videoUrl ? <Play size={16} fill="currentColor" /> : <Copy size={16} />}
+          {hasVideo ? <Play size={16} fill="currentColor" /> : <Copy size={16} />}
         </span>
       )}
 
@@ -187,6 +191,8 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const [following, setFollowing] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState("posts");
+  // Aba "Salvos": só no próprio perfil, lida quando aberta.
+  const [savedGoals, setSavedGoals] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -419,6 +425,20 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
     activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== "saved" || !isOwnProfile || !currentUserId) return undefined;
+    let alive = true;
+    fetchSavedPosts(currentUserId)
+      .then((list) => alive && setSavedGoals(list))
+      .catch((error) => {
+        console.error(error);
+        if (alive) setSavedGoals([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeTab, isOwnProfile, currentUserId]);
+
   // Feed aberto: rola até o post tocado uma vez (a lista pode chegar depois,
   // num link direto). De volta à grade: o quadrado de onde a pessoa saiu.
   useEffect(() => {
@@ -593,6 +613,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           onClose={() => setPostToShare(null)}
         />
         {postActions.reportDialog}
+        {postActions.captionDialog}
       </div>
     );
   }
@@ -749,6 +770,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               { id: "followers", label: t("profile.tabs.followers") },
               { id: "following", label: t("profile.tabs.following") },
               { id: "achievements", label: t("profile.tabs.achievements") },
+              ...(isOwnProfile ? [{ id: "saved", label: t("socialPosts.saved.tab") }] : []),
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -803,6 +825,23 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                     </button>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "saved" && isOwnProfile && (
+            <div>
+              <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">{t("socialPosts.saved.onlyYou")}</p>
+              {savedGoals === null ? (
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("common.loading")}</p>
+              ) : savedGoals.length ? (
+                <div className="-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6">
+                  {savedGoals.map((goal) => (
+                    <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={(id) => navigate(`/post/${id}`)} />
+                  ))}
+                </div>
+              ) : (
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("socialPosts.saved.empty")}</p>
               )}
             </div>
           )}
@@ -882,6 +921,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       )}
       {reportDialog}
       {postActions.reportDialog}
+      {postActions.captionDialog}
     </div>
   );
 }

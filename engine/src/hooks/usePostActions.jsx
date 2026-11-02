@@ -6,6 +6,7 @@ import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { useRequireAccount } from "./useRequireAccount";
 import { useSocialReport } from "./useSocialReport";
+import { CaptionEditor } from "../components/social/CaptionEditor";
 
 /**
  * Os botões do `GoalCard` fora da Comunidade: a página do post (/post/:id) e
@@ -34,6 +35,8 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
   const [pendingLikes, setPendingLikes] = useState({});
   const [pendingRatings, setPendingRatings] = useState({});
   const [blockedIds, setBlockedIds] = useState([]);
+  // Legenda em edição (o "Editar legenda" do menu do post).
+  const [captionGoal, setCaptionGoal] = useState(null);
   const uid = user?.uid || "";
 
   useEffect(() => {
@@ -187,6 +190,30 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
     }
   };
 
+  // Editar a legenda: até 02/11/2026 só o feed tinha o modal — na página do
+  // post (onde o toque no celular leva) e no feed do perfil o item nem
+  // aparecia no menu.
+  const onEditCaption = (goal) => setCaptionGoal(goal);
+  const saveCaption = async (goal, caption) => {
+    try {
+      await engineDB.updateCommunityGoalNote(goal.id, caption, uid);
+      setCaptionGoal(null);
+      toast(t("community.captionSaved"));
+      changed(goal.id);
+    } catch (error) {
+      console.error(error);
+      toast(
+        error?.code === "too-many-hashtags"
+          ? t("socialPosts.errors.tooManyHashtags", { max: 30 })
+          : t("community.captionError"),
+        "error",
+      );
+    }
+  };
+  const captionDialog = captionGoal ? (
+    <CaptionEditor goal={captionGoal} onClose={() => setCaptionGoal(null)} onSave={saveCaption} />
+  ) : null;
+
   // O link é sempre o da página do post — no perfil, a barra de endereço
   // aponta para o perfil, não para a publicação.
   const onShare = async (goal) => {
@@ -204,6 +231,7 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
     interactionsFor,
     withoutBlocked,
     reportDialog,
+    captionDialog,
     requireAccount,
     // `onLike` do cartão recebe só o id; quem usa passa o post junto.
     handlers: {
@@ -217,6 +245,7 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
       onReportComment,
       onBlock,
       onShare,
+      onEditCaption,
     },
   };
 }

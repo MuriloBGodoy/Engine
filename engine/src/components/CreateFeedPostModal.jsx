@@ -1,14 +1,23 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Car, ImagePlus, Info, Loader2, Trash2, Video, X } from "lucide-react";
+import { Car, Clapperboard, ImagePlus, Info, Link2, Loader2, Scissors, Trash2, X } from "lucide-react";
 import { auth } from "../services/supabase";
 import { engineDB } from "../services/db";
 import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
+import { MentionTextarea } from "./mentions/MentionTextarea";
+import { VideoEditor } from "./social/VideoEditor";
+import { VIDEO_LIMITS, probeVideo, uploadPostVideo, videoFileProblem } from "../services/postVideo";
+import { MAX_HASHTAGS, extractHashtags } from "../services/socialText";
+import "../services/i18n-social-posts";
 
 const MAX_PHOTOS = 3;
 const MAX_TEXT = 1000;
+const PERSON_ONLY = ["person"];
+const MB = Math.round(VIDEO_LIMITS.maxBytes / (1024 * 1024));
+const VIDEO_ERRORS_SHOWN = ["tooBig", "format", "notVideo", "signedOut"];
 
 /**
  * Compositor de post do feed.
@@ -17,28 +26,50 @@ const MAX_TEXT = 1000;
  * numa página de regras: o feed é sobre carro, e dizer isso na hora da escrita
  * evita a maior parte do desvio antes de virar trabalho de moderação.
  *
- * Três fotos, e não seis como na garagem, porque sem o Storage ligado a imagem
- * vai em base64 dentro do documento e o Firestore corta em 1 MiB.
+ * Mídia: até três fotos OU um vídeo enviado (com corte, sem som e capa no
+ * editor — services/postVideo.js) OU um link do YouTube. O vídeo só sobe ao
+ * publicar; desistir antes não deixa arquivo órfão no Storage.
+ *
+ * Texto: @ abre a busca de pessoas (o @ entra como texto); #tag vira link
+ * para a página da hashtag, até 30 por post.
  */
 export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onCreated }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
+  const [mentions, setMentions] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [videoUrl, setVideoUrl] = useState("");
+  // Vídeo enviado: o arquivo, o que o navegador leu dele e a edição.
+  const [video, setVideo] = useState(null); // { file, source, edit }
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [stage, setStage] = useState("");
   const [carId, setCarId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   // Voltar no Android fecha o compositor em vez de sair da comunidade.
   useHistoryDismiss(open, onClose);
 
+  // O endereço local do vídeo é liberado ao trocar de vídeo ou fechar.
+  useEffect(() => () => {
+    if (video?.source?.url) URL.revokeObjectURL(video.source.url);
+  }, [video?.source?.url]);
+
   if (!open) return null;
+
+  const hashtagCount = extractHashtags(text).length;
+  const tooManyTags = hashtagCount > MAX_HASHTAGS;
 
   const reset = () => {
     setText("");
+    setMentions([]);
     setPhotos([]);
     setVideoUrl("");
+    setVideo(null);
+    setEditorOpen(false);
+    setStage("");
     setCarId("");
     setError("");
   };
@@ -68,34 +99,91 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
     }
   };
 
-  const submit = async (event) => {
-    event.preventDefault();
-    setBusy(true);
+  const handleVideoFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
     setError("");
-
+    const problem = videoFileProblem(file);
+    if (problem) {
+      setError(t(`socialPosts.videoErrors.${problem}`, { mb: MB }));
+      return;
+    }
+    setBusy(true);
     try {
-      const car = cars.find((item) => String(item.id) === carId) || null;
-      // O carimbo do clube vem do objeto buscado por id, nunca da URL.
-      await engineDB.createCommunityPost({
-        text,
-        images: photos,
-        videoUrl,
-        car,
-        clubId: club?.id || "",
-        clubTag: club?.tag || "",
-      });
-      trackEvent("post_publicado", { comFoto: photos.length > 0, comCarro: Boolean(car) });
-      reset();
-      onCreated?.();
-      onClose();
-    } catch (err) {
-      setError(err.message);
+      const source = await probeVideo(file);
+      if (source.duration > VIDEO_LIMITS.maxSourceSeconds) {
+        URL.revokeObjectURL(source.url);
+        setError(t("socialPosts.videoErrors.tooLong", { minutes: VIDEO_LIMITS.maxSourceSeconds / 60 }));
+        return;
+      }
+      // Vídeo e fotos não se misturam no mesmo post (o player ocupa a mídia).
+      setPhotos([]);
+      setVideoUrl("");
+      setVideo({ file, source, edit: null });
+      setEditorOpen(true);
+    } catch (probeError) {
+      setError(t(`socialPosts.videoErrors.${probeError.code || "unreadable"}`, { mb: MB }));
     } finally {
       setBusy(false);
     }
   };
 
-  return (
+  const submit = async (event) => {
+    event.preventDefault();
+    if (tooManyTags || (video && !video.edit)) return;
+    setBusy(true);
+    setError("");
+
+    try {
+      const car = cars.find((item) => String(item.id) === carId) || null;
+      let uploaded = null;
+      if (video?.edit) {
+        setStage("uploading");
+        try {
+          uploaded = await uploadPostVideo(video.file, video.edit, { userId: auth.currentUser?.uid });
+        } catch (uploadError) {
+          const code = VIDEO_ERRORS_SHOWN.includes(uploadError?.code) ? uploadError.code : "upload";
+          throw new Error(t(`socialPosts.videoErrors.${code}`, { mb: MB }));
+        }
+      }
+      // O carimbo do clube vem do objeto buscado por id, nunca da URL.
+      await engineDB.createCommunityPost({
+        text,
+        images: photos,
+        videoUrl: uploaded ? "" : videoUrl,
+        video: uploaded,
+        car,
+        clubId: club?.id || "",
+        clubTag: club?.tag || "",
+      });
+      trackEvent("post_publicado", {
+        comFoto: photos.length > 0,
+        comCarro: Boolean(car),
+        comVideo: Boolean(uploaded),
+        hashtags: hashtagCount,
+      });
+      reset();
+      onCreated?.();
+      onClose();
+    } catch (err) {
+      setError(
+        err.code === "too-many-hashtags"
+          ? t("socialPosts.errors.tooManyHashtags", { max: MAX_HASHTAGS })
+          : err.message,
+      );
+    } finally {
+      setBusy(false);
+      setStage("");
+    }
+  };
+
+  const mediaButton =
+    "flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] text-xs font-black uppercase tracking-wide text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50";
+
+  // Portal: o compositor abre de dentro de telas com `transform` (feed, mural
+  // do clube), onde um `position: fixed` ficaria preso ao ancestral.
+  return createPortal(
     <div className="engine-modal-overlay" onClick={onClose}>
       <div
         role="dialog"
@@ -135,18 +223,83 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
           onSubmit={submit}
           className="engine-modal-body engine-scroll engine-safe-bottom space-y-4 px-5 py-5"
         >
-          <textarea
+          <MentionTextarea
+            id="feed-post-text"
             value={text}
-            onChange={(event) => setText(event.target.value.slice(0, MAX_TEXT))}
+            mentions={mentions}
+            kinds={PERSON_ONLY}
             rows={4}
+            maxLength={MAX_TEXT}
+            onChange={(next, list) => {
+              setText(next.slice(0, MAX_TEXT));
+              setMentions(list || []);
+            }}
             placeholder={t("feedPost.placeholder")}
             className="w-full resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3.5 py-3 text-sm text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]"
           />
+          {(hashtagCount > 0 || text.length > MAX_TEXT * 0.8) && (
+            <p className="-mt-2 flex justify-between gap-3 text-[11px] font-semibold text-[var(--engine-text-subtle)]">
+              <span className={tooManyTags ? "text-[var(--engine-accent)]" : ""}>
+                {tooManyTags
+                  ? t("socialPosts.errors.tooManyHashtags", { max: MAX_HASHTAGS })
+                  : hashtagCount
+                    ? t("socialPosts.caption.hashtags", { count: hashtagCount, max: MAX_HASHTAGS })
+                    : ""}
+              </span>
+              <span className="tabular-nums">
+                {t("socialPosts.caption.counter", { count: text.length, max: MAX_TEXT })}
+              </span>
+            </p>
+          )}
 
           <p className="flex items-start gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--engine-text-muted)]">
             <Info size={14} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" />
             {t("feedPost.nicheNotice")}
           </p>
+
+          {video && (
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] p-2">
+              <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-black">
+                {video.edit?.posterBlob ? (
+                  <PosterThumb blob={video.edit.posterBlob} />
+                ) : (
+                  <Clapperboard size={18} className="absolute inset-0 m-auto text-white/70" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-xs">
+                <p className="truncate font-bold text-[var(--engine-text)]">{video.file.name}</p>
+                {video.edit && (
+                  <p className="mt-0.5 tabular-nums text-[var(--engine-text-muted)]">
+                    {t("socialPosts.video.clipLength", {
+                      length: `${(video.edit.trimEnd - video.edit.trimStart).toFixed(1)} s`,
+                      max: VIDEO_LIMITS.maxClipSeconds,
+                    })}
+                    {video.edit.muted ? ` · ${t("socialPosts.video.noSound")}` : ""}
+                  </p>
+                )}
+                <div className="mt-1 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditorOpen(true)}
+                    disabled={busy}
+                    className="flex min-h-9 items-center gap-1 rounded-lg px-2 font-bold text-[var(--engine-accent)] hover:bg-[var(--engine-surface-2)]"
+                  >
+                    <Scissors size={13} />
+                    {t("socialPosts.video.edit")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideo(null)}
+                    disabled={busy}
+                    className="flex min-h-9 items-center gap-1 rounded-lg px-2 font-bold text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)]"
+                  >
+                    <Trash2 size={13} />
+                    {t("socialPosts.video.remove")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {photos.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
@@ -176,9 +329,9 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
-              disabled={busy || photos.length >= MAX_PHOTOS}
+              disabled={busy || photos.length >= MAX_PHOTOS || Boolean(video)}
               onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] text-xs font-black uppercase tracking-wide text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50"
+              className={mediaButton}
             >
               <ImagePlus size={15} />
               {t("feedPost.addPhoto", { count: photos.length, max: MAX_PHOTOS })}
@@ -192,8 +345,26 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
               onChange={handleFiles}
             />
 
+            <button
+              type="button"
+              disabled={busy || photos.length > 0}
+              onClick={() => videoInputRef.current?.click()}
+              title={t("socialPosts.video.addHint", { max: VIDEO_LIMITS.maxClipSeconds, mb: MB })}
+              className={mediaButton}
+            >
+              <Clapperboard size={15} />
+              {t("socialPosts.video.add")}
+            </button>
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm,video/*"
+              className="hidden"
+              onChange={handleVideoFile}
+            />
+
             {cars.length > 0 && (
-              <label className="engine-field relative flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3">
+              <label className="engine-field relative flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 sm:col-span-2">
                 <Car size={15} className="shrink-0 text-[var(--engine-text-muted)]" />
                 <select
                   value={carId}
@@ -211,15 +382,17 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
             )}
           </div>
 
-          <label className="engine-field flex items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3">
-            <Video size={15} className="shrink-0 text-[var(--engine-text-muted)]" />
-            <input
-              value={videoUrl}
-              onChange={(event) => setVideoUrl(event.target.value)}
-              placeholder={t("feedPost.videoPlaceholder")}
-              className="min-h-11 w-full bg-transparent text-xs text-[var(--engine-text)] outline-none"
-            />
-          </label>
+          {!video && (
+            <label className="engine-field flex items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3">
+              <Link2 size={15} className="shrink-0 text-[var(--engine-text-muted)]" />
+              <input
+                value={videoUrl}
+                onChange={(event) => setVideoUrl(event.target.value)}
+                placeholder={t("feedPost.videoPlaceholder")}
+                className="min-h-11 w-full bg-transparent text-xs text-[var(--engine-text)] outline-none"
+              />
+            </label>
+          )}
 
           {error && (
             <p className="rounded-xl border border-[var(--engine-accent)]/40 bg-[var(--engine-accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--engine-accent)]">
@@ -229,14 +402,38 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
 
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || tooManyTags}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] text-sm font-black uppercase tracking-widest text-white transition hover:brightness-95 disabled:opacity-60"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : null}
-            {t("feedPost.publish")}
+            {stage === "uploading" ? t("socialPosts.video.uploading") : t("feedPost.publish")}
           </button>
         </form>
       </div>
-    </div>
+
+      {editorOpen && video && (
+        <VideoEditor
+          source={video.source}
+          initial={video.edit}
+          onCancel={() => {
+            setEditorOpen(false);
+            // Desistir da primeira edição desiste do vídeo.
+            if (!video.edit) setVideo(null);
+          }}
+          onConfirm={(edit) => {
+            setVideo((current) => (current ? { ...current, edit } : current));
+            setEditorOpen(false);
+          }}
+        />
+      )}
+    </div>,
+    document.body,
   );
+}
+
+/** Miniatura da capa escolhida (blob local). */
+function PosterThumb({ blob }) {
+  const url = useMemo(() => URL.createObjectURL(blob), [blob]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return url ? <img src={url} alt="" className="h-full w-full object-cover" /> : null;
 }

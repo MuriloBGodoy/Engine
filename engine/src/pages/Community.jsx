@@ -51,6 +51,11 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import "../services/i18n-social-feed";
 import "../services/i18n-post-card";
+import "../services/i18n-social-posts";
+import { CaptionEditor } from "../components/social/CaptionEditor";
+import { ReelsFeed } from "../components/social/ReelsFeed";
+import { TrendingTags } from "../components/social/TrendingTags";
+import { normalizeTag, tagPath } from "../services/socialText";
 import { RichText } from "../components/social/RichText";
 import { TimeAgo } from "../components/social/TimeAgo";
 import { PostVideoPlayer } from "../components/social/PostVideoPlayer";
@@ -72,7 +77,6 @@ import { formatFipeYear } from "../services/carDisplay";
 const fallbackImage =
   "https://images.unsplash.com/photo-1598209279122-8541213a0387?q=80&w=900";
 
-const videoPosts = [];
 const friendSuggestions = [];
 
 const emptyInteraction = {
@@ -89,35 +93,6 @@ const getProgress = (goal) =>
     : Math.min(Math.max(Number(goal.progress) || 0, 0), 100);
 
 const isGoalCompleted = (goal) => getProgress(goal) >= 100;
-
-const RELATIVE_UNITS = [
-  ["year", 31536000],
-  ["month", 2592000],
-  ["week", 604800],
-  ["day", 86400],
-  ["hour", 3600],
-  ["minute", 60],
-];
-
-// Tempo relativo ("há 2 horas") no idioma atual, sem depender de i18n manual.
-const formatRelativeTime = (value, language = "pt-BR") => {
-  if (!value) return "";
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return "";
-  const diffSeconds = Math.round((time - Date.now()) / 1000);
-  const absSeconds = Math.abs(diffSeconds);
-  try {
-    const rtf = new Intl.RelativeTimeFormat(language, { numeric: "auto" });
-    for (const [unit, secondsInUnit] of RELATIVE_UNITS) {
-      if (absSeconds >= secondsInUnit) {
-        return rtf.format(Math.round(diffSeconds / secondsInUnit), unit);
-      }
-    }
-    return rtf.format(0, "second");
-  } catch {
-    return "";
-  }
-};
 
 const getInitials = (name = "U") =>
   name
@@ -1515,12 +1490,8 @@ function CommentRow({
   onReportComment,
   onCommentMenuChange,
 }) {
-  const { i18n } = useTranslation();
   const commentText = typeof comment === "string" ? comment : comment.text;
-  const commentTime =
-    typeof comment === "string"
-      ? ""
-      : formatRelativeTime(comment.createdAt, i18n.language);
+  const commentTime = typeof comment === "string" ? "" : comment.createdAt;
   const wasEdited = typeof comment !== "string" && Boolean(comment.editedAt);
   const commentAuthor =
     typeof comment === "string" ? t("community.member") : comment.author;
@@ -1657,15 +1628,17 @@ function CommentRow({
         ) : (
           <>
             <p className="font-medium text-[var(--engine-text-muted)] ">
-              {commentText}
+              <RichText text={commentText} linkClassName={RICH_LINK} />
             </p>
-            {(commentTime || wasEdited) && (
+            {commentTime ? (
               <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                {commentTime}
-                {commentTime && wasEdited ? " · " : ""}
-                {wasEdited ? t("community.edited") : ""}
+                <TimeAgo value={commentTime} editedAt={wasEdited ? comment.editedAt : ""} short />
               </p>
-            )}
+            ) : wasEdited ? (
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
+                {t("community.edited")}
+              </p>
+            ) : null}
           </>
         )}
       </div>
@@ -1722,65 +1695,6 @@ function ActionButton({ active = false, pressed, title, icon, onClick, count = 0
   );
 }
 
-function VideoCard({ video, t, saved, liked, onSave, onLike }) {
-  return (
-    <article className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] shadow-xl   dark:shadow-none">
-      <div className="relative bg-black">
-        <video
-          controls
-          preload="metadata"
-          poster={video.poster}
-          className="aspect-[9/14] max-h-[680px] w-full bg-black object-cover"
-        >
-          <source src={video.src} />
-        </video>
-        <div className="pointer-events-none absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-black/60 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur">
-          <Play size={13} />
-          {t("community.videoShort")}
-        </div>
-      </div>
-      <div className="space-y-4 p-5">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-accent)]">
-            {video.username}
-          </p>
-          <h2 className="mt-1 text-2xl font-black italic text-[var(--engine-text)] dark:text-white">
-            {t(video.titleKey)}
-          </h2>
-          <p className="mt-2 text-sm font-medium text-[var(--engine-text-muted)] ">
-            {t(video.captionKey)}
-          </p>
-        </div>
-        <div className="flex items-center justify-between border-t border-[var(--engine-border)] pt-4 ">
-          <button
-            type="button"
-            onClick={() => onLike(video.id)}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest transition ${
-              liked
-                ? "bg-[var(--engine-accent)] text-white"
-                : "bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)] "
-            }`}
-          >
-            <Heart size={16} fill={liked ? "currentColor" : "none"} />
-            {video.likes + (liked ? 1 : 0)}
-          </button>
-          <button
-            type="button"
-            onClick={() => onSave(video.id)}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest transition ${
-              saved
-                ? "bg-[var(--engine-accent)] text-white "
-                : "bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)] "
-            }`}
-          >
-            <Bookmark size={16} fill={saved ? "currentColor" : "none"} />
-            {saved ? t("community.saved") : t("community.save")}
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
 
 function ShareModal({
   goals,
@@ -2296,71 +2210,6 @@ function PeopleSearchModal({
 }
 
 /** Editor da legenda de uma publicação já no ar. */
-function CaptionModal({ goal, t, onClose, onSave }) {
-  const [caption, setCaption] = useState(goal?.note || "");
-
-  return (
-    <div className="engine-modal-overlay" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="engine-modal-panel engine-pop sm:max-w-lg"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3.5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--engine-accent)]">
-              {t("community.captionTitle")}
-            </p>
-            <p className="mt-1 truncate text-sm font-bold text-[var(--engine-text)]">
-              {goal.title}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("common.cancel")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
-          >
-            <X size={20} />
-          </button>
-        </header>
-
-        <div className="engine-modal-body engine-scroll p-4">
-          <textarea
-            value={caption}
-            rows={5}
-            maxLength={280}
-            autoFocus
-            onChange={(event) => setCaption(event.target.value)}
-            placeholder={t("community.captionPlaceholder")}
-            className="engine-scroll w-full resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2.5 text-sm font-medium text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
-          />
-          <p className="mt-2 text-right text-[11px] font-semibold text-[var(--engine-text-subtle)]">
-            {caption.length}/280
-          </p>
-        </div>
-
-        <div className="engine-safe-bottom flex shrink-0 items-center gap-2 border-t border-[var(--engine-border)] p-3">
-          <button
-            type="button"
-            onClick={() => onSave(goal, caption)}
-            className="rounded-full bg-[var(--engine-accent)] px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white transition hover:brightness-95"
-          >
-            {t("common.save")}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-[var(--engine-text-muted)] transition hover:text-[var(--engine-text)]"
-          >
-            {t("common.cancel")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Publicação individual.
@@ -2888,19 +2737,6 @@ export function Community({ cars = [], settings, user }) {
 
   const averageProgress = goals.length ? stats.progress / goals.length : 0;
 
-  const updateInteraction = (goalId, updater) => {
-    persistState((current) => {
-      const previous = current.interactions[goalId] || emptyInteraction;
-      return {
-        ...current,
-        interactions: {
-          ...current.interactions,
-          [goalId]: updater(previous),
-        },
-      };
-    });
-  };
-
   // Recusa do banco por bloqueio vira frase, não erro cru.
   const flashWriteError = (error) => {
     console.error(error);
@@ -3159,7 +2995,12 @@ export function Community({ cars = [], settings, user }) {
       flash(t("community.captionSaved"));
     } catch (error) {
       console.error(error);
-      flash(t("community.captionError"), "error");
+      flash(
+        error?.code === "too-many-hashtags"
+          ? t("socialPosts.errors.tooManyHashtags", { max: 30 })
+          : t("community.captionError"),
+        "error",
+      );
     }
   };
 
@@ -3220,25 +3061,6 @@ export function Community({ cars = [], settings, user }) {
       console.error(error);
       flash(t("community.clearPublishedError"), "error");
     }
-  };
-
-  const handleSaveVideo = (videoId) => {
-    persistState((current) => {
-      const saved = current.savedVideos.includes(videoId);
-      return {
-        ...current,
-        savedVideos: saved
-          ? current.savedVideos.filter((item) => item !== videoId)
-          : [...current.savedVideos, videoId],
-      };
-    });
-  };
-
-  const handleVideoLike = (videoId) => {
-    updateInteraction(videoId, (previous) => ({
-      ...previous,
-      liked: !previous.liked,
-    }));
   };
 
   /**
@@ -3423,12 +3245,22 @@ export function Community({ cars = [], settings, user }) {
                   {/* O campo só ocupa espaço quando a pessoa quer buscar; do
                       contrário fica atrás do ícone na barra. */}
                   {searchOpen && (
+                    <>
                     <label className="engine-field mb-4 flex h-11 w-full items-center gap-2.5 rounded-full border border-[var(--engine-border)] bg-[var(--engine-surface)] pl-4 pr-1.5">
                       <Search size={16} className="shrink-0 text-[var(--engine-text-subtle)]" />
                       <input
                         autoFocus
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
+                        // "#tag" + Enter abre a página da hashtag.
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" || !query.trim().startsWith("#")) return;
+                          const tag = normalizeTag(query);
+                          if (!tag) return;
+                          event.preventDefault();
+                          navigate(tagPath(tag));
+                        }}
+                        enterKeyHint="search"
                         placeholder={t("community.search")}
                         className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[var(--engine-text)] outline-none"
                       />
@@ -3445,6 +3277,8 @@ export function Community({ cars = [], settings, user }) {
                         </button>
                       )}
                     </label>
+                      <TrendingTags className="-mt-2 mb-4" />
+                    </>
                   )}
 
                   {regionWidened && (
@@ -3520,30 +3354,9 @@ export function Community({ cars = [], settings, user }) {
                 </>
               )}
 
-              {activeSubTab === "videos" && (
-                <div className="space-y-5">
-                  {videoPosts.map((video) => (
-                    <VideoCard
-                      key={video.id}
-                      video={video}
-                      t={t}
-                      saved={communityState.savedVideos.includes(video.id)}
-                      liked={communityState.interactions[video.id]?.liked}
-                      onSave={handleSaveVideo}
-                      onLike={handleVideoLike}
-                    />
-                  ))}
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--engine-border)] p-10 text-center">
-                    <Clapperboard className="mb-4 text-[var(--engine-accent)]" size={34} />
-                    <h2 className="text-base font-extrabold tracking-tight text-[var(--engine-text)]">
-                      {t("community.videos.slotTitle")}
-                    </h2>
-                    <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
-                      {t("community.videos.slotCopy")}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Vídeos enviados, um por tela (Reels). Até 02/11/2026 a aba
+                  era um aviso "em breve" fixo. */}
+              {activeSubTab === "videos" && <ReelsFeed user={user} blockedIds={blockedUserIds} />}
 
               {activeSubTab === "ranking" && <RankingPanel ranking={ranking} t={t} />}
             </>
@@ -3596,6 +3409,8 @@ export function Community({ cars = [], settings, user }) {
                 {t("community.shareNewGoal")}
               </button>
             </div>
+
+            <TrendingTags variant="list" />
 
             <SidebarRanking ranking={ranking} t={t} />
 
@@ -3709,9 +3524,8 @@ export function Community({ cars = [], settings, user }) {
       )}
 
       {captionGoal && (
-        <CaptionModal
+        <CaptionEditor
           goal={captionGoal}
-          t={t}
           onClose={() => setCaptionGoal(null)}
           onSave={handleSaveCaption}
         />

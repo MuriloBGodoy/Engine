@@ -35,7 +35,7 @@ export function PostPage({ user }) {
   const [following, setFollowing] = useState([]);
   const openComments = searchParams.get("comments") === "1";
 
-  const { blockedIds, interactionsFor, withoutBlocked, handlers, reportDialog } = usePostActions({
+  const { blockedIds, interactionsFor, withoutBlocked, handlers, reportDialog, captionDialog } = usePostActions({
     user,
     returnPath: (id) => `/post/${id}`,
     onRemoved: () => navigate("/community", { replace: true }),
@@ -145,6 +145,7 @@ export function PostPage({ user }) {
         />
       </div>
       {reportDialog}
+      {captionDialog}
     </div>
   );
 }
