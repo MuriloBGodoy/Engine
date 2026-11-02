@@ -13,6 +13,7 @@ import "./services/i18n-billing";
 import "./services/i18n-reviews";
 import "./services/i18n-quotes";
 import "./services/i18n-service-chat";
+import "./services/i18n-pro";
 import "./services/i18n-services-extra";
 import "./services/i18n-garage-fixes";
 import "./services/i18n-garage-v2";

@@ -23,6 +23,8 @@ import {
   chatErrorKey,
   conversationTab,
   conversationVisible,
+  iAmProviderOf,
+  isMyMessage,
   isServiceConversation,
   setServiceConversationStatus,
   conversationPartner,
@@ -368,7 +370,8 @@ export function Messages({ user, settings }) {
 
   // Prestador marca o fio como fechado (ou reabre).
   const isService = isServiceConversation(activeConversation || {});
-  const iAmProvider = isService && activeConversation?.providerId === userId;
+  // Dono do anúncio ou alguém da equipe da página (20261101130000).
+  const iAmProvider = isService && iAmProviderOf(activeConversation, userId);
   const awaitingProvider =
     isService &&
     !iAmProvider &&
@@ -628,6 +631,7 @@ export function Messages({ user, settings }) {
 
             <MessageList
               messages={messages}
+              conversation={activeConversation}
               userId={userId}
               locale={locale}
               dayLabels={dayLabels}
@@ -782,7 +786,7 @@ function ConversationRow({
           <span className="min-w-0 truncate text-sm font-bold text-[var(--engine-text)]">
             {partner.author}
           </span>
-          {service && conversation.providerId === userId && (
+          {service && iAmProviderOf(conversation, userId) && (
             <ServiceStatusPill status={conversation.serviceStatus} className="ml-auto" />
           )}
           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--engine-text-subtle)]">
@@ -816,7 +820,7 @@ function ConversationRow({
   );
 }
 
-function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDelete, onReport }) {
+function MessageList({ messages, conversation, userId, locale, dayLabels, t, onOpenPost, onDelete, onReport }) {
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -860,7 +864,8 @@ function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDel
             )}
             <MessageBubble
               message={message}
-              mine={message.senderId === userId}
+              mine={isMyMessage(conversation, message, userId)}
+              deletable={message.senderId === userId}
               locale={locale}
               t={t}
               onOpenPost={onOpenPost}
@@ -873,14 +878,14 @@ function MessageList({ messages, userId, locale, dayLabels, t, onOpenPost, onDel
   );
 }
 
-function MessageBubble({ message, mine, locale, t, onOpenPost, onDelete, onReport }) {
+function MessageBubble({ message, mine, deletable = mine, locale, t, onOpenPost, onDelete, onReport }) {
   const attachment = message.attachment;
   const imageData = message.imageData;
   const gifData = message.gifData;
 
   return (
     <div className={`group flex items-end gap-1.5 ${mine ? "justify-end" : "justify-start"}`}>
-      {mine && (
+      {deletable && (
         <button
           type="button"
           onClick={() => onDelete(message)}

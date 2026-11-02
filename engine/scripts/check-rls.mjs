@@ -581,6 +581,44 @@ try {
   check("presença, filiação e @ saem em cascata",
     (await admin.from("club_members").select("*").eq("uid", c.id)).data?.length === 0 &&
     (await admin.from("achievements").select("*").eq("user_id", c.id)).data?.length === 0);
+  console.log("\nconta profissional, página e Lojas");
+  // Desde 20261101130000: página com @ próprio no registro de @, equipe com
+  // papéis, produto é anúncio kind='product' da equipe do perfil.
+  const handleB = `rlsb${run}`.slice(0, 24);
+  const handlePage = `rlsp${run}`.slice(0, 24);
+  await b.client.rpc("reserve_username", { p_username: handleB });
+  check("@ livre responde enquanto digita", (await anon.rpc("handle_available", { p_handle: handlePage })).data === "available");
+  const pagina = await a.client.rpc("create_pro_page", { p_handle: handlePage, p_name: "Página RLS", p_data: { bio: "teste" } });
+  check("criar página com @ próprio", passed(pagina), why(pagina));
+  const pageId = pagina.data;
+  check("@ da página fica ocupado", (await anon.rpc("handle_available", { p_handle: handlePage })).data === "taken");
+  check("página não pega @ de pessoa", denied(await a.client.rpc("create_pro_page", { p_handle: handleB, p_name: "x", p_data: {} })));
+  check("pessoa não pega @ de página", denied(await b.client.rpc("reserve_username", { p_username: handlePage })));
+  check("resolve_handle diz que é página", (await anon.rpc("resolve_handle", { p_text: `@${handlePage}` })).data?.type === "page");
+  check("visitante lê a página", (await anon.from("pro_profiles").select("id").eq("id", pageId)).data?.length === 1);
+  // Valor que muda de verdade (no-op passa em qualquer regra).
+  check("de fora não edita a página",
+    denied(await b.client.from("pro_profiles").update({ name: `Invadida ${run}` }).eq("id", pageId).select()));
+  check("de fora não convida", denied(await b.client.rpc("invite_pro_member", { p_profile: pageId, p_username: handleB, p_role: "admin" })));
+  check("de fora não anuncia na página",
+    denied(await b.client.from("service_listings").insert({ id: `pb-${run}`, owner_id: b.id, kind: "product", profile_id: pageId, data: { title: "x" } }).select()));
+  check("dona convida editor", passed(await a.client.rpc("invite_pro_member", { p_profile: pageId, p_username: handleB, p_role: "editor" })));
+  check("convidado ainda não anuncia",
+    denied(await b.client.from("service_listings").insert({ id: `pb-${run}`, owner_id: b.id, kind: "product", profile_id: pageId, data: { title: "x" } }).select()));
+  check("convidado aceita", passed(await b.client.rpc("respond_pro_invite", { p_profile: pageId, p_accept: true })));
+  const produto = await b.client.from("service_listings")
+    .insert({ id: `pb-${run}`, owner_id: b.id, kind: "product", profile_id: pageId, data: { title: `Roda ${run}`, category: "parts", condition: "used", priceAmount: 900, photos: ["https://x/r.jpg"] } })
+    .select("moderation_status, kind");
+  check("editor anuncia produto: vai para a fila", produto.data?.[0]?.moderation_status === "pending" && produto.data?.[0]?.kind === "product", why(produto));
+  check("editor não edita a página",
+    denied(await b.client.from("pro_profiles").update({ name: `Editor ${run}` }).eq("id", pageId).select()));
+  check("editor não se promove", denied(await b.client.rpc("set_pro_member_role", { p_profile: pageId, p_user: b.id, p_role: "owner" })));
+  check("produto pendente não aparece para visitante", (await anon.from("service_listings").select("id").eq("id", `pb-${run}`)).data?.length === 0);
+  check("dona (outra da equipe) vê o pendente", (await a.client.from("service_listings").select("id").eq("id", `pb-${run}`)).data?.length === 1);
+  check("última dona não sai", denied(await a.client.rpc("remove_pro_member", { p_profile: pageId, p_user: a.id })));
+  await admin.from("service_listings").delete().eq("id", `pb-${run}`);
+  check("dona apaga a página", passed(await a.client.from("pro_profiles").delete().eq("id", pageId).select()));
+  check("@ volta a ficar livre", (await anon.rpc("handle_available", { p_handle: handlePage })).data === "available");
 } catch (error) {
   failures += 1;
   console.log(`\n  FALHA erro inesperado: ${error?.message || error}`);

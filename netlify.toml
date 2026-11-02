@@ -26,3 +26,8 @@
 [[edge_functions]]
   path = "/servicos/*"
   function = "service-og"
+
+# A mesma função para a página pública do produto (Lojas).
+[[edge_functions]]
+  path = "/produtos/*"
+  function = "service-og"

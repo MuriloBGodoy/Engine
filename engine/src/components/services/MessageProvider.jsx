@@ -19,6 +19,7 @@ import { authPath } from "../../services/authRedirect";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { useToast } from "../ToastProvider";
 import { WhatsAppIcon } from "./ListingParts";
+import { interestMessage, productPath } from "../../services/shops";
 
 /**
  * "Mensagem" no anúncio: abre (ou reabre) o fio cliente ↔ prestador em
@@ -41,21 +42,27 @@ const VARIANT_CLASS = {
   bar: "inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition",
 };
 
-export function MessageProviderButton({ listing, user, variant = "block", autoOpen = false, className = "" }) {
+export function MessageProviderButton({ listing, user, variant = "block", autoOpen = false, className = "", own = false }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const approved = listing?.moderationStatus === "approved";
-  const isOwner = Boolean(user?.uid && listing?.ownerId === user.uid);
-  const disabled = !approved || isOwner;
+  // `own`: a tela já sabe que eu estou na equipe da página dona do anúncio.
+  const isOwner = own || Boolean(user?.uid && listing?.ownerId === user.uid);
+  const isProduct = listing?.kind === "product";
+  const sold = isProduct && listing?.saleStatus === "sold";
+  const backPath = isProduct ? productPath(listing) : serviceListingPath(listing);
+  // Vendido não abre fio novo (o banco recusa); quem já conversava segue
+  // pela caixa de Mensagens.
+  const disabled = !approved || isOwner || sold;
 
   const start = async (event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     if (disabled || checking) return;
     if (!user?.uid) {
-      navigate(authPath("/login", `${serviceListingPath(listing)}?${MESSAGE_QUERY_FLAG}=1`));
+      navigate(authPath("/login", `${backPath}?${MESSAGE_QUERY_FLAG}=1`));
       return;
     }
     // Já conversamos sobre este anúncio: vai direto para o fio.
@@ -66,6 +73,7 @@ export function MessageProviderButton({ listing, user, variant = "block", autoOp
         navigate(`/messages/${existing.id}`);
         return;
       }
+
     } catch (error) {
       console.warn("[serviceChat] findConversation", error);
     } finally {
@@ -92,7 +100,7 @@ export function MessageProviderButton({ listing, user, variant = "block", autoOp
         onClick={start}
         disabled={disabled}
         aria-label={t("serviceChat.contact.buttonLong")}
-        title={isOwner ? t("serviceChat.contact.own") : t("serviceChat.contact.buttonLong")}
+        title={isOwner ? t("serviceChat.contact.own") : sold ? t("shops.status.soldHint") : t("serviceChat.contact.buttonLong")}
         className={`${VARIANT_CLASS[variant] || VARIANT_CLASS.block} ${
           disabled
             ? "cursor-not-allowed bg-[var(--engine-surface-2)] text-[var(--engine-text-subtle)]"
@@ -118,7 +126,9 @@ function ContactSheet({ listing, user, onClose }) {
   useHistoryDismiss(true, onClose);
   const [cars, setCars] = useState([]);
   const [carId, setCarId] = useState("none");
-  const [text, setText] = useState(() => t("serviceChat.contact.defaultMessage", { title: listing.title || "" }));
+  // A mesma linha pronta do WhatsApp ("Oi! Tenho interesse no *X*..."),
+  // editável antes de mandar.
+  const [text, setText] = useState(() => interestMessage(listing, t));
   const [sending, setSending] = useState(false);
   const [limits, setLimits] = useState(QUOTE_DEFAULT_LIMITS);
 
@@ -259,14 +269,19 @@ function ContactSheet({ listing, user, onClose }) {
               className="mt-2 w-full resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2.5 text-sm font-medium leading-6 text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
             />
             <div className="mt-2 flex flex-wrap gap-2">
-              {["price", "schedule", ...(listing.serviceMode === "place" ? [] : ["mobile"])].map((key) => (
+              {(listing.kind === "product"
+                ? [...(listing.acceptsOffers ? ["shops.quick.offer"] : []), "shops.quick.fits", "shops.quick.delivery"]
+                : ["price", "schedule", ...(listing.serviceMode === "place" ? [] : ["mobile"])].map(
+                    (key) => `serviceChat.contact.quick.${key}`,
+                  )
+              ).map((key) => (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => addQuick(t(`serviceChat.contact.quick.${key}`))}
+                  onClick={() => addQuick(t(key))}
                   className="min-h-9 rounded-full border border-[var(--engine-border)] px-3 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
                 >
-                  {t(`serviceChat.contact.quick.${key}`)}
+                  {t(key)}
                 </button>
               ))}
             </div>

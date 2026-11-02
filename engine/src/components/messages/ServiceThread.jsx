@@ -7,6 +7,7 @@ import { formatQuotePrice } from "../../services/quotes";
 import { getServiceCategoryLabel, getWhatsAppHref } from "../../services/serviceListingDisplay";
 import { serviceListingPath } from "../../services/serviceListingPublic";
 import { WhatsAppIcon } from "../services/ListingParts";
+import { formatProductPrice, productCategoryLabel, productPath } from "../../services/shops";
 
 /**
  * Peças do fio cliente ↔ prestador em Mensagens (migration 20261030120000).
@@ -97,6 +98,12 @@ export function ServiceContextCard({ conversation, locale }) {
   const title = listing?.title || snapshot.listingTitle || t("serviceChat.card.service");
   const photo = listing?.photo || snapshot.listingPhoto || "";
   const category = listing?.category || snapshot.category || "";
+  // Produto de Lojas (20261101130000): rótulo, preço e "vendido" do produto.
+  const isProduct = (listing?.kind || snapshot.listingKind) === "product";
+  const categoryLabel = category ? (isProduct ? productCategoryLabel(category, t) : getServiceCategoryLabel(category, t)) : "";
+  const productPrice = isProduct && listing ? formatProductPrice(listing, t, locale) : "";
+  const sold = isProduct && listing?.saleStatus === "sold";
+  const listingLink = listing ? (isProduct ? productPath(listing) : serviceListingPath(listing)) : "";
   const car = context?.car || snapshot.car || "";
   const removed = Boolean(context) && !listing;
   const whatsappHref = listing?.whatsapp ? getWhatsAppHref(listing, t) : undefined;
@@ -126,10 +133,21 @@ export function ServiceContextCard({ conversation, locale }) {
         <div className="min-w-0 flex-1">
           {category && (
             <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[var(--engine-accent)]">
-              {getServiceCategoryLabel(category, t)}
+              {categoryLabel}
+              {context?.page?.author ? ` · ${context.page.author}` : ""}
             </p>
           )}
           <p className="truncate text-sm font-bold text-[var(--engine-text)]">{title}</p>
+          {isProduct && listing && (
+            <p className="truncate text-xs font-bold text-[var(--engine-text)]">
+              {productPrice}
+              {sold && (
+                <span className="ml-2 rounded-full bg-[var(--engine-surface)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-[var(--engine-text-subtle)]">
+                  {t("shops.status.sold")}
+                </span>
+              )}
+            </p>
+          )}
           <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-[var(--engine-text-muted)]">
             {car && (
               <span className="inline-flex min-w-0 items-center gap-1">
@@ -212,7 +230,7 @@ export function ServiceContextCard({ conversation, locale }) {
           <div className="flex flex-wrap gap-2">
             {listing?.approved && (
               <Link
-                to={serviceListingPath(listing)}
+                to={listingLink}
                 className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--engine-border)] px-3 text-xs font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
               >
                 <ExternalLink size={14} aria-hidden="true" />

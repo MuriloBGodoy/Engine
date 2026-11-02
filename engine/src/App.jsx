@@ -59,6 +59,8 @@ const EventDetails = lazyNamed(() => import("./pages/EventDetails"), "EventDetai
 const UserProfile = lazyNamed(() => import("./pages/UserProfile"), "UserProfile");
 const Services = lazyNamed(() => import("./pages/Services"), "Services");
 const ServicePublicPage = lazyNamed(() => import("./pages/ServicePublicPage"), "ServicePublicPage");
+const ProductPublicPage = lazyNamed(() => import("./pages/ProductPublicPage"), "ProductPublicPage");
+const ProPage = lazyNamed(() => import("./pages/ProPage"), "ProPage");
 const ServiceApprovals = lazyNamed(() => import("./pages/Services"), "ServiceApprovals");
 const Quotes = lazyNamed(() => import("./pages/Quotes"), "Quotes");
 const Moderation = lazyNamed(() => import("./pages/Moderation"), "Moderation");
@@ -553,6 +555,25 @@ function App() {
           }
         />
         <Route path="/servicos" element={<Navigate to="/services" replace />} />
+
+        {/* Lojas e conta profissional (20261101130000): a página do produto e
+            a vitrine do perfil (página ou pessoa), também fora do shell. */}
+        <Route
+          path="/produtos/:slug"
+          element={
+            <Suspense fallback={<div className="min-h-[100dvh] bg-[var(--engine-bg)]" />}>
+              <ProductPublicPage user={user} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/p/:handle"
+          element={
+            <Suspense fallback={<div className="min-h-[100dvh] bg-[var(--engine-bg)]" />}>
+              <ProPage user={user} />
+            </Suspense>
+          }
+        />
 
         {/* O Engine abre sem login. Início, comunidade e serviços são
             livres para visitantes; as rotas pessoais ficam protegidas por

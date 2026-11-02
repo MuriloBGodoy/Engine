@@ -132,12 +132,22 @@ export default async (request, context) => {
     if (!row || data.active === false) return reply(html);
 
     const city = [data.city, data.state].filter(Boolean).join(" - ");
-    const title = clip(city ? `${data.title} · ${city}` : data.title, 90) || "Engine";
+    // Produto (/produtos/<slug>, 20261101130000): o preço vai no título.
+    const isProduct = row.kind === "product";
+    const price = isProduct
+      ? data.priceNegotiable || data.priceAmount == null
+        ? "A combinar"
+        : `R$ ${Number(data.priceAmount).toLocaleString("pt-BR")}`
+      : "";
+    const title =
+      clip([data.title, price, city].filter(Boolean).join(" · "), 90) || "Engine";
     const description =
-      clip(data.description, 180) || clip(`${data.providerName || ""} ${city}`.trim(), 180) || "Serviço no Engine";
+      clip(data.description, 180) ||
+      clip(`${data.providerName || ""} ${city}`.trim(), 180) ||
+      (isProduct ? "Produto no Engine" : "Serviço no Engine");
     const photo = (Array.isArray(data.photos) ? data.photos : []).find((item) => /^https:\/\//.test(String(item)));
     const image = photo || `${requestUrl.origin}/icons/icon-512.png`;
-    const canonical = `${requestUrl.origin}/servicos/${row.slug || row.id}`;
+    const canonical = `${requestUrl.origin}/${isProduct ? "produtos" : "servicos"}/${row.slug || row.id}`;
 
     // O cartão muda quando o anúncio muda; a CDN não guarda a versão do robô.
     headers.set("cache-control", "public, max-age=0, must-revalidate");

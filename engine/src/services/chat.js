@@ -38,7 +38,66 @@ const conversationFromRow = (row) => ({
   context: row.context || {},
   startedBy: row.started_by || "",
   firstReplyAt: row.first_reply_at || null,
+  // Página profissional dona do anúncio (20261101130000): a equipe lê e
+  // responde como o prestador.
+  profileId: row.profile_id || "",
 });
+
+/**
+ * Páginas profissionais em que eu estou na equipe (ativo). Preenchido por
+ * `subscribeConversations`; as funções abaixo usam para saber de que lado
+ * da conversa eu estou quando não sou um dos dois `member_ids`.
+ */
+const myTeamProfiles = new Set();
+
+const loadMyTeamProfiles = async (userId) => {
+  const { data, error } = await supabase
+    .from("pro_profile_members")
+    .select("profile_id, pro_profiles(kind)")
+    .eq("user_id", userId)
+    .eq("status", "active");
+  myTeamProfiles.clear();
+  if (error) return [];
+  for (const row of data || []) {
+    if (row.pro_profiles?.kind === "page") myTeamProfiles.add(row.profile_id);
+  }
+  return [...myTeamProfiles];
+};
+
+/**
+ * Em nome de quem eu ajo nesta conversa: eu mesmo, ou — na conversa de uma
+ * página em que estou na equipe — o prestador (mesma regra do
+ * `conversation_actor` do banco).
+ */
+export const conversationActor = (conversation = {}, userId = "") => {
+  if ((conversation.memberIds || []).includes(userId)) return userId;
+  if (
+    conversation.kind === "service" &&
+    conversation.profileId &&
+    myTeamProfiles.has(conversation.profileId) &&
+    conversation.customerId !== userId
+  ) {
+    return conversation.providerId;
+  }
+  return userId;
+};
+
+/** A mensagem é do meu lado da conversa? (Na página: qualquer um da equipe.) */
+export const isMyMessage = (conversation = {}, message = {}, userId = "") => {
+  if (message.senderId === userId) return true;
+  const actor = conversationActor(conversation, userId);
+  return (
+    actor !== userId &&
+    conversation.kind === "service" &&
+    actor === conversation.providerId &&
+    Boolean(message.senderId) &&
+    message.senderId !== conversation.customerId
+  );
+};
+
+/** Eu respondo por este fio como prestador (dono do anúncio ou equipe da página)? */
+export const iAmProviderOf = (conversation = {}, userId = "") =>
+  conversation.kind === "service" && conversationActor(conversation, userId) === conversation.providerId;
 
 const messageFromRow = (row) => ({
   ...(row.data || {}),
@@ -92,8 +151,9 @@ export const profileCardFromSettings = (settings = {}, user = null) => {
 };
 
 export const conversationPartner = (conversation = {}, userId = "") => {
+  const me = conversationActor(conversation, userId);
   const partnerId =
-    (conversation.memberIds || []).find((id) => id !== userId) || "";
+    (conversation.memberIds || []).find((id) => id !== me) || "";
   return {
     userId: partnerId,
     ...memberCard(conversation.members?.[partnerId]),
@@ -101,7 +161,7 @@ export const conversationPartner = (conversation = {}, userId = "") => {
 };
 
 export const conversationUnread = (conversation = {}, userId = "") =>
-  Number(conversation.unread?.[userId]) || 0;
+  Number(conversation.unread?.[conversationActor(conversation, userId)]) || 0;
 
 /** Resumo curto de um anexo, usado na prévia da lista de conversas. */
 export const attachmentSummary = (attachment) =>
@@ -146,14 +206,12 @@ export const subscribeConversations = (userId, callback) => {
   let active = true;
   const load = async () => {
     try {
-      const rows = must(
-        await supabase
-          .from("conversations")
-          .select("*")
-          .contains("member_ids", [userId])
-          .order("updated_at", { ascending: false })
-          .limit(60),
-      );
+      const teams = await loadMyTeamProfiles(userId).catch(() => []);
+      let request = supabase.from("conversations").select("*");
+      request = teams.length
+        ? request.or(`member_ids.cs.{${userId}},profile_id.in.(${teams.join(",")})`)
+        : request.contains("member_ids", [userId]);
+      const rows = must(await request.order("updated_at", { ascending: false }).limit(60));
       if (active) callback(rows.map(conversationFromRow));
     } catch (error) {
       console.warn("[chat] subscribeConversations", error);
@@ -350,7 +408,7 @@ export const isServiceConversation = (conversation = {}) => conversation.kind ==
  */
 export const conversationTab = (conversation = {}, userId = "") => {
   if (!isServiceConversation(conversation)) return "direct";
-  return conversation.providerId === userId ? "clients" : "services";
+  return iAmProviderOf(conversation, userId) ? "clients" : "services";
 };
 
 /**
@@ -364,7 +422,7 @@ export const conversationVisible = (conversation = {}, userId = "") =>
 // Códigos que o banco devolve e a tela sabe explicar (serviceChat.errors.*).
 const CHAT_ERRORS = new Set([
   "not-signed-in", "not-found", "own-listing", "blocked", "too-many-open",
-  "rate-limited", "awaiting-reply", "invalid-status", "account-suspended",
+  "rate-limited", "awaiting-reply", "invalid-status", "account-suspended", "sold",
 ]);
 
 export const chatErrorKey = (error) => {

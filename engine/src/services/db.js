@@ -137,6 +137,7 @@ const LISTING_COLUMN_KEYS = [
   "id", "ownerId", "moderationStatus", "viewCount", "detailCount", "whatsappCount",
   "ratingCount", "ratingAvg", "createdAt", "updatedAt",
   "slug",
+  "profileId", "kind",
 ];
 
 const listingFromRow = (row) => ({
@@ -147,6 +148,9 @@ const listingFromRow = (row) => ({
   // Endereço público (/servicos/<slug>): o banco gera e guarda, o app só lê.
   // Antes da migração de 25/10/2026 a coluna não existe e vem vazio.
   slug: row.slug || "",
+  // Perfil profissional dono do anúncio e o tipo (20261101130000).
+  profileId: row.profile_id || "",
+  kind: row.kind === "product" ? "product" : "service",
   viewCount: row.view_count,
   detailCount: row.detail_count,
   whatsappCount: row.whatsapp_count,
@@ -911,11 +915,15 @@ export const normalizeServiceListing = (listing = {}) => {
     id: String(listing.id || crypto.randomUUID()),
     ownerId: String(listing.ownerId || currentUserId || ""),
     slug: String(listing.slug || "").trim().slice(0, 80),
+    kind: listing.kind === "product" ? "product" : "service",
+    profileId: String(listing.profileId || ""),
     title,
     providerName,
     category: String(listing.category || "").trim().slice(0, 60),
     description: String(listing.description || "").trim().slice(0, 900),
     price: String(listing.price || "").trim().slice(0, PRICE_MAX_LENGTH),
+    // "A partir de": o preço é o mínimo, não o valor fechado.
+    priceFrom: Boolean(listing.priceFrom),
     serviceMode: ["place", "mobile", "hybrid"].includes(listing.serviceMode)
       ? listing.serviceMode
       : "hybrid",
@@ -1667,6 +1675,8 @@ export const engineDB = {
     const row = {
       owner_id: normalized.ownerId,
       moderation_status: normalized.moderationStatus,
+      // Sem perfil escolhido o banco usa o perfil profissional pessoal.
+      ...(normalized.profileId ? { profile_id: normalized.profileId } : {}),
       data: serializeForFirestore(omitKeys(normalized, LISTING_COLUMN_KEYS)),
     };
 

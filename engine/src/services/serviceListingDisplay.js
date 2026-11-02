@@ -146,8 +146,16 @@ export const normalizeWhatsApp = (value = "") => String(value || "").replace(/\D
 export const getWhatsAppHref = (listing, t) => {
   const phone = normalizeWhatsApp(listing?.whatsapp);
   if (!phone) return undefined;
-  const message = t("services.whatsappMessage", { title: listing.title || "" });
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  // Desde 01/11/2026: a mesma linha pronta do chat ("Oi! Tenho interesse no
+  // *X*...", o * é negrito no WhatsApp) + o link da página pública, para o
+  // prestador abrir o anúncio do próprio celular. Produto vai para /produtos.
+  const message = t(listing?.kind === "product" ? "shops.interest.product" : "shops.interest.service", {
+    title: listing.title || "",
+  });
+  const handle = listing?.slug || listing?.id || "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const url = handle ? `${origin}${listing?.kind === "product" ? "/produtos" : "/servicos"}/${encodeURIComponent(handle)}` : "";
+  return `https://wa.me/${phone}?text=${encodeURIComponent([message, url].filter(Boolean).join("\n"))}`;
 };
 
 export const mapQuery = (listing) =>

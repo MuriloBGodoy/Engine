@@ -47,6 +47,7 @@ export const notificationStyles = {
   garage_reminder: { icon: CalendarClock, iconClass: "text-amber-500" },
   quote_request: { icon: ClipboardList, iconClass: "text-[var(--engine-accent)]" },
   quote_reply: { icon: BadgeDollarSign, iconClass: "text-emerald-500" },
+  pro_invite: { icon: UserPlus, iconClass: "text-[var(--engine-accent)]" },
 };
 
 export const defaultNotificationStyle = {
@@ -98,7 +99,7 @@ export const getNotificationTarget = (notification) => {
 const TRANSLATED_TYPES = new Set([
   "follow", "like", "comment", "rating", "message", "achievement",
   "service_approved", "service_changes_requested", "service_rejected", "service_suspended",
-  "quote_request", "quote_reply",
+  "quote_request", "quote_reply", "pro_invite",
 ]);
 
 // Pedido de orçamento: o aviso traz o id da categoria ("body-paint"); o

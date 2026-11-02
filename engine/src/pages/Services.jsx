@@ -95,6 +95,10 @@ import { BioLinkCard, ShareListingButton } from "../components/services/ShareLis
 import { ListingMonthPanel } from "../components/services/ListingMonthPanel";
 import { QuoteEntryCard } from "../components/services/QuoteEntryCard";
 import { MessageProviderButton } from "../components/services/MessageProvider";
+import { ProAccountHub } from "../components/pro/ProAccountHub";
+import { ShopsTab } from "../components/shops/ShopsTab";
+import { ProductEditor } from "../components/shops/ProductEditor";
+import { useMyPro } from "../hooks/useMyPro";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
@@ -1190,6 +1194,7 @@ function SubmittedPanel({ isNew, onOpenMyListings, onClose }) {
 function ListingEditorModal({
   form,
   sellerProfile,
+  proOptions = [],
   saving,
   photoUploading,
   draftRestored,
@@ -1241,10 +1246,29 @@ function ListingEditorModal({
                     getInitials(sellerProfile?.displayName)
                   )}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
                     {t("services.publishedAs")}
                   </p>
+                  {/* Anunciar como você ou como uma página em que estou na
+                      equipe. Perfil não muda depois de publicado. */}
+                  {proOptions.length > 1 && !form.id && (
+                    <select
+                      aria-label={t("pro.publishAs")}
+                      value={form.profileId || ""}
+                      onChange={(event) => onChange("profileId", event.target.value)}
+                      className="mt-1 min-h-10 w-full rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface)] px-2 text-xs font-bold text-[var(--engine-text)]"
+                    >
+                      <option value="">{t("pro.personal")}</option>
+                      {proOptions
+                        .filter((entry) => entry.profile.kind === "page")
+                        .map((entry) => (
+                          <option key={entry.profile.id} value={entry.profile.id}>
+                            {entry.profile.name} (@{entry.profile.handle})
+                          </option>
+                        ))}
+                    </select>
+                  )}
                   <p className="truncate text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
                     {sellerProfile?.displayName || t("services.engineUser")}
                   </p>
@@ -1527,6 +1551,15 @@ function ListingEditorModal({
                     maxLength={PRICE_MAX_LENGTH}
                     placeholder={t("services.placeholders.price")}
                   />
+                  <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-bold text-[var(--engine-text-muted)]">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.priceFrom)}
+                      onChange={(event) => onChange("priceFrom", event.target.checked)}
+                      className="h-4 w-4 accent-[var(--engine-accent)]"
+                    />
+                    {t("pro.priceFromToggle")}
+                  </label>
                 </Field>
                 <Field label={t("services.fields.availability")} optional>
                   <TextInput
@@ -1640,101 +1673,6 @@ function ListingEditorModal({
           </>
         )}
       </form>
-    </div>
-  );
-}
-
-function SellerProfileModal({
-  sellerProfile,
-  listings,
-  onClose,
-  onEditProfile,
-  onNewListing,
-}) {
-  const { t } = useTranslation();
-  if (!sellerProfile) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-5">
-      <section className="w-full max-w-lg rounded-t-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-5 text-[var(--engine-text)] shadow-2xl dark:text-white sm:rounded-2xl sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--engine-accent)] text-lg font-bold uppercase text-white">
-              {sellerProfile.avatar ? (
-                <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
-              ) : (
-                getInitials(sellerProfile.displayName)
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--engine-accent)]">
-                {t("services.sellerAccount")}
-              </p>
-              <h2 className="mt-1 truncate text-lg font-extrabold tracking-tight">
-                {t("services.sellerProfile")}
-              </h2>
-              <p className="mt-1 truncate text-xs font-bold text-[var(--engine-text-muted)]">
-                {sellerProfile.displayName}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-accent)] hover:text-white"
-            title={t("common.cancel")}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-              {t("services.account")}
-            </span>
-            <span className="min-w-0 truncate text-xs font-bold text-[var(--engine-text-muted)]">
-              {sellerProfile.username || sellerProfile.email || "Engine"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-              {t("services.fields.city")}
-            </span>
-            <span className="min-w-0 truncate text-xs font-bold text-[var(--engine-text-muted)]">
-              {sellerProfile.city || t("services.addInProfile")}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-              {t("services.statusLabel")}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
-              <ShieldCheck size={12} />
-              {listings.length ? t("services.activeSeller") : t("services.ready")}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={onEditProfile}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-4 text-xs font-black uppercase tracking-widest text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white"
-          >
-            <UserRoundCheck size={16} />
-            {t("services.editProfile")}
-          </button>
-          <button
-            type="button"
-            onClick={onNewListing}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-4 text-xs font-bold uppercase text-white transition hover:brightness-95"
-          >
-            <Plus size={16} />
-            {t("services.newService")}
-          </button>
-        </div>
-      </section>
     </div>
   );
 }
@@ -2416,7 +2354,13 @@ export function Services({ user, settings }) {
   const [saving, setSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [detailListing, setDetailListing] = useState(null);
-  const [sellerProfileOpen, setSellerProfileOpen] = useState(false);
+  // Conta profissional (substitui o antigo "Perfil de vendedor"): abre pelo
+  // botão do hero ou pelo aviso de convite (?pro=1).
+  const [sellerProfileOpen, setSellerProfileOpen] = useState(() => searchParams.get("pro") === "1" && Boolean(user?.uid));
+  const pro = useMyPro(user?.uid);
+  // Serviços | Lojas (?aba=lojas).
+  const [tab, setTab] = useState(() => (searchParams.get("aba") === "lojas" ? "shops" : "services"));
+  const [productEditor, setProductEditor] = useState(null); // { profileId }
   const [sellerListingsOpen, setSellerListingsOpen] = useState(false);
   const { isAdmin } = useServiceAdmin(user);
   // A moderação também age do detalhe aberto na vitrine (ex.: tirar do ar
@@ -2429,24 +2373,58 @@ export function Services({ user, settings }) {
     [settings, user],
   );
 
+  // Produto (Lojas) mora na mesma tabela; a vitrine de serviços só serviço.
   useEffect(
-    () => engineDB.subscribeServiceListings(setListings, { userId: user?.uid, isAdmin }),
+    () =>
+      engineDB.subscribeServiceListings(
+        (all) => setListings(all.filter((listing) => listing.kind !== "product")),
+        { userId: user?.uid, isAdmin },
+      ),
     [isAdmin, user?.uid],
   );
 
   // O `publish=1` já foi lido na montagem; sai da barra de endereço para um
   // recarregar não reabrir o formulário.
   useEffect(() => {
-    if (!wantsPublish) return;
+    if (!wantsPublish && !searchParams.get("pro")) return;
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
         next.delete("publish");
+        next.delete("pro");
         return next;
       },
       { replace: true },
     );
+    // Só na chegada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsPublish, setSearchParams]);
+
+  const switchTab = (next) => {
+    setTab(next);
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === "shops") params.set("aba", "lojas");
+        else params.delete("aba");
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  // Anunciar produto: sem perfil profissional, primeiro a conta profissional.
+  const openProductEditor = (profileId = "") => {
+    if (!user?.uid) {
+      setGateOpen(true);
+      return;
+    }
+    if (!pro.publishable.length) {
+      setSellerProfileOpen(true);
+      return;
+    }
+    setProductEditor({ profileId: profileId || pro.publishable[0].profile.id });
+  };
 
   // Rascunho do anúncio NOVO enquanto o editor está aberto. Editar um
   // anúncio que já existe não gera rascunho: o original está no banco.
@@ -2648,7 +2626,7 @@ export function Services({ user, settings }) {
     }
   };
 
-  const openEditor = (listing = null) => {
+  const openEditor = (listing = null, profileId = "") => {
     // Sem conta, a conta vem ANTES do formulário (e o login devolve para cá).
     if (!user?.uid) {
       setGateOpen(true);
@@ -2673,7 +2651,10 @@ export function Services({ user, settings }) {
       const draft = readListingDraft(user.uid);
       setEditingOriginal(null);
       setDraftRestored(Boolean(draft));
-      setForm(draft ? { ...makeInitialForm(settings, user), ...draft, id: "" } : makeInitialForm(settings, user));
+      setForm({
+        ...(draft ? { ...makeInitialForm(settings, user), ...draft, id: "" } : makeInitialForm(settings, user)),
+        profileId: profileId || draft?.profileId || "",
+      });
     }
     setEditorOpen(true);
   };
@@ -2824,7 +2805,13 @@ export function Services({ user, settings }) {
       return;
     }
 
-    const candidate = { ...form, category: normalizeServiceCategory(form.category) };
+    // Publicado como página: o nome do anúncio é o da página.
+    const asPage = pro.pages.find((entry) => entry.profile.id === form.profileId)?.profile || null;
+    const candidate = {
+      ...form,
+      category: normalizeServiceCategory(form.category),
+      ...(asPage ? { providerName: asPage.name } : {}),
+    };
     const original = editingOriginal;
 
     // Anúncio no ar: avisa ANTES se a edição tira ele do ar até a revisão.
@@ -2925,6 +2912,32 @@ export function Services({ user, settings }) {
         />
       </header>
 
+      <div role="tablist" aria-label={t("shops.tabsLabel")} className="flex gap-2">
+        {[
+          ["services", t("shops.tabServices")],
+          ["shops", t("shops.tabShops")],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => switchTab(key)}
+            className={`min-h-11 flex-1 rounded-xl border px-4 text-sm font-bold transition sm:flex-none ${
+              tab === key
+                ? "border-[var(--engine-accent)] bg-[var(--engine-accent)] text-white"
+                : "border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "shops" && <ShopsTab user={user} region={region} onNewProduct={() => openProductEditor()} />}
+
+      {tab === "services" && (
+      <>
       <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
 
       <div className="engine-card p-4 sm:p-5">
@@ -3183,11 +3196,14 @@ export function Services({ user, settings }) {
       {(regionResult.widened || filteredListings.length < 3) && (
         <InviteProviderCard place={regionResult.requestedLabel} />
       )}
+      </>
+      )}
 
       {editorOpen && (
         <ListingEditorModal
           form={form}
           sellerProfile={sellerProfile}
+          proOptions={pro.publishable}
           saving={saving}
           photoUploading={photoUploading}
           draftRestored={draftRestored}
@@ -3208,19 +3224,41 @@ export function Services({ user, settings }) {
 
       <PublishSignInGate open={gateOpen} onClose={() => setGateOpen(false)} next={PUBLISH_PATH} />
 
-      {sellerProfileOpen && (
-        <SellerProfileModal
-          sellerProfile={sellerProfile}
-          listings={myListings}
+      {sellerProfileOpen && user?.uid && (
+        <ProAccountHub
+          user={user}
+          pro={pro}
+          username={sellerProfile.username}
+          seed={{
+            name: sellerProfile.displayName,
+            avatar: sellerProfile.avatar,
+            data: {
+              city: sellerProfile.city,
+              state: sellerProfile.state,
+              country: sellerProfile.country,
+              ...splitStoredPhone(sellerProfile.phone),
+            },
+          }}
           onClose={() => setSellerProfileOpen(false)}
-          onEditProfile={() => {
+          onNewService={(profile) => {
             setSellerProfileOpen(false);
-            navigate("/settings");
+            switchTab("services");
+            openEditor(null, profile.id);
           }}
-          onNewListing={() => {
+          onNewProduct={(profile) => {
             setSellerProfileOpen(false);
-            openEditor();
+            switchTab("shops");
+            setProductEditor({ profileId: profile.id });
           }}
+        />
+      )}
+
+      {productEditor && (
+        <ProductEditor
+          user={user}
+          profiles={pro.publishable}
+          profileId={productEditor.profileId}
+          onClose={() => setProductEditor(null)}
         />
       )}
 

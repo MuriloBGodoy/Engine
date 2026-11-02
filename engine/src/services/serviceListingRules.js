@@ -32,6 +32,14 @@ export const LIGHT_EDIT_KEYS = [
   "tiktok",
   "serviceArea",
   "active",
+  // Produto (Lojas, 20261101130000): preço, "a combinar", "aceito proposta",
+  // moeda e vendido. "A partir de" do serviço também.
+  "priceAmount",
+  "priceNegotiable",
+  "acceptsOffers",
+  "priceFrom",
+  "currency",
+  "saleStatus",
 ];
 
 // Contabilidade: não é conteúdo do anúncio, não conta como mudança.
@@ -53,11 +61,16 @@ const BOOKKEEPING_KEYS = [
   "ratingCount",
   "ratingAvg",
   "subscriptionStatus",
+  "profileId",
+  "kind",
 ];
 
 const IGNORED = new Set([...LIGHT_EDIT_KEYS, ...BOOKKEEPING_KEYS]);
 
+// `false` vale como vazio, igual ao banco: desligar um interruptor que nunca
+// foi ligado não é mudança.
 const isEmpty = (value) =>
+  value === false ||
   value === undefined ||
   value === null ||
   value === "" ||
