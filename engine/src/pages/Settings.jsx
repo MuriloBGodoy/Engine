@@ -1079,6 +1079,12 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   onChange={(value) => updateSetting("privacy", "lockSensitiveValues", value)}
                 />
                 <SwitchRow
+                  label={t("engineBlock.settingLabel")}
+                  hint={t("engineBlock.settingHint")}
+                  checked={Boolean(privacy.hideEngineBlock)}
+                  onChange={(value) => updateSetting("privacy", "hideEngineBlock", value)}
+                />
+                <SwitchRow
                   label={t("settings.privacy.showEmail")}
                   hint={t("settings.privacy.showEmailHint")}
                   checked={privacy.showEmailInSidebar !== false}

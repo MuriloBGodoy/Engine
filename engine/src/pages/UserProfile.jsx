@@ -29,6 +29,8 @@ import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { useRequireAccount } from "../hooks/useRequireAccount";
 import { useSocialReport } from "../hooks/useSocialReport";
+import { BioWithMentions } from "../components/mentions/BioWithMentions";
+import { EngineBlock } from "../components/mentions/EngineBlock";
 
 // Banner will be solid color gradient - no default image
 const DEFAULT_BANNER_GRADIENT = "from-[var(--engine-accent)] to-[var(--engine-accent)]/70";
@@ -669,11 +671,16 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
 
           {/* Bio. O perfil público grava a bio como `note` (db.js,
               getProfileSnapshot); a tela lia `bio` e ela nunca aparecia. */}
-          {(profile.note || profile.bio) && (
-            <p className="mb-4 whitespace-pre-line text-sm text-[var(--engine-text)] leading-relaxed">
-              {profile.note || profile.bio}
-            </p>
-          )}
+          {/* Menções (`@[tipo:id]`) viram chip com o nome atual. */}
+          <BioWithMentions
+            key={reloadKey}
+            text={profile.note || profile.bio || ""}
+            ownerId={profile.userId}
+            viewerId={currentUserId || ""}
+          />
+
+          {/* "No Engine": clubes, páginas e próximos eventos, automático. */}
+          <EngineBlock key={`engine-${reloadKey}`} userId={profile.userId} isOwn={isOwnProfile} />
 
           {/* Location */}
           {profile.city && (

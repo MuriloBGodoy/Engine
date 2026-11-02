@@ -52,6 +52,10 @@ const defaultSettings = {
   privacy: {
     showEmailInSidebar: true,
     lockSensitiveValues: false,
+    // Esconde dos outros o bloco "No Engine" do perfil (clubes, páginas,
+    // eventos). Vai para o perfil público como `hideEngineBlock`, que o
+    // servidor lê em `profile_engine_presence`.
+    hideEngineBlock: false,
   },
   // Renda e despesa são da PESSOA, não do carro. Antes disso a renda morava em
   // `car.ownership` e portanto estava duplicada no documento de cada carro:
@@ -274,7 +278,9 @@ const normalizeSettings = (settings = {}) => {
       country: String(merged.profile.country || "").trim().slice(0, 4).toUpperCase(),
       state: String(merged.profile.state || "").trim().slice(0, 8).toUpperCase(),
       location: merged.profile.location.trim().slice(0, 80),
-      bio: merged.profile.bio.trim().slice(0, 280),
+      // Cabe a bio de 160 caracteres lidos mais até 10 marcadores de menção
+      // (`@[person:<uuid>]`, ~45 cada) — ver services/mentions.js.
+      bio: merged.profile.bio.trim().slice(0, 800),
     },
     budget: {
       ...merged.budget,
@@ -636,6 +642,7 @@ const buildPublicProfile = (settings = {}, userId = currentUserId) => {
     // A capa vai só aqui: o retrato acima também é copiado em post,
     // comentário e notificação, e até 400 KB de imagem não cabem em cada um.
     banner: settings.profile?.banner || "",
+    hideEngineBlock: Boolean(settings.privacy?.hideEngineBlock),
     updatedAt: nowIso(),
   };
 };

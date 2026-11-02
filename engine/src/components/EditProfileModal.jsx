@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { auth, updateAuthProfile } from '../services/supabase';
 import { engineDB } from '../services/db';
 import { splitPhone, isPhoneValid } from '../services/phone';
@@ -8,6 +9,15 @@ import { AVATAR, BANNER, reduzirImagem } from '../services/imagens';
 import { storeDataUri } from '../services/photos';
 import { useToast } from './ToastProvider';
 import { useHistoryDismiss } from '../hooks/useHistoryDismiss';
+import { MentionTextarea } from './mentions/MentionTextarea';
+import {
+  BIO_DISPLAY_MAX,
+  bioToEditor,
+  fetchMentionCards,
+  mentionRefs,
+  serializeBio,
+  syncBioMentions,
+} from '../services/mentions';
 
 // Salva pelo mesmo caminho das Configurações (engineDB.saveSettings), que
 // reserva o @, grava os ajustes e espelha o perfil público. Antes o modal
@@ -17,7 +27,15 @@ import { useHistoryDismiss } from '../hooks/useHistoryDismiss';
 export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
   const user = auth.currentUser;
   const showToast = useToast();
+  const { t } = useTranslation();
   const profile = settings.profile || {};
+
+  // Bio com @menção: no editor, `@[tipo:id]` vira `@Rótulo` (com o nome
+  // ATUAL, vindo do banco). Até os cartões chegarem o campo fica travado —
+  // salvar antes apagaria as menções.
+  const hasTokens = mentionRefs(profile.bio || '').length > 0;
+  const [bioMentions, setBioMentions] = useState([]);
+  const [bioReady, setBioReady] = useState(!hasTokens);
 
   const [formData, setFormData] = useState({
     displayName: profile.displayName || user?.displayName || '',
@@ -37,6 +55,24 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [bioCharCount, setBioCharCount] = useState(formData.bio.length);
+
+  useEffect(() => {
+    if (!hasTokens || !user?.uid) return undefined;
+    let alive = true;
+    fetchMentionCards(user.uid).then((cards) => {
+      if (!alive) return;
+      const { value, mentions } = bioToEditor(profile.bio || '', cards);
+      setFormData((prev) => ({ ...prev, bio: value }));
+      setBioCharCount(value.length);
+      setBioMentions(mentions);
+      setBioReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+    // Só na abertura: depois disso o texto é de quem está editando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
@@ -65,10 +101,11 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
     handleFieldChange('city', '');
   };
 
-  const handleBioChange = (value) => {
-    if (value.length <= 160) {
+  const handleBioChange = (value, mentions = bioMentions) => {
+    if (value.length <= BIO_DISPLAY_MAX) {
       handleFieldChange('bio', value);
       setBioCharCount(value.length);
+      setBioMentions(mentions);
     }
   };
 
@@ -183,6 +220,8 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
         storeDataUri(preview.avatar || '', { userId: user.uid, folder: 'avatar' }),
         storeDataUri(preview.banner || '', { userId: user.uid, folder: 'banner' }),
       ]);
+      // `@Rótulo` escolhido no autocompletar → marcador com id.
+      const { bio: storedBio } = serializeBio(formData.bio, bioMentions);
       const saved = await engineDB.saveSettings(
         {
           ...settings,
@@ -190,7 +229,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
             ...profile,
             displayName: formData.displayName,
             username: formData.username,
-            bio: formData.bio,
+            bio: storedBio,
             phone,
             country: formData.country,
             state: formData.state,
@@ -202,6 +241,18 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
         },
         user.uid,
       );
+
+      // As menções valem quando o banco grava a lista (limite, bloqueio, aviso
+      // para quem foi mencionado). Falhar aqui não desfaz o perfil salvo.
+      try {
+        const result = await syncBioMentions(storedBio);
+        if (result?.skipped?.length) showToast(t('mentions.someSkipped'), 'info');
+      } catch (error) {
+        showToast(
+          error?.code === 'too-many-mentions' ? t('mentions.limit', { count: 10 }) : t('mentions.saveError'),
+          'error',
+        );
+      }
 
       // Foto em data URI não vai para a conta: ela viajaria dentro do token,
       // em toda requisição. Só URL do Storage.
@@ -367,15 +418,25 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
 
               {/* Bio */}
               <div>
-                <label className="text-sm font-medium text-[var(--engine-text)]">Bio</label>
-                <textarea
-                  maxLength={160}
-                  placeholder="Conte sobre você"
-                  value={formData.bio}
-                  onChange={(e) => handleBioChange(e.target.value)}
-                  className="w-full px-3 py-2.5 mt-2 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm resize-none min-h-24 transition focus:outline-none focus:border-[var(--engine-accent)] focus:ring-4 focus:ring-[var(--engine-accent)]/20"
-                />
-                <p className="text-xs text-[var(--engine-text-subtle)] mt-1">{bioCharCount}/160</p>
+                <label htmlFor="edit-profile-bio" className="text-sm font-medium text-[var(--engine-text)]">Bio</label>
+                <div className="mt-2">
+                  {bioReady ? (
+                    <MentionTextarea
+                      id="edit-profile-bio"
+                      maxLength={BIO_DISPLAY_MAX}
+                      placeholder={t('mentions.bioPlaceholder')}
+                      value={formData.bio}
+                      mentions={bioMentions}
+                      onChange={(value, mentions) => handleBioChange(value, mentions)}
+                      className="w-full px-3 py-2.5 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm resize-none min-h-24 transition focus:outline-none focus:border-[var(--engine-accent)] focus:ring-4 focus:ring-[var(--engine-accent)]/20"
+                    />
+                  ) : (
+                    <div className="min-h-24 w-full animate-pulse rounded-lg bg-[var(--engine-surface-2)]" aria-busy="true" />
+                  )}
+                </div>
+                <p className="text-xs text-[var(--engine-text-subtle)] mt-1">
+                  {bioCharCount}/{BIO_DISPLAY_MAX} · {t('mentions.bioHint')}
+                </p>
               </div>
             </div>
           </div>
