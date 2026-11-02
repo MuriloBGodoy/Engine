@@ -207,7 +207,7 @@ function ExpiryLine({ request }) {
 // Formulário do pedido
 // ---------------------------------------------------------------------------
 
-function RequestForm({ user, cars, limits, onClose, onCreated }) {
+function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { region } = useRegion();
@@ -221,13 +221,16 @@ function RequestForm({ user, cars, limits, onClose, onCreated }) {
   );
   const country = region.country && region.country !== "all" ? region.country : "BR";
   const states = getStates(country);
+  // `prefill` vem do "Orçamento" do detalhe de um anúncio: categoria e
+  // cidade do prestador. O pedido segue indo para a região (o banco não tem
+  // pedido endereçado a um anúncio), mas já nasce com o que a pessoa viu.
   const [form, setForm] = useState(() => ({
-    category: "",
+    category: serviceCategories.some((category) => category.value === prefill?.category) ? prefill.category : "",
     carId: garageCars[0]?.id || "other",
     carText: "",
     description: "",
-    state: region.state && region.state !== "all" ? region.state : "",
-    city: "",
+    state: prefill?.state || (region.state && region.state !== "all" ? region.state : ""),
+    city: prefill?.city || "",
     urgency: "week",
     contact: "message",
   }));
@@ -1000,6 +1003,12 @@ export function Quotes({ user, cars = [] }) {
   const tab = searchParams.get("tab") === "inbox" ? "inbox" : "mine";
   const openId = searchParams.get("req") || "";
   const [formOpen, setFormOpen] = useState(() => searchParams.get("new") === "1");
+  // Lido uma vez na chegada (os parâmetros saem da barra logo abaixo).
+  const [prefill] = useState(() =>
+    searchParams.get("new") === "1"
+      ? { category: searchParams.get("cat") || "", state: searchParams.get("uf") || "", city: searchParams.get("cidade") || "" }
+      : null,
+  );
   const [limits, setLimits] = useState(QUOTE_DEFAULT_LIMITS);
   const [mine, setMine] = useState(null);
   const [inbox, setInbox] = useState(null);
@@ -1037,7 +1046,7 @@ export function Quotes({ user, cars = [] }) {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
-        next.delete("new");
+        ["new", "cat", "uf", "cidade"].forEach((key) => next.delete(key));
         return next;
       },
       { replace: true },
@@ -1189,6 +1198,7 @@ export function Quotes({ user, cars = [] }) {
           user={user}
           cars={cars}
           limits={limits}
+          prefill={prefill}
           onClose={() => setFormOpen(false)}
           onCreated={async () => {
             setFormOpen(false);

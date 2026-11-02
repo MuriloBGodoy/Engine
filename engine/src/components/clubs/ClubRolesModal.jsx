@@ -252,7 +252,7 @@ function RolesContent({ club, onClose, onSaved }) {
                             type="checkbox"
                             checked={role.permissions.includes(perm)}
                             onChange={() => togglePerm(role, perm)}
-                            className="h-4 w-4 accent-[var(--engine-accent)]"
+                            className="engine-checkbox"
                           />
                           {t(`clubRoles.perms.${perm}`)}
                         </label>

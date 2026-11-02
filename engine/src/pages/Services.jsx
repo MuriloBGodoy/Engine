@@ -1016,7 +1016,12 @@ function ServiceDetailModal({ listing, isMine, user, moderation = null, onClose,
                     <div className={`grid gap-2 ${phone ? "grid-cols-2" : "grid-cols-1"}`}>
                       {whatsappLink(`${actionBase} bg-emerald-600 text-white hover:bg-emerald-700`, true)}
                       <Link
-                        to="/services/orcamentos?new=1"
+                        to={`/services/orcamentos?${new URLSearchParams({
+                          new: "1",
+                          cat: normalizeServiceCategory(listing.category) || "",
+                          uf: listing.state || "",
+                          cidade: listing.city || "",
+                        })}`}
                         className={`${actionBase} border border-[var(--engine-border-strong)] bg-[var(--engine-surface)] text-[var(--engine-text)]`}
                       >
                         <ClipboardList size={16} aria-hidden="true" />
