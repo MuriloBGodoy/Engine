@@ -334,10 +334,15 @@ try {
   const mencao = await a.client.rpc("set_bio_mentions", { p_refs: [{ kind: "person", id: b.id }, { kind: "club", id: clubId }, { kind: "person", id: a.id }] });
   check("menção a pessoa e clube passa; a si mesmo vai para skipped",
     passed(mencao) && mencao.data?.accepted?.length === 2 && mencao.data?.skipped?.length === 1, why(mencao));
-  const avisoMencao = (await b.client.from("notifications").select("type").eq("type", "mention")).data;
-  check("mencionado recebe um aviso", avisoMencao?.length === 1, JSON.stringify(avisoMencao));
+  // B é mencionado E é Diretor do clube mencionado (edit_club): recebe um
+  // aviso de cada — o da pessoa e o do clube.
+  const avisosMencao = async () =>
+    (await b.client.from("notifications").select("data").eq("type", "mention")).data?.map((n) => n.data?.mentionKind).sort() || [];
+  let tiposMencao = await avisosMencao();
+  check("mencionado recebe um aviso, e a direção do clube o do clube", tiposMencao.join(",") === "club,person", JSON.stringify(tiposMencao));
   await a.client.rpc("set_bio_mentions", { p_refs: [{ kind: "person", id: b.id }, { kind: "club", id: clubId }] });
-  check("regravar não avisa de novo", (await b.client.from("notifications").select("type").eq("type", "mention")).data?.length === 1);
+  tiposMencao = await avisosMencao();
+  check("regravar não avisa de novo", tiposMencao.join(",") === "club,person", JSON.stringify(tiposMencao));
   check("ninguém grava menção direto", denied(await a.client.from("profile_mentions").insert({ owner_id: a.id, kind: "person", target_id: c.id })));
   const muitas = await a.client.rpc("set_bio_mentions", { p_refs: Array.from({ length: 11 }, (_, i) => ({ kind: "event", id: `x${i}` })) });
   check("mais de 10 menções é recusado", muitas.error?.message === "too-many-mentions", why(muitas));
