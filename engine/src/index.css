@@ -56,6 +56,9 @@
   /* Marca / acento */
   --engine-accent: #e11d2a;
   --engine-accent-soft: rgba(225, 29, 42, 0.1);
+  /* Acento como TEXTO miudo (hashtag, mencao, link, "Seguir"): 5,1:1 sobre a
+     superficie clara. Posts do feed, 02/11/2026. */
+  --engine-accent-text: #d0182a;
 
   /* Sombras */
   --engine-ring: rgba(225, 29, 42, 0.35);
@@ -95,6 +98,9 @@
      25/10/2026. */
   --engine-accent: #e22a37;
   --engine-accent-soft: rgba(226, 42, 55, 0.16);
+  /* O acento do escuro da ~3,3:1 em texto pequeno; esta versao clara da ~6:1
+     sobre --engine-surface. Posts do feed, 02/11/2026. */
+  --engine-accent-text: #ff6b74;
 
   /* Sombras */
   --engine-ring: rgba(226, 42, 55, 0.45);

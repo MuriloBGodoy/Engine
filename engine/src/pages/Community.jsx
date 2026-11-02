@@ -25,6 +25,7 @@ import {
   Send,
   Share2,
   ShieldCheck,
+  Target,
   Star,
   MessageCircle,
   Trophy,
@@ -49,6 +50,13 @@ import { SpecSheetModal } from "../components/specsheet/SpecSheetModal";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import "../services/i18n-social-feed";
+import "../services/i18n-post-card";
+import { RichText } from "../components/social/RichText";
+import { TimeAgo } from "../components/social/TimeAgo";
+import { PostVideoPlayer } from "../components/social/PostVideoPlayer";
+import { useSavedPosts } from "../hooks/useSavedPosts";
+import { originTag } from "../services/carSpecSheet";
+import { formatNumber, originLabel } from "../components/specsheet/labels";
 import { useRequireAccount } from "../hooks/useRequireAccount";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -425,8 +433,20 @@ function PostVideo({ url, t }) {
 // ~350 o toque simples (abrir o post) começa a parecer travado.
 const DOUBLE_TAP_MS = 300;
 
-function PostGallery({ images, alt, t, onOpen, onDoubleTap }) {
+// Moldura do Instagram: a 1a foto decide a proporção do post inteiro, presa
+// entre 4:5 (retrato) e 1,91:1 (paisagem). Antes era 4:3 fixo: foto em pé
+// perdia cabeça e rodas. As demais fotos do carrossel preenchem a mesma
+// moldura. Enquanto a 1a não carrega, 1:1 (meio-termo que menos pula).
+const MEDIA_MIN_RATIO = 4 / 5;
+const MEDIA_MAX_RATIO = 1.91;
+const clampMediaRatio = (width, height) =>
+  width > 0 && height > 0
+    ? Math.min(Math.max(width / height, MEDIA_MIN_RATIO), MEDIA_MAX_RATIO)
+    : 1;
+
+function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null }) {
   const [index, setIndex] = useState(0);
+  const [ratio, setRatio] = useState(1);
   const dragStart = useRef(null);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
@@ -490,7 +510,17 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap }) {
 
   return (
     <div
-      className="relative aspect-[4/3] overflow-hidden bg-[var(--engine-surface-2)]"
+      className="relative max-w-full overflow-hidden bg-[var(--engine-surface-2)]"
+      // No lightbox do desktop a moldura cabe na caixa disponível mantendo a
+      // proporção da foto: sem tarja preta dos lados nem corte.
+      style={
+        box
+          ? {
+              height: Math.round(Math.min(box.maxHeight, box.maxWidth / ratio)),
+              width: Math.round(Math.min(box.maxHeight, box.maxWidth / ratio) * ratio),
+            }
+          : { aspectRatio: ratio }
+      }
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -498,11 +528,23 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap }) {
         className="flex h-full transition-transform duration-300 ease-out"
         style={{ transform: `translateX(-${current * 100}%)` }}
       >
-        {images.map((image) => (
+        {images.map((image, position) => (
           <img
             key={image}
             src={image}
             alt={alt}
+            draggable={false}
+            onLoad={
+              position === 0
+                ? (event) =>
+                    setRatio(
+                      clampMediaRatio(
+                        event.currentTarget.naturalWidth,
+                        event.currentTarget.naturalHeight,
+                      ),
+                    )
+                : undefined
+            }
             onError={(event) => {
               event.currentTarget.src = fallbackImage;
             }}
@@ -557,12 +599,15 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap }) {
             </button>
           )}
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+          <span className="pointer-events-none absolute right-2.5 top-2.5 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white">
+            {current + 1}/{total}
+          </span>
+          <div className="pointer-events-none absolute bottom-2.5 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-black/35 px-1.5 py-1">
             {images.map((image, position) => (
               <span
                 key={image}
-                className={`h-1.5 rounded-full transition-all ${
-                  position === current ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                  position === current ? "bg-white" : "bg-white/50"
                 }`}
               />
             ))}
@@ -632,6 +677,240 @@ function PostMenu({ items, label }) {
   );
 }
 
+// Hashtag, menção e link no post: acento em versão de TEXTO (legível no
+// escuro, onde o acento cheio dá ~3,3:1 em letra miúda).
+const RICH_LINK = "font-semibold text-[var(--engine-accent-text)] hover:underline";
+
+// Legenda cortada perto de duas linhas no celular. Por caractere, como o
+// Instagram, e sempre num espaço: cortar dentro de uma #tag quebraria o link.
+const CAPTION_PREVIEW_CHARS = 110;
+
+const compactMoney = (value, language) =>
+  new Intl.NumberFormat(language, {
+    style: "currency",
+    currency: "BRL",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(Number(value) || 0);
+
+/**
+ * Até 4 chips do que o dono declarou na ficha (potência, torque, câmbio,
+ * stage). Só o declarado: o feed não consulta catálogo de fábrica por post.
+ * Cada chip leva no `title` de onde o número veio (regra do Brian: declarado
+ * sempre etiquetado).
+ */
+const specChips = (specs, t, language) => {
+  if (!specs) return [];
+  const chips = [];
+  const power = specs.performance?.powerCv;
+  if (power) {
+    chips.push({ id: "power", label: `${formatNumber(language, power.value)} cv`, cell: power });
+  }
+  const torque = specs.performance?.torque;
+  if (torque) {
+    chips.push({
+      id: "torque",
+      label: `${formatNumber(language, torque.value, 1)} ${torque.unit || "kgfm"}`,
+      cell: torque,
+    });
+  }
+  const aspiration = specs.version?.aspiration;
+  if (aspiration && aspiration !== "naturally_aspirated") {
+    chips.push({ id: "aspiration", label: t(`specSheet.value.aspiration.${aspiration}`) });
+  }
+  const transmission = specs.version?.transmission;
+  if (transmission) {
+    chips.push({ id: "transmission", label: t(`specSheet.value.transmission.${transmission}`) });
+  }
+  if (specs.stage && specs.stage !== "stock") {
+    chips.push({ id: "stage", label: t(`specSheet.stage.${specs.stage}`) });
+  }
+  return chips.slice(0, 4);
+};
+
+/**
+ * Faixa de cima do post de carro/meta (o "título + números" do Strava):
+ * nome do carro abre a ficha; na meta, guardado/falta/% e a barra; no post de
+ * carro, os chips da ficha. A nota em estrelas virou um "★ 4,7" que abre o
+ * seletor — na linha de ações ela disputava espaço com curtir e salvar.
+ */
+function PostFicha({ goal, t, language, full, isGoal, progress, rating, onRate, onOpenSpecs }) {
+  const [rateOpen, setRateOpen] = useState(false);
+  const completed = isGoal && isGoalCompleted(goal);
+  const hasMoney = isGoal && Number(goal.targetValue) > 0;
+  const chips = isGoal ? [] : specChips(goal.specs, t, language);
+  const KindIcon = isGoal ? Target : Car;
+
+  return (
+    <div className="relative space-y-1.5 px-3 pb-2.5 sm:px-4">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]">
+          <KindIcon size={13} aria-hidden="true" />
+        </span>
+        {/* Mesmo gesto do CarCard: o nome do veículo É a porta da ficha. O
+            carro é de outra pessoa, então a ficha abre só em leitura. */}
+        <button
+          type="button"
+          onClick={onOpenSpecs}
+          aria-label={t("specSheet.cardAction")}
+          className="group/specs -my-2 flex min-h-11 min-w-0 items-center gap-1 rounded-lg text-left sm:my-0 sm:min-h-0"
+        >
+          <span className="min-w-0 truncate [font-family:var(--font-display)] text-sm font-bold text-[var(--engine-text)]">
+            {full ? getVehicleTitle(goal) : getVehicleTitleShort(goal)}
+          </span>
+          {goal.year ? (
+            <span className="shrink-0 text-[13px] text-[var(--engine-text-muted)]">
+              · {formatFipeYear(goal.year, t("car.zeroKm"))}
+            </span>
+          ) : null}
+          <ChevronRight
+            size={14}
+            aria-hidden="true"
+            className="shrink-0 text-[var(--engine-text-muted)] transition group-hover/specs:translate-x-0.5 group-hover/specs:text-[var(--engine-accent)]"
+          />
+        </button>
+
+        {isGoal && (
+          <button
+            type="button"
+            onClick={() => setRateOpen((open) => !open)}
+            aria-expanded={rateOpen}
+            aria-label={rating > 0 ? t("postCard.rating", { value: rating.toFixed(1) }) : t("postCard.rate")}
+            className="-my-2 ml-auto flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-1.5 text-xs font-bold tabular-nums text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] sm:my-0 sm:min-h-8"
+          >
+            <Star size={13} className="text-amber-400" fill={rating > 0 ? "currentColor" : "none"} />
+            {rating > 0 ? rating.toLocaleString(language, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : t("postCard.rate")}
+          </button>
+        )}
+      </div>
+
+      {rateOpen && (
+        <div className="absolute right-3 top-9 z-10 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] px-1.5 shadow-[var(--engine-shadow-lg)] sm:right-4">
+          <RatingControl
+            value={rating}
+            size={20}
+            label={t("community.rate")}
+            onRate={(value) => {
+              onRate(value);
+              setRateOpen(false);
+            }}
+          />
+        </div>
+      )}
+
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {chips.map((chip) => {
+            const tag = chip.cell ? originTag(chip.cell) : "";
+            return (
+              <span
+                key={chip.id}
+                title={tag ? originLabel(t, tag) : undefined}
+                className="rounded-md border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--engine-text)]"
+              >
+                {chip.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {isGoal &&
+        (completed ? (
+          /* Meta batida: barra cheia, "100%" e selo diziam a mesma coisa
+             três vezes. Fica só o selo. */
+          <div className="flex items-center gap-2">
+            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--engine-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--engine-accent-text)]">
+              <Trophy size={12} />
+              {t("community.completed")}
+            </span>
+            <span className="mr-1.5 flex">
+              <InfoTip text={t("community.privacyLine")} align="right" />
+            </span>
+          </div>
+        ) : (
+          <>
+            {/* Valores em dinheiro só existem no post do próprio dono; para os
+                outros o banco manda só o percentual. */}
+            {hasMoney && (
+              <dl className="flex gap-5">
+                <div className="min-w-0">
+                  <dt className="text-[11px] text-[var(--engine-text-muted)]">{t("postCard.goalSaved")}</dt>
+                  <dd className="[font-family:var(--font-display)] text-[15px] font-bold tabular-nums text-[var(--engine-text)]">
+                    {compactMoney(goal.savedValue, language)}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-[11px] text-[var(--engine-text-muted)]">{t("postCard.goalLeft")}</dt>
+                  <dd className="[font-family:var(--font-display)] text-[15px] font-bold tabular-nums text-[var(--engine-text)]">
+                    {compactMoney(Math.max(Number(goal.targetValue) - Number(goal.savedValue), 0), language)}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-[11px] text-[var(--engine-text-muted)]">{t("postCard.goalTarget")}</dt>
+                  <dd className="[font-family:var(--font-display)] text-[15px] font-bold tabular-nums text-[var(--engine-accent-text)]">
+                    {progress.toFixed(0)}%
+                  </dd>
+                </div>
+              </dl>
+            )}
+            <div className="flex items-center gap-2">
+              <span
+                role="progressbar"
+                aria-valuenow={Math.round(progress)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--engine-surface-2)]"
+              >
+                <span
+                  className="block h-full rounded-full bg-[var(--engine-accent)] transition-[width] duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </span>
+              {!hasMoney && (
+                <span className="shrink-0 text-xs font-bold tabular-nums text-[var(--engine-accent-text)]">
+                  {t("postCard.goalOfTarget", { value: progress.toFixed(0) })}
+                </span>
+              )}
+              <span className="mr-1.5 flex">
+              <InfoTip text={t("community.privacyLine")} align="right" />
+            </span>
+            </div>
+          </>
+        ))}
+    </div>
+  );
+}
+
+/** "autor legenda… mais". O @ do autor abre o perfil como o nome no topo. */
+function PostCaption({ goal, t, full, onExpand }) {
+  const text = goal.note || "";
+  const cut = full || text.length <= CAPTION_PREVIEW_CHARS
+    ? text
+    : text.slice(0, Math.max(text.lastIndexOf(" ", CAPTION_PREVIEW_CHARS), 40)).trimEnd();
+  const truncated = cut !== text;
+  const handle = withoutAt(goal.username) || goal.author;
+
+  return (
+    <p className="break-words px-3 pb-2 text-sm leading-[1.45] text-[var(--engine-text)] sm:px-4">
+      <span className="mr-1 font-bold">{handle}</span>
+      <RichText text={cut} linkClassName={RICH_LINK} className="whitespace-pre-line" />
+      {truncated && (
+        <>
+          {"… "}
+          <button
+            type="button"
+            onClick={onExpand}
+            className="font-medium text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+          >
+            {t("postCard.more")}
+          </button>
+        </>
+      )}
+    </p>
+  );
+}
+
 /**
  * Cartão do feed.
  *
@@ -668,6 +947,8 @@ export function GoalCard({
   variant = "feed",
   initialCommentsOpen = false,
   commentPreview = true,
+  // Lightbox do desktop: a mídia mora na coluna da esquerda, fora do cartão.
+  hideMedia = false,
 }) {
   const [draft, setDraft] = useState("");
   const [editingCommentId, setEditingCommentId] = useState("");
@@ -677,6 +958,10 @@ export function GoalCard({
   const [specsOpen, setSpecsOpen] = useState(false);
 
   const { i18n } = useTranslation();
+  const [captionOpen, setCaptionOpen] = useState(false);
+  const { isSaved, toggleSaved } = useSavedPosts(currentUserId);
+  const requireAccount = useRequireAccount(currentUserId ? { uid: currentUserId } : null);
+  const saved = isSaved(goal.id);
   const progress = getProgress(goal);
   const comments = [...goal.comments, ...interactions.comments];
   const liked = interactions.liked;
@@ -696,7 +981,8 @@ export function GoalCard({
   const gallery = goal.images?.length ? goal.images : (goal.image ? [goal.image] : []);
   const photos = gallery.length ? gallery : isFreePost ? [] : [fallbackImage];
   // Post só de texto inverte a ordem: conteúdo antes dos botões de ação.
-  const textFirst = isFreePost && !photos.length && !goal.videoUrl && Boolean(goal.note);
+  const textFirst =
+    isFreePost && !photos.length && !goal.videoUrl && !goal.video && Boolean(goal.note);
   // No modal de publicação (desktop) os comentários já estão ao lado: o balão
   // leva o foco para o compositor em vez de abrir outra folha.
   const showComments = onCommentClick || (() => setCommentsOpen(true));
@@ -799,34 +1085,50 @@ export function GoalCard({
             }`
       }
     >
-      <header className="flex items-center gap-2.5 px-3 py-2.5 sm:px-4">
+      <header className="flex items-center gap-2.5 px-3 py-2 sm:px-4">
         <AvatarButton
           person={goal}
           size="sm"
           onClick={() => onOpenProfile(goal.ownerId, goal)}
         />
         <div className="min-w-0 flex-1">
+          {/* Linha 1: quem (o nome não encolhe antes do @). Linha 2: clube,
+              horário e "editado". Selo, cargo e botão na mesma linha do nome
+              faziam ele virar "Rafael ..." no celular. */}
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => onOpenProfile(goal.ownerId, goal)}
-              className="-my-3 inline-flex min-h-11 min-w-0 items-center truncate text-left text-[13px] font-bold text-[var(--engine-text)] transition hover:text-[var(--engine-accent)] sm:my-0 sm:min-h-0"
+              className="-my-3 inline-flex min-h-11 min-w-0 max-w-[70%] shrink-0 items-center text-left text-[13px] font-bold text-[var(--engine-text)] transition hover:text-[var(--engine-accent-text)] sm:my-0 sm:min-h-0"
             >
-              {goal.author}
+              <span className="truncate">{goal.author}</span>
             </button>
             {goal.verified && (
               <ShieldCheck size={13} className="shrink-0 text-[var(--engine-accent)]" />
             )}
-          </div>
-          <p className="flex items-center gap-1.5 truncate text-[11px] font-medium text-[var(--engine-text-subtle)]">
-            <span className="truncate">
+            <span className="min-w-0 truncate text-xs text-[var(--engine-text-muted)]">
               {goal.username}
-              {goal.city ? ` · ${goal.city}` : ""}
             </span>
-            {/* Post publicado a partir de um clube carrega a sigla dele: é
-                assim que a crew aparece no feed geral (CLUBES-CONTRATO §2). */}
-            <ClubTag tag={goal.clubTag} />
-          </p>
+          </div>
+          {(goal.clubTag || goal.createdAt || (isModal && goal.city)) && (
+            <div className="mt-px flex min-w-0 items-center gap-1.5 overflow-hidden text-xs text-[var(--engine-text-muted)]">
+              {/* Post publicado a partir de um clube carrega a sigla dele: é
+                  assim que a crew aparece no feed geral (CLUBES-CONTRATO §2). */}
+              <ClubTag tag={goal.clubTag} className="shrink-0" />
+              {goal.clubTag && goal.createdAt ? <span aria-hidden="true">·</span> : null}
+              {goal.createdAt ? (
+                <TimeAgo
+                  value={goal.createdAt}
+                  editedAt={goal.editedAt}
+                  short
+                  className="hover:text-[var(--engine-text)]"
+                />
+              ) : null}
+              {isModal && goal.city ? (
+                <span className="min-w-0 truncate">· {goal.city}</span>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -834,13 +1136,18 @@ export function GoalCard({
               sozinho — 10K substitui 1K aqui, mas os dois continuam contando
               na aba de Conquistas do perfil (decisão da sessão de
               22/08/2026). Sem faixa batida, nada aparece. */}
-          {postLikeTier && <AchievementBadge tier={postLikeTier} state="unlocked" />}
+          {/* Abaixo de 360px o selo empurrava o horário para baixo dele. */}
+          {postLikeTier && (
+            <span className="hidden min-[360px]:flex">
+              <AchievementBadge tier={postLikeTier} state="unlocked" />
+            </span>
+          )}
 
           {/* "Compartilhada / Privada" diz se o carro da GARAGEM está publicado.
               Num post livre não significa nada: ele nasce no feed, e o selo só
               aparecia como "privada" porque post nenhum entra em sharedGoalIds. */}
           {isOwner && !isFreePost ? (
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
+            <span className="text-[11px] font-semibold text-[var(--engine-text-muted)]">
               {shared ? t("community.shared") : t("community.privateDraft")}
             </span>
           ) : isOwner ? null : (
@@ -848,7 +1155,7 @@ export function GoalCard({
               <button
                 type="button"
                 onClick={() => onFollow(goal)}
-                className="-my-3 inline-flex min-h-11 items-center rounded-full px-2 text-[11px] font-black uppercase tracking-wide text-[var(--engine-accent)] transition hover:brightness-110 sm:my-0 sm:min-h-0"
+                className="-my-3 inline-flex min-h-11 items-center rounded-full px-1.5 text-[13px] font-bold text-[var(--engine-accent-text)] transition hover:brightness-110 sm:my-0 sm:min-h-0"
               >
                 {t("community.follow")}
               </button>
@@ -859,7 +1166,24 @@ export function GoalCard({
         <PostMenu items={menuItems} label={t("community.postOptions")} />
       </header>
 
-      {photos.length > 0 && (
+      {/* Ficha ANTES da mídia, como o card de atividade do Strava: o carro e a
+          meta são a manchete, a foto é a prova. Post livre só tem ficha quando
+          foi publicado a partir de um carro. */}
+      {(!isFreePost || goal.title) && (goal.brand || goal.model) && (
+        <PostFicha
+          goal={goal}
+          t={t}
+          language={i18n.language}
+          full={isModal}
+          isGoal={!isFreePost}
+          progress={progress}
+          rating={rating}
+          onRate={(value) => onRate(goal.id, value)}
+          onOpenSpecs={() => setSpecsOpen(true)}
+        />
+      )}
+
+      {!hideMedia && photos.length > 0 && (
         <PostGallery
           images={photos}
           alt={goal.title}
@@ -871,30 +1195,37 @@ export function GoalCard({
         />
       )}
 
-      {goal.videoUrl && <PostVideo url={goal.videoUrl} t={t} />}
+      {hideMedia ? null : goal.video ? (
+        <PostVideoPlayer video={goal.video} />
+      ) : goal.videoUrl ? (
+        <PostVideo url={goal.videoUrl} t={t} />
+      ) : null}
 
       {/* Post sem foto nem vídeo: o texto É o conteúdo, então vem antes dos
           botões. Deixar curtir e comentar acima de um card vazio fazia a ação
           aparecer antes de existir o que curtir. */}
       {textFirst && (
-        <p className="whitespace-pre-line px-3 pt-1 text-sm leading-6 text-[var(--engine-text)] sm:px-4">
-          {goal.note}
-        </p>
+        <RichText
+          as="p"
+          text={goal.note}
+          linkClassName={RICH_LINK}
+          className="block whitespace-pre-line break-words px-3 pb-1 pt-0.5 text-[15px] leading-6 text-[var(--engine-text)] sm:px-4"
+        />
       )}
 
-      <div className="flex items-center gap-0.5 px-2 pt-1.5 sm:px-3">
+      <div className="flex items-center px-1 sm:px-2">
         <ActionButton
           active={liked}
           title={t("community.like")}
           onClick={() => onLike(goal.id)}
-          icon={<Heart size={20} fill={liked ? "currentColor" : "none"} />}
+          icon={<Heart size={22} fill={liked ? "currentColor" : "none"} />}
           count={likeCount}
           language={i18n.language}
         />
         <ActionButton
           title={t("community.commentsAction")}
           onClick={showComments}
-          icon={<MessageCircle size={20} />}
+          icon={<MessageCircle size={22} />}
           count={comments.length}
           language={i18n.language}
         />
@@ -902,95 +1233,32 @@ export function GoalCard({
           <ActionButton
             title={t("messages.shareTitle")}
             onClick={() => onSendToChat(goal)}
-            icon={<Send size={19} />}
+            icon={<Send size={21} />}
           />
         )}
-        {/* Avaliar por estrela é sobre a meta/veículo; num post de texto ou
-            foto solta não há o que pontuar. A nota fica colada no controle,
-            em vez de numa linha própria embaixo. */}
-        {!isFreePost && (
-          <div className="ml-auto flex items-center gap-1.5">
-            {rating > 0 && (
-              <span className="text-[13px] font-bold tabular-nums text-[var(--engine-text-muted)]">
-                {rating.toFixed(1)}
-              </span>
-            )}
-            <RatingControl
-              value={rating}
-              label={t("community.rate")}
-              onRate={(value) => onRate(goal.id, value)}
-            />
-          </div>
-        )}
+        <div className="ml-auto">
+          <ActionButton
+            title={saved ? t("postCard.unsave") : t("postCard.save")}
+            pressed={saved}
+            onClick={() => {
+              if (requireAccount()) return;
+              toggleSaved(goal.id);
+            }}
+            icon={<Bookmark size={21} fill={saved ? "currentColor" : "none"} />}
+          />
+        </div>
       </div>
 
-      {/* Ordem de leitura: primeiro o que a pessoa escreveu, depois o que o
-          sistema sabe sobre o carro. Antes a legenda vinha por último, atrás
-          de título, barra e selo — o conteúdo do autor era a última coisa. */}
-      <div className="space-y-2 px-3 pb-3.5 pt-1.5 sm:px-4 sm:pb-4">
-        {goal.note && !textFirst && (
-          <p
-            className={`text-sm leading-6 text-[var(--engine-text)] ${
-              isModal ? "whitespace-pre-line" : "line-clamp-3"
-            }`}
-          >
-            {goal.note}
-          </p>
-        )}
-
-        {/* No modal o cabeçalho já anuncia o veículo. Post livre só mostra
-            quando foi publicado a partir de um carro. */}
-        {/* Mesmo gesto do CarCard: o nome do veiculo E a porta da ficha. Aqui
-            o carro e de outra pessoa, entao a ficha abre so em leitura — a
-            camada de fabrica sai de marca/modelo/ano, que ja sao publicos, e o
-            que o dono declarou vem sempre etiquetado por `publicSpecSheet`. */}
-        {(!isFreePost || goal.title) && (goal.brand || goal.model) && (
-          <button
-            type="button"
-            onClick={() => setSpecsOpen(true)}
-            aria-label={t("specSheet.cardAction")}
-            className="group/specs -mx-1 flex max-w-full items-center gap-1.5 rounded-lg px-1 py-0.5 text-left text-[13px] leading-5 text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)]"
-          >
-            <span className="min-w-0 truncate">
-              <span className="font-bold italic text-[var(--engine-text)]">
-                {isModal ? getVehicleTitle(goal) : getVehicleTitleShort(goal)}
-              </span>
-              {goal.year ? <span>{` · ${formatFipeYear(goal.year, t("car.zeroKm"))}`}</span> : null}
-            </span>
-            <ChevronRight
-              size={14}
-              aria-hidden="true"
-              className="shrink-0 transition group-hover/specs:translate-x-0.5 group-hover/specs:text-[var(--engine-accent)]"
-            />
-          </button>
-        )}
-
-        {!isFreePost &&
-          (isGoalCompleted(goal) ? (
-            /* Meta batida: barra cheia, "100%" e selo diziam a mesma coisa
-               três vezes. Fica só o selo. */
-            <div className="flex items-center gap-2">
-              <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--engine-accent-soft)] px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-[var(--engine-accent)]">
-                <Trophy size={11} />
-                {t("community.completed")}
-              </span>
-              <InfoTip text={t("community.privacyLine")} align="right" />
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 max-w-[220px] flex-1 overflow-hidden rounded-full bg-[var(--engine-surface-2)]">
-                <span
-                  className="block h-full rounded-full bg-[var(--engine-accent)] transition-[width] duration-500"
-                  style={{ width: `${progress}%` }}
-                />
-              </span>
-              <span className="shrink-0 text-[11px] font-black tabular-nums text-[var(--engine-accent)]">
-                {progress.toFixed(0)}%
-              </span>
-              <InfoTip text={t("community.privacyLine")} align="right" />
-            </div>
-          ))}
-      </div>
+      {/* Legenda à moda do Instagram: @ do autor + texto, cortada com "mais".
+          No modal ela vem inteira. */}
+      {goal.note && !textFirst && (
+        <PostCaption
+          goal={goal}
+          t={t}
+          full={isModal || captionOpen}
+          onExpand={() => setCaptionOpen(true)}
+        />
+      )}
 
       {/* Prévia dos comentários, como no Instagram: "ver todos os N" e o
           último comentário numa linha. A conversa inteira abre por cima, na
@@ -1213,7 +1481,7 @@ function CommentPreview({ comments, t, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="-mt-1.5 block w-full px-3 pb-3 text-left sm:px-4 sm:pb-4"
+      className="block w-full px-3 pb-3 text-left sm:px-4"
     >
       {comments.length > 1 && (
         <span className="block text-[13px] font-medium text-[var(--engine-text-subtle)] transition hover:text-[var(--engine-text-muted)]">
@@ -1221,8 +1489,8 @@ function CommentPreview({ comments, t, onOpen }) {
         </span>
       )}
       {text && (
-        <span className="mt-0.5 block truncate text-[13px] leading-5 text-[var(--engine-text-muted)]">
-          {who && <span className="mr-1.5 font-bold text-[var(--engine-text)]">{who}</span>}
+        <span className="mt-0.5 block truncate text-[13px] leading-5 text-[var(--engine-text)]">
+          {who && <span className="mr-1 font-bold">{who}</span>}
           {text}
         </span>
       )}
@@ -1432,22 +1700,21 @@ const formatCount = (value, language) => {
   }).format(count);
 };
 
-function ActionButton({ active = false, title, icon, onClick, count = 0, language }) {
+function ActionButton({ active = false, pressed, title, icon, onClick, count = 0, language }) {
+  // Curtido: só o ícone fica vermelho. O número segue na cor do texto: o
+  // acento cheio em número miúdo não passa contraste no escuro.
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-11 items-center gap-1.5 rounded-full px-2 transition-colors sm:h-9 ${
-        active
-          ? "text-[var(--engine-accent)]"
-          : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
-      }`}
+      aria-pressed={pressed ?? (active || undefined)}
+      className="flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl px-2 text-[var(--engine-text)] transition-colors hover:bg-[var(--engine-surface-2)]"
       title={title}
       aria-label={title}
     >
-      {icon}
+      <span className={active ? "text-[var(--engine-accent)]" : ""}>{icon}</span>
       {count > 0 && (
-        <span className="text-[13px] font-bold tabular-nums">
+        <span className="text-[13px] font-semibold tabular-nums">
           {formatCount(count, language)}
         </span>
       )}
@@ -2111,7 +2378,7 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
   // A coluna lateral de comentários só se justifica quando há mídia ocupando a
   // esquerda. Num post de texto ela deixava metade do modal vazia, com um
   // "sem comentários" gigante ao lado de duas linhas de conteúdo.
-  const hasMedia = Boolean(goal?.images?.length || goal?.image || goal?.videoUrl);
+  const hasMedia = Boolean(goal?.images?.length || goal?.image || goal?.videoUrl || goal?.video);
   const sideBySide = isWide && hasMedia;
   const [draft, setDraft] = useState("");
   const [editingCommentId, setEditingCommentId] = useState("");
@@ -2120,6 +2387,16 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
   const composerRef = useRef(null);
 
   const comments = goal?.comments || [];
+  const gallery = goal?.images?.length ? goal.images : goal?.image ? [goal.image] : [];
+  // Caixa da mídia no lightbox: o que sobra da tela depois da coluna de 380px
+  // e do cabeçalho. Lido no render (a troca de tamanho de tela já re-renderiza
+  // pelo useMediaQuery); a moldura final sai da proporção da foto.
+  const mediaBox = sideBySide
+    ? {
+        maxWidth: Math.min(window.innerWidth * 0.95, 1400) - 380,
+        maxHeight: Math.min(window.innerHeight * 0.92, 960) - 54,
+      }
+    : null;
 
   // Quem chega por notificação de comentário (`?comments=1`): no lightbox o
   // compositor já vem focado; fora dele, a folha de comentários abre direto
@@ -2162,25 +2439,13 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
         role="dialog"
         aria-modal="true"
         aria-label={t("community.postTitle")}
-        className={`engine-modal-panel engine-pop ${sideBySide ? "sm:max-w-5xl" : "sm:max-w-2xl"}`}
+        className={`engine-modal-panel engine-pop ${sideBySide ? "sm:w-auto sm:max-w-[95vw]" : "sm:max-w-xl"}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3.5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--engine-accent)]">
-              {t("community.postTitle")}
-            </p>
-            {/* Post sem carro não tem veículo pra anunciar: getVehicleTitle
-                caía no rótulo genérico "Meta", que é justamente o que ele não
-                é. Nesse caso o cabeçalho identifica pelo autor. */}
-            <h2 className="mt-1 truncate text-base font-extrabold italic text-[var(--engine-text)] dark:text-white">
-              {!goal
-                ? t("common.loading")
-                : goal.kind === POST_KIND_POST && !goal.title
-                  ? goal.author
-                  : getVehicleTitle(goal)}
-            </h2>
-          </div>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] py-1.5 pl-4 pr-2">
+          <h2 className="text-sm font-bold text-[var(--engine-text)]">
+            {goal ? t("community.postTitle") : t("common.loading")}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -2192,59 +2457,82 @@ function PostModal({ goal, loading, openComments, t, onClose, cardProps }) {
           </button>
         </header>
 
-        {goal ? (
-          <div className="flex min-h-0 flex-1 lg:flex-row">
-            <div className="engine-scroll engine-safe-bottom min-h-0 min-w-0 flex-1 overflow-y-auto lg:border-r lg:border-[var(--engine-border)]">
-              {sideBySide ? (
-                <GoalCard
-                  {...cardProps}
-                  goal={goal}
+        {goal && sideBySide ? (
+          <div className="flex min-h-0 flex-1">
+            {/* Mídia à esquerda, do tamanho da proporção dela. */}
+            <div className="flex min-w-0 items-center justify-center bg-[var(--engine-surface-2)]">
+              {gallery.length > 0 ? (
+                <PostGallery
+                  images={gallery}
+                  alt={goal.title}
                   t={t}
-                  variant="modal"
-                  // A lista já está ao lado: o balão só leva ao compositor.
-                  commentPreview={false}
-                  onCommentClick={() => composerRef.current?.focus()}
+                  box={mediaBox}
+                  onDoubleTap={() => {
+                    if (!cardProps.interactions?.liked) cardProps.onLike(goal.id);
+                  }}
                 />
+              ) : goal.video ? (
+                <div className="w-[min(560px,50vw)]">
+                  <PostVideoPlayer video={goal.video} autoPlay={false} />
+                </div>
               ) : (
-                <GoalCard
-                  // A chave troca com o post: `initialCommentsOpen` é estado
-                  // inicial, e o mesmo cartão reaproveitado não reabriria a
-                  // folha ao trocar de publicação.
-                  key={goal.id}
-                  {...cardProps}
-                  goal={goal}
-                  t={t}
-                  variant="modal"
-                  initialCommentsOpen={openComments}
-                />
+                <div className="w-[min(640px,50vw)]">
+                  <PostVideo url={goal.videoUrl} t={t} />
+                </div>
               )}
             </div>
 
-            {sideBySide && (
-              <div className="flex min-h-0 w-[360px] shrink-0 flex-col">
-                <CommentsPanel
+            {/* Coluna da direita: autor, ficha, legenda inteira e ações em
+                cima; a conversa rola embaixo, com o compositor preso ao pé. */}
+            <div className="flex min-h-0 w-[380px] shrink-0 flex-col border-l border-[var(--engine-border)]">
+              <div className="engine-scroll max-h-[55%] shrink-0 overflow-y-auto border-b border-[var(--engine-border)]">
+                <GoalCard
+                  {...cardProps}
                   goal={goal}
-                  comments={comments}
-                  draft={draft}
-                  editingCommentId={editingCommentId}
-                  editingDraft={editingDraft}
-                  commentMenuId={commentMenuId}
-                  currentUserId={cardProps.currentUserId}
-                  composerRef={composerRef}
                   t={t}
-                  onDraftChange={setDraft}
-                  onSubmitComment={submitComment}
-                  onOpenProfile={cardProps.onOpenProfile}
-                  onStartEditComment={startEditComment}
-                  onEditingDraftChange={setEditingDraft}
-                  onSubmitEditComment={submitEditComment}
-                  onCancelEdit={cancelEdit}
-                  onDeleteComment={cardProps.onDeleteComment}
-                  onReportComment={cardProps.onReportComment}
-                  onCommentMenuChange={setCommentMenuId}
+                  variant="modal"
+                  hideMedia
+                  // A lista já está logo abaixo: o balão só leva ao compositor.
+                  commentPreview={false}
+                  onCommentClick={() => composerRef.current?.focus()}
                 />
               </div>
-            )}
+              <CommentsPanel
+                goal={goal}
+                comments={comments}
+                draft={draft}
+                editingCommentId={editingCommentId}
+                editingDraft={editingDraft}
+                commentMenuId={commentMenuId}
+                currentUserId={cardProps.currentUserId}
+                composerRef={composerRef}
+                t={t}
+                onDraftChange={setDraft}
+                onSubmitComment={submitComment}
+                onOpenProfile={cardProps.onOpenProfile}
+                onStartEditComment={startEditComment}
+                onEditingDraftChange={setEditingDraft}
+                onSubmitEditComment={submitEditComment}
+                onCancelEdit={cancelEdit}
+                onDeleteComment={cardProps.onDeleteComment}
+                onReportComment={cardProps.onReportComment}
+                onCommentMenuChange={setCommentMenuId}
+              />
+            </div>
+          </div>
+        ) : goal ? (
+          <div className="engine-scroll engine-safe-bottom min-h-0 flex-1 overflow-y-auto">
+            <GoalCard
+              // A chave troca com o post: `initialCommentsOpen` é estado
+              // inicial, e o mesmo cartão reaproveitado não reabriria a
+              // folha ao trocar de publicação.
+              key={goal.id}
+              {...cardProps}
+              goal={goal}
+              t={t}
+              variant="modal"
+              initialCommentsOpen={openComments}
+            />
           </div>
         ) : (
           <p className="px-4 py-16 text-center text-sm font-semibold text-[var(--engine-text-muted)]">
