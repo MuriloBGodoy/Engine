@@ -147,10 +147,12 @@ export function Footer({ user = null }) {
   const lojas = [LINKS.app.googlePlay, LINKS.app.appStore].some(temDestino);
 
   return (
-    <footer className="mt-12 border-t border-[var(--engine-border)] pt-8">
-      {/* Flex e não grade fixa: o número de colunas depende de quantos links
-          têm destino (ver `temDestino`), e grade de 5 colunas deixava buraco. */}
-      <div className="engine-container grid gap-8 pb-8 md:flex md:flex-wrap md:justify-between md:gap-12">
+    <footer className="mt-8 border-t border-[var(--engine-border)] pt-5 lg:mt-12 lg:pt-8">
+      {/* No celular o rodapé inteiro (marca, redes, três colunas de links)
+          dizia "site", não "app": nenhum app de celular tem rodapé. Lá fica
+          só a linha mínima abaixo; Planos, Apoie e Anuncie já vivem em
+          Configurações, que é onde a pessoa procura. */}
+      <div className="engine-container hidden gap-8 pb-8 lg:flex lg:flex-wrap lg:justify-between lg:gap-12">
         {/* Marca + redes sociais */}
         <div>
           <div className="flex items-center gap-2.5">
@@ -240,6 +242,21 @@ export function Footer({ user = null }) {
           </div>
         </div>
         )}
+      </div>
+
+      {/* Celular: só o que a lei pede e o caminho para falar com a gente. */}
+      <div className="engine-container flex flex-wrap items-center justify-center gap-x-5 pb-4 lg:hidden">
+        {[
+          { href: LINKS.legal.terms, label: t("footer.legal.terms") },
+          { href: LINKS.legal.privacy, label: t("footer.legal.privacy") },
+          { href: LINKS.help.contact, label: t("footer.help.contact") },
+        ]
+          .filter((item) => temDestino(item.href))
+          .map((item) => (
+            <FooterLink key={item.label} href={item.href}>
+              {item.label}
+            </FooterLink>
+          ))}
       </div>
 
       {/* Barra de copyright */}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { CarFront, Plus, Search } from "lucide-react";
+import { CarFront, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { engineDB } from "../../services/db";
 import {
   PRODUCT_CATEGORIES,
@@ -38,6 +38,12 @@ export function ShopsTab({ user, region, onNewProduct }) {
   const [condition, setCondition] = useState("all");
   const [onlyMyCar, setOnlyMyCar] = useState(false);
   const [onlyRegion, setOnlyRegion] = useState(true);
+  /* No celular os filtros ficam recolhidos: abertos, eram quatro blocos
+     (serve no meu carro, categorias, condição, região) empurrando o primeiro
+     produto para fora da tela. No desktop continuam todos à vista. */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters =
+    (onlyMyCar ? 1 : 0) + (category === "all" ? 0 : 1) + (condition === "all" ? 0 : 1);
 
   useEffect(() => subscribeProducts((list) => setProducts(list)), []);
   useEffect(() => {
@@ -84,13 +90,31 @@ export function ShopsTab({ user, region, onNewProduct }) {
             className="min-w-0 flex-1 border-0 bg-transparent text-base font-semibold text-[var(--engine-text)] outline-none placeholder:font-medium placeholder:text-[var(--engine-text-muted)]"
           />
         </label>
+        {/* Só no celular: abre e fecha os filtros, com a conta dos que estão
+            ligados, para dar para ver que existem sem ocupar a tela. */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-[var(--engine-border)] bg-[var(--engine-surface)] px-4 text-[14px] font-bold text-[var(--engine-text)] lg:hidden"
+        >
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          {t("shops.filters")}
+          {activeFilters > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--engine-accent)] px-1.5 text-[11px] font-black text-white">
+              {activeFilters}
+            </span>
+          )}
+        </button>
         {cars.length > 0 && (
           <button
             type="button"
             role="switch"
             aria-checked={onlyMyCar}
             onClick={() => setOnlyMyCar((value) => !value)}
-            className="flex items-center gap-2.5 rounded-[14px] border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 py-2.5 text-left lg:w-[340px]"
+            className={`items-center gap-2.5 rounded-[14px] border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 py-2.5 text-left lg:flex lg:w-[340px] ${
+              filtersOpen ? "flex" : "hidden"
+            }`}
           >
             <CarFront size={20} aria-hidden="true" className="shrink-0 text-[var(--engine-text)]" />
             <span className="min-w-0 flex-1">
@@ -106,16 +130,19 @@ export function ShopsTab({ user, region, onNewProduct }) {
             <SwitchKnob on={onlyMyCar} />
           </button>
         )}
+        {/* No celular anunciar já é o botão da barra do vendedor, logo acima;
+            dois botões para a mesma ação na mesma tela confundiam. */}
         <button
           type="button"
           onClick={onNewProduct}
-          className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-[14px] bg-[var(--engine-accent)] px-4 text-[15px] font-bold text-white"
+          className="hidden min-h-12 items-center justify-center gap-1.5 rounded-[14px] bg-[var(--engine-accent)] px-4 text-[15px] font-bold text-white lg:inline-flex"
         >
           <Plus size={18} aria-hidden="true" />
           {t("shop.browse.advertise")}
         </button>
       </div>
 
+      <div className={filtersOpen ? "" : "hidden lg:block"}>
       <ChipRow className="pt-2" label={t("shop.browse.categories")}>
         {[{ value: "all", label: t("shop.browse.all") }, ...PRODUCT_CATEGORIES.map((id) => ({ value: id, label: productCategoryLabel(id, t) }))].map((option) => (
           <Chip key={option.value} selected={category === option.value} onClick={() => setCategory(option.value)}>
@@ -139,6 +166,7 @@ export function ShopsTab({ user, region, onNewProduct }) {
           </Chip>
         )}
       </ChipRow>
+      </div>
 
       <div className="flex items-baseline justify-between gap-3 pb-3 pt-5">
         <h2 className="font-display text-lg font-bold text-[var(--engine-text)]">

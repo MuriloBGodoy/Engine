@@ -1311,15 +1311,24 @@ h5 {
   color: var(--engine-text);
 }
 
-/* Header logado em celular de 320–379px: o pino da região perde a seta e
-   o botão de tema sai (fica em Configurações) para tudo caber sem rolar. */
+/* O botão de tema sai do header do celular em qualquer largura: eram sete
+   ícones numa barra só (logo, região, sino, tema, mensagens, avatar,
+   configurações), e claro/escuro é coisa que se escolhe uma vez na vida —
+   o lugar dele é Configurações, onde já está. */
+@media (max-width: 1023px) {
+  .engine-mobile-header .engine-theme-toggle {
+    display: none;
+  }
+}
+
+/* Header logado em celular de 320–379px: o pino da região perde a seta
+   para tudo caber sem rolar. */
 @media (max-width: 379px) {
   .engine-mobile-header .region-pill {
     gap: 4px;
     padding: 0 10px;
   }
-  .engine-mobile-header .region-pill-caret,
-  .engine-mobile-header .engine-theme-toggle {
+  .engine-mobile-header .region-pill-caret {
     display: none;
   }
 }

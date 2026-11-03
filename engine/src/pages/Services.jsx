@@ -2985,8 +2985,14 @@ export function Services({ user, settings }) {
         {/* No celular o título em caixa alta mais o subtítulo tomavam a tela
             inteira antes de qualquer anúncio aparecer. Lá o cabeçalho é uma
             linha; a explicação fica para o desktop, onde sobra espaço. */}
-        <div className="grid gap-4 p-4 sm:gap-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-8">
-          <div>
+        <div
+          className={`grid gap-4 p-4 sm:gap-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-8 ${
+            user?.uid && stats.total === 0 ? "max-sm:hidden" : ""
+          }`}
+        >
+          {/* Quem já entrou não precisa do anúncio da seção: no celular o
+              título em caixa alta era a primeira coisa da tela, toda vez. */}
+          <div className={user?.uid ? "hidden sm:block" : ""}>
             <h1 className="max-w-4xl text-lg font-extrabold uppercase italic leading-tight tracking-tight sm:text-3xl">
               {t("services.title")}
             </h1>

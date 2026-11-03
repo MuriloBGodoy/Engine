@@ -1,5 +1,5 @@
 import ReactECharts from "echarts-for-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Calculator, Check, ChevronRight, Trophy } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
@@ -9,6 +9,9 @@ import { simulateCar, isSimulatorAvailable } from "../services/ownership";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarName } from "../services/carDisplay";
 
+/** Quantos itens cada lista mostra no celular antes do "ver todos". */
+const COMPACT_LIMIT = 3;
+
 export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
   const { i18n, t } = useTranslation();
   const isDark = useIsDark();
@@ -17,6 +20,11 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
   // como lista de progresso — mais legível e sem carregar o canvas.
   const isCompact = useMediaQuery("(max-width: 639px)");
   const hideValues = Boolean(settings?.privacy?.lockSensitiveValues);
+  /* Com quatro carros a tela já rolava sem fim, e cada carro novo piora:
+     no celular as duas listas mostram os três primeiros e o resto vem a
+     pedido. No desktop continuam inteiras. */
+  const [allGoals, setAllGoals] = useState(false);
+  const [allCompare, setAllCompare] = useState(false);
 
   // Comparador de custo real. A conta é a de `simulateCar`, a mesma do modal e
   // do card: carro próprio à vista, combustível da FIPE, consumo do INMETRO e o
@@ -81,6 +89,10 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
         .sort((a, b) => a.value - b.value),
     [cars],
   );
+
+  // A lista do celular vai da meta mais adiantada para a mais atrasada.
+  const goalsOrdered = useMemo(() => [...chartData].reverse(), [chartData]);
+  const goalsShown = allGoals ? goalsOrdered : goalsOrdered.slice(0, COMPACT_LIMIT);
 
   const axisColor = isDark ? "#f4f6fa" : "#0b0e14";
   const mutedColor = isDark ? "#6b7480" : "#8a93a3";
@@ -158,8 +170,9 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
             {cars.length ? t("dashboard.emptyGoals") : t("dashboard.empty")}
           </div>
         ) : isCompact ? (
+          <>
           <ul className="space-y-4">
-            {[...chartData].reverse().map((item) => (
+            {goalsShown.map((item) => (
               <li key={item.name}>
                 <div className="mb-1.5 flex items-baseline justify-between gap-3">
                   <span className="min-w-0 truncate text-sm font-bold text-[var(--engine-text)]">
@@ -188,6 +201,18 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
               </li>
             ))}
           </ul>
+          {goalsOrdered.length > COMPACT_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setAllGoals((open) => !open)}
+              className="mt-4 min-h-11 w-full rounded-xl border border-[var(--engine-border)] text-sm font-bold text-[var(--engine-text)]"
+            >
+              {allGoals
+                ? t("dashboard.showLess")
+                : t("dashboard.showAll", { count: goalsOrdered.length })}
+            </button>
+          )}
+          </>
         ) : (
           <ReactECharts option={option} style={{ height: `${chartHeight}px` }} />
         )}
@@ -207,7 +232,7 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
           {/* Mobile: cartões. Uma tabela de 5 colunas viraria rolagem lateral
               dentro da página, que é o pior padrão possível no celular. */}
           <ul className="space-y-3 sm:hidden">
-            {comparison.map((row) => (
+            {(allCompare ? comparison : comparison.slice(0, COMPACT_LIMIT)).map((row) => (
               <li key={row.car.id}>
                 <button
                   type="button"
@@ -304,6 +329,17 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
               </li>
             ))}
           </ul>
+          {comparison.length > COMPACT_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setAllCompare((open) => !open)}
+              className="mt-3 min-h-11 w-full rounded-xl border border-[var(--engine-border)] text-sm font-bold text-[var(--engine-text)] sm:hidden"
+            >
+              {allCompare
+                ? t("dashboard.showLess")
+                : t("dashboard.showAll", { count: comparison.length })}
+            </button>
+          )}
 
           <div className="engine-scroll hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[640px] border-collapse text-left">
