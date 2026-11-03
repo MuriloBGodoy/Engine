@@ -54,7 +54,17 @@ export function RegionPicker({ compact = false, className = "" }) {
       >
         <MapPin size={15} className="region-pill-pin" />
         {!compact && <span className="region-pill-label">{label}</span>}
-        {compact && active && <span className="region-pill-dot" />}
+        {/* No celular cabia só uma bolinha, e a pílula ficava com cara de
+            campo vazio. A sigla ("SP", "BR") ocupa o mesmo espaço e diz
+            onde a pessoa está. */}
+        {compact && active && (
+          <span className="region-pill-label">
+            {(region.state && region.state !== "all"
+              ? region.state
+              : region.country
+            ).toUpperCase()}
+          </span>
+        )}
         <ChevronDown
           size={13}
           className={`region-pill-caret ${open ? "region-pill-caret-open" : ""}`}

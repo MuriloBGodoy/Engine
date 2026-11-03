@@ -2982,12 +2982,15 @@ export function Services({ user, settings }) {
     <section className="space-y-5 pb-28 sm:space-y-8 sm:pb-10">
 
       <header className="-mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
-        <div className="grid gap-5 p-5 sm:gap-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-8">
+        {/* No celular o título em caixa alta mais o subtítulo tomavam a tela
+            inteira antes de qualquer anúncio aparecer. Lá o cabeçalho é uma
+            linha; a explicação fica para o desktop, onde sobra espaço. */}
+        <div className="grid gap-4 p-4 sm:gap-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-8">
           <div>
-            <h1 className="max-w-4xl text-2xl font-extrabold uppercase italic leading-tight tracking-tight sm:text-3xl">
+            <h1 className="max-w-4xl text-lg font-extrabold uppercase italic leading-tight tracking-tight sm:text-3xl">
               {t("services.title")}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+            <p className="mt-3 hidden max-w-2xl text-sm font-medium leading-6 text-[var(--engine-text-muted)] sm:block">
               {t("services.subtitle")}
             </p>
           </div>
@@ -3568,7 +3571,14 @@ function SellerBar({
 
   return (
     <div className="border-t border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:px-8">
+      {/* Visitante: tudo numa linha só. Empilhado, o convite virava um bloco
+          alto com um botão vermelho de ponta a ponta antes de qualquer
+          anúncio — peso de dono numa tela de quem só está olhando. */}
+      <div
+        className={`flex gap-3 p-4 sm:flex-row sm:items-center sm:px-8 ${
+          guest ? "flex-row items-center" : "flex-col"
+        }`}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             type="button"
@@ -3577,7 +3587,11 @@ function SellerBar({
             className="group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-ring)]"
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-sm font-bold uppercase text-white">
-              {sellerProfile.avatar ? (
+              {/* Visitante não tem nome: as iniciais saíam "UE", de "Usuario
+                  Engine", com cara de defeito. */}
+              {guest ? (
+                <BriefcaseBusiness size={18} aria-hidden="true" />
+              ) : sellerProfile.avatar ? (
                 <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
               ) : (
                 getInitials(sellerProfile.displayName)
@@ -3589,7 +3603,9 @@ function SellerBar({
                 {guest ? t("pro.guestSeller") : sellerProfile.displayName || t("services.sellerProfile")}
               </span>
               {guest ? (
-                <span className="mt-0.5 block truncate text-xs font-medium text-[var(--engine-text-muted)]">
+                /* Numa linha só com o botão ao lado, a frase cortava no meio
+                   ("Serviço ou produto, de …"). Fica para o desktop. */
+                <span className="mt-0.5 hidden truncate text-xs font-medium text-[var(--engine-text-muted)] sm:block">
                   {t("pro.guestSellerHint")}
                 </span>
               ) : (
@@ -3618,7 +3634,13 @@ function SellerBar({
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-[minmax(0,1fr)_auto] sm:flex sm:shrink-0 sm:items-center">
+        <div
+          className={`gap-2 sm:flex sm:shrink-0 sm:items-center ${
+            guest
+              ? "flex shrink-0 items-center"
+              : "grid grid-cols-1 min-[360px]:grid-cols-[minmax(0,1fr)_auto]"
+          }`}
+        >
           {!guest && (
           <button
             type="button"

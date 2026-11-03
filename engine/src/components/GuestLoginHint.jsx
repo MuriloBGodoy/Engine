@@ -66,20 +66,20 @@ export function GuestLoginHint({ placement = "top" }) {
            também: é `fixed`, então o padding do body não a afasta do notch em
            landscape. `engine-guest-dock` é o gancho do index.css que a recolhe
            enquanto o convite de instalação ocupa o mesmo trilho. */
-        className="engine-guest-dock engine-rise fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] py-2 pl-3.5 pr-1 shadow-[var(--engine-shadow-md)] lg:hidden"
+        /* Encostada na barra de abas e sangrando até as bordas: flutuando como
+           cartão solto, com folga dos dois lados, parecia um anúncio por cima
+           do conteúdo. Colada, lê-se como parte do rodapé do app. */
+        className="engine-guest-dock engine-rise fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 flex items-center gap-2 border-t border-[var(--engine-border)] bg-[var(--engine-surface)] py-1.5 pl-[max(0.875rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] lg:hidden"
       >
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-bold leading-tight text-[var(--engine-text)]">
-            {t("guest.hint.title")}
-          </p>
-          <p className="mt-0.5 line-clamp-1 text-[12px] leading-tight text-[var(--engine-text-muted)] max-[359px]:hidden">
-            {t("guest.hint.desc")}
-          </p>
-        </div>
+        {/* Sem descrição: em 390px ela cortava no meio da frase
+            ("Entre para publicar, segui…"). Título e botão bastam. */}
+        <p className="min-w-0 flex-1 truncate text-[13px] font-bold leading-tight text-[var(--engine-text)]">
+          {t("guest.hint.title")}
+        </p>
         <Link
           to="/register"
           onClick={dismiss}
-          className="flex h-11 shrink-0 items-center rounded-full bg-[var(--engine-accent)] px-3.5 text-[13px] font-bold text-white transition active:scale-95"
+          className="flex h-10 shrink-0 items-center rounded-full bg-[var(--engine-accent)] px-3.5 text-[13px] font-bold text-white transition active:scale-95"
         >
           {t("guest.hint.cta")}
         </Link>
