@@ -162,6 +162,12 @@ site_url = "https://enginegarage.netlify.app"
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
+  # Domínio próprio, registrado em 03/11/2026. Entra na lista antes de o DNS
+  # apontar: aceitar um endereço que ainda não resolve não quebra nada, e no
+  # dia da virada o login já funciona. O `site_url` acima só muda quando o
+  # domínio estiver no ar — é ele que monta os links dos e-mails.
+  "https://enginegarage.com.br/**",
+  "https://www.enginegarage.com.br/**",
   "https://enginegarage.netlify.app/**",
   "https://*--enginegarage.netlify.app/**",
   "http://localhost:5173/**",

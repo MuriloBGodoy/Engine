@@ -12,7 +12,7 @@
 
 export const SHARE_REF = "share";
 
-const origin = () => (typeof window !== "undefined" ? window.location.origin : "https://engine.app");
+const origin = () => (typeof window !== "undefined" ? window.location.origin : "https://enginegarage.com.br");
 
 /** Acrescenta `ref=share` sem apagar parâmetros que já existam (convite do clube). */
 export const withShareRef = (url) => {
