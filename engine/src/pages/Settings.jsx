@@ -11,6 +11,7 @@ import {
   Download,
   CreditCard,
   EyeOff,
+  HeartHandshake,
   KeyRound,
   Loader2,
   LogOut,
@@ -524,6 +525,16 @@ function PlanGroup({ t, i18n, user }) {
           {opening && <Loader2 size={18} className="animate-spin text-[var(--engine-text-muted)]" />}
         </Row>
       )}
+      {/* Apoiar só existia no rodapé, que no celular virou três links. Aqui,
+          colado em "Seu plano", é onde a pessoa que não quer assinar está
+          olhando — e é a única porta para /apoie no celular. */}
+      <Row
+        icon={HeartHandshake}
+        label={t("settings.plan.support")}
+        hint={t("settings.plan.supportHint")}
+        chevron
+        onClick={() => navigate("/apoie")}
+      />
     </Group>
   );
 }
