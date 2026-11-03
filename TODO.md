@@ -7,6 +7,27 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 
 ---
 
+## Domínio enginegarage.com.br (comprado em 03/11/2026)
+
+Registrado no registro.br, válido até 03/11/2027, DNS no próprio registro.br.
+A zona fica travada ("domínio em transição") nas primeiras horas.
+
+- [ ] Zona DNS, quando liberar (o editor não aceita `@`; usar o nome cheio):
+      `A enginegarage.com.br → 75.2.60.5` e
+      `CNAME www.enginegarage.com.br → enginegarage.netlify.app`.
+- [ ] Netlify: adicionar o domínio (Domain management) para emitir o certificado.
+- [ ] Supabase: virar `site_url` para o domínio novo e `config push`
+      (os redirects já foram liberados no commit 5b5d3fe).
+- [ ] E-mail de entrada: ImprovMX grátis, contato@/suporte@/privacidade@
+      redirecionando para enginegarage.app@gmail.com (registros MX + SPF).
+- [ ] E-mail do app: Resend grátis (3 mil/mês) no lugar do remetente de teste
+      do Supabase, que só manda uns poucos por hora. Registros SPF/DKIM.
+- [ ] Responder como contato@ pelo Gmail, usando o SMTP do Resend.
+- [ ] Depois do domínio: verificação de marca no Google, para a tela de login
+      parar de mostrar `evaankeqxykcktxvesbf.supabase.co`.
+
+---
+
 ## Pedidos do Murilo (30/10/2026)
 
 - [ ] Editor de texto na foto (`ImageEditor.jsx`): posicionar o texto
