@@ -922,6 +922,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               unlocked={unlockedAchievements}
               likesReceived={likesReceived}
               followersCount={followers.length}
+              isOwn={isOwnProfile}
             />
           )}
         </div>

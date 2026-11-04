@@ -17,16 +17,22 @@ function formatNumber(value, language) {
  * (`visibleTiers`). O progresso numérico só aparece quando a tela sabe o valor
  * atual (`value`); quando não sabe, mostra só qual é o próximo degrau.
  */
-function SeriesCard({ series, tiers, unlocked, value }) {
+function SeriesCard({ series, tiers, unlocked, value, showLocked = true }) {
   const { t, i18n } = useTranslation();
   const Icon = SERIES_ICON[series];
   // Sem o valor, o "próximo" é o primeiro degrau ainda não conquistado.
   const known = typeof value === "number";
   const batidos = tiers.filter((tier) => unlocked.has(seriesTierId(series, tier)));
-  const mostrar = known
-    ? visibleTiers(tiers, value)
-    : [...batidos, ...tiers.filter((tier) => !batidos.includes(tier)).slice(0, 1)];
-  const proximo = mostrar.find((tier) => !unlocked.has(seriesTierId(series, tier)));
+  // No perfil de outra pessoa a série mostra só o que ela tem: o que falta
+  // é assunto de quem está correndo atrás, não de quem está olhando.
+  const mostrar = !showLocked
+    ? batidos
+    : known
+      ? visibleTiers(tiers, value)
+      : [...batidos, ...tiers.filter((tier) => !batidos.includes(tier)).slice(0, 1)];
+  const proximo = showLocked
+    ? mostrar.find((tier) => !unlocked.has(seriesTierId(series, tier)))
+    : null;
   const algum = batidos.length > 0;
 
   return (
@@ -114,13 +120,39 @@ function SeriesCard({ series, tiers, unlocked, value }) {
  * de dados, via `unlocked`. Os valores que a tela conhece (curtidas e
  * seguidores) vêm por props; as outras séries mostram só o próximo degrau.
  */
-export function AchievementsTab({ unlocked = new Set(), likesReceived = 0, followersCount = 0 }) {
+export function AchievementsTab({
+  unlocked = new Set(),
+  likesReceived = 0,
+  followersCount = 0,
+  isOwn = true,
+}) {
   const { t } = useTranslation();
   const values = { likes: likesReceived, followers: followersCount };
 
+  // Perfil alheio é vitrine, não lista de tarefas: mostra o que a pessoa
+  // conquistou. O que falta só interessa a quem pode ir buscar, e por isso
+  // aparece inteiro no seu próprio perfil.
+  const ganhou = (item) =>
+    item.id
+      ? unlocked.has(item.id)
+      : item.tiers.some((tier) => unlocked.has(seriesTierId(item.series, tier)));
+
+  const categorias = ACHIEVEMENT_CATALOG.map((category) => ({
+    ...category,
+    mostrados: isOwn ? category.items : category.items.filter(ganhou),
+  })).filter((category) => isOwn || category.mostrados.length > 0);
+
+  if (!categorias.length) {
+    return (
+      <p className="rounded-2xl border border-dashed border-[var(--engine-border)] p-8 text-center text-sm font-medium text-[var(--engine-text-muted)]">
+        {t("achievements.noneYet")}
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      {ACHIEVEMENT_CATALOG.map((category) => {
+      {categorias.map((category) => {
         const ids = category.items.flatMap((item) =>
           item.id ? [item.id] : item.tiers.map((tier) => seriesTierId(item.series, tier)),
         );
@@ -132,11 +164,13 @@ export function AchievementsTab({ unlocked = new Set(), likesReceived = 0, follo
                 {t(`achievements.categories.${category.key}`)}
               </h3>
               <span className="text-[11.5px] font-bold text-[var(--engine-text-muted)]">
-                {t("achievements.categoryProgress", { atual: got, total: ids.length })}
+                {isOwn
+                  ? t("achievements.categoryProgress", { atual: got, total: ids.length })
+                  : t("achievements.earnedCount", { count: got })}
               </span>
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {category.items.map((item) =>
+              {category.mostrados.map((item) =>
                 item.id ? (
                   <AchievementMilestone
                     key={item.id}
@@ -150,6 +184,7 @@ export function AchievementsTab({ unlocked = new Set(), likesReceived = 0, follo
                     tiers={item.tiers}
                     unlocked={unlocked}
                     value={values[item.series]}
+                    showLocked={isOwn}
                   />
                 ),
               )}
