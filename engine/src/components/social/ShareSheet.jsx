@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Check, Copy, Mail, Search, Send, Share2, X } from "lucide-react";
 import {
   attachmentFromGoal,
+  attachmentFromShare,
   conversationPartner,
   profileCardFromSettings,
   sendMessage,
@@ -96,10 +97,16 @@ export function ShareSheet({ open, payload, user, settings, onClose }) {
     setSendingTo(person.userId);
     try {
       const conversationId = await startConversation(profileCardFromSettings(settings, user), person);
-      // Post viaja como anexo (cartão com foto); o resto, como link no texto.
-      await sendMessage(conversationId, payload.goal
-        ? { senderId: userId, text: note.trim(), attachment: attachmentFromGoal(payload.goal) }
-        : { senderId: userId, text: [note.trim(), `${title} ${payload.url}`.trim()].filter(Boolean).join("\n") });
+      // Tudo viaja como cartão: post pelo anexo de sempre, o resto pelo
+      // anexo genérico. Mandar o endereço cru no texto deixava o id do
+      // clube à mostra e o balão ilegível.
+      await sendMessage(conversationId, {
+        senderId: userId,
+        text: note.trim(),
+        attachment: payload.goal
+          ? attachmentFromGoal(payload.goal)
+          : attachmentFromShare({ ...payload, title }),
+      });
       setSentTo((current) => [...current, person.userId]);
       track("engine_dm");
     } catch (error) {

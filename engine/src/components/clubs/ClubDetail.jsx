@@ -180,7 +180,14 @@ export function ClubDetail({ clubId, onClose }) {
     // Link de membro leva o convite: quem entrar por ele ganha padrinho
     // (o `ref` do convite tem prioridade sobre o `ref=share`).
     const url = `${window.location.origin}/clubs/${clubId}${isMember && uid ? `?ref=${uid}` : ""}`;
-    openShareSheet({ url, title: club?.name || "Engine", kind: "club" });
+    openShareSheet({
+      url,
+      title: club?.name || "Engine",
+      kind: "club",
+      // O cartão na conversa mostra a cara do clube, não o endereço.
+      subtitle: club?.tag ? `#${club.tag}` : "",
+      image: club?.coverUrl || club?.logoUrl || "",
+    });
   };
 
   if (loading && !club) {

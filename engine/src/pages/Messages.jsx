@@ -954,7 +954,12 @@ function MessageList({ messages, conversation, userId, locale, dayLabels, t, onO
   );
 }
 
+/** O que o cartão promete ao ser tocado, conforme o que ele carrega. */
+const attachmentAction = (attachment, t) =>
+  attachment?.href ? t("messages.openAttachment") : t("messages.viewPost");
+
 function MessageBubble({ message, mine, deletable = mine, editable = false, locale, t, onOpenPost, onDelete, onEdit, onReport }) {
+  const navigate = useNavigate();
   const attachment = message.attachment;
   const imageData = message.imageData;
   const gifData = message.gifData;
@@ -1015,7 +1020,11 @@ function MessageBubble({ message, mine, deletable = mine, editable = false, loca
         {attachment && (
           <button
             type="button"
-            onClick={() => onOpenPost(attachment.goalId)}
+            /* Post abre no visualizador de post; clube, evento, anúncio e
+               perfil são navegação normal, pelo caminho guardado no anexo. */
+            onClick={() =>
+              attachment.href ? navigate(attachment.href) : onOpenPost(attachment.goalId)
+            }
             className={`mb-2 block w-full overflow-hidden rounded-xl text-left transition ${
               mine ? "bg-black/15" : "bg-[var(--engine-surface)]"
             }`}
@@ -1036,7 +1045,9 @@ function MessageBubble({ message, mine, deletable = mine, editable = false, loca
                   mine ? "text-white/75" : "text-[var(--engine-text-subtle)]"
                 }`}
               >
-                {attachment.author} · {t("messages.viewPost")}
+                {[attachment.author || attachment.subtitle, attachmentAction(attachment, t)]
+                  .filter(Boolean)
+                  .join(" · ")}
               </span>
             </span>
           </button>

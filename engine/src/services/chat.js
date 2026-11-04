@@ -170,6 +170,33 @@ export const conversationUnread = (conversation = {}, userId = "") =>
 export const attachmentSummary = (attachment) =>
   attachment?.title ? `📷 ${attachment.title}` : "📷 Publicação";
 
+/**
+ * Anexo de qualquer coisa do Engine que não seja um post: clube, evento,
+ * anúncio, página profissional, perfil, hashtag.
+ *
+ * Antes só post virava cartão, e o resto era mandado como texto — chegava um
+ * endereço cru de setenta caracteres na conversa, com o id do clube à mostra.
+ * Guardo o caminho, e não o endereço inteiro, porque abrir é navegação
+ * interna: o domínio muda (netlify, domínio próprio) e o cartão antigo
+ * continua valendo.
+ */
+export const attachmentFromShare = ({ kind = "link", url = "", title = "", subtitle = "", image = "" } = {}) => {
+  let href = String(url || "");
+  try {
+    const parsed = new URL(href, "https://enginegarage.com.br");
+    href = `${parsed.pathname}${parsed.search}`;
+  } catch {
+    // Endereço estranho: guarda como veio, o cartão vira texto simples.
+  }
+  return {
+    kind: String(kind || "link"),
+    href,
+    title: String(title || "").slice(0, 120),
+    subtitle: String(subtitle || "").slice(0, 120),
+    image: String(image || ""),
+  };
+};
+
 export const attachmentFromGoal = (goal = {}) => {
   // Post de outra pessoa não traz dinheiro, só `progress` (0–100).
   const target = Number(goal.targetValue) || 0;
