@@ -2487,6 +2487,24 @@ export const engineDB = {
     );
   },
 
+  /** Apaga um aviso. A política "avisos: dono apaga" já garante que é o seu. */
+  async deleteNotification(notificationId, userId = currentUserId) {
+    if (!userId || !notificationId) return;
+    must(
+      await supabase
+        .from("notifications")
+        .delete()
+        .eq("id", notificationId)
+        .eq("user_id", userId),
+    );
+  },
+
+  /** Limpa a caixa inteira. Não tem volta: quem chama pergunta antes. */
+  async clearNotifications(userId = currentUserId) {
+    if (!userId) return;
+    must(await supabase.from("notifications").delete().eq("user_id", userId));
+  },
+
   async toggleCommunityLike(goalId, liked, userId = currentUserId) {
     if (!userId) return;
 

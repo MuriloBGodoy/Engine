@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bell, Moon, Sun } from "lucide-react";
+import { useConfirm } from "./ConfirmProvider";
 import { engineDB } from "../services/db";
 import { NotificationsPanel } from "./NotificationsPanel";
 import {
@@ -30,6 +31,7 @@ function TopbarIconButton({ className = "", onClick, title, active = false, chil
 export function Topbar({ settings, onSettingsUpdate, user }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [allNotifications, setNotifications] = useState([]);
 
@@ -73,6 +75,31 @@ export function Topbar({ settings, onSettingsUpdate, user }) {
   const closeNotifications = () => {
     setNotificationsOpen(false);
     if (unreadCount > 0) markAllRead();
+  };
+
+  // Apagar some da lista na hora; o `subscribeNotifications` confirma logo
+  // em seguida. Se o servidor recusar, a inscrição recoloca a linha.
+  const deleteNotification = (notification) => {
+    setNotifications((current) =>
+      current.filter((item) => item.id !== notification.id),
+    );
+    engineDB
+      .deleteNotification(notification.id, user?.uid)
+      .catch((error) => console.error(error));
+  };
+
+  // Limpar tudo não tem volta e some com avisos que a pessoa talvez não
+  // tenha lido — por isso pergunta, ao contrário do apagar de um só.
+  const clearAll = async () => {
+    const ok = await confirm({
+      title: t("notifications.clearAll"),
+      message: t("notifications.clearAllConfirm"),
+      confirmLabel: t("notifications.clearAll"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    setNotifications([]);
+    engineDB.clearNotifications(user?.uid).catch((error) => console.error(error));
   };
 
   const handleNotificationClick = (notification) => {
@@ -119,6 +146,8 @@ export function Topbar({ settings, onSettingsUpdate, user }) {
         onClose={closeNotifications}
         onSelect={handleNotificationClick}
         onMarkAllRead={markAllRead}
+        onDelete={deleteNotification}
+        onClearAll={clearAll}
       />
     </>
   );

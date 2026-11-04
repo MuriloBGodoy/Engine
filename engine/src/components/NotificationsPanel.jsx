@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, CheckCheck, ChevronRight, X } from "lucide-react";
+import { Bell, CheckCheck, ChevronRight, Trash2, X } from "lucide-react";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import {
@@ -12,6 +12,114 @@ import {
   notificationStyles,
 } from "../services/notifications";
 import { achievementName } from "./achievements/icons";
+
+/** Quanto a pessoa precisa arrastar para o aviso ir embora. */
+const SWIPE_TO_DELETE = 104;
+
+/**
+ * Uma linha da lista, que se arrasta para o lado para sumir.
+ *
+ * É o gesto que todo app de celular tem e que aqui não existia: a única
+ * saída era abrir a notificação. A lixeira aparece por baixo e vai ficando
+ * vermelha conforme o dedo anda — sem isso o gesto é adivinhação. Passou do
+ * limite, o aviso sai; soltou antes, ele volta sozinho.
+ *
+ * O eixo é decidido no primeiro movimento: se o dedo anda mais para cima ou
+ * para baixo, a linha não se mexe e a lista rola normalmente.
+ */
+function NotificationRow({ notification, children, onSelect, onDelete, t }) {
+  const [offset, setOffset] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const start = useRef(null);
+  const axis = useRef(null);
+
+  const progress = Math.min(1, Math.abs(offset) / SWIPE_TO_DELETE);
+  const armed = Math.abs(offset) >= SWIPE_TO_DELETE;
+
+  const onTouchStart = (event) => {
+    start.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    axis.current = null;
+  };
+
+  const onTouchMove = (event) => {
+    if (!start.current) return;
+    const dx = event.touches[0].clientX - start.current.x;
+    const dy = event.touches[0].clientY - start.current.y;
+
+    if (!axis.current) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      axis.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+    if (axis.current !== "x") return;
+    // Só para a esquerda: para a direita não há nada embaixo.
+    setOffset(Math.min(0, dx));
+  };
+
+  const onTouchEnd = () => {
+    if (axis.current === "x" && armed) {
+      setLeaving(true);
+      setOffset(-window.innerWidth);
+      window.setTimeout(() => onDelete(notification), 180);
+    } else {
+      setOffset(0);
+    }
+    start.current = null;
+    axis.current = null;
+  };
+
+  return (
+    <div
+      className="group relative overflow-hidden border-b border-[var(--engine-border)] last:border-0"
+      style={leaving ? { maxHeight: 0, opacity: 0, transition: "max-height .18s, opacity .18s" } : undefined}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 right-0 flex w-28 items-center justify-center"
+        style={{
+          background: `color-mix(in srgb, var(--engine-accent) ${Math.round(progress * 100)}%, transparent)`,
+        }}
+      >
+        <Trash2
+          size={20}
+          className={armed ? "text-white" : "text-[var(--engine-text-muted)]"}
+          style={{ transform: `scale(${0.8 + progress * 0.35})` }}
+        />
+      </div>
+
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className="relative bg-[var(--engine-bg)]"
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: offset === 0 || leaving ? "transform .18s" : "none",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => onSelect(notification)}
+          className={`relative flex w-full gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[var(--engine-surface-2)] sm:px-5 ${
+            notification.read ? "" : "bg-[var(--engine-accent-soft)]"
+          }`}
+        >
+          {children}
+        </button>
+
+        {/* No desktop não há gesto: a lixeira aparece ao passar o mouse. */}
+        <button
+          type="button"
+          onClick={() => onDelete(notification)}
+          aria-label={t("notifications.delete")}
+          title={t("notifications.delete")}
+          className="absolute right-1 top-1 hidden h-11 w-11 items-center justify-center rounded-lg text-[var(--engine-text-subtle)] opacity-0 transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Central de notificações.
@@ -29,6 +137,8 @@ export function NotificationsPanel({
   onClose,
   onSelect,
   onMarkAllRead,
+  onDelete,
+  onClearAll,
 }) {
   const { t, i18n } = useTranslation();
   const isSheet = useMediaQuery("(max-width: 639px)");
@@ -107,6 +217,13 @@ export function NotificationsPanel({
                   ? t("notifications.unread", { count: unreadCount })
                   : t("notifications.allRead")}
               </p>
+              {/* O gesto não se anuncia sozinho: uma linha, só no celular e
+                  só enquanto há o que arrastar. */}
+              {notifications.length > 0 && (
+                <p className="mt-0.5 text-[11px] font-medium text-[var(--engine-text-subtle)] sm:hidden">
+                  {t("notifications.swipeHint")}
+                </p>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
@@ -119,6 +236,17 @@ export function NotificationsPanel({
                   className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
                 >
                   <CheckCheck size={19} />
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  title={t("notifications.clearAll")}
+                  aria-label={t("notifications.clearAll")}
+                  className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
+                >
+                  <Trash2 size={18} />
                 </button>
               )}
               <button
@@ -151,13 +279,12 @@ export function NotificationsPanel({
               const target = getNotificationTarget(notification);
 
               return (
-                <button
+                <NotificationRow
                   key={notification.id}
-                  type="button"
-                  onClick={() => onSelect(notification)}
-                  className={`relative flex w-full gap-3 border-b border-[var(--engine-border)] px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-[var(--engine-surface-2)] sm:px-5 ${
-                    notification.read ? "" : "bg-[var(--engine-accent-soft)]"
-                  }`}
+                  notification={notification}
+                  onSelect={onSelect}
+                  onDelete={onDelete}
+                  t={t}
                 >
                   {!notification.read && (
                     <span className="absolute left-0 top-0 h-full w-0.5 bg-[var(--engine-accent)]" />
@@ -213,7 +340,7 @@ export function NotificationsPanel({
                       </span>
                     )}
                   </span>
-                </button>
+                </NotificationRow>
               );
             })
           ) : (
