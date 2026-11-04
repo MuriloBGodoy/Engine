@@ -34,6 +34,7 @@ import { useRequireAccount } from "../hooks/useRequireAccount";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { BioWithMentions } from "../components/mentions/BioWithMentions";
 import { EngineBlock } from "../components/mentions/EngineBlock";
+import { useEnginePresence } from "../hooks/useEnginePresence";
 
 // Banner will be solid color gradient - no default image
 const DEFAULT_BANNER_GRADIENT = "from-[var(--engine-accent)] to-[var(--engine-accent)]/70";
@@ -192,6 +193,11 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const [following, setFollowing] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState("posts");
+  // "No Engine" (clubes, páginas, eventos) virou aba em 04/11/2026: no
+  // cabeçalho ele empurrava a bio, o botão de editar e a grade pra baixo, e
+  // num celular a pessoa abria o perfil e via um cartão de clube em vez das
+  // publicações. A aba só existe quando há o que mostrar.
+  const enginePresence = useEnginePresence(profile?.userId || "");
   // Aba "Salvos": só no próprio perfil, lida quando aberta.
   const [savedGoals, setSavedGoals] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -701,9 +707,6 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             viewerId={currentUserId || ""}
           />
 
-          {/* "No Engine": clubes, páginas e próximos eventos, automático. */}
-          <EngineBlock key={`engine-${reloadKey}`} userId={profile.userId} isOwn={isOwnProfile} />
-
           {/* Location */}
           {profile.city && (
             <p className="mb-4 text-xs text-[var(--engine-text-muted)]">
@@ -784,6 +787,9 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           <div className="flex gap-6 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
             {[
               { id: "posts", label: t("socialFeed.postsTab") },
+              ...(enginePresence.hasPresence
+                ? [{ id: "engine", label: t("engineBlock.title") }]
+                : []),
               { id: "followers", label: t("profile.tabs.followers") },
               { id: "following", label: t("profile.tabs.following") },
               { id: "achievements", label: t("profile.tabs.achievements") },
@@ -861,6 +867,15 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("socialPosts.saved.empty")}</p>
               )}
             </div>
+          )}
+
+          {activeTab === "engine" && (
+            <EngineBlock
+              key={`engine-${reloadKey}`}
+              data={enginePresence.data}
+              isOwn={isOwnProfile}
+              bare
+            />
           )}
 
           {activeTab === "followers" && (

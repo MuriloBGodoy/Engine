@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { CalendarDays, EyeOff } from "lucide-react";
-import { fetchEnginePresence } from "../../services/mentions";
 import { clubColorVars } from "../../services/clubStyles";
 import { roleFromRow } from "../../services/clubRoles";
 import { useIsDark } from "../../hooks/useIsDark";
@@ -17,19 +15,13 @@ import { MentionKindIcon } from "./MentionKindIcon";
  * Privacidade fica no banco (`profile_engine_presence`): clube só-membros só
  * aparece para quem é do clube, presença em evento só para quem tem conta,
  * bloqueio esconde tudo, e a pessoa pode esconder o bloco em Configurações.
+ *
+ * `bare` tira a moldura e o título: dentro de uma aba do perfil o cartão
+ * dentro do cartão só empilhava borda.
  */
-export function EngineBlock({ userId, isOwn = false }) {
+export function EngineBlock({ data, isOwn = false, bare = false }) {
   const { t, i18n } = useTranslation();
   const isDark = useIsDark();
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    let alive = true;
-    fetchEnginePresence(userId).then((result) => alive && setData(result));
-    return () => {
-      alive = false;
-    };
-  }, [userId]);
 
   if (!data || data.hidden) return null;
   const clubs = data.clubs || [];
@@ -42,11 +34,21 @@ export function EngineBlock({ userId, isOwn = false }) {
   const heading = "text-[10.5px] font-bold uppercase tracking-widest text-[var(--engine-text-muted)]";
 
   return (
-    <section aria-labelledby="engine-block-title" className="mb-4 space-y-2.5 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
+    <section
+      aria-labelledby={bare ? undefined : "engine-block-title"}
+      aria-label={bare ? t("engineBlock.title") : undefined}
+      className={
+        bare
+          ? "space-y-4"
+          : "mb-4 space-y-2.5 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3"
+      }
+    >
       <div className="flex items-center justify-between gap-2">
-        <h3 id="engine-block-title" className="text-[13px] font-extrabold text-[var(--engine-text)]">
-          {t("engineBlock.title")}
-        </h3>
+        {bare ? null : (
+          <h3 id="engine-block-title" className="text-[13px] font-extrabold text-[var(--engine-text)]">
+            {t("engineBlock.title")}
+          </h3>
+        )}
         {isOwn && data.hiddenForOthers ? (
           <Link to="/settings?section=privacy" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--engine-text-muted)]">
             <EyeOff size={12} aria-hidden="true" />
