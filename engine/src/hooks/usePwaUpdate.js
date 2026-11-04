@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import {
+  applyPendingUpdate,
+  startPwaUpdates,
+  subscribeToUpdates,
+} from "../services/pwaUpdate";
 
 /**
  * Avisa quando existe versão nova esperando.
@@ -7,39 +12,17 @@ import { useEffect, useState } from "react";
  * pessoa pode ficar semanas numa versão antiga sem perceber — inclusive sem
  * correções de bug. O service worker novo fica em espera e só assume quando o
  * usuário aceita, pra não recarregar a página no meio de um formulário.
+ *
+ * A mecânica toda mora em `services/pwaUpdate`, para Configurações poder
+ * mandar procurar atualização usando o mesmo registro.
  */
 export function usePwaUpdate() {
   const [updateReady, setUpdateReady] = useState(false);
-  const [applyUpdate, setApplyUpdate] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    // Import dinâmico: o módulo virtual só existe no build com o plugin PWA.
-    // No `npm run dev` ele não é gerado, e um import estático quebraria a tela.
-    import("virtual:pwa-register")
-      .then(({ registerSW }) => {
-        if (cancelled) return;
-
-        const update = registerSW({
-          immediate: true,
-          onNeedRefresh() {
-            setUpdateReady(true);
-          },
-        });
-
-        // Guardado dentro de função: setState com função como valor a
-        // executaria em vez de armazenar.
-        setApplyUpdate(() => () => update(true));
-      })
-      .catch(() => {
-        // Sem service worker (dev ou navegador sem suporte): segue a vida.
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    startPwaUpdates();
+    return subscribeToUpdates(setUpdateReady);
   }, []);
 
-  return { updateReady, applyUpdate };
+  return { updateReady, applyUpdate: applyPendingUpdate };
 }

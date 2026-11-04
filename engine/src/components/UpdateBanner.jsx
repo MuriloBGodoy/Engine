@@ -11,7 +11,7 @@ export function UpdateBanner() {
   const { t } = useTranslation();
   const { updateReady, applyUpdate } = usePwaUpdate();
 
-  if (!updateReady || !applyUpdate) return null;
+  if (!updateReady) return null;
 
   return (
     <div className="fixed inset-x-0 top-0 z-[220] flex justify-center px-3 pt-3">
