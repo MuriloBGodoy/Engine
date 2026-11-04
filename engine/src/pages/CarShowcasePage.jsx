@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Heart, Share2 } from "lucide-react";
-import { didILike, getShowcaseBySlug, likeCar } from "../services/carShowcase";
+import { Heart, Send, Share2, Trash2 } from "lucide-react";
+import {
+  addCarComment,
+  deleteCarComment,
+  didILike,
+  getShowcaseBySlug,
+  likeCar,
+} from "../services/carShowcase";
 import { engineDB } from "../services/db";
 import { auth } from "../services/supabase";
 import { openShareSheet, shareUrls } from "../services/shareLinks";
@@ -23,6 +29,10 @@ export function CarShowcasePage() {
   const [owner, setOwner] = useState(null);
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(0);
+  const [comments, setComments] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const meuUid = auth.currentUser?.uid || "";
 
   useEffect(() => {
     let alive = true;
@@ -31,6 +41,7 @@ export function CarShowcasePage() {
         if (!alive) return;
         setCar(found);
         setLikes(found?.likeCount || 0);
+        setComments(found?.comments || []);
         if (!found) return;
         const [perfis, meu] = await Promise.all([
           engineDB.getPublicProfilesByIds([found.ownerId]),
@@ -59,6 +70,31 @@ export function CarShowcasePage() {
       setLiked(!next);
       setLikes((value) => Math.max(0, value + (next ? -1 : 1)));
       showToast(t("community.genericError"), "error");
+    }
+  };
+
+  const comment = async (event) => {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || sending) return;
+    setSending(true);
+    try {
+      const saved = await addCarComment(car.id, text);
+      setComments((current) => [...current, saved]);
+      setDraft("");
+    } catch (error) {
+      showToast(error?.message || t("community.genericError"), "error");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const removeComment = async (id) => {
+    try {
+      await deleteCarComment(car.id, id);
+      setComments((current) => current.filter((item) => item.id !== id));
+    } catch (error) {
+      showToast(error?.message || t("community.genericError"), "error");
     }
   };
 
@@ -172,6 +208,62 @@ export function CarShowcasePage() {
               </span>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
+        <h2 className="text-[13px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
+          {t("cars.comments", { count: comments.length })}
+        </h2>
+
+        <ul className="mt-3 space-y-3">
+          {comments.map((item) => (
+            <li key={item.id} className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[var(--engine-text)]">
+                  {item.author || `@${item.username}`}
+                </p>
+                <p className="whitespace-pre-wrap break-words text-[13.5px] leading-5 text-[var(--engine-text)]">
+                  {item.text}
+                </p>
+              </div>
+              {(item.userId === meuUid || car.ownerId === meuUid) && (
+                <button
+                  type="button"
+                  onClick={() => removeComment(item.id)}
+                  aria-label={t("community.delete")}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-subtle)]"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        {meuUid ? (
+          <form onSubmit={comment} className="mt-3 flex gap-2">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={t("cars.commentPlaceholder")}
+              aria-label={t("cars.commentPlaceholder")}
+              maxLength={300}
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 text-[14px] font-medium text-[var(--engine-text)] outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!draft.trim() || sending}
+              aria-label={t("cars.send")}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white disabled:opacity-60"
+            >
+              <Send size={17} />
+            </button>
+          </form>
+        ) : (
+          <p className="mt-3 text-[13px] text-[var(--engine-text-muted)]">
+            {t("cars.signInToComment")}
+          </p>
         )}
       </section>
     </article>

@@ -41,6 +41,11 @@ const pt = {
     likes_one: "{{count}} curtida",
     likes_other: "{{count}} curtidas",
     notFound: "Este carro não está mais na comunidade.",
+    comments_one: "{{count}} comentário",
+    comments_other: "{{count}} comentários",
+    commentPlaceholder: "Escreva um comentário",
+    send: "Enviar",
+    signInToComment: "Entre para comentar.",
   },
 };
 
@@ -78,6 +83,11 @@ const en = {
     likes_one: "{{count}} like",
     likes_other: "{{count}} likes",
     notFound: "This car is no longer in the community.",
+    comments_one: "{{count}} comment",
+    comments_other: "{{count}} comments",
+    commentPlaceholder: "Write a comment",
+    send: "Send",
+    signInToComment: "Sign in to comment.",
   },
 };
 
@@ -115,6 +125,11 @@ const es = {
     likes_one: "{{count}} me gusta",
     likes_other: "{{count}} me gusta",
     notFound: "Este coche ya no está en la comunidad.",
+    comments_one: "{{count}} comentario",
+    comments_other: "{{count}} comentarios",
+    commentPlaceholder: "Escribe un comentario",
+    send: "Enviar",
+    signInToComment: "Entra para comentar.",
   },
 };
 

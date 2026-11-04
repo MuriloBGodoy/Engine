@@ -12,6 +12,7 @@
  */
 import { supabase, auth, must } from "./supabase";
 import { normalizeSpecSheet, publicSpecSheet } from "./carSpecSheet";
+import { engineDB } from "./db";
 
 const texto = (valor, limite) => String(valor ?? "").trim().slice(0, limite);
 
@@ -34,9 +35,23 @@ export function showcasePayload(car = {}, { state = "", city = "" } = {}) {
   };
 }
 
-/** Publica (ou atualiza) o carro na vitrine. Devolve o endereço dele. */
-export async function publishCar(car, place = {}) {
-  const data = showcasePayload(car, place);
+/**
+ * Publica (ou atualiza) o carro na vitrine. Devolve o endereço dele.
+ *
+ * A região sai do perfil de quem publica, não do carro: o carro não tem
+ * cidade, a pessoa tem. É o que faz o filtro "em SP" da aba Carros achar
+ * alguma coisa.
+ */
+export async function publishCar(car, place = null) {
+  let regiao = place;
+  if (!regiao) {
+    const settings = await engineDB.getSettings().catch(() => null);
+    regiao = {
+      state: settings?.profile?.state || "",
+      city: settings?.profile?.location || "",
+    };
+  }
+  const data = showcasePayload(car, regiao);
   return must(
     await supabase.rpc("publish_car", { p_car_id: String(car.id), p_data: data }),
   );
@@ -128,6 +143,32 @@ export async function didILike(carId) {
       .maybeSingle(),
   );
   return Boolean(row);
+}
+
+/** Comentar na página do carro. O autor quem carimba é o banco. */
+export async function addCarComment(carId, text) {
+  const settings = await engineDB.getSettings().catch(() => null);
+  const perfil = settings?.profile || {};
+  return must(
+    await supabase.rpc("add_car_comment", {
+      p_car_id: String(carId),
+      p_comment: {
+        text: texto(text, 300),
+        author: texto(perfil.displayName, 80),
+        username: texto(perfil.username, 32),
+        avatar: String(perfil.avatar || ""),
+      },
+    }),
+  );
+}
+
+export async function deleteCarComment(carId, commentId) {
+  must(
+    await supabase.rpc("delete_car_comment", {
+      p_car_id: String(carId),
+      p_comment_id: String(commentId),
+    }),
+  );
 }
 
 export async function likeCar(carId, like) {
