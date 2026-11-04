@@ -3,7 +3,27 @@
 Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 `ROADMAP.md`; aqui é só o que fazer.
 
-Última atualização: 28 de outubro de 2026 (ideias pré e pós-lançamento).
+Última atualização: 4 de novembro de 2026 (lote mobile + busca de carros).
+
+---
+
+## Aberto depois do lote de 04/11/2026
+
+- **E-mail de contato é o Gmail pessoal do Murilo.** `muxdtuber@gmail.com`
+  aparece no rodapé, em Configurações › Sobre o Engine, nos Termos e na
+  Política de privacidade — quatro lugares públicos. Quando o e-mail do
+  domínio estiver no ar (ver a seção abaixo), trocar nos quatro. A constante
+  do app é `CONTACT_MAILTO`, em `pages/Settings.jsx`, e `LINKS.help.contact`,
+  em `components/Footer.jsx`.
+- **Nada do lote foi testado logado.** Falta percorrer com conta de verdade:
+  apagar notificação arrastando, limpar tudo, aba "No Engine" no perfil,
+  botão flutuante de publicar, "Buscar atualização" em Configurações, e
+  publicar um carro com preparação escrita para ver a busca achar.
+- **Privacidade do "No Engine" no perfil.** O Murilo quer poder esconder a
+  seção. O banco já sabe esconder (`profile_engine_presence` respeita o
+  ajuste), falta a decisão de produto sobre o que fica visível para quem.
+- **`supabase config push`** das URLs de redirecionamento do domínio novo
+  continua pendente: precisa do ok dele.
 
 ---
 
