@@ -1013,6 +1013,78 @@ export async function approveRequest(clubId, alvoUid) {
 
 }
 
+/**
+ * Convidar pelo @. Quem valida cargo, bloqueio e duplicata é o banco
+ * (`invite_to_club`), porque convite escreve na caixa de aviso de outra
+ * pessoa — não é decisão que possa morar no navegador.
+ */
+export async function inviteToClub(clubId, username, message = "") {
+  must(
+    await supabase.rpc("invite_to_club", {
+      p_club: String(clubId),
+      p_username: String(username || "").replace(/^@/, "").trim(),
+      p_message: texto(message, 280),
+    }),
+  );
+}
+
+/** Convites que o clube mandou e ainda não foram respondidos. */
+export async function listClubInvites(clubId) {
+  if (!clubId) return [];
+  const rows = must(
+    await supabase
+      .from("club_invites")
+      .select("uid, message, created_at")
+      .eq("club_id", String(clubId))
+      .order("created_at", { ascending: true }),
+  );
+  if (!rows.length) return [];
+  // O @ e a foto vêm do perfil público, não de cópia guardada no convite:
+  // quem troca de nome não fica com o nome velho pendurado na lista.
+  const perfis = await engineDB.getPublicProfilesByIds(rows.map((row) => row.uid));
+  return rows.map((row) => ({
+    uid: row.uid,
+    displayName: perfis[row.uid]?.author || "Usuário Engine",
+    username: perfis[row.uid]?.username || "",
+    avatar: perfis[row.uid]?.avatar || "",
+    message: texto(row.message, 280),
+    createdAt: paraIso(row.created_at),
+  }));
+}
+
+/** Convites que eu recebi e ainda não respondi. */
+export async function listMyClubInvites() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
+  const rows = must(
+    await supabase
+      .from("club_invites")
+      .select("club_id, message, created_at")
+      .eq("uid", uid)
+      .order("created_at", { ascending: false }),
+  );
+  return rows.map((row) => ({
+    clubId: row.club_id,
+    message: texto(row.message, 280),
+    createdAt: paraIso(row.created_at),
+  }));
+}
+
+export async function acceptClubInvite(clubId) {
+  must(await supabase.rpc("accept_club_invite", { p_club: String(clubId) }));
+}
+
+/** Recusar (quem foi convidado) ou cancelar (a direção): mesma linha. */
+export async function cancelClubInvite(clubId, alvoUid) {
+  must(
+    await supabase
+      .from("club_invites")
+      .delete()
+      .eq("club_id", String(clubId))
+      .eq("uid", String(alvoUid)),
+  );
+}
+
 export async function rejectRequest(clubId, alvoUid) {
   await exigeCargo(clubId);
   must(
@@ -1385,6 +1457,15 @@ export const useClubAdmin = (clubId) => {
       [correr, clubId],
     ),
     listRequests: useCallback(() => correr(() => listRequests(clubId)), [correr, clubId]),
+    listInvites: useCallback(() => correr(() => listClubInvites(clubId)), [correr, clubId]),
+    invite: useCallback(
+      (username, message) => correr(() => inviteToClub(clubId, username, message)),
+      [correr, clubId],
+    ),
+    cancelInvite: useCallback(
+      (alvoUid) => correr(() => cancelClubInvite(clubId, alvoUid)),
+      [correr, clubId],
+    ),
     approveRequest: useCallback(
       (uid) => correr(() => approveRequest(clubId, uid)),
       [correr, clubId],

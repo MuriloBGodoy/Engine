@@ -53,6 +53,7 @@ export const notificationStyles = {
   pro_invite: { icon: UserPlus, iconClass: "text-[var(--engine-accent)]" },
   mention: { icon: AtSign, iconClass: "text-sky-500" },
   club_role: { icon: Crown, iconClass: "text-amber-500" },
+  club_invite: { icon: UserPlus, iconClass: "text-[var(--engine-accent)]" },
   event_team: { icon: CalendarClock, iconClass: "text-[var(--engine-accent)]" },
 };
 
@@ -88,6 +89,9 @@ export const getNotificationTarget = (notification) => {
 
   if (notification.serviceId) return "/services";
 
+  // Convite e cargo novo levam ao clube, que é onde se aceita ou se vê.
+  if (notification.clubId) return `/clubs/${encodeURIComponent(notification.clubId)}`;
+
   // Sem meta: leva ao perfil de quem interagiu.
   if (["follow", "like", "comment", "rating"].includes(notification.type)) {
     return notification.actorId
@@ -109,6 +113,8 @@ const TRANSLATED_TYPES = new Set([
   // Menção na bio, cargo novo no clube, entrada na equipe de evento
   // (20261101150000 / 20261101160000).
   "mention", "club_role", "event_team",
+  // Convite para entrar num clube (20261104120000).
+  "club_invite",
 ]);
 
 // Pedido de orçamento: o aviso traz o id da categoria ("body-paint"); o

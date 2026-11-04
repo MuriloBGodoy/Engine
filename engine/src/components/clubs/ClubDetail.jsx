@@ -19,6 +19,9 @@ import {
   useClubMembership,
   useClubAdmin,
   clubErrorMessage,
+  listMyClubInvites,
+  acceptClubInvite,
+  cancelClubInvite,
 } from "./clubsDataSource";
 import { useToast } from "../ToastProvider";
 import { openShareSheet } from "../../services/shareLinks";
@@ -102,6 +105,44 @@ export function ClubDetail({ clubId, onClose }) {
     fetch();
     fetchMembers({ limit: 30 });
     setTreeKey((value) => value + 1);
+  };
+
+  /* Convite pendente para quem está olhando: aceitar e recusar ficam no topo
+     do clube, que é onde o aviso do sino deixa a pessoa. */
+  const [invited, setInvited] = useState(false);
+  const [answering, setAnswering] = useState(false);
+  useEffect(() => {
+    if (!uid || !clubId || isMember) {
+      setInvited(false);
+      return undefined;
+    }
+    let alive = true;
+    listMyClubInvites()
+      .then((list) => {
+        if (alive) setInvited((list || []).some((row) => row.clubId === clubId));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [uid, clubId, isMember]);
+
+  const answerInvite = async (accept) => {
+    setAnswering(true);
+    try {
+      if (accept) {
+        await acceptClubInvite(clubId);
+        showToast(t("clubs.invite.accepted"), "success");
+      } else {
+        await cancelClubInvite(clubId, uid);
+      }
+      setInvited(false);
+      refresh();
+    } catch (error) {
+      showToast(clubErrorMessage(error, t), "error");
+    } finally {
+      setAnswering(false);
+    }
   };
 
   const handleJoin = async () => {
@@ -231,6 +272,32 @@ export function ClubDetail({ clubId, onClose }) {
         photoBusy={photoBusy}
         actionLoading={membershipLoading}
       />
+
+      {/* Convite esperando resposta: aceitar entra no clube com quem convidou
+          como padrinho; recusar some com o convite. */}
+      {invited && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[color-mix(in_srgb,var(--club)_42%,transparent)] bg-[color-mix(in_srgb,var(--club)_10%,var(--engine-surface))] p-3.5">
+          <p className="min-w-[12rem] flex-1 text-[13.5px] font-bold text-[var(--engine-text)]">
+            {t("clubs.invite.youWereInvited")}
+          </p>
+          <button
+            type="button"
+            disabled={answering}
+            onClick={() => answerInvite(true)}
+            className="min-h-11 rounded-xl bg-[var(--club)] px-4 text-[13px] font-bold text-[var(--club-on)] disabled:opacity-60"
+          >
+            {t("clubs.invite.accept")}
+          </button>
+          <button
+            type="button"
+            disabled={answering}
+            onClick={() => answerInvite(false)}
+            className="min-h-11 rounded-xl px-3 text-[13px] font-semibold text-[var(--engine-text-muted)] disabled:opacity-60"
+          >
+            {t("clubs.invite.decline")}
+          </button>
+        </div>
+      )}
 
       {canEditLook ? (
         <>
