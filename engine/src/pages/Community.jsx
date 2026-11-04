@@ -371,22 +371,63 @@ function RatingControl({ value, onRate, label, size = 16 }) {
  * script deles na página, o que traz rastreamento de terceiro e uma
  * dependência externa capaz de quebrar o post. Para esses, o link abre fora.
  */
-function PostVideo({ url, t }) {
-  const match = String(url).match(
+const youTubeId = (url) =>
+  String(url || "").match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/,
-  );
+  )?.[1] || "";
 
-  if (match?.[1]) {
+/**
+ * Capa do vídeo do YouTube, com o player entrando só no toque.
+ *
+ * Antes o `<iframe>` nascia junto com o post: passar o feed já puxava o
+ * código do YouTube de cada vídeo à vista, e três posts desses engasgavam
+ * um celular de entrada. Capa é imagem estática; quem quer assistir carrega.
+ */
+function YouTubeSlide({ id, t }) {
+  const [playing, setPlaying] = useState(false);
+
+  if (playing) {
     return (
-      <div className="bg-black">
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${match[1]}`}
-          title={t("community.watchVideo")}
-          allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
-          allowFullScreen
-          loading="lazy"
-          className="aspect-video w-full"
-        />
+      <iframe
+        src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1`}
+        title={t("community.watchVideo")}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+        allowFullScreen
+        className="h-full w-full shrink-0 bg-black"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setPlaying(true)}
+      aria-label={t("community.watchVideo")}
+      className="relative h-full w-full shrink-0 bg-black"
+    >
+      <img
+        src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
+        alt=""
+        loading="lazy"
+        draggable={false}
+        className="h-full w-full object-cover opacity-90"
+      />
+      <span className="absolute inset-0 flex items-center justify-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/65 text-white">
+          <Play size={26} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function PostVideo({ url, t }) {
+  const id = youTubeId(url);
+
+  if (id) {
+    return (
+      <div className="aspect-video bg-black">
+        <YouTubeSlide id={id} t={t} />
       </div>
     );
   }
@@ -419,9 +460,20 @@ const clampMediaRatio = (width, height) =>
     ? Math.min(Math.max(width / height, MEDIA_MIN_RATIO), MEDIA_MAX_RATIO)
     : 1;
 
-function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null, onRatio }) {
+function PostGallery({ images, videoUrl = "", alt, t, onOpen, onDoubleTap, box = null, onRatio }) {
   const [index, setIndex] = useState(0);
   const [ratio, setRatio] = useState(1);
+  /* Vídeo do YouTube entra como mais um item do carrossel, não como bloco
+     embaixo da foto: empilhados, o post virava uma foto alta com um player
+     espremido no pé. */
+  const videoId = youTubeId(videoUrl);
+  const slides = useMemo(
+    () => [
+      ...images.map((src) => ({ key: src, type: "image", src })),
+      ...(videoId ? [{ key: `yt-${videoId}`, type: "youtube", id: videoId }] : []),
+    ],
+    [images, videoId],
+  );
   const dragStart = useRef(null);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
@@ -466,8 +518,9 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null, onRatio 
     tapTimer.current = setTimeout(onOpen, DOUBLE_TAP_MS);
   };
 
-  const total = images.length;
+  const total = slides.length;
   const current = Math.min(index, total - 1);
+  const onVideo = slides[current]?.type === "youtube";
 
   const go = (next) => setIndex(Math.max(0, Math.min(next, total - 1)));
 
@@ -503,10 +556,13 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null, onRatio 
         className="flex h-full transition-transform duration-300 ease-out"
         style={{ transform: `translateX(-${current * 100}%)` }}
       >
-        {images.map((image, position) => (
+        {slides.map((slide, position) =>
+          slide.type === "youtube" ? (
+            <YouTubeSlide key={slide.key} id={slide.id} t={t} />
+          ) : (
           <img
-            key={image}
-            src={image}
+            key={slide.key}
+            src={slide.src}
             alt={alt}
             draggable={false}
             onLoad={
@@ -526,13 +582,16 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null, onRatio 
             }}
             className="h-full w-full shrink-0 object-cover"
           />
-        ))}
+          ),
+        )}
       </div>
 
       {/* A foto é o "abrir publicação" — mesmo gesto de qualquer feed — e o
           toque duplo curte. `touch-manipulation` tira o zoom de toque duplo
           do navegador, que comeria o gesto. */}
-      {onOpen ? (
+      {/* No item de vídeo a camada de abrir sai da frente: ela cobriria o
+          play, e tocar num vídeo tem que tocar o vídeo. */}
+      {onVideo ? null : onOpen ? (
         <button
           type="button"
           onClick={handleTap}
@@ -579,9 +638,9 @@ function PostGallery({ images, alt, t, onOpen, onDoubleTap, box = null, onRatio 
             {current + 1}/{total}
           </span>
           <div className="pointer-events-none absolute bottom-2.5 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-black/35 px-1.5 py-1">
-            {images.map((image, position) => (
+            {slides.map((slide, position) => (
               <span
-                key={image}
+                key={slide.key}
                 className={`h-1.5 w-1.5 rounded-full transition-colors ${
                   position === current ? "bg-white" : "bg-white/50"
                 }`}
@@ -1160,9 +1219,12 @@ export function GoalCard({
         />
       )}
 
+      {/* Foto e vídeo do YouTube no mesmo carrossel; vídeo nativo continua
+          com o player próprio, que tem corte, capa e som definidos no envio. */}
       {!hideMedia && photos.length > 0 && (
         <PostGallery
           images={photos}
+          videoUrl={goal.video ? "" : goal.videoUrl}
           alt={goal.title}
           t={t}
           onOpen={openable ? () => onOpenPost(goal.id) : undefined}
@@ -1174,7 +1236,7 @@ export function GoalCard({
 
       {hideMedia ? null : goal.video ? (
         <PostVideoPlayer video={goal.video} />
-      ) : goal.videoUrl ? (
+      ) : goal.videoUrl && photos.length === 0 ? (
         <PostVideo url={goal.videoUrl} t={t} />
       ) : null}
 
@@ -2338,6 +2400,7 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
               {gallery.length > 0 ? (
                 <PostGallery
                   images={gallery}
+                  videoUrl={goal.video ? "" : goal.videoUrl}
                   alt={goal.title}
                   t={t}
                   box={{ maxWidth: lightbox.width, maxHeight: lightbox.height }}
