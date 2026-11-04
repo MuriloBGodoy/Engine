@@ -2094,9 +2094,14 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
   const mediaRatio = (goal && ratioByPost[goal.id]) || fallbackRatio;
   const lightbox = (() => {
     if (!sideBySide) return null;
-    const maxHeight = Math.min(window.innerHeight * 0.9 - 54, 860);
-    // Paisagem larga para em 1080px: o modal não vira a tela inteira.
-    const maxWidth = Math.min(window.innerWidth * 0.95 - 383, 1080);
+    // Os tetos vêm do tamanho que as redes de referência usam, não da tela:
+    // num monitor grande o modal antigo ia a 860px de altura e 1080 de
+    // largura de mídia, somava 1463 com a coluna e virava quase a janela
+    // inteira — deixava de parecer um post aberto e passava a parecer outra
+    // página. Com 700x720 o painel fica em no máximo ~1100px, que é a ordem
+    // de grandeza do lightbox do Instagram.
+    const maxHeight = Math.min(window.innerHeight * 0.86 - 54, 700);
+    const maxWidth = Math.min(window.innerWidth * 0.92 - 383, 720);
     const height = Math.round(Math.min(maxHeight, maxWidth / mediaRatio));
     const width = Math.round(height * mediaRatio);
     // +380 da coluna, +1 da borda dela, +2 das bordas do painel.
