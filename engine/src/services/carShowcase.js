@@ -16,16 +16,27 @@ import { engineDB } from "./db";
 
 const texto = (valor, limite) => String(valor ?? "").trim().slice(0, limite);
 
-/** O recorte publicável de um carro da garagem. */
-export function showcasePayload(car = {}, { state = "", city = "" } = {}) {
+/**
+ * O recorte publicável de um carro da garagem.
+ *
+ * `cover` é a foto que representa o carro na aba Carros. Vem separada do
+ * `car.image` porque a capa da garagem é escolhida para a garagem — foto de
+ * documento, de detalhe, de quando chegou — e a da vitrine é escolhida para
+ * ser vista por estranho. São decisões diferentes, feitas em momentos
+ * diferentes, e misturá-las obrigava a trocar uma para arrumar a outra.
+ */
+export function showcasePayload(car = {}, { state = "", city = "", cover = "" } = {}) {
   const sheet = normalizeSpecSheet(car.specs);
   const images = Array.isArray(car.images) ? car.images.filter(Boolean) : [];
+  // Capa só vale se for uma foto que o carro realmente tem: um endereço
+  // solto no payload viraria foto de qualquer lugar na vitrine.
+  const escolhida = cover && [car.image, ...images].includes(cover) ? cover : "";
   return {
     brand: texto(car.brand, 80),
     model: texto(car.model, 120),
     year: texto(car.year, 40),
     title: texto(`${car.brand || ""} ${car.model || ""}`, 160),
-    image: texto(car.image || images[0] || "", 500),
+    image: texto(escolhida || car.image || images[0] || "", 500),
     images: images.slice(0, 10),
     stage: sheet?.stage || "stock",
     mods: Array.isArray(sheet?.mods) ? sheet.mods : [],
@@ -42,7 +53,7 @@ export function showcasePayload(car = {}, { state = "", city = "" } = {}) {
  * cidade, a pessoa tem. É o que faz o filtro "em SP" da aba Carros achar
  * alguma coisa.
  */
-export async function publishCar(car, place = null) {
+export async function publishCar(car, place = null, cover = "") {
   let regiao = place;
   if (!regiao) {
     const settings = await engineDB.getSettings().catch(() => null);
@@ -51,7 +62,7 @@ export async function publishCar(car, place = null) {
       city: settings?.profile?.location || "",
     };
   }
-  const data = showcasePayload(car, regiao);
+  const data = showcasePayload(car, { ...regiao, cover });
   return must(
     await supabase.rpc("publish_car", { p_car_id: String(car.id), p_data: data }),
   );
@@ -61,12 +72,21 @@ export async function unpublishCar(carId) {
   must(await supabase.rpc("unpublish_car", { p_car_id: String(carId) }));
 }
 
-/** Os ids dos meus carros que estão na vitrine, para marcar o interruptor. */
-export async function myShowcasedCarIds() {
+/**
+ * Os meus carros que estão na vitrine: id, endereço e a capa escolhida.
+ *
+ * A tela do carro precisa dos três — do id para o interruptor, do endereço
+ * para o link e da capa para marcar qual foto está valendo.
+ */
+export async function myShowcase() {
   const uid = auth.currentUser?.uid;
-  if (!uid) return [];
-  const rows = must(await supabase.from("car_showcase").select("id").eq("user_id", uid));
-  return rows.map((row) => row.id);
+  if (!uid) return {};
+  const rows = must(
+    await supabase.from("car_showcase").select("id, slug, data").eq("user_id", uid),
+  );
+  return Object.fromEntries(
+    rows.map((row) => [row.id, { slug: row.slug, cover: row.data?.image || "" }]),
+  );
 }
 
 const fromRow = (row) => ({

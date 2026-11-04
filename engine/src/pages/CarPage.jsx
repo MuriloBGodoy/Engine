@@ -16,7 +16,7 @@ import { CarMenu, MonthStrip, ProgressRing, Stat } from "../components/garage/Ga
 import { GarageReminders } from "../components/reminders/GarageReminders";
 import { ReminderSettingsModal } from "../components/reminders/ReminderSettingsModal";
 import { SpecSheetView } from "../components/specsheet/SpecSheetView";
-import { myShowcasedCarIds, publishCar, unpublishCar } from "../services/carShowcase";
+import { myShowcase, publishCar, unpublishCar } from "../services/carShowcase";
 import { useToast } from "../components/ToastProvider";
 import "../services/i18n-cars";
 
@@ -229,13 +229,22 @@ function ShowcaseToggle({ car }) {
   const showToast = useToast();
   const [on, setOn] = useState(null);
   const [slug, setSlug] = useState("");
+  const [cover, setCover] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Todas as fotos do carro, sem repetir: a capa da garagem costuma ser
+  // também a primeira da lista.
+  const fotos = [...new Set([car.image, ...(car.images || [])].filter(Boolean))];
 
   useEffect(() => {
     let alive = true;
-    myShowcasedCarIds()
-      .then((ids) => {
-        if (alive) setOn(ids.includes(car.id));
+    myShowcase()
+      .then((mine) => {
+        if (!alive) return;
+        const meu = mine[car.id];
+        setOn(Boolean(meu));
+        setSlug(meu?.slug || "");
+        setCover(meu?.cover || "");
       })
       .catch(() => {
         if (alive) setOn(false);
@@ -255,11 +264,28 @@ function ShowcaseToggle({ car }) {
         setSlug("");
         showToast(t("cars.unpublished"), "success");
       } else {
-        setSlug(await publishCar(car));
+        setSlug(await publishCar(car, null, cover));
         setOn(true);
         showToast(t("cars.published"), "success");
       }
     } catch (error) {
+      showToast(error?.message || t("community.genericError"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Trocar a capa é republicar o carro com a foto nova. */
+  const pickCover = async (foto) => {
+    if (busy) return;
+    const anterior = cover;
+    setCover(foto);
+    setBusy(true);
+    try {
+      setSlug(await publishCar(car, null, foto));
+      showToast(t("cars.coverSaved"), "success");
+    } catch (error) {
+      setCover(anterior);
       showToast(error?.message || t("community.genericError"), "error");
     } finally {
       setBusy(false);
@@ -300,6 +326,37 @@ function ShowcaseToggle({ car }) {
         <p className="mt-2 text-[12.5px] leading-5 text-[var(--engine-accent-text)]">
           {t("cars.describeHint")}
         </p>
+      )}
+      {/* A escolha da capa. A da garagem serve para a garagem — foto de
+          detalhe, de documento, de quando chegou. Na vitrine a foto é vista
+          por estranho rolando uma grade, e quem sabe qual delas é essa é o
+          dono. Só aparece com mais de uma foto: com uma, não há escolha. */}
+      {on && fotos.length > 1 && (
+        <div className="mt-3">
+          <p className="text-[12px] font-bold text-[var(--engine-text-muted)]">
+            {t("cars.coverTitle")}
+          </p>
+          <div className="engine-scroll-x mt-1.5 flex gap-2 overflow-x-auto pb-1">
+            {fotos.map((foto) => {
+              const atual = (cover || fotos[0]) === foto;
+              return (
+                <button
+                  key={foto}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => pickCover(foto)}
+                  aria-pressed={atual}
+                  aria-label={t("cars.coverTitle")}
+                  className={`h-16 w-20 shrink-0 overflow-hidden rounded-lg border-2 transition disabled:opacity-60 ${
+                    atual ? "border-[var(--engine-accent)]" : "border-transparent opacity-70"
+                  }`}
+                >
+                  <img src={foto} alt="" className="h-full w-full object-cover" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
       {on && slug && (
         <Link

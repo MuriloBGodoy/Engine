@@ -6,17 +6,6 @@ import { listShowcase, showcaseBrands } from "../../services/carShowcase";
 import "../../services/i18n-cars";
 
 /**
- * Atalhos de busca: o que esse público procura primeiro.
- *
- * Não são filtros — cada um escreve a palavra no campo. O banco entende o
- * que ela significa (um carro marcado como Stage 1 responde a "stage 1" sem
- * o dono ter escrito isso em lugar nenhum), então o atalho e a digitação
- * levam ao mesmo lugar. É o que impede a tela de ter dois mecanismos
- * fazendo a mesma coisa.
- */
-const SUGGESTIONS = ["stage1", "turbo", "suspension", "wheels", "sound"];
-
-/**
  * "Encontrar carros": o acervo dos carros do Engine.
  *
  * O feed é momento; isto é catálogo. São mentalidades diferentes e por isso
@@ -64,21 +53,6 @@ export function CarsTab({ region }) {
     };
   }, [term, brand, nearMe, state]);
 
-  /** O atalho acrescenta a palavra à busca; tocar de novo tira. */
-  const toggleWord = (word) => {
-    const label = t(`cars.suggestions.${word}`);
-    setTerm((current) => {
-      const parts = current.split(/\s+/).filter(Boolean);
-      const at = parts.findIndex((part) => part.toLowerCase() === label.toLowerCase());
-      if (at >= 0) parts.splice(at, 1);
-      else parts.push(label);
-      return parts.join(" ");
-    });
-  };
-
-  const inTerm = (word) =>
-    term.toLowerCase().includes(t(`cars.suggestions.${word}`).toLowerCase());
-
   const chip = (selected) =>
     `min-h-9 shrink-0 rounded-full px-3 text-[12.5px] font-bold transition-colors ${
       selected
@@ -117,39 +91,39 @@ export function CarsTab({ region }) {
         {t("cars.searchHint")}
       </p>
 
-      <div className="engine-scroll-x flex gap-1.5 overflow-x-auto pb-1">
-        {SUGGESTIONS.map((word) => (
-          <button
-            key={word}
-            type="button"
-            onClick={() => toggleWord(word)}
-            className={chip(inTerm(word))}
-          >
-            {t(`cars.suggestions.${word}`)}
-          </button>
-        ))}
-        {state && (
-          <button type="button" onClick={() => setNearMe((value) => !value)} className={chip(nearMe)}>
-            {t("cars.nearMe", { state })}
-          </button>
-        )}
-      </div>
-
-      {brands.length > 1 && (
+      {/* O que sobrou de etiqueta: marca e região. Elas não são atalhos de
+          digitação — são recortes que a busca por palavra não faz bem (marca
+          é lista fechada, região não está no texto de ninguém). As sugestões
+          de palavra saíram: escreviam no mesmo campo logo acima, o que é
+          dois caminhos para a mesma coisa. */}
+      {(brands.length > 1 || state) && (
         <div className="engine-scroll-x flex gap-1.5 overflow-x-auto pb-1">
-          <button type="button" onClick={() => setBrand("")} className={chip(!brand)}>
-            {t("cars.allBrands")}
-          </button>
-          {brands.map((item) => (
+          {brands.length > 1 && (
+            <>
+              <button type="button" onClick={() => setBrand("")} className={chip(!brand)}>
+                {t("cars.allBrands")}
+              </button>
+              {brands.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setBrand(brand === item ? "" : item)}
+                  className={chip(brand === item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </>
+          )}
+          {state && (
             <button
-              key={item}
               type="button"
-              onClick={() => setBrand(brand === item ? "" : item)}
-              className={chip(brand === item)}
+              onClick={() => setNearMe((value) => !value)}
+              className={chip(nearMe)}
             >
-              {item}
+              {t("cars.nearMe", { state })}
             </button>
-          ))}
+          )}
         </div>
       )}
 
@@ -178,7 +152,11 @@ export function CarsTab({ region }) {
               to={`/carro/${car.slug}`}
               className="group overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)]"
             >
-              <span className="block aspect-[4/5] overflow-hidden bg-[var(--engine-surface-2)]">
+              {/* 4:3, não 4:5. Carro se fotografa deitado, e a moldura retrato
+                  cortava o carro pelo meio para caber — sobrava a porta e o
+                  pneu. Mesmo com o dono escolhendo a foto, a moldura tem
+                  que ser a da foto que ele tirou. */}
+              <span className="block aspect-[4/3] overflow-hidden bg-[var(--engine-surface-2)]">
                 {car.image ? (
                   <img
                     src={car.image}
