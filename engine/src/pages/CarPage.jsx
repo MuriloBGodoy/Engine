@@ -16,6 +16,9 @@ import { CarMenu, MonthStrip, ProgressRing, Stat } from "../components/garage/Ga
 import { GarageReminders } from "../components/reminders/GarageReminders";
 import { ReminderSettingsModal } from "../components/reminders/ReminderSettingsModal";
 import { SpecSheetView } from "../components/specsheet/SpecSheetView";
+import { myShowcasedCarIds, publishCar, unpublishCar } from "../services/carShowcase";
+import { useToast } from "../components/ToastProvider";
+import "../services/i18n-cars";
 
 const OWNED_TABS = ["summary", "expenses", "reminders", "specs"];
 const GOAL_TABS = ["summary", "contributions", "specs"];
@@ -203,6 +206,10 @@ export function CarPage({
           <ContributionsTab car={car} t={t} locale={locale} money={money} onAdd={() => onAddContribution(car)} />
         )}
         {tab === "specs" && <SpecsTab car={car} t={t} onOpenSpecs={() => onOpenSpecs(car)} />}
+
+        {/* Só carro que a pessoa TEM vai para a vitrine: meta é um carro que
+            ainda não existe na garagem dela. */}
+        {tab === "summary" && isOwned && <ShowcaseToggle car={car} />}
       </div>
 
       {remindersOpen && onSaveReminders && (
@@ -213,6 +220,91 @@ export function CarPage({
 }
 
 /** Foto com a identidade dentro, mais baixa que a vitrine: a página é do carro, não da foto. */
+/**
+ * "Mostrar na comunidade": o único caminho de um carro da garagem para a
+ * vitrine pública. Fora daqui nada do carro é lido por outra pessoa.
+ */
+function ShowcaseToggle({ car }) {
+  const { t } = useTranslation();
+  const showToast = useToast();
+  const [on, setOn] = useState(null);
+  const [slug, setSlug] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    myShowcasedCarIds()
+      .then((ids) => {
+        if (alive) setOn(ids.includes(car.id));
+      })
+      .catch(() => {
+        if (alive) setOn(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [car.id]);
+
+  const flip = async () => {
+    if (busy || on === null) return;
+    setBusy(true);
+    try {
+      if (on) {
+        await unpublishCar(car.id);
+        setOn(false);
+        setSlug("");
+        showToast(t("cars.unpublished"), "success");
+      } else {
+        setSlug(await publishCar(car));
+        setOn(true);
+        showToast(t("cars.published"), "success");
+      }
+    } catch (error) {
+      showToast(error?.message || t("community.genericError"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-extrabold text-[var(--engine-text)]">{t("cars.show")}</p>
+          <p className="mt-0.5 text-[12.5px] leading-5 text-[var(--engine-text-muted)]">
+            {t("cars.showHint")}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={Boolean(on)}
+          aria-label={t("cars.show")}
+          disabled={busy || on === null}
+          onClick={flip}
+          className={`mt-0.5 h-7 w-12 shrink-0 rounded-full p-0.5 transition-colors disabled:opacity-60 ${
+            on ? "bg-[var(--engine-accent)]" : "bg-[var(--engine-surface-2)]"
+          }`}
+        >
+          <span
+            className={`block h-6 w-6 rounded-full bg-white transition-transform ${
+              on ? "translate-x-5" : ""
+            }`}
+          />
+        </button>
+      </div>
+      {on && slug && (
+        <Link
+          to={`/carro/${slug}`}
+          className="mt-2 inline-block text-[13px] font-bold text-[var(--engine-accent-text)]"
+        >
+          {t("cars.viewPublic")}
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function CarHero({ car, t, locale, onBack, children }) {
   const specs = useMemo(() => {
     try {

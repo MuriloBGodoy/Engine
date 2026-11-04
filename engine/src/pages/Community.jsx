@@ -8,6 +8,7 @@ import {
   Bookmark,
   Building,
   Calendar,
+  CarFront,
   Car,
   Check,
   ChevronLeft,
@@ -59,6 +60,7 @@ import { normalizeTag, tagPath } from "../services/socialText";
 import { RichText } from "../components/social/RichText";
 import { TimeAgo } from "../components/social/TimeAgo";
 import { PostVideoPlayer } from "../components/social/PostVideoPlayer";
+import { CarsTab } from "../components/cars/CarsTab";
 import { useSavedPosts } from "../hooks/useSavedPosts";
 import { originTag } from "../services/carSpecSheet";
 import { formatNumber, originLabel } from "../components/specsheet/labels";
@@ -2506,7 +2508,7 @@ export function Community({ cars = [], settings, user }) {
   // `tab === "goals"`. Valor desconhecido também cai no feed em vez de numa
   // página vazia.
   const rawTab = searchParams.get("tab") || "goals";
-  const topLevelTab = ["clubes", "eventos"].includes(rawTab) ? rawTab : "goals";
+  const topLevelTab = ["clubes", "eventos", "carros"].includes(rawTab) ? rawTab : "goals";
   const composeClubId = searchParams.get("compose") ? searchParams.get("club") || "" : "";
   const [activeSubTab, setActiveSubTab] = useState(() =>
     GOALS_SUBTABS.includes(rawTab) ? rawTab : "feed",
@@ -3172,6 +3174,7 @@ export function Community({ cars = [], settings, user }) {
   const sections = [
     { id: "feed", label: t("community.tabs.feed"), icon: Users },
     { id: "videos", label: t("community.tabs.videos"), icon: Clapperboard },
+    { id: "carros", label: t("cars.tab"), icon: CarFront },
     ...(hasRail ? [] : [{ id: "ranking", label: t("community.tabs.ranking"), icon: Trophy }]),
     { id: "clubes", label: t("community.tabs.clubs"), icon: Building },
     { id: "eventos", label: t("community.tabs.events"), icon: Calendar },
@@ -3181,7 +3184,7 @@ export function Community({ cars = [], settings, user }) {
 
   /* Abas de primeiro nível vivem na URL (?tab=). "goals" guarda ainda uma
      sub-aba própria (feed/vídeos/ranking); clubes e eventos não têm. */
-  const TOP_LEVEL = ["clubes", "eventos"];
+  const TOP_LEVEL = ["clubes", "eventos", "carros"];
   const activeSection = TOP_LEVEL.includes(topLevelTab) ? topLevelTab : activeSubTab;
 
   const selectSection = (id) => {
@@ -3465,6 +3468,9 @@ export function Community({ cars = [], settings, user }) {
               quem anuncia onde você está é a barra de abas acima. A rota
               /events continua existindo e é o que o menu do desktop usa. */}
           {topLevelTab === "eventos" && <Events embedded user={user} />}
+
+          {/* Acervo dos carros do Engine. Feed é momento; isto é catálogo. */}
+          {topLevelTab === "carros" && <CarsTab region={region} />}
         </div>
 
         {/* Sidebar (only shown for Goals tab) */}

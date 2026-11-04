@@ -42,6 +42,7 @@ const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ defa
 const ContributionModal = lazyNamed(() => import("./components/ContributionModal"), "ContributionModal");
 const ExpensesModal = lazyNamed(() => import("./components/ExpensesModal"), "ExpensesModal");
 const CarPage = lazyNamed(() => import("./pages/CarPage"), "CarPage");
+const CarShowcasePage = lazyNamed(() => import("./pages/CarShowcasePage"), "CarShowcasePage");
 const Terms = lazyNamed(() => import("./pages/Terms"), "Terms");
 const Privacy = lazyNamed(() => import("./pages/Privacy"), "Privacy");
 const PostPage = lazyNamed(() => import("./pages/PostPage"), "PostPage");
@@ -738,6 +739,8 @@ function App() {
               </RequireAuth>
             }
           />
+          {/* Página pública de um carro da vitrine (20261103150000). */}
+          <Route path="/carro/:slug" element={<CarShowcasePage />} />
           <Route
             path="/events"
             element={<Events user={user} />}

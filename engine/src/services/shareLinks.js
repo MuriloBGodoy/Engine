@@ -34,6 +34,7 @@ export const shareUrls = {
   club: (clubId) => `${origin()}/clubs/${clean(clubId)}`,
   event: (eventId) => `${origin()}/events/${clean(eventId)}`,
   hashtag: (tag) => `${origin()}/community/tag/${clean(tag)}`,
+  car: (slug) => `${origin()}/carro/${clean(slug)}`,
 };
 
 /**
