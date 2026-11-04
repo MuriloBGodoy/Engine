@@ -73,7 +73,6 @@ import { AdSlot } from "../components/AdSlot";
 import { CreateFeedPostModal } from "../components/CreateFeedPostModal";
 import { useRegion } from "../hooks/RegionProvider";
 import { applyRegionFilter } from "../services/region";
-import { profileCardFromSettings, startConversation } from "../services/chat";
 import { formatFipeYear } from "../services/carDisplay";
 
 const fallbackImage =
@@ -245,28 +244,6 @@ const enrichGoalProfiles = (goal, profiles) => {
 
 // O @ já vem no username salvo; ao lado do ícone de arroba ele duplicava.
 const withoutAt = (value = "") => String(value || "").replace(/^@+/, "");
-
-const mergeDefined = (base, incoming = {}) =>
-  Object.entries(incoming).reduce(
-    (merged, [key, value]) =>
-      value === null || value === undefined || value === ""
-        ? merged
-        : { ...merged, [key]: value },
-    { ...base },
-  );
-
-const getProfileStats = (profile = {}) => {
-  const goals = profile.goals || [];
-  const progress = goals.reduce((sum, goal) => sum + getProgress(goal), 0);
-  return {
-    goalsCount: profile.goalsCount ?? goals.length,
-    likesCount:
-      profile.likesCount ??
-      goals.reduce((sum, goal) => sum + (Number(goal.likes) || 0), 0),
-    averageProgress:
-      profile.averageProgress ?? (goals.length ? progress / goals.length : 0),
-  };
-};
 
 const isGoalShared = (goal, sharedGoalIds, userId = "") => {
   const goalId = communityGoalId(goal, userId || goal.ownerId);
@@ -1945,208 +1922,6 @@ function ShareModal({
   );
 }
 
-function UserProfileModal({
-  profile,
-  loading,
-  isFollowing = false,
-  t,
-  currentUserId,
-  onClose,
-  onOpenGoal,
-  onMessage,
-  onFollow,
-}) {
-  const canMessage =
-    Boolean(onMessage) &&
-    Boolean(profile?.userId) &&
-    profile.userId !== currentUserId;
-  const canFollow =
-    Boolean(onFollow) &&
-    Boolean(profile?.userId) &&
-    profile.userId !== currentUserId;
-  const goals = profile?.goals || [];
-  const stats = getProfileStats(profile);
-  // Contagem reativa: o snapshot do backend (isFollowedByMe) é o ponto de
-  // partida e o toggle local ajusta na hora, sem esperar um refetch.
-  const followersDisplay = Math.max(
-    0,
-    (profile?.followersCount || 0) +
-      (isFollowing ? 1 : 0) -
-      (profile?.isFollowedByMe ? 1 : 0),
-  );
-
-  return (
-    <div className="engine-modal-overlay">
-      <div className="engine-modal-panel engine-pop sm:max-w-3xl">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] p-4 sm:p-5">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--engine-accent)] text-lg font-black italic text-white sm:h-16 sm:w-16 sm:text-xl">
-              {isImageUrl(profile?.avatar) ? (
-                <img src={profile.avatar} alt={profile.author} className="h-full w-full object-cover" />
-              ) : (
-                profile?.avatarInitials || profile?.avatar || getInitials(profile?.author)
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--engine-accent)]">
-                {t("community.profileTitle")}
-              </p>
-              {/* O nome que o feed já conhecia entra na hora: só cai no
-                  "carregando" quando não temos nem isso. */}
-              <h2 className="truncate text-xl font-extrabold italic text-[var(--engine-text)] dark:text-white sm:text-2xl">
-                {profile?.author || (loading ? t("common.loading") : "Usuário Engine")}
-              </h2>
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[13px] font-medium text-[var(--engine-text-subtle)] sm:text-sm">
-                <span className="inline-flex items-center gap-1">
-                  <AtSign size={14} />
-                  {withoutAt(profile?.username) || "engine"}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <MapPin size={14} />
-                  {profile?.city || "Engine Garage"}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {canFollow && (
-              <button
-                type="button"
-                onClick={() => onFollow(profile)}
-                title={isFollowing ? t("community.following") : t("community.follow")}
-                className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[10px] font-black uppercase tracking-widest transition ${
-                  isFollowing
-                    ? "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                    : "bg-[var(--engine-accent)] text-white hover:brightness-95"
-                }`}
-              >
-                {isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
-                <span className="hidden sm:inline">
-                  {isFollowing ? t("community.following") : t("community.follow")}
-                </span>
-              </button>
-            )}
-            {canMessage && (
-              <button
-                type="button"
-                onClick={() => onMessage(profile)}
-                title={t("messages.messageAction")}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[var(--engine-accent)] px-3.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:brightness-95"
-              >
-                <MessageCircle size={15} />
-                <span className="hidden sm:inline">{t("messages.messageAction")}</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)] "
-              title={t("common.cancel")}
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        <div className="engine-modal-body engine-scroll engine-safe-bottom space-y-5 p-4 sm:p-5">
-          {profile?.note && (
-            <p className="rounded-xl bg-[var(--engine-surface-2)] p-4 text-sm font-medium leading-6 text-[var(--engine-text-muted)]  ">
-              {profile.note}
-            </p>
-          )}
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Metric icon={Users} label={t("community.profileStats.followers")} value={followersDisplay} />
-            <Metric icon={Car} label={t("community.profileStats.goals")} value={stats.goalsCount} />
-            <Metric icon={Heart} label={t("community.profileStats.likes")} value={stats.likesCount} />
-            <Metric icon={Award} label={t("community.profileStats.avg")} value={`${Number(stats.averageProgress || 0).toFixed(0)}%`} />
-          </div>
-
-          {/* Followers and Following sections */}
-          <div className="grid grid-cols-2 gap-4 border-t border-[var(--engine-border)] pt-4">
-            <div>
-              <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--engine-text-muted)]">
-                Seguidores
-              </h4>
-              <div className="space-y-2">
-                {profile?.followers && profile.followers.length > 0 ? (
-                  profile.followers.slice(0, 5).map((follower) => (
-                    <div
-                      key={follower.id}
-                      className="rounded-lg border border-[var(--engine-border)] p-2 text-sm text-[var(--engine-text)]"
-                    >
-                      {follower.author || "Usuário"}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-[var(--engine-text-muted)]">Sem seguidores</p>
-                )}
-              </div>
-            </div>
-            <div>
-              <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--engine-text-muted)]">
-                Seguindo
-              </h4>
-              <div className="space-y-2">
-                {profile?.following && profile.following.length > 0 ? (
-                  profile.following.slice(0, 5).map((following) => (
-                    <div
-                      key={following.id}
-                      className="rounded-lg border border-[var(--engine-border)] p-2 text-sm text-[var(--engine-text)]"
-                    >
-                      {following.author || "Usuário"}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-[var(--engine-text-muted)]">Não segue ninguém</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
-              {t("community.profileGoals")}
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {goals.map((goal) => (
-                <button
-                  key={goal.id}
-                  type="button"
-                  onClick={() => onOpenGoal(goal.id)}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] p-3 text-left transition hover:border-[var(--engine-accent)] "
-                >
-                  <img
-                    src={goal.images?.[0] || fallbackImage}
-                    alt={goal.title}
-                    className="h-16 w-20 rounded-lg object-cover"
-                    onError={(event) => {
-                      event.currentTarget.src = fallbackImage;
-                    }}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black italic text-[var(--engine-text)] dark:text-white">
-                      {goal.title}
-                    </p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                      {getProgress(goal).toFixed(0)}% / {goal.likes} likes
-                    </p>
-                  </div>
-                </button>
-              ))}
-              {!loading && !goals.length && (
-                <p className="rounded-xl border border-dashed border-[var(--engine-border)] p-5 text-center text-sm font-medium text-[var(--engine-text-subtle)] ">
-                  {t("community.profileEmpty")}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Busca de pessoas (aba de usuários). Diretório de todos os perfis públicos
  * do Engine: buscar por nome/@, seguir/deixar de seguir na hora e tocar para
@@ -2546,11 +2321,6 @@ export function Community({ cars = [], settings, user }) {
   };
   const [searchOpen, setSearchOpen] = useState(false);
   const [peopleModalOpen, setPeopleModalOpen] = useState(false);
-  const [profileModal, setProfileModal] = useState({
-    open: false,
-    loading: false,
-    profile: null,
-  });
 
   const personalGoals = useMemo(
     () => buildUserGoals(cars, settings, user),
@@ -2918,48 +2688,37 @@ export function Community({ cars = [], settings, user }) {
 
   };
 
+  /**
+   * Toque no nome ou na foto de alguém abre o perfil da pessoa.
+   *
+   * Antes isso abria uma espiada em modal, que mostrava metade das coisas e
+   * ainda obrigava a voltar pra ver o resto. Rede social nenhuma faz isso: o
+   * perfil é uma página. A rota resolve por @, então quando o card não traz
+   * o @ a gente busca o perfil só pra descobrir pra onde ir.
+   */
   const handleOpenProfile = async (profileUserId, fallback = {}) => {
-    const profileGoals = goals.filter((goal) => goal.ownerId === profileUserId);
-    const profileProgress = profileGoals.reduce((sum, goal) => sum + getProgress(goal), 0);
-    const fallbackProfile = {
-      id: profileUserId,
-      userId: profileUserId,
-      author: fallback.author || fallback.name || "Usuário Engine",
-      username: fallback.username || "@engine",
-      avatar: fallback.avatar || "",
-      avatarInitials: fallback.avatarInitials || getInitials(fallback.author),
-      city: fallback.city || "Engine Garage",
-      note: fallback.note || "",
-      goals: profileGoals,
-      goalsCount: profileGoals.length,
-      likesCount: profileGoals.reduce((sum, goal) => sum + (Number(goal.likes) || 0), 0),
-      averageProgress: profileGoals.length ? profileProgress / profileGoals.length : 0,
-    };
-
-    setProfileModal({
-      open: true,
-      loading: Boolean(profileUserId),
-      profile: fallbackProfile,
-    });
+    const known = withoutAt(
+      fallback.username || profiles[profileUserId]?.username || "",
+    );
+    if (known) {
+      navigate(`/community/@${known}`);
+      return;
+    }
     if (!profileUserId) return;
 
     try {
       const profile = await engineDB.getPublicProfile(profileUserId);
-      setProfileModal({
-        open: true,
-        loading: false,
-        // Campo vazio vindo do perfil público não apaga o que o card do feed
-        // já sabia sobre a pessoa.
-        profile: mergeDefined(fallbackProfile, profile),
-      });
+      const username = withoutAt(profile?.username || "");
+      if (username) navigate(`/community/@${username}`);
+      else flash(t("community.profileUnavailable"), "error");
     } catch (error) {
       console.error(error);
-      setProfileModal((current) => ({ ...current, loading: false }));
+      flash(t("community.profileUnavailable"), "error");
     }
   };
 
-  // Notificação de seguidor (ou link de perfil): /community?user=<uid>.
-  // O setTimeout evita setState síncrono dentro do efeito.
+  // Link antigo de perfil: /community?user=<uid>. Continua funcionando —
+  // leva pra página da pessoa em vez de abrir o modal que não existe mais.
   useEffect(() => {
     if (!openProfileId) {
       handledProfileId.current = "";
@@ -2968,47 +2727,14 @@ export function Community({ cars = [], settings, user }) {
     if (handledProfileId.current === openProfileId) return undefined;
 
     handledProfileId.current = openProfileId;
-    const timer = window.setTimeout(
-      () => handleOpenProfile(openProfileId, profiles[openProfileId] || {}),
-      0,
-    );
+    const timer = window.setTimeout(() => {
+      closeParamModal("user");
+      handleOpenProfile(openProfileId, profiles[openProfileId] || {});
+    }, 0);
 
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openProfileId, profiles]);
-
-  const closeProfileModal = () => {
-    setProfileModal({ open: false, loading: false, profile: null });
-    if (openProfileId) closeParamModal("user");
-  };
-
-  const handleOpenProfileGoal = (goalId) => {
-    closeProfileModal();
-    openPost(goalId);
-  };
-
-  const handleMessageProfile = async (profile) => {
-    const targetId = profile?.userId || profile?.id;
-    if (!targetId || targetId === user?.uid) return;
-
-    try {
-      const conversationId = await startConversation(
-        profileCardFromSettings(settings, user),
-        {
-          userId: targetId,
-          author: profile.author,
-          username: profile.username,
-          avatar: profile.avatar,
-          avatarInitials: profile.avatarInitials,
-        },
-      );
-      closeProfileModal();
-      navigate(`/messages/${conversationId}`);
-    } catch (error) {
-      console.error(error);
-      flash(t("messages.startError"), "error");
-    }
-  };
 
   const handleCopyShareLink = async (goal) => {
     const shareText = `${t("community.shareText")} ${goal.title} - ${getProgress(
@@ -3278,7 +3004,10 @@ export function Community({ cars = [], settings, user }) {
                         : "text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
                     }`}
                   >
-                    <Icon size={15} className="shrink-0" />
+                    {/* No celular o ícone sai: medido em 04/11/2026 num
+                        Galaxy de 360px ele custava 21px por aba e sobrava
+                        meia aba visível. O rótulo é o que a pessoa lê. */}
+                    <Icon size={15} className="hidden shrink-0 sm:block" />
                     <span className="sm:truncate">{section.label}</span>
                   </button>
                 );
@@ -3314,7 +3043,7 @@ export function Community({ cars = [], settings, user }) {
                 }}
                 title={t("feedPost.action")}
                 aria-label={t("feedPost.action")}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--engine-accent)] text-white transition hover:brightness-95 xl:hidden"
+                className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--engine-accent)] text-white transition hover:brightness-95 sm:flex xl:hidden"
               >
                 <Plus size={18} />
               </button>
@@ -3326,7 +3055,7 @@ export function Community({ cars = [], settings, user }) {
                 onClick={() => setPeopleModalOpen(true)}
                 title={t("community.discoverPeople")}
                 aria-label={t("community.discoverPeople")}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:flex"
               >
                 <UserPlus size={18} />
               </button>
@@ -3342,7 +3071,8 @@ export function Community({ cars = [], settings, user }) {
                       contrário fica atrás do ícone na barra. */}
                   {searchOpen && (
                     <>
-                    <label className="engine-field mb-4 flex h-11 w-full items-center gap-2.5 rounded-full border border-[var(--engine-border)] bg-[var(--engine-surface)] pl-4 pr-1.5">
+                    <div className="mb-4 flex items-center gap-2">
+                    <label className="engine-field flex h-11 w-full min-w-0 flex-1 items-center gap-2.5 rounded-full border border-[var(--engine-border)] bg-[var(--engine-surface)] pl-4 pr-1.5">
                       <Search size={16} className="shrink-0 text-[var(--engine-text-subtle)]" />
                       <input
                         autoFocus
@@ -3373,6 +3103,20 @@ export function Community({ cars = [], settings, user }) {
                         </button>
                       )}
                     </label>
+                    {/* No celular este botão saiu da barra de abas pra não
+                        disputar largura com os rótulos. Aqui é o lugar certo:
+                        quem abre a busca está procurando alguém ou alguma
+                        coisa. No desktop ele continua na barra. */}
+                    <button
+                      type="button"
+                      onClick={() => setPeopleModalOpen(true)}
+                      title={t("community.discoverPeople")}
+                      aria-label={t("community.discoverPeople")}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:hidden"
+                    >
+                      <UserPlus size={18} />
+                    </button>
+                    </div>
                       <TrendingTags className="-mt-2 mb-4" />
                     </>
                   )}
@@ -3557,6 +3301,27 @@ export function Community({ cars = [], settings, user }) {
         />
       )}
 
+      {/* Publicar no celular: botão flutuante, como Instagram e X.
+          Vai pelo portal porque um `fixed` dentro de ancestral com
+          backdrop-filter passa a se posicionar em relação a ele, não à tela —
+          armadilha que já custou um modal aqui. O CSS o faz pousar acima da
+          barra de abas e sumir enquanto o convite de instalação está na tela. */}
+      {topLevelTab === "goals" &&
+        createPortal(
+          <button
+            type="button"
+            onClick={() => {
+              if (requireAccount("/community?compose=1")) return;
+              setPostModalOpen(true);
+            }}
+            aria-label={t("feedPost.action")}
+            className="engine-compose-fab sm:hidden"
+          >
+            <Plus size={24} />
+          </button>,
+          document.body,
+        )}
+
       {peopleModalOpen && (
         <PeopleSearchModal
           people={peopleDirectory}
@@ -3567,22 +3332,6 @@ export function Community({ cars = [], settings, user }) {
           onFollow={handleFollow}
           onOpenProfile={handleOpenProfile}
           onClose={() => setPeopleModalOpen(false)}
-        />
-      )}
-
-      {profileModal.open && (
-        <UserProfileModal
-          profile={profileModal.profile}
-          loading={profileModal.loading}
-          isFollowing={communityState.following.includes(
-            profileModal.profile?.userId,
-          )}
-          t={t}
-          currentUserId={user?.uid}
-          onClose={closeProfileModal}
-          onOpenGoal={handleOpenProfileGoal}
-          onMessage={handleMessageProfile}
-          onFollow={handleFollow}
         />
       )}
 

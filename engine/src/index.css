@@ -1804,3 +1804,40 @@ h5 {
 .engine-scroll-x::-webkit-scrollbar {
   display: none;
 }
+
+/* ===== Botão flutuante de publicar (Comunidade, celular) =====
+   Nasceu em 04/11/2026: a barra de abas da Comunidade tinha seis seções
+   disputando largura com três botões redondos, e num aparelho de 360px
+   sobrava meia aba visível. Publicar saiu da barra e virou o que as redes
+   fazem — um botão que mora no canto.
+
+   Ele entra no mesmo trilho já negociado pelo rodapé do celular: pousa acima
+   da barra de abas e se recolhe enquanto o convite de instalação ocupa o
+   canto, porque dois círculos empilhados no mesmo ponto é como o convite
+   cobriu a barra de abas em 13/09. */
+.engine-compose-fab {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  background: var(--engine-accent);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  transition: transform 0.12s, filter 0.12s;
+}
+.engine-compose-fab:active {
+  transform: scale(0.94);
+}
+
+@media (max-width: 1023px) {
+  body:has(.engine-install-prompt) .engine-compose-fab,
+  body:has(.engine-guest-dock) .engine-compose-fab {
+    display: none;
+  }
+}
