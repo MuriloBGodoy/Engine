@@ -6,6 +6,7 @@
 //   /community/tag/<tag>   hashtag
 //   /p/<@>                 página profissional
 //   /clubs/<id>            clube
+//   /carro/<endereço>      carro da vitrine
 //   /events/<id>           evento
 //
 // Mesmo desenho do service-og.js: a SPA entrega o mesmo index.html para toda
@@ -154,6 +155,28 @@ const resolvers = {
         `Clube automotivo no Engine${row.member_count ? ` · ${row.member_count} membros` : ""}.`,
       image: anyImage(config, data.cover) || anyImage(config, data.logo),
       canonical: `${origin}/clubs/${encodeURIComponent(row.id)}`,
+    };
+  },
+
+  // Carro da vitrine (/carro/<endereço>). O endereço é o `slug`, não o id.
+  async carro(config, [slug], origin) {
+    if (!/^[a-z0-9-]{1,80}$/.test(String(slug || ""))) return null;
+    const row = await one(
+      config,
+      "car_showcase",
+      `select=slug,brand,model,model_year,stage,city,state,hidden,like_count,data&slug=eq.${encodeURIComponent(slug)}`,
+    );
+    if (!row || row.hidden) return null;
+    const data = row.data || {};
+    const nome = [row.brand, row.model].filter(Boolean).join(" ") || "Carro";
+    const lugar = [row.city, row.state].filter(Boolean).join(" - ");
+    return {
+      title: clip([nome, row.model_year].filter(Boolean).join(" · ") + " · Engine", 90),
+      description:
+        clip(stripMarkers(data.specs?.notes), 180) ||
+        clip(["Na garagem do Engine", lugar].filter(Boolean).join(" · "), 180),
+      image: anyImage(config, data.image),
+      canonical: `${origin}/carro/${encodeURIComponent(row.slug)}`,
     };
   },
 

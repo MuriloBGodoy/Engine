@@ -48,6 +48,10 @@
   function = "social-og"
 
 [[edge_functions]]
+  path = "/carro/*"
+  function = "social-og"
+
+[[edge_functions]]
   path = "/clubs/*"
   function = "social-og"
 
