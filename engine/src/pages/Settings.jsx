@@ -11,12 +11,16 @@ import {
   Download,
   CreditCard,
   EyeOff,
+  FileText,
+  RefreshCw,
   HeartHandshake,
   KeyRound,
   Loader2,
   LogOut,
   Mail,
+  Megaphone,
   Palette,
+  ShieldCheck,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -45,6 +49,13 @@ import {
   AccountDeletionIncomplete,
   deleteAccountEverywhere,
 } from "../services/accountDeletion";
+// `footer.company.advertise` mora no pacote de Planos/Apoie/Anuncie.
+import "../services/i18n-billing";
+import {
+  applyPendingUpdate,
+  checkForUpdate,
+  subscribeToUpdates,
+} from "../services/pwaUpdate";
 import { PageHeader } from "../components/PageHeader";
 import { useToast } from "../components/ToastProvider";
 import { useRegion } from "../hooks/RegionProvider";
@@ -157,6 +168,10 @@ function Group({ title, footer, children }) {
     </section>
   );
 }
+
+// O mesmo endereço que Termos e Privacidade declaram como contato. Quando o
+// e-mail do domínio estiver no ar, troque aqui e nas duas páginas legais.
+const CONTACT_MAILTO = "mailto:muxdtuber@gmail.com";
 
 function Row({ icon: Icon, label, hint, children, onClick, tone = "default", chevron = false }) {
   const content = (
@@ -536,6 +551,48 @@ function PlanGroup({ t, i18n, user }) {
         onClick={() => navigate("/apoie")}
       />
     </Group>
+  );
+}
+
+/**
+ * "Buscar atualização".
+ *
+ * O app instalado abre do cache e podia ficar numa versão velha sem jeito de
+ * sair dela pela tela — fechar e abrir não resolve, porque quem responde é o
+ * service worker, não o servidor. Este botão pergunta na hora e, se houver
+ * versão nova esperando, aplica.
+ */
+function UpdateRow({ t }) {
+  const toast = useToast();
+  const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => subscribeToUpdates(setReady), []);
+
+  const handleCheck = async () => {
+    if (checking) return;
+    if (ready) {
+      applyPendingUpdate();
+      return;
+    }
+    setChecking(true);
+    const found = await checkForUpdate();
+    setChecking(false);
+    // `checkForUpdate` já terminou de falar com o servidor; se o service
+    // worker novo foi achado, o aviso chega pelo subscribe em seguida.
+    if (!found) toast(t("settings.app.updateUpToDate"));
+  };
+
+  return (
+    <Row
+      icon={RefreshCw}
+      label={ready ? t("settings.app.updateReady") : t("settings.app.update")}
+      hint={ready ? t("settings.app.updateReadyHint") : t("settings.app.updateHint")}
+      chevron={!checking}
+      onClick={handleCheck}
+    >
+      {checking && <Loader2 size={18} className="animate-spin text-[var(--engine-text-muted)]" />}
+    </Row>
   );
 }
 
@@ -1203,6 +1260,40 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                     <option value="name-asc">{t("settings.options.nameAZ")}</option>
                   </select>
                 </Row>
+              </Group>
+
+              {/* Termos, privacidade e contato moravam só no rodapé. App de
+                  verdade não pendura isso no fim de cada rolagem — põe em
+                  Ajustes, que é onde a pessoa vai procurar. No celular o
+                  rodapé some e este grupo é o caminho. */}
+              <Group title={t("settings.about.title")}>
+                <UpdateRow t={t} />
+                <Row
+                  icon={FileText}
+                  label={t("footer.legal.terms")}
+                  chevron
+                  onClick={() => navigate("/termos")}
+                />
+                <Row
+                  icon={ShieldCheck}
+                  label={t("footer.legal.privacy")}
+                  chevron
+                  onClick={() => navigate("/privacidade")}
+                />
+                <Row
+                  icon={Megaphone}
+                  label={t("footer.company.advertise")}
+                  chevron
+                  onClick={() => navigate("/anuncie")}
+                />
+                <Row
+                  icon={Mail}
+                  label={t("footer.help.contact")}
+                  chevron
+                  onClick={() => {
+                    window.location.href = CONTACT_MAILTO;
+                  }}
+                />
               </Group>
             </>
           )}

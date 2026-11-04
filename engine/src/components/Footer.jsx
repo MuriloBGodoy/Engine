@@ -147,7 +147,15 @@ export function Footer({ user = null }) {
   const lojas = [LINKS.app.googlePlay, LINKS.app.appStore].some(temDestino);
 
   return (
-    <footer className="mt-8 border-t border-[var(--engine-border)] pt-5 lg:mt-12 lg:pt-8">
+    <footer
+      /* Quem tem conta não vê rodapé nenhum no celular: ele some inteiro,
+         inclusive a linha de copyright. Tudo o que estava nele tem casa em
+         Configurações. No desktop o rodapé continua, porque ali a tela é um
+         site e um site tem rodapé. */
+      className={`mt-8 border-t border-[var(--engine-border)] pt-5 lg:mt-12 lg:block lg:pt-8 ${
+        user ? "hidden" : ""
+      }`}
+    >
       {/* No celular o rodapé inteiro (marca, redes, três colunas de links)
           dizia "site", não "app": nenhum app de celular tem rodapé. Lá fica
           só a linha mínima abaixo; Planos, Apoie e Anuncie já vivem em
@@ -244,7 +252,10 @@ export function Footer({ user = null }) {
         )}
       </div>
 
-      {/* Celular: só o que a lei pede e o caminho para falar com a gente. */}
+      {/* Celular (visitante): só o que a lei pede e o caminho para falar com
+          a gente. Quem tem conta nem chega aqui — o rodapé inteiro some, e
+          isto vive em Configurações › Sobre o Engine. Visitante não tem
+          Configurações, então para ele fica aqui. */}
       <div className="engine-container flex flex-wrap items-center justify-center gap-x-5 pb-4 lg:hidden">
         {[
           { href: LINKS.legal.terms, label: t("footer.legal.terms") },
