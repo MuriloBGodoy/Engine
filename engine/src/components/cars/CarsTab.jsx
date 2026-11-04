@@ -1,19 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Heart, Search, SlidersHorizontal } from "lucide-react";
+import { Heart, Search, X } from "lucide-react";
 import { listShowcase, showcaseBrands } from "../../services/carShowcase";
-import { STAGES } from "../../services/carSpecSheet";
 import "../../services/i18n-cars";
 
-/** As modificações que esse público procura primeiro. O resto fica na ficha. */
-const MOD_FILTERS = ["turbo", "suspension", "wheels", "exhaust", "sound"];
+/**
+ * Atalhos de busca: o que esse público procura primeiro.
+ *
+ * Não são filtros — cada um escreve a palavra no campo. O banco entende o
+ * que ela significa (um carro marcado como Stage 1 responde a "stage 1" sem
+ * o dono ter escrito isso em lugar nenhum), então o atalho e a digitação
+ * levam ao mesmo lugar. É o que impede a tela de ter dois mecanismos
+ * fazendo a mesma coisa.
+ */
+const SUGGESTIONS = ["stage1", "turbo", "suspension", "wheels", "sound"];
 
 /**
- * "Encontrar carros": o acervo dos carros do Engine, com filtro.
+ * "Encontrar carros": o acervo dos carros do Engine.
  *
  * O feed é momento; isto é catálogo. São mentalidades diferentes e por isso
  * são abas diferentes — misturar as duas é o que deixa rede social confusa.
+ *
+ * Nasceu com duas tiras de etiquetas (stage e modificação) que num celular
+ * rolavam para fora da tela: quem queria "stage 1" tinha que descobrir que
+ * existia uma etiqueta com esse nome e alcançá-la rolando. Viraram busca em
+ * 04/11/2026. A marca — lista curta e fechada — é a única etiqueta que
+ * sobrou, e só aparece quando há mais de uma.
  */
 export function CarsTab({ region }) {
   const { t } = useTranslation();
@@ -21,14 +34,9 @@ export function CarsTab({ region }) {
   const [brands, setBrands] = useState([]);
   const [term, setTerm] = useState("");
   const [brand, setBrand] = useState("");
-  const [stage, setStage] = useState("");
-  const [mods, setMods] = useState([]);
   const [nearMe, setNearMe] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const state = region?.state && region.state !== "all" ? region.state : "";
-  const activeFilters =
-    (brand ? 1 : 0) + (stage ? 1 : 0) + mods.length + (nearMe && state ? 1 : 0);
 
   useEffect(() => {
     showcaseBrands()
@@ -38,25 +46,38 @@ export function CarsTab({ region }) {
 
   useEffect(() => {
     let alive = true;
-    const timer = setTimeout(() => {
-      listShowcase({ term, brand, stage, mods, state: nearMe ? state : "" })
-        .then((list) => {
-          if (alive) setCars(list);
-        })
-        .catch(() => {
-          if (alive) setCars([]);
-        });
-    }, term ? 300 : 0);
+    const timer = setTimeout(
+      () => {
+        listShowcase({ term, brand, state: nearMe ? state : "" })
+          .then((list) => {
+            if (alive) setCars(list);
+          })
+          .catch(() => {
+            if (alive) setCars([]);
+          });
+      },
+      term ? 300 : 0,
+    );
     return () => {
       alive = false;
       clearTimeout(timer);
     };
-  }, [term, brand, stage, mods, nearMe, state]);
+  }, [term, brand, nearMe, state]);
 
-  const toggleMod = (id) =>
-    setMods((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
+  /** O atalho acrescenta a palavra à busca; tocar de novo tira. */
+  const toggleWord = (word) => {
+    const label = t(`cars.suggestions.${word}`);
+    setTerm((current) => {
+      const parts = current.split(/\s+/).filter(Boolean);
+      const at = parts.findIndex((part) => part.toLowerCase() === label.toLowerCase());
+      if (at >= 0) parts.splice(at, 1);
+      else parts.push(label);
+      return parts.join(" ");
+    });
+  };
+
+  const inTerm = (word) =>
+    term.toLowerCase().includes(t(`cars.suggestions.${word}`).toLowerCase());
 
   const chip = (selected) =>
     `min-h-9 shrink-0 rounded-full px-3 text-[12.5px] font-bold transition-colors ${
@@ -65,38 +86,56 @@ export function CarsTab({ region }) {
         : "bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]"
     }`;
 
+  const searching = Boolean(term || brand || nearMe);
   const empty = useMemo(() => cars !== null && cars.length === 0, [cars]);
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        <label className="flex min-h-11 flex-1 items-center gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3">
-          <Search size={17} className="shrink-0 text-[var(--engine-text-muted)]" aria-hidden="true" />
-          <input
-            type="search"
-            value={term}
-            onChange={(event) => setTerm(event.target.value)}
-            placeholder={t("cars.searchPlaceholder")}
-            aria-label={t("cars.searchPlaceholder")}
-            className="min-w-0 flex-1 border-0 bg-transparent text-[15px] font-semibold text-[var(--engine-text)] outline-none placeholder:font-medium placeholder:text-[var(--engine-text-muted)]"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-expanded={filtersOpen}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 text-[13px] font-bold text-[var(--engine-text)] lg:hidden"
-        >
-          <SlidersHorizontal size={16} aria-hidden="true" />
-          {activeFilters > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--engine-accent)] px-1.5 text-[11px] font-black text-white">
-              {activeFilters}
-            </span>
-          )}
-        </button>
+      <label className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3">
+        <Search size={17} className="shrink-0 text-[var(--engine-text-muted)]" aria-hidden="true" />
+        <input
+          type="search"
+          value={term}
+          onChange={(event) => setTerm(event.target.value)}
+          placeholder={t("cars.searchPlaceholder")}
+          aria-label={t("cars.searchPlaceholder")}
+          className="min-w-0 flex-1 border-0 bg-transparent text-[15px] font-semibold text-[var(--engine-text)] outline-none placeholder:font-medium placeholder:text-[var(--engine-text-muted)]"
+        />
+        {term && (
+          <button
+            type="button"
+            onClick={() => setTerm("")}
+            aria-label={t("cars.clearSearch")}
+            className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--engine-text-subtle)]"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </label>
+
+      <p className="text-[12px] font-medium text-[var(--engine-text-muted)]">
+        {t("cars.searchHint")}
+      </p>
+
+      <div className="engine-scroll-x flex gap-1.5 overflow-x-auto pb-1">
+        {SUGGESTIONS.map((word) => (
+          <button
+            key={word}
+            type="button"
+            onClick={() => toggleWord(word)}
+            className={chip(inTerm(word))}
+          >
+            {t(`cars.suggestions.${word}`)}
+          </button>
+        ))}
+        {state && (
+          <button type="button" onClick={() => setNearMe((value) => !value)} className={chip(nearMe)}>
+            {t("cars.nearMe", { state })}
+          </button>
+        )}
       </div>
 
-      <div className={`space-y-2 ${filtersOpen ? "" : "hidden lg:block"}`}>
+      {brands.length > 1 && (
         <div className="engine-scroll-x flex gap-1.5 overflow-x-auto pb-1">
           <button type="button" onClick={() => setBrand("")} className={chip(!brand)}>
             {t("cars.allBrands")}
@@ -112,39 +151,7 @@ export function CarsTab({ region }) {
             </button>
           ))}
         </div>
-
-        <div className="engine-scroll-x flex gap-1.5 overflow-x-auto pb-1">
-          {STAGES.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setStage(stage === item ? "" : item)}
-              className={chip(stage === item)}
-            >
-              {t(`cars.stage.${item}`)}
-            </button>
-          ))}
-          {MOD_FILTERS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => toggleMod(item)}
-              className={chip(mods.includes(item))}
-            >
-              {t(`cars.mods.${item}`)}
-            </button>
-          ))}
-          {state && (
-            <button
-              type="button"
-              onClick={() => setNearMe((value) => !value)}
-              className={chip(nearMe)}
-            >
-              {t("cars.nearMe", { state })}
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {cars === null && (
         <p className="py-8 text-center text-sm font-medium text-[var(--engine-text-muted)]">
@@ -154,8 +161,12 @@ export function CarsTab({ region }) {
 
       {empty && (
         <div className="rounded-2xl border border-dashed border-[var(--engine-border)] p-8 text-center">
-          <p className="text-sm font-bold text-[var(--engine-text)]">{t("cars.emptyTitle")}</p>
-          <p className="mt-1 text-[13px] text-[var(--engine-text-muted)]">{t("cars.emptyHint")}</p>
+          <p className="text-sm font-bold text-[var(--engine-text)]">
+            {searching ? t("cars.noMatchTitle") : t("cars.emptyTitle")}
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--engine-text-muted)]">
+            {searching ? t("cars.noMatchHint") : t("cars.emptyHint")}
+          </p>
         </div>
       )}
 

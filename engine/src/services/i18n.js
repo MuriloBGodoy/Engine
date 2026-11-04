@@ -1423,6 +1423,10 @@ const resources = {
         unread_other: "{{count}} não lidas",
         allRead: "Tudo em dia",
         markAllRead: "Marcar todas como lidas",
+        delete: "Apagar aviso",
+        clearAll: "Limpar tudo",
+        clearAllConfirm: "Isso apaga todos os avisos, inclusive os que você ainda não leu. Não dá pra desfazer.",
+        swipeHint: "Arraste para o lado para apagar.",
         close: "Fechar notificações",
         open: "Abrir",
         adminNote: "Comentário do admin",
@@ -1542,6 +1546,7 @@ const resources = {
         profileTitle: "Perfil público",
         profileGoals: "Metas compartilhadas",
         profileEmpty: "Este usuário ainda não compartilhou metas.",
+        profileUnavailable: "Não foi possível abrir este perfil.",
         profileStats: {
           goals: "metas",
           likes: "curtidas",
@@ -1635,6 +1640,7 @@ const resources = {
         status: {
           saveError: "Não foi possível salvar agora.",
         },
+        about: { title: "Sobre o Engine" },
         plan: {
           title: "Seu plano",
           free: "Grátis",
@@ -1723,6 +1729,11 @@ const resources = {
         },
         app: {
           appearance: "Aparência",
+          update: "Buscar atualização",
+          updateHint: "O app instalado abre do que já baixou. Toque para perguntar se tem versão nova.",
+          updateReady: "Atualizar agora",
+          updateReadyHint: "Tem versão nova esperando. O app recarrega.",
+          updateUpToDate: "Você já está na versão mais recente.",
           navHint: "Vale no computador. No celular a navegação fica embaixo.",
           languageRegion: "Idioma e região",
           regionHint: "A região escolhe quais eventos, clubes e serviços aparecem primeiro.",
@@ -3220,6 +3231,10 @@ const resources = {
         unread_other: "{{count}} unread",
         allRead: "All caught up",
         markAllRead: "Mark all as read",
+        delete: "Delete notification",
+        clearAll: "Clear all",
+        clearAllConfirm: "This deletes every notification, including the ones you haven't read. It can't be undone.",
+        swipeHint: "Swipe a notification to delete it.",
         close: "Close notifications",
         open: "Open",
         adminNote: "Admin note",
@@ -3339,6 +3354,7 @@ const resources = {
         profileTitle: "Public profile",
         profileGoals: "Shared goals",
         profileEmpty: "This user has not shared goals yet.",
+        profileUnavailable: "Could not open this profile.",
         profileStats: {
           goals: "goals",
           likes: "likes",
@@ -3431,6 +3447,7 @@ const resources = {
         status: {
           saveError: "Could not save right now.",
         },
+        about: { title: "About Engine" },
         plan: {
           title: "Your plan",
           free: "Free",
@@ -3519,6 +3536,11 @@ const resources = {
         },
         app: {
           appearance: "Appearance",
+          update: "Check for updates",
+          updateHint: "The installed app opens from what it already downloaded. Tap to ask for a newer version.",
+          updateReady: "Update now",
+          updateReadyHint: "A new version is waiting. The app will reload.",
+          updateUpToDate: "You're already on the latest version.",
           navHint: "Applies on desktop. On phones navigation stays at the bottom.",
           languageRegion: "Language and region",
           regionHint: "Your region decides which events, clubs and services show first.",
@@ -5021,6 +5043,10 @@ const resources = {
         unread_other: "{{count}} sin leer",
         allRead: "Todo al día",
         markAllRead: "Marcar todas como leídas",
+        delete: "Borrar aviso",
+        clearAll: "Borrar todo",
+        clearAllConfirm: "Esto borra todos los avisos, incluso los que no leíste. No se puede deshacer.",
+        swipeHint: "Desliza el aviso para borrarlo.",
         close: "Cerrar notificaciones",
         open: "Abrir",
         adminNote: "Comentario del admin",
@@ -5140,6 +5166,7 @@ const resources = {
         profileTitle: "Perfil público",
         profileGoals: "Metas compartidas",
         profileEmpty: "Este usuario todavía no compartió metas.",
+        profileUnavailable: "No se pudo abrir este perfil.",
         profileStats: {
           goals: "metas",
           likes: "likes",
@@ -5233,6 +5260,7 @@ const resources = {
         status: {
           saveError: "No se pudo guardar ahora.",
         },
+        about: { title: "Sobre Engine" },
         plan: {
           title: "Tu plan",
           free: "Gratis",
@@ -5321,6 +5349,11 @@ const resources = {
         },
         app: {
           appearance: "Apariencia",
+          update: "Buscar actualización",
+          updateHint: "La app instalada abre de lo que ya descargó. Toca para preguntar si hay versión nueva.",
+          updateReady: "Actualizar ahora",
+          updateReadyHint: "Hay una versión nueva esperando. La app se recarga.",
+          updateUpToDate: "Ya estás en la versión más reciente.",
           navHint: "Se aplica en el ordenador. En el móvil la navegación queda abajo.",
           languageRegion: "Idioma y región",
           regionHint: "La región decide qué eventos, clubes y servicios aparecen primero.",

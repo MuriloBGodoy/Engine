@@ -85,16 +85,29 @@ const fromRow = (row) => ({
   ...(row.data || {}),
 });
 
+/** A mesma normalização do banco (`car_search_normalize`), do lado de cá. */
+const paraBusca = (valor = "") =>
+  String(valor)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
 /**
- * Busca na vitrine. Marca, modelo e texto livre casam por `ilike`; stage,
- * modificação e região são comparação exata, que é o que as colunas indexadas
- * da migração entregam.
+ * Busca na vitrine.
+ *
+ * Cada palavra digitada vira uma condição que a linha de busca do carro
+ * precisa conter — "golf stage 1" acha o Golf preparado, não todo Golf e todo
+ * stage 1. A linha inclui a preparação que o dono escreveu na garagem e as
+ * palavras que cada etiqueta significa, então "stg1", "suspensão" e
+ * "coilover" chegam no mesmo lugar (ver 20261104180000_car_search_text.sql).
+ *
+ * Marca e região continuam exatos: são escolha de etiqueta, não digitação.
  */
 export async function listShowcase({
   term = "",
   brand = "",
-  stage = "",
-  mods = [],
   state = "",
   limit = 30,
 } = {}) {
@@ -105,12 +118,12 @@ export async function listShowcase({
     .limit(limit);
 
   if (brand) query = query.ilike("brand", brand);
-  if (stage) query = query.eq("stage", stage);
   if (state) query = query.eq("state", state);
-  if (mods.length) query = query.contains("mods", mods);
-  if (term.trim()) {
-    const alvo = `%${term.trim()}%`;
-    query = query.or(`brand.ilike.${alvo},model.ilike.${alvo}`);
+
+  // Teto de 6 palavras: passar disso é frase, não busca, e cada palavra é
+  // mais uma varredura.
+  for (const palavra of paraBusca(term).split(" ").filter(Boolean).slice(0, 6)) {
+    query = query.ilike("search_text", `%${palavra}%`);
   }
 
   return must(await query).map(fromRow);

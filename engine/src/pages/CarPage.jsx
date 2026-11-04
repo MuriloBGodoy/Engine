@@ -293,6 +293,14 @@ function ShowcaseToggle({ car }) {
           />
         </button>
       </div>
+      {/* Sem a preparação escrita, o carro só é achado por marca e modelo:
+          é esse texto que a busca da aba Carros varre. Vale avisar — quem
+          publica quer ser encontrado. */}
+      {on && !String(car.specs?.notes || "").trim() && (
+        <p className="mt-2 text-[12.5px] leading-5 text-[var(--engine-accent-text)]">
+          {t("cars.describeHint")}
+        </p>
+      )}
       {on && slug && (
         <Link
           to={`/carro/${slug}`}
