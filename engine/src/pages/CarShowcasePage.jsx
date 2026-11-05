@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Heart, Send, Share2, Trash2 } from "lucide-react";
+import { Bookmark, Heart, Send, Share2, Trash2 } from "lucide-react";
 import {
   addCarComment,
   deleteCarComment,
@@ -11,6 +11,8 @@ import {
 } from "../services/carShowcase";
 import { engineDB } from "../services/db";
 import { PersonLink } from "../components/social/PersonLink";
+import { useSavedCars } from "../hooks/useSavedCars";
+import { useRequireAccount } from "../hooks/useRequireAccount";
 import { auth } from "../services/supabase";
 import { openShareSheet, shareUrls } from "../services/shareLinks";
 import { useToast } from "../components/ToastProvider";
@@ -34,6 +36,9 @@ export function CarShowcasePage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const meuUid = auth.currentUser?.uid || "";
+  const { isSaved, toggleSaved } = useSavedCars(meuUid);
+  // Visitante que toca em salvar vai para o login e volta para este carro.
+  const requireAccount = useRequireAccount(meuUid ? { uid: meuUid } : null);
 
   useEffect(() => {
     let alive = true;
@@ -117,6 +122,7 @@ export function CarShowcasePage() {
     );
   }
 
+  const salvo = car ? isSaved(car.id) : false;
   const specs = car.specs;
   const images = car.images?.length ? car.images : [car.image].filter(Boolean);
 
@@ -165,6 +171,22 @@ export function CarShowcasePage() {
               fill={liked ? "currentColor" : "none"}
             />
             {likes > 0 ? likes : ""}
+          </button>
+          {/* Salvar fica ao lado de curtir porque são leituras diferentes do
+              mesmo carro: curtir é recado para o dono, salvar é bilhete
+              para mim. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (requireAccount(`/carro/${car.slug}`)) return;
+              toggleSaved(car.id);
+            }}
+            aria-pressed={salvo}
+            aria-label={t(salvo ? "postCard.unsave" : "postCard.save")}
+            title={t(salvo ? "postCard.unsave" : "postCard.save")}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--engine-border)] text-[var(--engine-text)]"
+          >
+            <Bookmark size={17} fill={salvo ? "currentColor" : "none"} />
           </button>
           <button
             type="button"

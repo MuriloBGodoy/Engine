@@ -2782,7 +2782,7 @@ export function Community({ cars = [], settings, user }) {
           {topLevelTab === "eventos" && <Events embedded user={user} />}
 
           {/* Acervo dos carros do Engine. Feed é momento; isto é catálogo. */}
-          {topLevelTab === "carros" && <CarsTab region={region} />}
+          {topLevelTab === "carros" && <CarsTab region={region} user={user} />}
         </div>
 
         {/* Sidebar (only shown for Goals tab) */}

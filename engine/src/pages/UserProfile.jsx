@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Heart,
@@ -22,6 +22,7 @@ import { ShareToChatModal } from "../components/ShareToChatModal";
 import { usePostActions } from "../hooks/usePostActions";
 import { fetchSavedPosts } from "../services/savedPosts";
 import { fetchArchivedPosts, setPostArchived } from "../services/archivedPosts";
+import { fetchSavedCars } from "../services/savedCars";
 import { TimeAgo } from "../components/social/TimeAgo";
 import { openShareSheet, shareUrls } from "../services/shareLinks";
 import "../services/i18n-social-posts";
@@ -210,6 +211,8 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   // Aba "Salvos": só no próprio perfil, lida quando aberta.
   const [savedGoals, setSavedGoals] = useState(null);
   const [archivedGoals, setArchivedGoals] = useState(null);
+  const [savedCars, setSavedCars] = useState(null);
+  const [savedKind, setSavedKind] = useState("posts");
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -457,6 +460,22 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       alive = false;
     };
   }, [activeTab, isOwnProfile, currentUserId, reloadKey]);
+
+  useEffect(() => {
+    if (activeTab !== "saved" || savedKind !== "cars" || !isOwnProfile || !currentUserId) {
+      return undefined;
+    }
+    let alive = true;
+    fetchSavedCars(currentUserId)
+      .then((list) => alive && setSavedCars(list))
+      .catch((error) => {
+        console.error(error);
+        if (alive) setSavedCars([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeTab, savedKind, isOwnProfile, currentUserId]);
 
   useEffect(() => {
     if (activeTab !== "saved" || !isOwnProfile || !currentUserId) return undefined;
@@ -886,16 +905,68 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           {activeTab === "saved" && isOwnProfile && (
             <div>
               <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">{t("socialPosts.saved.onlyYou")}</p>
-              {savedGoals === null ? (
+              {/* Publicação e carro são coisas diferentes e abrem telas
+                  diferentes: misturar os dois numa grade só faria o toque
+                  virar sorteio. Duas seções, a mesma lista. */}
+              <div className="mb-3 flex gap-1.5">
+                {["posts", "cars"].map((qual) => (
+                  <button
+                    key={qual}
+                    type="button"
+                    onClick={() => setSavedKind(qual)}
+                    className={`min-h-9 rounded-full px-3 text-[12.5px] font-bold transition-colors ${
+                      savedKind === qual
+                        ? "bg-[var(--engine-accent)] text-white"
+                        : "bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]"
+                    }`}
+                  >
+                    {t(qual === "posts" ? "socialFeed.postsTab" : "cars.tab")}
+                  </button>
+                ))}
+              </div>
+
+              {savedKind === "posts" ? (
+                savedGoals === null ? (
+                  <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("common.loading")}</p>
+                ) : savedGoals.length ? (
+                  <div className="-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6">
+                    {savedGoals.map((goal) => (
+                      <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={(id) => navigate(`/post/${id}`)} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("socialPosts.saved.empty")}</p>
+                )
+              ) : savedCars === null ? (
                 <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("common.loading")}</p>
-              ) : savedGoals.length ? (
-                <div className="-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6">
-                  {savedGoals.map((goal) => (
-                    <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={(id) => navigate(`/post/${id}`)} />
+              ) : savedCars.length ? (
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                  {savedCars.map((car) => (
+                    <Link
+                      key={car.id}
+                      to={`/carro/${car.slug}`}
+                      className="overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)]"
+                    >
+                      <span className="block aspect-[4/3] overflow-hidden bg-[var(--engine-surface-2)]">
+                        {car.image ? (
+                          <img src={car.image} alt={car.title} loading="lazy" className="h-full w-full object-cover" />
+                        ) : null}
+                      </span>
+                      <span className="block p-2.5">
+                        <span className="block truncate text-[13px] font-extrabold text-[var(--engine-text)]">
+                          {car.title}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11.5px] font-semibold text-[var(--engine-text-muted)]">
+                          {[car.year, car.city].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                    </Link>
                   ))}
                 </div>
               ) : (
-                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("socialPosts.saved.empty")}</p>
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">
+                  {t("community.savedCarsEmpty")}
+                </p>
               )}
             </div>
           )}

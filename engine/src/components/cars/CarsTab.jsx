@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Heart, Search, X } from "lucide-react";
+import { Bookmark, Heart, Search, X } from "lucide-react";
 import { listShowcase, showcaseBrands } from "../../services/carShowcase";
+import { useSavedCars } from "../../hooks/useSavedCars";
+import { useRequireAccount } from "../../hooks/useRequireAccount";
 import "../../services/i18n-cars";
 
 /**
@@ -17,8 +19,13 @@ import "../../services/i18n-cars";
  * 04/11/2026. A marca — lista curta e fechada — é a única etiqueta que
  * sobrou, e só aparece quando há mais de uma.
  */
-export function CarsTab({ region }) {
+export function CarsTab({ region, user }) {
   const { t } = useTranslation();
+  // Salvar é diferente de curtir: curtir é recado para o dono, salvar é
+  // bilhete para mim. Numa grade de carro de desconhecido, sem isso a única
+  // forma de não perder uma build era decorar o nome.
+  const { isSaved, toggleSaved } = useSavedCars(user?.uid || "");
+  const requireAccount = useRequireAccount(user);
   const [cars, setCars] = useState(null);
   const [brands, setBrands] = useState([]);
   const [term, setTerm] = useState("");
@@ -150,8 +157,30 @@ export function CarsTab({ region }) {
             <Link
               key={car.id}
               to={`/carro/${car.slug}`}
-              className="group overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)]"
+              className="group relative overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)]"
             >
+              {/* Em cima da foto, como em qualquer grade: o cartão inteiro é
+                  um link, então o marcador precisa cortar o clique antes que
+                  ele vire navegação. */}
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (requireAccount("/community?tab=carros")) return;
+                  toggleSaved(car.id);
+                }}
+                aria-pressed={isSaved(car.id)}
+                aria-label={t(isSaved(car.id) ? "postCard.unsave" : "postCard.save")}
+                title={t(isSaved(car.id) ? "postCard.unsave" : "postCard.save")}
+                className="absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center text-white"
+              >
+                {/* O alvo tem 44px, mas o desenho é um disco de 32: sobre
+                    foto clara um ícone branco solto sumia. */}
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45">
+                  <Bookmark size={16} fill={isSaved(car.id) ? "currentColor" : "none"} />
+                </span>
+              </button>
               {/* 4:3, não 4:5. Carro se fotografa deitado, e a moldura retrato
                   cortava o carro pelo meio para caber — sobrava a porta e o
                   pneu. Mesmo com o dono escolhendo a foto, a moldura tem
