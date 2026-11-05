@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
+  BellOff,
   Award,
   AtSign,
   Bookmark,
@@ -911,6 +912,7 @@ export function GoalCard({
   onShare,
   onUnshare,
   onArchive,
+  onMute,
   onFollow,
   onOpenProfile,
   onEditComment,
@@ -1007,6 +1009,18 @@ export function GoalCard({
             icon: Flag,
             label: t("community.report"),
             onClick: () => onReport(goal),
+          },
+        ]
+      : []),
+    // Silenciar vem ANTES de bloquear no menu, e sem o vermelho: é a saída
+    // leve, e menu bom oferece a leve primeiro. Bloquear fica por último,
+    // onde moram as coisas das quais não se volta fácil.
+    ...(!isOwner && onMute
+      ? [
+          {
+            icon: BellOff,
+            label: t("community.mute", { user: withoutAt(goal.username) || goal.author }),
+            onClick: () => onMute(goal),
           },
         ]
       : []),
@@ -1842,6 +1856,7 @@ export function Community({ cars = [], settings, user }) {
   const [postToShare, setPostToShare] = useState(null);
   const [captionGoal, setCaptionGoal] = useState(null);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
+  const [mutedUserIds, setMutedUserIds] = useState([]);
   const handledProfileId = useRef("");
   const [communityState, setCommunityState] = useState(
     engineDB.getDefaultCommunityState(),
@@ -1917,6 +1932,7 @@ export function Community({ cars = [], settings, user }) {
   );
 
   const blockedSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds]);
+  const mutedSet = useMemo(() => new Set(mutedUserIds), [mutedUserIds]);
 
   const goals = useMemo(
     () =>
@@ -1924,6 +1940,12 @@ export function Community({ cars = [], settings, user }) {
         // Bloquear some com a publicação e também com os comentários da
         // pessoa nos posts dos outros — meia-medida não é bloqueio.
         .filter((goal) => !blockedSet.has(goal.ownerId))
+        // Silenciar tira a pessoa DO FEED e para por aí: os comentários dela
+        // continuam onde estão, e o perfil dela continua inteiro. Quem some
+        // de tudo é o bloqueado — a diferença entre os dois é justamente
+        // essa, e apagar o silenciado de todo canto o transformaria num
+        // bloqueio que não avisa que é um.
+        .filter((goal) => !mutedSet.has(goal.ownerId))
         .map((goal) => ({
           ...goal,
           comments: (goal.comments || []).filter(
@@ -1949,7 +1971,7 @@ export function Community({ cars = [], settings, user }) {
 
           return enrichGoalProfiles(mergedGoal, profiles);
         }),
-    [blockedSet, carsById, communityGoals, profiles, user?.uid],
+    [blockedSet, mutedSet, carsById, communityGoals, profiles, user?.uid],
   );
 
   useEffect(() => {
@@ -1982,6 +2004,13 @@ export function Community({ cars = [], settings, user }) {
       .getBlockedUsers(user?.uid)
       .then((ids) => {
         if (alive) setBlockedUserIds(ids);
+      })
+      .catch((error) => console.error(error));
+
+    engineDB
+      .getMutedUsers(user?.uid)
+      .then((ids) => {
+        if (alive) setMutedUserIds(ids);
       })
       .catch((error) => console.error(error));
 
@@ -2298,6 +2327,19 @@ export function Community({ cars = [], settings, user }) {
     try {
       await setPostArchived(goal.id, true);
       flash(t("community.archived"));
+    } catch (error) {
+      flashWriteError(error);
+    }
+  };
+
+  // Silenciar: some do meu feed e mais nada. Sem confirmação com cara de
+  // decisão grave — é reversível num toque e ninguém é avisado.
+  const handleMute = async (goal) => {
+    if (requireAccount(goalPath(goal.id)) || !goal.ownerId) return;
+    try {
+      await engineDB.setUserMuted(goal.ownerId, true, user?.uid);
+      setMutedUserIds((ids) => (ids.includes(goal.ownerId) ? ids : [...ids, goal.ownerId]));
+      flash(t("community.muted", { user: withoutAt(goal.username) || goal.author }));
     } catch (error) {
       flashWriteError(error);
     }
@@ -2723,6 +2765,7 @@ export function Community({ cars = [], settings, user }) {
                             onShare={handleCopyShareLink}
                             onUnshare={handleUnshareGoal}
                             onArchive={handleArchive}
+                            onMute={handleMute}
                             onFollow={handleFollow}
                             onOpenProfile={handleOpenProfile}
                             onEditComment={handleEditComment}
@@ -2926,6 +2969,7 @@ export function Community({ cars = [], settings, user }) {
             onShare: handleCopyShareLink,
             onUnshare: handleUnshareGoal,
             onArchive: handleArchive,
+            onMute: handleMute,
             onFollow: handleFollow,
             onOpenProfile: handleOpenProfile,
             onEditComment: handleEditComment,

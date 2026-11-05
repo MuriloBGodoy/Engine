@@ -2426,6 +2426,35 @@ export const engineDB = {
     }
   },
 
+  /**
+   * Silenciados. Preferência de tela, não segurança: o feed para de trazer a
+   * pessoa e nada mais muda — continuo seguindo, ela continua me vendo, e
+   * ela não é avisada. Quem precisa de garantia do banco é o bloqueio.
+   */
+  async getMutedUsers(userId = currentUserId) {
+    if (!userId) return [];
+    try {
+      const rows = must(await supabase.from("mutes").select("muted_id").eq("muter_id", userId));
+      return rows.map((row) => row.muted_id);
+    } catch (error) {
+      warnFirestoreFallback("getMutedUsers", error);
+      return [];
+    }
+  },
+
+  async setUserMuted(targetUserId, muted, userId = currentUserId) {
+    if (!userId || !isUserId(targetUserId) || targetUserId === userId) return;
+    if (muted) {
+      const { error } = await supabase
+        .from("mutes")
+        .insert({ muter_id: userId, muted_id: targetUserId });
+      // Já silenciado: chave repetida não é erro para quem pediu.
+      if (error && error.code !== "23505") throw error;
+      return;
+    }
+    must(await supabase.from("mutes").delete().eq("muter_id", userId).eq("muted_id", targetUserId));
+  },
+
   async setUserBlocked(targetUserId, blocked, userId = currentUserId) {
     if (!userId || !isUserId(targetUserId) || targetUserId === userId) return;
 

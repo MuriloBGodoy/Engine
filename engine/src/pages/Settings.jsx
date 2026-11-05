@@ -323,6 +323,84 @@ function BlockedUsers({ t, userId }) {
   );
 }
 
+/**
+ * Silenciados.
+ *
+ * Mesma forma da lista de bloqueados de propósito: são o par leve e o par
+ * pesado da mesma decisão, e quem procura um vai procurar o outro no mesmo
+ * lugar. A diferença fica na frase embaixo — bloqueado não te alcança,
+ * silenciado só não aparece no seu feed.
+ */
+function MutedUsers({ t, userId }) {
+  const [muted, setMuted] = useState(null);
+  const [profiles, setProfiles] = useState({});
+  const [busyId, setBusyId] = useState("");
+  const toast = useToast();
+
+  useEffect(() => {
+    let alive = true;
+    engineDB
+      .getMutedUsers(userId)
+      .then(async (ids) => {
+        if (!alive) return;
+        setMuted(ids);
+        const found = await engineDB.getPublicProfilesByIds(ids);
+        if (alive) setProfiles(found);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (alive) setMuted([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  const unmute = async (mutedId) => {
+    setBusyId(mutedId);
+    try {
+      await engineDB.setUserMuted(mutedId, false, userId);
+      setMuted((current) => current.filter((item) => item !== mutedId));
+    } catch (error) {
+      console.error(error);
+      toast(t("settings.status.saveError"), "error");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  return (
+    <Group title={t("settings.privacy.mutedTitle")} footer={t("settings.privacy.mutedHint")}>
+      {muted === null ? (
+        <Row label={<Loader2 size={16} className="animate-spin" />} />
+      ) : muted.length ? (
+        muted.map((mutedId) => {
+          const person = profiles[mutedId] || {};
+          const username = (person.username || "").replace(/^@/, "");
+          return (
+            <Row
+              key={mutedId}
+              label={person.author || t("settings.privacy.blockedUnknown")}
+              hint={username ? `@${username}` : undefined}
+            >
+              <button
+                type="button"
+                onClick={() => unmute(mutedId)}
+                disabled={busyId === mutedId}
+                className="min-h-11 shrink-0 rounded-lg border border-[var(--engine-border)] px-3 text-xs font-bold text-[var(--engine-text)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50"
+              >
+                {t("settings.privacy.unmute")}
+              </button>
+            </Row>
+          );
+        })
+      ) : (
+        <Row label={t("settings.privacy.mutedEmpty")} />
+      )}
+    </Group>
+  );
+}
+
 function ChangePasswordForm({ t, user, onDone }) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -1186,6 +1264,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                 />
               </Group>
               <AdsConsentGroup t={t} />
+              <MutedUsers t={t} userId={user?.uid} />
               <BlockedUsers t={t} userId={user?.uid} />
             </>
           )}
