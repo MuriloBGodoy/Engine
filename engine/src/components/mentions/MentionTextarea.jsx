@@ -30,6 +30,12 @@ export function MentionTextarea({
   autoFocus,
   onKeyDown,
   inputRef,
+  // Compositor colado no pé da tela (o comentário): a lista tem que abrir
+  // para CIMA, senão nasce fora da folha e ninguém vê sugestão nenhuma.
+  dropUp = false,
+  // Campo de uma linha que cresce com o texto até um teto, em vez de rolar
+  // por dentro — é o que o campo de comentário de qualquer rede faz.
+  autoGrow = false,
 }) {
   const { t } = useTranslation();
   const ref = useRef(null);
@@ -119,6 +125,15 @@ export function MentionTextarea({
     }
   };
 
+  // A altura acompanha o conteúdo: zera primeiro para o scrollHeight não
+  // ficar preso na altura anterior quando o texto encolhe. O teto vem do
+  // `max-height` da classe, então quem usa decide até onde cresce.
+  useEffect(() => {
+    if (!autoGrow || !ref.current) return;
+    ref.current.style.height = "auto";
+    ref.current.style.height = `${ref.current.scrollHeight}px`;
+  }, [autoGrow, value]);
+
   const open = Boolean(query) && (loading || results.length > 0 || full);
   const listId = `${id}-mentions`;
 
@@ -148,7 +163,9 @@ export function MentionTextarea({
         <ul
           id={listId}
           role="listbox"
-          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] p-1 shadow-lg"
+          className={`absolute left-0 right-0 z-20 max-h-64 overflow-y-auto rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] p-1 shadow-lg ${
+            dropUp ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
         >
           {full ? (
             <li className="px-3 py-2 text-[12.5px] text-[var(--engine-text-muted)]">

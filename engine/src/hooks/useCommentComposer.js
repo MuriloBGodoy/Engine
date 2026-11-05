@@ -14,6 +14,10 @@ import { useRef, useState } from "react";
  */
 export function useCommentComposer({ goalId, onComment, onEditComment }) {
   const [draft, setDraft] = useState("");
+  // As pessoas marcadas com @ no rascunho. Para gente, o rótulo JÁ é o
+  // @usuario, então o texto vai cru para o banco — a lista serve só para o
+  // campo saber quantas menções cabem ainda.
+  const [mentions, setMentions] = useState([]);
   const [replyTo, setReplyTo] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState("");
   const [editingDraft, setEditingDraft] = useState("");
@@ -26,6 +30,7 @@ export function useCommentComposer({ goalId, onComment, onEditComment }) {
     if (!cleanDraft || !goalId) return;
     onComment?.(goalId, cleanDraft, replyTo?.id || "");
     setDraft("");
+    setMentions([]);
     setReplyTo(null);
   };
 
@@ -63,11 +68,15 @@ export function useCommentComposer({ goalId, onComment, onEditComment }) {
     // Tudo o que `CommentsPanel`/`CommentsSheet` esperam, com os nomes deles.
     panelProps: {
       draft,
+      mentions,
       replyTo,
       editingCommentId,
       editingDraft,
       commentMenuId,
-      onDraftChange: setDraft,
+      onDraftChange: (text, list) => {
+        setDraft(text);
+        setMentions(list || []);
+      },
       onSubmitComment: submitComment,
       onReply: startReply,
       onCancelReply: () => setReplyTo(null),

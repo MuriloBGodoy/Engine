@@ -7,8 +7,12 @@ import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { buildThreads } from "../../services/comments";
 import { RichText } from "./RichText";
 import { TimeAgo } from "./TimeAgo";
+import { MentionTextarea } from "../mentions/MentionTextarea";
 
 const RICH_LINK = "font-semibold text-[var(--engine-accent-text)] hover:underline";
+
+/** O @ do comentário procura gente, não clube nem evento. */
+const PESSOAS = ["person"];
 
 /** Quantas respostas aparecem antes do "ver mais". */
 const RESPOSTAS_A_MOSTRAR = 2;
@@ -57,6 +61,7 @@ export function CommentsPanel({
   goal,
   comments,
   draft,
+  mentions = [],
   replyTo = null,
   editingCommentId,
   editingDraft,
@@ -154,19 +159,41 @@ export function CommentsPanel({
           </div>
         )}
         <div className="flex gap-2">
-          <input
-            ref={composerRef}
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            placeholder={t(
-              replyTo
-                ? "community.replyPlaceholder"
-                : goal?.kind === POST_KIND_POST
-                  ? "community.commentPlaceholderPost"
-                  : "community.commentPlaceholder",
-            )}
-            className="min-w-0 flex-1 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-3 text-sm font-medium text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] sm:px-4"
-          />
+          {/* @ abre a busca de pessoas, igual à legenda. O texto gravado é
+              `@usuario` em texto puro — é o que o banco lê para avisar quem
+              foi marcado, e o que o RichText transforma em link na lista.
+              A lista abre para cima: o campo mora no pé da folha. */}
+          <div className="min-w-0 flex-1">
+            <MentionTextarea
+              id={`comment-${goal?.id || "novo"}`}
+              inputRef={composerRef}
+              value={draft}
+              mentions={mentions}
+              kinds={PESSOAS}
+              rows={1}
+              dropUp
+              autoGrow
+              maxLength={180}
+              onChange={onDraftChange}
+              onKeyDown={(event) => {
+                // Enter envia, Shift+Enter quebra linha — e quando a lista
+                // de sugestões está aberta ela fica com o Enter (quem trata
+                // isso é o próprio MentionTextarea, antes de chegar aqui).
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  onSubmitComment(event);
+                }
+              }}
+              placeholder={t(
+                replyTo
+                  ? "community.replyPlaceholder"
+                  : goal?.kind === POST_KIND_POST
+                    ? "community.commentPlaceholderPost"
+                    : "community.commentPlaceholder",
+              )}
+              className="engine-scroll max-h-28 w-full resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-3 text-sm font-medium text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] sm:px-4"
+            />
+          </div>
           <button
             type="submit"
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95"
