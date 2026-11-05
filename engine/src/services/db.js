@@ -850,6 +850,10 @@ export const normalizeCommunityGoal = (goal = {}) => {
             userId: comment.userId || "",
             createdAt: comment.createdAt || "",
             editedAt: comment.editedAt || "",
+            // Fio de respostas: id do comentário respondido e o @ de quem
+            // escreveu ele (cópia de leitura, sobrevive ao pai apagado).
+            replyTo: comment.replyTo || "",
+            replyToAuthor: comment.replyToAuthor || "",
           },
     ),
     rating: rating || 0,
@@ -2542,7 +2546,7 @@ export const engineDB = {
     // `post_likes`).
   },
 
-  async addCommunityComment(goalId, comment, userId = currentUserId) {
+  async addCommunityComment(goalId, comment, userId = currentUserId, replyTo = "") {
     if (!userId) return;
 
     const actorSettings = await this.getSettings();
@@ -2557,6 +2561,9 @@ export const engineDB = {
           avatar: actor.avatar,
           avatarInitials: actor.avatarInitials,
           text: String(comment).trim().slice(0, 180),
+          // O banco confere o pai: id que não existe vira comentário de
+          // raiz, e resposta de resposta prende no mesmo fio.
+          replyTo: String(replyTo || ""),
         },
       }),
     );

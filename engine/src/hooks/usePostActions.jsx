@@ -90,11 +90,11 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
     }
   };
 
-  const onComment = async (goalId, text) => {
+  const onComment = async (goalId, text, replyTo = "") => {
     if (requireAccount(here(goalId))) return;
     try {
-      await engineDB.addCommunityComment(goalId, text, uid);
-      toast(t("community.commentSaved"));
+      await engineDB.addCommunityComment(goalId, text, uid, replyTo);
+      toast(t(replyTo ? "community.replySaved" : "community.commentSaved"));
       changed(goalId);
     } catch (error) {
       fail(error);

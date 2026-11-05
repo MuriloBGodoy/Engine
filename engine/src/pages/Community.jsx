@@ -49,7 +49,6 @@ import { AchievementBadge } from "../components/achievements/AchievementBadge";
 import { InfoTip } from "../components/InfoTip";
 import { SpecSheetModal } from "../components/specsheet/SpecSheetModal";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import "../services/i18n-social-feed";
 import "../services/i18n-post-card";
 import "../services/i18n-social-posts";
@@ -58,6 +57,15 @@ import { ReelsFeed } from "../components/social/ReelsFeed";
 import { TrendingTags } from "../components/social/TrendingTags";
 import { normalizeTag, tagPath } from "../services/socialText";
 import { RichText } from "../components/social/RichText";
+import {
+  AvatarButton,
+  CommentPreview,
+  CommentsPanel,
+  CommentsSheet,
+} from "../components/social/Comments";
+import { getInitials, withoutAt } from "../services/people";
+import { useCommentComposer } from "../hooks/useCommentComposer";
+import { PersonLink } from "../components/social/PersonLink";
 import { TimeAgo } from "../components/social/TimeAgo";
 import { PostVideoPlayer } from "../components/social/PostVideoPlayer";
 import { CarsTab } from "../components/cars/CarsTab";
@@ -94,17 +102,6 @@ const getProgress = (goal) =>
     : Math.min(Math.max(Number(goal.progress) || 0, 0), 100);
 
 const isGoalCompleted = (goal) => getProgress(goal) >= 100;
-
-const getInitials = (name = "U") =>
-  name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-const isImageUrl = (value) =>
-  typeof value === "string" && (value.startsWith("http") || value.startsWith("data:"));
 
 const normalizeVehicleText = (value = "") =>
   String(value).replace(/\s+/g, " ").trim();
@@ -242,9 +239,6 @@ const enrichGoalProfiles = (goal, profiles) => {
   };
 };
 
-// O @ já vem no username salvo; ao lado do ícone de arroba ele duplicava.
-const withoutAt = (value = "") => String(value || "").replace(/^@+/, "");
-
 const isGoalShared = (goal, sharedGoalIds, userId = "") => {
   const goalId = communityGoalId(goal, userId || goal.ownerId);
   const legacyGoalId = legacyCommunityGoalId(goal, userId || goal.ownerId);
@@ -252,38 +246,6 @@ const isGoalShared = (goal, sharedGoalIds, userId = "") => {
     sharedGoalIds.includes(id),
   );
 };
-
-function AvatarButton({ person, onClick, size = "md" }) {
-  const label = person?.author || person?.name || "Usuário Engine";
-  const avatar = person?.avatar || person?.avatarInitials || getInitials(label);
-  const isSmall = size === "sm";
-  const sizeClass = isSmall ? "h-8 w-8 text-xs" : "h-11 w-11";
-
-  /* O desenho do avatar vive no `span`; o `button` é só o alvo. No tamanho
-     pequeno (32px) a bolinha ficaria abaixo dos 44px de toque, então o botão
-     cresce por fora com margem negativa e o avatar continua do tamanho que o
-     layout pede. */
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex shrink-0 items-center justify-center rounded-full transition hover:ring-2 hover:ring-red-500/40 ${
-        isSmall ? "-m-1.5 h-11 w-11 sm:m-0 sm:h-8 sm:w-8" : "h-11 w-11"
-      }`}
-      title={label}
-    >
-      <span
-        className={`flex ${sizeClass} items-center justify-center overflow-hidden rounded-full bg-[var(--engine-accent)] font-black italic text-white`}
-      >
-        {isImageUrl(avatar) ? (
-          <img src={avatar} alt={label} className="h-full w-full object-cover" />
-        ) : (
-          avatar
-        )}
-      </span>
-    </button>
-  );
-}
 
 const buildUserGoals = (cars, settings, user) => {
   const displayName = settings.profile.displayName || user?.displayName || "Você";
@@ -964,12 +926,13 @@ export function GoalCard({
   // Lightbox do desktop: a mídia mora na coluna da esquerda, fora do cartão.
   hideMedia = false,
 }) {
-  const [draft, setDraft] = useState("");
-  const [editingCommentId, setEditingCommentId] = useState("");
-  const [editingDraft, setEditingDraft] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
-  const [commentMenuId, setCommentMenuId] = useState("");
   const [specsOpen, setSpecsOpen] = useState(false);
+  const { composerRef, panelProps: commentProps } = useCommentComposer({
+    goalId: goal.id,
+    onComment,
+    onEditComment,
+  });
 
   const { i18n } = useTranslation();
   const [captionOpen, setCaptionOpen] = useState(false);
@@ -1000,28 +963,6 @@ export function GoalCard({
   // No modal de publicação (desktop) os comentários já estão ao lado: o balão
   // leva o foco para o compositor em vez de abrir outra folha.
   const showComments = onCommentClick || (() => setCommentsOpen(true));
-
-  const submitComment = (event) => {
-    event.preventDefault();
-    const cleanDraft = draft.trim().slice(0, 180);
-    if (!cleanDraft) return;
-    onComment(goal.id, cleanDraft);
-    setDraft("");
-  };
-
-  const startEditComment = (comment) => {
-    setEditingCommentId(comment.id);
-    setEditingDraft(comment.text || "");
-  };
-
-  const submitEditComment = (event, comment) => {
-    event.preventDefault();
-    const cleanDraft = editingDraft.trim().slice(0, 180);
-    if (!cleanDraft) return;
-    onEditComment(goal.id, comment.id, cleanDraft);
-    setEditingCommentId("");
-    setEditingDraft("");
-  };
 
   const menuItems = [
     { icon: Copy, label: t("community.copyLink"), onClick: () => onShare(goal) },
@@ -1120,9 +1061,15 @@ export function GoalCard({
             {goal.verified && (
               <ShieldCheck size={13} className="shrink-0 text-[var(--engine-accent)]" />
             )}
-            <span className="min-w-0 truncate text-xs text-[var(--engine-text-muted)]">
+            {/* O @ ao lado do nome também abre o perfil: nas redes o
+                arroba É o nome, e aqui só o nome respondia ao toque. */}
+            <button
+              type="button"
+              onClick={() => onOpenProfile(goal.ownerId, goal)}
+              className="min-w-0 truncate text-xs text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent-text)]"
+            >
               {goal.username}
-            </span>
+            </button>
           </div>
           {(goal.clubTag || goal.createdAt || (isModal && goal.city)) && (
             <div className="mt-px flex min-w-0 items-center gap-1.5 overflow-hidden text-xs text-[var(--engine-text-muted)]">
@@ -1293,399 +1240,17 @@ export function GoalCard({
         <CommentsSheet
           goal={goal}
           comments={comments}
-          draft={draft}
-          editingCommentId={editingCommentId}
-          editingDraft={editingDraft}
-          commentMenuId={commentMenuId}
           currentUserId={currentUserId}
           t={t}
           onClose={() => setCommentsOpen(false)}
-          onDraftChange={setDraft}
-          onSubmitComment={submitComment}
           onOpenProfile={onOpenProfile}
-          onStartEditComment={startEditComment}
-          onEditingDraftChange={setEditingDraft}
-          onSubmitEditComment={submitEditComment}
-          onCancelEdit={() => {
-            setEditingCommentId("");
-            setEditingDraft("");
-          }}
           onDeleteComment={onDeleteComment}
           onReportComment={onReportComment}
-          onCommentMenuChange={setCommentMenuId}
+          composerRef={composerRef}
+          {...commentProps}
         />
       )}
     </article>
-  );
-}
-
-/**
- * Lista de comentários + compositor. Vive dentro do modal de comentários
- * (feed) e também na coluna lateral do modal de publicação (desktop).
- */
-function CommentsPanel({
-  goal,
-  comments,
-  draft,
-  editingCommentId,
-  editingDraft,
-  commentMenuId,
-  currentUserId,
-  composerRef,
-  t,
-  onDraftChange,
-  onSubmitComment,
-  onOpenProfile,
-  onStartEditComment,
-  onEditingDraftChange,
-  onSubmitEditComment,
-  onCancelEdit,
-  onDeleteComment,
-  onReportComment,
-  onCommentMenuChange,
-  inline = false,
-}) {
-  return (
-    <>
-      {/* Inline, a lista entra no fluxo da coluna que já rola: manter o
-          overflow próprio criaria scroll dentro de scroll. */}
-      <div
-        className={
-          inline
-            ? "border-t border-[var(--engine-border)] px-4 py-4 sm:px-5"
-            : "engine-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5"
-        }
-      >
-        {comments.length ? (
-          <div className="space-y-4">
-            {comments.map((comment, index) => (
-              <CommentRow
-                key={`${goal.id}-comment-${comment.id || index}`}
-                goal={goal}
-                comment={comment}
-                currentUserId={currentUserId}
-                editingCommentId={editingCommentId}
-                editingDraft={editingDraft}
-                commentMenuId={commentMenuId}
-                t={t}
-                onOpenProfile={onOpenProfile}
-                onStartEditComment={onStartEditComment}
-                onEditingDraftChange={onEditingDraftChange}
-                onSubmitEditComment={onSubmitEditComment}
-                onCancelEdit={onCancelEdit}
-                onDeleteComment={onDeleteComment}
-                onReportComment={onReportComment}
-                onCommentMenuChange={onCommentMenuChange}
-              />
-            ))}
-          </div>
-        ) : (
-          <div
-            className={`flex flex-col items-center justify-center text-center ${
-              inline ? "py-6" : "h-full min-h-48"
-            }`}
-          >
-            <MessageCircle className="mb-3 text-[var(--engine-text-subtle)]" size={30} />
-            <p className="text-sm font-bold text-[var(--engine-text)]">
-              {t("community.noComments")}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <form
-        onSubmit={onSubmitComment}
-        className="flex shrink-0 gap-2 border-t border-[var(--engine-border)] p-3 sm:p-4"
-      >
-        <input
-          ref={composerRef}
-          value={draft}
-          onChange={(event) => onDraftChange(event.target.value)}
-          placeholder={t(
-            goal?.kind === POST_KIND_POST
-              ? "community.commentPlaceholderPost"
-              : "community.commentPlaceholder",
-          )}
-          className="min-w-0 flex-1 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-3 text-sm font-medium text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] sm:px-4"
-        />
-        <button
-          type="submit"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95"
-          title={t("community.send")}
-          aria-label={t("community.send")}
-        >
-          <Send size={18} />
-        </button>
-      </form>
-    </>
-  );
-}
-
-/**
- * Folha de comentários: sobe de baixo no celular e encosta na direita no
- * desktop (classes `engine-drawer`, as mesmas do painel de avisos). É o que o
- * Instagram faz no app — o post fica atrás, à vista, e fechar devolve a
- * pessoa exatamente onde ela estava.
- *
- * Vai para o `document.body` por portal: o cartão do feed mora dentro de
- * ancestrais com `transform`/`backdrop-filter`, e um `position: fixed` ali
- * dentro fica preso ao ancestral em vez da tela. O voltar do aparelho fecha a
- * folha primeiro (useHistoryDismiss), em vez de sair da página.
- */
-function CommentsSheet({ goal, onClose, t, ...panelProps }) {
-  useHistoryDismiss(true, onClose);
-  const count = panelProps.comments?.length || 0;
-
-  // O portal muda o DOM, não a árvore do React: o clique dentro da folha
-  // ainda sobe até o <article> do cartão, que abre o post ao ser clicado. O
-  // invólucro corta a subida (o fundo escuro fecha antes disso).
-  return createPortal(
-    <div onClick={(event) => event.stopPropagation()}>
-      <div className="engine-drawer-scrim" onClick={onClose} aria-hidden="true" />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("community.commentsAction")}
-        className="engine-drawer engine-safe-bottom"
-      >
-        {/* Alça: diz "isto é uma folha" no celular. */}
-        <span
-          aria-hidden="true"
-          className="mx-auto mt-2 block h-1 w-10 shrink-0 rounded-full bg-[var(--engine-border-strong)] sm:hidden"
-        />
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-2.5 sm:py-3.5">
-          <h2 className="min-w-0 truncate text-[15px] font-extrabold text-[var(--engine-text)]">
-            {t("community.commentsAction")}
-            {count > 0 && (
-              <span className="ml-1.5 font-semibold tabular-nums text-[var(--engine-text-subtle)]">
-                {count}
-              </span>
-            )}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="-mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
-            title={t("socialFeed.closeComments")}
-            aria-label={t("socialFeed.closeComments")}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* No celular a folha cresce com a lista até 78% da tela; sem uma
-            altura mínima, "sem comentários" virava uma tira de 200px. */}
-        <div className="flex min-h-[45dvh] flex-1 flex-col overflow-hidden sm:min-h-0">
-          <CommentsPanel goal={goal} t={t} {...panelProps} />
-        </div>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-/**
- * Prévia dos comentários no cartão: o link "ver todos" e o comentário mais
- * recente, cortado numa linha. Tudo é um botão só — a prévia não tem ação
- * própria, ela é a porta da folha.
- */
-function CommentPreview({ comments, t, onOpen }) {
-  const last = comments[comments.length - 1];
-  const text = typeof last === "string" ? last : last?.text || "";
-  const who =
-    typeof last === "string" ? "" : withoutAt(last?.username) || last?.author || "";
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="block w-full px-3 pb-3 text-left sm:px-4"
-    >
-      {comments.length > 1 && (
-        <span className="block text-[13px] font-medium text-[var(--engine-text-subtle)] transition hover:text-[var(--engine-text-muted)]">
-          {t("socialFeed.viewAllComments", { count: comments.length })}
-        </span>
-      )}
-      {text && (
-        <span className="mt-0.5 block truncate text-[13px] leading-5 text-[var(--engine-text)]">
-          {who && <span className="mr-1 font-bold">{who}</span>}
-          {text}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function CommentRow({
-  goal,
-  comment,
-  currentUserId,
-  editingCommentId,
-  editingDraft,
-  commentMenuId,
-  t,
-  onOpenProfile,
-  onStartEditComment,
-  onEditingDraftChange,
-  onSubmitEditComment,
-  onCancelEdit,
-  onDeleteComment,
-  onReportComment,
-  onCommentMenuChange,
-}) {
-  const commentText = typeof comment === "string" ? comment : comment.text;
-  const commentTime = typeof comment === "string" ? "" : comment.createdAt;
-  const wasEdited = typeof comment !== "string" && Boolean(comment.editedAt);
-  const commentAuthor =
-    typeof comment === "string" ? t("community.member") : comment.author;
-  const commentUsername = typeof comment === "string" ? "" : comment.username;
-  const commentPerson =
-    typeof comment === "string"
-      ? { author: commentAuthor, username: commentUsername }
-      : {
-          author: commentAuthor,
-          username: commentUsername,
-          avatar: comment.avatar,
-          avatarInitials: comment.avatarInitials,
-          userId: comment.userId,
-        };
-  const canEdit =
-    typeof comment !== "string" &&
-    comment.id &&
-    comment.userId === currentUserId;
-  const canDelete =
-    typeof comment !== "string" &&
-    comment.id &&
-    (comment.userId === currentUserId || goal.ownerId === currentUserId);
-  // Comentário de outra pessoa: denunciar (o visitante vai para o login).
-  const canReport =
-    typeof comment !== "string" &&
-    Boolean(comment.id) &&
-    Boolean(onReportComment) &&
-    comment.userId !== currentUserId;
-  const isEditing = canEdit && editingCommentId === comment.id;
-
-  return (
-    <div className="group flex gap-3 rounded-xl px-1 py-1.5 text-sm transition hover:bg-[var(--engine-surface-2)] hover:bg-[var(--engine-surface-2)]">
-      <AvatarButton
-        person={commentPerson}
-        size="sm"
-        onClick={() => onOpenProfile(commentPerson.userId, commentPerson)}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => onOpenProfile(commentPerson.userId, commentPerson)}
-            className="min-w-0 truncate text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent)] dark:text-white"
-          >
-            {commentAuthor} <span className="text-[var(--engine-text-subtle)]">{commentUsername}</span>
-          </button>
-          {(canEdit || canDelete || canReport) && !isEditing && (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  onCommentMenuChange((current) =>
-                    current === comment.id ? "" : comment.id,
-                  )
-                }
-                className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--engine-text-subtle)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] hover:bg-[var(--engine-surface-2)] dark:hover:text-white"
-                title={t("socialFixes.commentOptions")}
-                aria-label={t("socialFixes.commentOptions")}
-              >
-                <MoreHorizontal size={16} />
-              </button>
-              {commentMenuId === comment.id && (
-                <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface)] py-1 shadow-xl  ">
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onStartEditComment(comment);
-                        onCommentMenuChange("");
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]  hover:bg-[var(--engine-surface-2)]"
-                    >
-                      <Edit3 size={14} />
-                      {t("socialFixes.editComment")}
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onDeleteComment(goal.id, comment.id);
-                        onCommentMenuChange("");
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]  hover:bg-[var(--engine-surface-2)]"
-                    >
-                      <Trash2 size={14} />
-                      {t("common.delete")}
-                    </button>
-                  )}
-                  {canReport && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onReportComment(goal, comment);
-                        onCommentMenuChange("");
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
-                    >
-                      <Flag size={14} />
-                      {t("socialFixes.reportComment")}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        {isEditing ? (
-          <form
-            onSubmit={(event) => onSubmitEditComment(event, comment)}
-            className="mt-2 grid gap-2"
-          >
-            <input
-              value={editingDraft}
-              onChange={(event) => onEditingDraftChange(event.target.value)}
-              className="min-h-10 rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 text-sm font-semibold text-[var(--engine-text)] outline-none focus:border-[var(--engine-accent)]   dark:text-white"
-            />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                className="rounded-lg bg-[var(--engine-accent)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white"
-              >
-                {t("common.save")}
-              </button>
-              <button
-                type="button"
-                onClick={onCancelEdit}
-                className="rounded-lg border border-[var(--engine-border)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-muted)] "
-              >
-                {t("common.cancel")}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <>
-            <p className="font-medium text-[var(--engine-text-muted)] ">
-              <RichText text={commentText} linkClassName={RICH_LINK} />
-            </p>
-            {commentTime ? (
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                <TimeAgo value={commentTime} editedAt={wasEdited ? comment.editedAt : ""} short />
-              </p>
-            ) : wasEdited ? (
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                {t("community.edited")}
-              </p>
-            ) : null}
-          </>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -2070,11 +1635,11 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
   // "sem comentários" gigante ao lado de duas linhas de conteúdo.
   const hasMedia = Boolean(goal?.images?.length || goal?.image || goal?.videoUrl || goal?.video);
   const sideBySide = isWide && hasMedia;
-  const [draft, setDraft] = useState("");
-  const [editingCommentId, setEditingCommentId] = useState("");
-  const [editingDraft, setEditingDraft] = useState("");
-  const [commentMenuId, setCommentMenuId] = useState("");
-  const composerRef = useRef(null);
+  const { composerRef, panelProps: commentProps } = useCommentComposer({
+    goalId: goal?.id || "",
+    onComment: cardProps.onComment,
+    onEditComment: cardProps.onEditComment,
+  });
 
   const comments = goal?.comments || [];
   const gallery = goal?.images?.length ? goal.images : goal?.image ? [goal.image] : [];
@@ -2114,34 +1679,7 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
   useEffect(() => {
     if (!openComments || !goal || !sideBySide) return;
     composerRef.current?.focus({ preventScroll: false });
-  }, [openComments, goal, sideBySide]);
-
-  const submitComment = (event) => {
-    event.preventDefault();
-    const cleanDraft = draft.trim().slice(0, 180);
-    if (!cleanDraft || !goal) return;
-    cardProps.onComment(goal.id, cleanDraft);
-    setDraft("");
-  };
-
-  const startEditComment = (comment) => {
-    setEditingCommentId(comment.id);
-    setEditingDraft(comment.text || "");
-  };
-
-  const submitEditComment = (event, comment) => {
-    event.preventDefault();
-    const cleanDraft = editingDraft.trim().slice(0, 180);
-    if (!cleanDraft) return;
-    cardProps.onEditComment(goal.id, comment.id, cleanDraft);
-    setEditingCommentId("");
-    setEditingDraft("");
-  };
-
-  const cancelEdit = () => {
-    setEditingCommentId("");
-    setEditingDraft("");
-  };
+  }, [openComments, goal, sideBySide, composerRef]);
 
   return (
     <div className="engine-modal-overlay" onClick={onClose}>
@@ -2224,23 +1762,13 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
               <CommentsPanel
                 goal={goal}
                 comments={comments}
-                draft={draft}
-                editingCommentId={editingCommentId}
-                editingDraft={editingDraft}
-                commentMenuId={commentMenuId}
                 currentUserId={cardProps.currentUserId}
-                composerRef={composerRef}
                 t={t}
-                onDraftChange={setDraft}
-                onSubmitComment={submitComment}
                 onOpenProfile={cardProps.onOpenProfile}
-                onStartEditComment={startEditComment}
-                onEditingDraftChange={setEditingDraft}
-                onSubmitEditComment={submitEditComment}
-                onCancelEdit={cancelEdit}
                 onDeleteComment={cardProps.onDeleteComment}
                 onReportComment={cardProps.onReportComment}
-                onCommentMenuChange={setCommentMenuId}
+                composerRef={composerRef}
+                {...commentProps}
               />
             </div>
           </div>
@@ -2625,11 +2153,11 @@ export function Community({ cars = [], settings, user }) {
     engineDB.toggleCommunityLike(goalId, !liked, user?.uid).catch(flashWriteError);
   };
 
-  const handleComment = async (goalId, comment) => {
+  const handleComment = async (goalId, comment, replyTo = "") => {
     if (requireAccount(`${goalPath(goalId)}&comments=1`)) return;
     try {
-      await engineDB.addCommunityComment(goalId, comment, user?.uid);
-      flash(t("community.commentSaved"));
+      await engineDB.addCommunityComment(goalId, comment, user?.uid, replyTo);
+      flash(t(replyTo ? "community.replySaved" : "community.commentSaved"));
     } catch (error) {
       flashWriteError(error);
     }
@@ -3452,7 +2980,10 @@ function SidebarRanking({ ranking, t }) {
                 )}
               </p>
               <p className="truncate text-[11px] font-medium text-[var(--engine-text-subtle)]">
-                {goal.username} · {goal.likes} likes · {getProgress(goal).toFixed(0)}%
+                <PersonLink username={goal.username} className="hover:text-[var(--engine-accent)]">
+                  {goal.username}
+                </PersonLink>
+                {` · ${goal.likes} likes · ${getProgress(goal).toFixed(0)}%`}
               </p>
             </div>
           </div>
@@ -3532,9 +3063,12 @@ function RankingPanel({ ranking, t }) {
                 <p className="truncate text-lg font-black italic text-[var(--engine-text)] dark:text-white">
                   {getVehicleTitleShort(goal)}
                 </p>
-                <p className="text-xs font-bold uppercase tracking-widest text-[var(--engine-text-subtle)]">
+                <PersonLink
+                  username={goal.username}
+                  className="block text-xs font-bold uppercase tracking-widest text-[var(--engine-text-subtle)] hover:text-[var(--engine-accent)]"
+                >
                   {goal.author} / {goal.username}
-                </p>
+                </PersonLink>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--engine-surface-2)] dark:bg-red-950/30">
                   <div
                     className="h-full rounded-full bg-[var(--engine-accent)]"
