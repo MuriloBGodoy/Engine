@@ -10,6 +10,7 @@ import { useRequireAccount } from "../../hooks/useRequireAccount";
 import { useSavedPosts } from "../../hooks/useSavedPosts";
 import { useToast } from "../ToastProvider";
 import { PostVideoPlayer } from "./PostVideoPlayer";
+import { ReelComments } from "./ReelComments";
 import { RichText } from "./RichText";
 import { TimeAgo } from "./TimeAgo";
 import "../../services/i18n-social-posts";
@@ -40,6 +41,10 @@ export function ReelsFeed({ user, blockedIds = [] }) {
   const [status, setStatus] = useState("loading");
   const [activeId, setActiveId] = useState("");
   const [liked, setLiked] = useState({});
+  // Comentários do vídeo: a folha sobe por cima, o vídeo fica rodando atrás.
+  const [commentsOf, setCommentsOf] = useState("");
+  const [commentCounts, setCommentCounts] = useState({});
+  const [following, setFollowing] = useState([]);
   const loadingRef = useRef(false);
   const listRef = useRef(null);
   const language = i18n.language || "pt-BR";
@@ -69,6 +74,19 @@ export function ReelsFeed({ user, blockedIds = [] }) {
   useEffect(() => {
     loadMore(null, true);
   }, [loadMore]);
+
+  // Quem eu já sigo: o botão do autor precisa nascer certo, não virar
+  // "Seguir" num perfil que eu sigo há meses.
+  useEffect(() => {
+    if (!uid) return undefined;
+    let alive = true;
+    engineDB.getUserFollowing(uid).then((ids) => {
+      if (alive) setFollowing(ids || []);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [uid]);
 
   const visible = items.filter((goal) => !blockedIds.includes(goal.ownerId));
 
@@ -106,6 +124,20 @@ export function ReelsFeed({ user, blockedIds = [] }) {
     } catch (error) {
       console.error(error);
       setLiked((map) => ({ ...map, [goal.id]: current }));
+      toast(t("socialFixes.writeError"), "error");
+    }
+  };
+
+  const follow = async (goal) => {
+    const ownerId = goal.ownerId;
+    if (requireAccount(`/post/${goal.id}`) || !ownerId || ownerId === uid) return;
+    const already = following.includes(ownerId);
+    setFollowing((ids) => (already ? ids.filter((id) => id !== ownerId) : [...ids, ownerId]));
+    try {
+      await engineDB.setFollow(ownerId, !already);
+    } catch (error) {
+      console.error(error);
+      setFollowing((ids) => (already ? [...ids, ownerId] : ids.filter((id) => id !== ownerId)));
       toast(t("socialFixes.writeError"), "error");
     }
   };
@@ -161,6 +193,7 @@ export function ReelsFeed({ user, blockedIds = [] }) {
             <PostVideoPlayer video={goal.video} mode="reel" active={activeId === goal.id} />
 
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-4 pb-4 pr-20 pt-16 text-white">
+              <div className="flex flex-wrap items-center">
               <button
                 type="button"
                 onClick={() => username && navigate(`/community/@${username}`)}
@@ -176,6 +209,23 @@ export function ReelsFeed({ user, blockedIds = [] }) {
                 )}
                 <span className="text-sm font-bold">{goal.author}</span>
               </button>
+              {/* Seguir ao lado do autor, como no Reels: quem acabou de
+                  descobrir alguém pelo vídeo não devia ter que abrir o perfil
+                  só para apertar um botão. No próprio vídeo ele não aparece. */}
+              {goal.ownerId && goal.ownerId !== uid && (
+                <button
+                  type="button"
+                  onClick={() => follow(goal)}
+                  className={`pointer-events-auto ml-2 min-h-9 rounded-lg border px-3 text-[12.5px] font-bold transition ${
+                    following.includes(goal.ownerId)
+                      ? "border-white/40 text-white/80"
+                      : "border-white bg-white/10 text-white"
+                  }`}
+                >
+                  {t(following.includes(goal.ownerId) ? "community.following" : "community.follow")}
+                </button>
+              )}
+              </div>
               {goal.note ? (
                 <RichText
                   as="p"
@@ -200,14 +250,14 @@ export function ReelsFeed({ user, blockedIds = [] }) {
               </button>
               <button
                 type="button"
-                onClick={() => navigate(`/post/${goal.id}?comments=1`)}
+                onClick={() => setCommentsOf(goal.id)}
                 aria-label={t("socialPosts.reels.comments")}
                 className={action}
               >
                 <span className={actionIcon}>
                   <MessageCircle size={22} />
                 </span>
-                {compact(goal.comments?.length || 0, language)}
+                {compact(commentCounts[goal.id] ?? goal.comments?.length ?? 0, language)}
               </button>
               <button
                 type="button"
@@ -236,6 +286,22 @@ export function ReelsFeed({ user, blockedIds = [] }) {
         <div className="flex h-24 items-center justify-center text-white/70">
           <Loader2 size={18} className="animate-spin" />
         </div>
+      )}
+
+      {/* Uma folha só, do vídeo aberto: ela vai para o document.body por
+          portal, então não importa de dentro de qual <section> é montada. */}
+      {commentsOf && (
+        <ReelComments
+          key={commentsOf}
+          goalId={commentsOf}
+          user={user}
+          onClose={() => setCommentsOf("")}
+          onCount={(total) =>
+            setCommentCounts((counts) =>
+              counts[commentsOf] === total ? counts : { ...counts, [commentsOf]: total },
+            )
+          }
+        />
       )}
     </div>
   );
