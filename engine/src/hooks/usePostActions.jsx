@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { engineDB } from "../services/db";
+import { setPostArchived } from "../services/archivedPosts";
 import { trackEvent } from "../services/observability";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
@@ -140,6 +141,27 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
     }
   };
 
+  // Arquivar: tira do ar inteiro e volta igual. Pede confirmação porque
+  // some de todo mundo na hora — mas sem o tom de "isto não tem volta", que
+  // é justamente o que arquivar não é.
+  const onArchive = async (goal) => {
+    if (requireAccount(here(goal.id))) return;
+    const ok = await confirm({
+      title: t("community.archive"),
+      message: t("community.archiveConfirm"),
+      confirmLabel: t("community.archive"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    try {
+      await setPostArchived(goal.id, true);
+      toast(t("community.archived"));
+      onRemoved?.(goal, "archive");
+    } catch (error) {
+      fail(error);
+    }
+  };
+
   const onUnshare = async (goal) => {
     const ok = await confirm({
       title: t("community.unshare"),
@@ -241,6 +263,7 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
       onEditComment,
       onDeleteComment,
       onUnshare,
+      onArchive,
       onReport,
       onReportComment,
       onBlock,

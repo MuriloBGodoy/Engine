@@ -26,6 +26,8 @@ import {
   Trash2,
   UserRound,
   X,
+  Archive,
+  Bookmark,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -864,6 +866,11 @@ export function Settings({ user, settings, onSettingsUpdate }) {
     toast(t(checkoutResult === "ok" ? "settings.plan.checkoutOk" : "settings.plan.checkoutCancelled"));
     setSearchParams({}, { replace: true });
   }, [checkoutResult, setSearchParams, t, toast]);
+  // Onde mora o meu perfil. Sem @ salvo ainda (cadastro pela metade), cai na
+  // Comunidade em vez de montar um endereço que não existe.
+  const meuPerfil = settings?.profile?.username
+    ? `/community/@${String(settings.profile.username).replace(/^@+/, "")}`
+    : "/community";
   const [openForm, setOpenForm] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const saveQueue = useRef(Promise.resolve());
@@ -990,6 +997,25 @@ export function Settings({ user, settings, onSettingsUpdate }) {
         <div className="max-w-2xl space-y-6">
           {activeSection === "account" && (
             <>
+              {/* As minhas coisas: salvos e arquivo. Existem como aba do
+                  perfil, mas ninguém procura "arquivadas" num perfil — a
+                  cabeça da pessoa manda ela para Configurações, que é onde
+                  as outras redes puseram isso. Duas portas, um lugar só. */}
+              <Group title={t("settings.myStuff.title")} footer={t("settings.myStuff.hint")}>
+                <Row
+                  icon={Bookmark}
+                  label={t("socialPosts.saved.tab")}
+                  chevron
+                  onClick={() => navigate(`${meuPerfil}?tab=saved`)}
+                />
+                <Row
+                  icon={Archive}
+                  label={t("community.archivedTab")}
+                  chevron
+                  onClick={() => navigate(`${meuPerfil}?tab=archived`)}
+                />
+              </Group>
+
               <Group title={t("settings.account.title")}>
                 <Row
                   icon={Mail}

@@ -14,12 +14,15 @@ import {
   ArrowLeft,
   Copy,
   Play,
+  Archive,
 } from "lucide-react";
 import { engineDB, POST_KIND_POST } from "../services/db";
 import { GoalCard } from "./Community";
 import { ShareToChatModal } from "../components/ShareToChatModal";
 import { usePostActions } from "../hooks/usePostActions";
 import { fetchSavedPosts } from "../services/savedPosts";
+import { fetchArchivedPosts, setPostArchived } from "../services/archivedPosts";
+import { TimeAgo } from "../components/social/TimeAgo";
 import { openShareSheet, shareUrls } from "../services/shareLinks";
 import "../services/i18n-social-posts";
 import "../services/i18n-social-feed";
@@ -192,7 +195,13 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const [likesReceived, setLikesReceived] = useState(0);
   const [following, setFollowing] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [activeTab, setActiveTab] = useState("posts");
+  // `?tab=` abre direto na aba: é por aí que Configurações leva a pessoa para
+  // "Salvos" e "Arquivadas", e é o que faz o endereço valer como link. Vale
+  // na montagem e só: depois disso quem manda é o toque na aba, senão o
+  // parâmetro antigo puxaria a pessoa de volta a cada render.
+  const [activeTab, setActiveTab] = useState(
+    () => new URLSearchParams(window.location.search).get("tab") || "posts",
+  );
   // "No Engine" (clubes, páginas, eventos) virou aba em 04/11/2026: no
   // cabeçalho ele empurrava a bio, o botão de editar e a grade pra baixo, e
   // num celular a pessoa abria o perfil e via um cartão de clube em vez das
@@ -200,6 +209,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const enginePresence = useEnginePresence(profile?.userId || "");
   // Aba "Salvos": só no próprio perfil, lida quando aberta.
   const [savedGoals, setSavedGoals] = useState(null);
+  const [archivedGoals, setArchivedGoals] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -431,6 +441,22 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   useEffect(() => {
     activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [activeTab]);
+
+  // O arquivo: publicações que eu tirei do ar. O banco esconde de todo mundo,
+  // inclusive de mim — este é o único lugar por onde elas aparecem.
+  useEffect(() => {
+    if (activeTab !== "archived" || !isOwnProfile || !currentUserId) return undefined;
+    let alive = true;
+    fetchArchivedPosts()
+      .then((list) => alive && setArchivedGoals(list))
+      .catch((error) => {
+        console.error(error);
+        if (alive) setArchivedGoals([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeTab, isOwnProfile, currentUserId, reloadKey]);
 
   useEffect(() => {
     if (activeTab !== "saved" || !isOwnProfile || !currentUserId) return undefined;
@@ -793,7 +819,12 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               { id: "followers", label: t("profile.tabs.followers") },
               { id: "following", label: t("profile.tabs.following") },
               { id: "achievements", label: t("profile.tabs.achievements") },
-              ...(isOwnProfile ? [{ id: "saved", label: t("socialPosts.saved.tab") }] : []),
+              ...(isOwnProfile
+                ? [
+                    { id: "saved", label: t("socialPosts.saved.tab") },
+                    { id: "archived", label: t("community.archivedTab") },
+                  ]
+                : []),
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -865,6 +896,42 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 </div>
               ) : (
                 <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("socialPosts.saved.empty")}</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "archived" && isOwnProfile && (
+            <div>
+              <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">
+                {t("community.archivedOnlyYou")}
+              </p>
+              {archivedGoals === null ? (
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">{t("common.loading")}</p>
+              ) : archivedGoals.length ? (
+                <div className="space-y-2">
+                  {archivedGoals.map((goal) => (
+                    <ArchivedRow
+                      key={goal.id}
+                      goal={goal}
+                      t={t}
+                      onRestore={async () => {
+                        try {
+                          await setPostArchived(goal.id, false);
+                          setArchivedGoals((list) => list.filter((item) => item.id !== goal.id));
+                          toast(t("community.restored"));
+                          setReloadKey((key) => key + 1);
+                        } catch (error) {
+                          console.error(error);
+                          toast(t("socialFixes.writeError"), "error");
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">
+                  {t("community.archivedEmpty")}
+                </p>
               )}
             </div>
           )}
@@ -955,6 +1022,48 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       {reportDialog}
       {postActions.reportDialog}
       {postActions.captionDialog}
+    </div>
+  );
+}
+
+/**
+ * Uma publicação arquivada.
+ *
+ * Linha, e não quadradinho como em "Salvos": a grade existe para passar o
+ * olho por muita coisa, e o arquivo é uma lista curta onde a pessoa procura
+ * UMA publicação específica para trazer de volta. Post de texto nem tem foto
+ * para pôr num quadrado.
+ */
+function ArchivedRow({ goal, t, onRestore }) {
+  const capa = goal.image || goal.images?.[0] || "";
+  const texto = String(goal.note || goal.title || "").trim();
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-2.5">
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--engine-surface-2)]">
+        {capa ? (
+          <img src={capa} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <Archive size={18} className="text-[var(--engine-text-subtle)]" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-[13px] font-semibold leading-5 text-[var(--engine-text)]">
+          {texto || t("community.archivedNoText")}
+        </p>
+        {goal.createdAt ? (
+          <p className="mt-0.5 text-[11px] text-[var(--engine-text-subtle)]">
+            <TimeAgo value={goal.createdAt} short />
+          </p>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={onRestore}
+        className="min-h-11 shrink-0 rounded-lg border border-[var(--engine-border)] px-3 text-[12px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+      >
+        {t("community.restore")}
+      </button>
     </div>
   );
 }

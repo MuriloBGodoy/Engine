@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  Archive,
   Award,
   AtSign,
   Bookmark,
@@ -66,6 +67,7 @@ import {
 import { getInitials, withoutAt } from "../services/people";
 import { useCommentComposer } from "../hooks/useCommentComposer";
 import { PersonLink } from "../components/social/PersonLink";
+import { setPostArchived } from "../services/archivedPosts";
 import { TimeAgo } from "../components/social/TimeAgo";
 import { PostVideoPlayer } from "../components/social/PostVideoPlayer";
 import { CarsTab } from "../components/cars/CarsTab";
@@ -908,6 +910,7 @@ export function GoalCard({
   onRate,
   onShare,
   onUnshare,
+  onArchive,
   onFollow,
   onOpenProfile,
   onEditComment,
@@ -972,6 +975,18 @@ export function GoalCard({
             icon: Edit3,
             label: t("community.editCaption"),
             onClick: () => onEditCaption(goal),
+          },
+        ]
+      : []),
+    // Arquivar: só no post livre. No carro da garagem o "deixar de
+    // compartilhar" JÁ é o arquivo — tira do feed e o carro continua na
+    // garagem — e dois itens com a mesma função é o que deixa menu confuso.
+    ...(isOwner && isFreePost && onArchive
+      ? [
+          {
+            icon: Archive,
+            label: t("community.archive"),
+            onClick: () => onArchive(goal),
           },
         ]
       : []),
@@ -2269,6 +2284,25 @@ export function Community({ cars = [], settings, user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openProfileId, profiles]);
 
+  // Arquivar: sai do ar para todo mundo (inclusive para mim) e fica no
+  // arquivo do perfil, de onde volta inteiro.
+  const handleArchive = async (goal) => {
+    if (requireAccount(goalPath(goal.id))) return;
+    const ok = await confirm({
+      title: t("community.archive"),
+      message: t("community.archiveConfirm"),
+      confirmLabel: t("community.archive"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    try {
+      await setPostArchived(goal.id, true);
+      flash(t("community.archived"));
+    } catch (error) {
+      flashWriteError(error);
+    }
+  };
+
   const handleCopyShareLink = async (goal) => {
     const shareText = `${t("community.shareText")} ${goal.title} - ${getProgress(
       goal,
@@ -2688,6 +2722,7 @@ export function Community({ cars = [], settings, user }) {
                             onRate={handleRate}
                             onShare={handleCopyShareLink}
                             onUnshare={handleUnshareGoal}
+                            onArchive={handleArchive}
                             onFollow={handleFollow}
                             onOpenProfile={handleOpenProfile}
                             onEditComment={handleEditComment}
@@ -2890,6 +2925,7 @@ export function Community({ cars = [], settings, user }) {
             onRate: handleRate,
             onShare: handleCopyShareLink,
             onUnshare: handleUnshareGoal,
+            onArchive: handleArchive,
             onFollow: handleFollow,
             onOpenProfile: handleOpenProfile,
             onEditComment: handleEditComment,
