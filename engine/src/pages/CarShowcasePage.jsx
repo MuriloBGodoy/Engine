@@ -10,6 +10,7 @@ import {
   likeCar,
 } from "../services/carShowcase";
 import { engineDB } from "../services/db";
+import { PersonLink } from "../components/social/PersonLink";
 import { auth } from "../services/supabase";
 import { openShareSheet, shareUrls } from "../services/shareLinks";
 import { useToast } from "../components/ToastProvider";
@@ -220,9 +221,14 @@ export function CarShowcasePage() {
           {comments.map((item) => (
             <li key={item.id} className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[var(--engine-text)]">
+                {/* O nome de quem comentou abre o perfil, como em qualquer
+                    rede — aqui era texto morto. */}
+                <PersonLink
+                  username={item.username}
+                  className="text-[13px] font-bold text-[var(--engine-text)] hover:text-[var(--engine-accent)]"
+                >
                   {item.author || `@${item.username}`}
-                </p>
+                </PersonLink>
                 <p className="whitespace-pre-wrap break-words text-[13.5px] leading-5 text-[var(--engine-text)]">
                   {item.text}
                 </p>

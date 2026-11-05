@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { PersonLink } from "../social/PersonLink";
 import { Flag, MessageSquare, Pencil, Star, Trash2 } from "lucide-react";
 import { useToast } from "../ToastProvider";
 import { useConfirm } from "../ConfirmProvider";
@@ -254,7 +255,19 @@ function ReviewItem({ review, isOwner, isMine, canReport, onReply, onReport, bus
     <li className="border-b border-[var(--engine-border)] py-4 last:border-b-0">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-[var(--engine-text)]">{name}</p>
+          {/* Quem avaliou é uma pessoa do Engine: o nome leva ao perfil
+              dela, como em qualquer outra lista da plataforma. No "Você" não
+              faz sentido linkar. */}
+          {isMine ? (
+            <p className="truncate text-sm font-bold text-[var(--engine-text)]">{name}</p>
+          ) : (
+            <PersonLink
+              username={profile?.username}
+              className="block truncate text-sm font-bold text-[var(--engine-text)] hover:text-[var(--engine-accent)]"
+            >
+              {name}
+            </PersonLink>
+          )}
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--engine-text-subtle)]">
             <StarRow value={review.rating} size={14} label={t("serviceReviews.starsLabel", { count: review.rating })} />
             <time dateTime={review.createdAt}>{formatDate(review.createdAt, i18n.language)}</time>

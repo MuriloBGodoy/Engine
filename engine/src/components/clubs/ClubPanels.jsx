@@ -12,6 +12,7 @@ import { ClubEmptyState } from "./ClubHeader";
 import { clubPlaceLabel, clubStyleLabel } from "../../services/clubStyles";
 import { formatFipeYear } from "../../services/carDisplay";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
+import { PersonLink } from "../social/PersonLink";
 
 /**
  * Link digitado pela direção vira `href` só se for http(s). Sem isso um
@@ -96,14 +97,18 @@ export function ClubWall({ club, posts, loading, canPost, onCreatePost, canPin =
             <header className="flex items-center gap-2.5">
               {/* O post do mural é o da Comunidade: o nome vem em `author`.
                   `authorName` ficou do contrato antigo e saía vazio. */}
-              <Avatar
-                name={post.authorName || post.author}
-                avatar={/^(https?:|data:image\/)/.test(post.authorAvatar || post.avatar || "") ? post.authorAvatar || post.avatar : ""}
-                ring={post.pinned}
-              />
+              <PersonLink username={post.username} title={post.authorName || post.author}>
+                <Avatar
+                  name={post.authorName || post.author}
+                  avatar={/^(https?:|data:image\/)/.test(post.authorAvatar || post.avatar || "") ? post.authorAvatar || post.avatar : ""}
+                  ring={post.pinned}
+                />
+              </PersonLink>
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-bold text-[var(--engine-text)]">
-                  {post.authorName || post.author}
+                  <PersonLink username={post.username} className="hover:text-[var(--engine-accent)]">
+                    {post.authorName || post.author}
+                  </PersonLink>
                   <ClubTag tag={club?.tag} />
                 </p>
                 <p className="text-[11.5px] text-[var(--engine-text-muted)]">
@@ -316,10 +321,14 @@ export function ClubGarage({ cars, loading, isMember, hasOwnCar, onPublish }) {
                   {car.name || `${car.brand} ${car.model}`}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[var(--engine-text-muted)]">{formatFipeYear(car.year, t("car.zeroKm"))}</p>
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[var(--engine-text-muted)]">
+                <PersonLink
+                  username={car.ownerTag}
+                  className="mt-2 flex items-center gap-1.5 text-[11px] text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)]"
+                  title={car.ownerName}
+                >
                   <Avatar name={car.ownerName} avatar={car.ownerAvatar} size={20} />
                   <span className="truncate">{car.ownerName}</span>
-                </div>
+                </PersonLink>
               </div>
             </article>
           ))}
@@ -463,10 +472,14 @@ export function ClubMemberList({ club, members, total, loading, roles = [], myRo
             key={member.uid}
             className="flex flex-wrap items-center gap-2.5 border-b border-[var(--engine-border)] py-2.5 last:border-b-0"
           >
-            <Avatar name={member.displayName} avatar={member.avatar} ring={member.roleId === "founder"} />
+            <PersonLink username={member.username} title={member.displayName}>
+              <Avatar name={member.displayName} avatar={member.avatar} ring={member.roleId === "founder"} />
+            </PersonLink>
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-bold text-[var(--engine-text)]">
-                {member.displayName}
+                <PersonLink username={member.username} className="hover:text-[var(--engine-accent)]">
+                  {member.displayName}
+                </PersonLink>
                 <ClubTag tag={club?.tag} />
                 <ClubRoleBadge role={role} />
               </p>

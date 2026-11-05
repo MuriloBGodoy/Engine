@@ -9,7 +9,6 @@ import {
   Search,
   Send,
   Trash2,
-  UserRound,
   Image,
   Check,
   CheckCheck,
@@ -53,6 +52,7 @@ import { useProfileSearch } from "../hooks/useProfileSearch";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
 import { ChatAvatar } from "../components/ChatAvatar";
+import { profilePath } from "../services/people";
 import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { GiphyPicker } from "../components/GiphyPicker";
@@ -171,6 +171,9 @@ export function Messages({ user, settings }) {
     () => (activeConversation ? conversationPartner(activeConversation, userId) : null),
     [activeConversation, userId],
   );
+  // Conta apagada não tem @, e sem @ não existe perfil para abrir: o
+  // cabeçalho então não oferece um toque que não leva a lugar nenhum.
+  const partnerPath = partner?.deleted ? "" : profilePath(partner?.username);
 
   // Abrir a conversa já marca como lida (e toda vez que chega algo novo com
   // a janela aberta).
@@ -622,17 +625,27 @@ export function Messages({ user, settings }) {
                 <ArrowLeft size={20} />
               </button>
 
-              <ChatAvatar person={partner} />
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-[var(--engine-text)]">
-                  {partner?.author || t("messages.title")}
-                </p>
-                <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-[var(--engine-text-subtle)]">
-                  <span className="truncate">{partner?.username}</span>
-                  {iAmProvider && <ServiceStatusPill status={activeConversation?.serviceStatus} />}
-                </p>
-              </div>
+              {/* O retrato e o nome são o caminho para o perfil, como em
+                  qualquer app de mensagem — antes era preciso achar um ícone
+                  de bonequinho à direita, que ninguém lê como "ver perfil". */}
+              <button
+                type="button"
+                onClick={() => partnerPath && navigate(partnerPath)}
+                disabled={!partnerPath}
+                title={partnerPath ? t("messages.viewProfile") : undefined}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl text-left transition enabled:hover:bg-[var(--engine-surface-2)] disabled:cursor-default"
+              >
+                <ChatAvatar person={partner} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-[var(--engine-text)]">
+                    {partner?.author || t("messages.title")}
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-[var(--engine-text-subtle)]">
+                    <span className="truncate">{partner?.username}</span>
+                    {iAmProvider && <ServiceStatusPill status={activeConversation?.serviceStatus} />}
+                  </span>
+                </span>
+              </button>
 
               {iAmProvider && (
                 <button
@@ -647,17 +660,6 @@ export function Messages({ user, settings }) {
                 </button>
               )}
 
-              {partner?.username && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/community/${partner.username}`)}
-                  title={t("messages.viewProfile")}
-                  aria-label={t("messages.viewProfile")}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)]"
-                >
-                  <UserRound size={19} />
-                </button>
-              )}
               {partner?.userId && !partner?.deleted && (
                 <button
                   type="button"
