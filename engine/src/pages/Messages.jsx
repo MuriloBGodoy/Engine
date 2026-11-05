@@ -49,6 +49,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { engineDB } from "../services/db";
 import { useProfileSearch } from "../hooks/useProfileSearch";
+import { useLiveProfiles, withLiveProfile } from "../hooks/useLiveProfiles";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
 import { ChatAvatar } from "../components/ChatAvatar";
@@ -167,9 +168,22 @@ export function Messages({ user, settings }) {
   }
   const currentTab = shownTabs.includes(tab) ? tab : "direct";
 
+  // O cartão guardado na conversa é do dia em que ela começou: quem trocou de
+  // @ ficava com o @ velho no chat, e desde que o nome virou o caminho para o
+  // perfil, esse @ velho abria uma página que não existe. O perfil de verdade
+  // entra por cima.
+  const partnerIds = useMemo(
+    () => conversations.map((item) => conversationPartner(item, userId).userId),
+    [conversations, userId],
+  );
+  const livePeople = useLiveProfiles(partnerIds);
+
   const partner = useMemo(
-    () => (activeConversation ? conversationPartner(activeConversation, userId) : null),
-    [activeConversation, userId],
+    () =>
+      activeConversation
+        ? withLiveProfile(conversationPartner(activeConversation, userId), livePeople)
+        : null,
+    [activeConversation, userId, livePeople],
   );
   // Conta apagada não tem @, e sem @ não existe perfil para abrir: o
   // cabeçalho então não oferece um toque que não leva a lugar nenhum.
@@ -199,12 +213,12 @@ export function Messages({ user, settings }) {
     if (!term) return list;
     return list.filter((conversation) =>
       matchesQuery(
-        conversationPartner(conversation, userId),
+        withLiveProfile(conversationPartner(conversation, userId), livePeople),
         term,
         `${conversation.context?.listingTitle || ""} ${conversation.context?.car || ""}`,
       ),
     );
-  }, [visibleConversations, currentTab, statusFilter, term, userId]);
+  }, [visibleConversations, currentTab, statusFilter, term, userId, livePeople]);
 
   // Pessoas da comunidade que ainda não têm conversa aberta. Some quando já
   // existem conversas e nada foi buscado (a lista não é um diretório), mas
@@ -533,6 +547,7 @@ export function Messages({ user, settings }) {
                   youLabel={t("messages.you")}
                   emptyLabel={t("messages.noMessagesYet")}
                   quoteLabel={t("serviceChat.quoteBubble")}
+                  livePeople={livePeople}
                   onClick={() => {
                     setSearch("");
                     navigate(`/messages/${conversation.id}`);
@@ -832,9 +847,10 @@ function ConversationRow({
   youLabel,
   emptyLabel,
   quoteLabel,
+  livePeople,
   onClick,
 }) {
-  const partner = conversationPartner(conversation, userId);
+  const partner = withLiveProfile(conversationPartner(conversation, userId), livePeople);
   const unread = conversationUnread(conversation, userId);
   const last = conversation.lastMessage;
   const service = isServiceConversation(conversation);

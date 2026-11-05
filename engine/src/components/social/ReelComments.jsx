@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { engineDB } from "../../services/db";
-import { profilePath } from "../../services/people";
+import { resolveProfilePath } from "../../services/people";
 import { usePostActions } from "../../hooks/usePostActions";
 import { useCommentComposer } from "../../hooks/useCommentComposer";
 import { CommentsSheet } from "./Comments";
@@ -50,8 +50,14 @@ export function ReelComments({ goalId, user, onClose, onCount }) {
     if (visible) onCount?.(comments.length);
   }, [visible, comments.length, onCount]);
 
-  const openProfile = (userId, person) => {
-    const path = profilePath(person?.username);
+  // Pelo uid, não pelo @ guardado no comentário: quem trocou de @ deixava o
+  // toque no nome levando para uma página que não existe mais.
+  const openProfile = async (userId, person) => {
+    const path = await resolveProfilePath(
+      userId || person?.userId,
+      person?.username,
+      (id) => engineDB.getPublicProfile(id),
+    );
     if (path) navigate(path);
   };
 

@@ -10,6 +10,31 @@
  * de um perfil.
  */
 
+/**
+ * O caminho do perfil de alguém, resolvido pelo uid.
+ *
+ * O @ guardado junto de um comentário, de um post ou de uma conversa é uma
+ * cópia do dia em que aquilo foi escrito. Quem troca de @ deixa cópias velhas
+ * espalhadas pelo app, e cada uma delas vira um link para uma página que não
+ * existe. O uid não muda: quando ele está à mão, é ele que manda.
+ *
+ * O @ guardado continua servindo de rede: conta apagada não tem perfil para
+ * consultar, e aí é melhor tentar o endereço antigo do que não ir a lugar
+ * nenhum.
+ */
+export async function resolveProfilePath(userId, fallbackUsername = "", getProfile) {
+  if (userId && typeof getProfile === "function") {
+    try {
+      const perfil = await getProfile(userId);
+      const atual = profilePath(perfil?.username);
+      if (atual) return atual;
+    } catch {
+      // Sem rede ou perfil sumido: cai no @ guardado.
+    }
+  }
+  return profilePath(fallbackUsername);
+}
+
 /** "@ana" e "ana" viram "ana". */
 export const withoutAt = (value = "") => String(value || "").replace(/^@+/, "");
 

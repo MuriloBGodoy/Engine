@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { engineDB } from "../services/db";
+import { resolveProfilePath } from "../services/people";
 import { GoalCard } from "./Community";
 import { useToast } from "../components/ToastProvider";
 import { useRequireAccount } from "../hooks/useRequireAccount";
@@ -141,10 +142,16 @@ export function PostPage({ user }) {
           onSendToChat={(item) =>
             openShareSheet({ url: shareUrls.post(item.id), title: item.title || String(item.note || "").slice(0, 80) || item.author || "Engine", goal: item, kind: "post" })
           }
-          onOpenProfile={(profileUserId, person) => {
+          // Pelo uid: o @ guardado no post e no comentário é do dia em que
+          // foram escritos, e quem trocou de @ virava link quebrado.
+          onOpenProfile={async (profileUserId, person) => {
             const source = person || visibleGoal;
-            const username = String(source?.username || "").replace(/^@/, "");
-            if (username) navigate(`/community/@${username}`);
+            const path = await resolveProfilePath(
+              profileUserId || source?.userId || source?.ownerId,
+              source?.username,
+              (id) => engineDB.getPublicProfile(id),
+            );
+            if (path) navigate(path);
           }}
           initialCommentsOpen={openComments}
         />
