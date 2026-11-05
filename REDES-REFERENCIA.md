@@ -135,12 +135,18 @@ Cada uma saiu de um conserto de verdade, com a data.
 - **R26.** O estado vazio é a tela mais vista de uma rede nova. Ele tem que
   dizer o que fazer, não só que não há nada.
 
+### Dados da pessoa saem quando ela quiser
+
+- **R27.** Se o app sabe **apagar** uma conta, tem que saber **devolver** o que
+  ela tem. No Brasil não é cortesia: LGPD art. 18, V. *(05/11/2026)*
+- **R28.** Exportar é portabilidade **do que já está à vista**, não porta para
+  ver o que não se via. A conversa inteira entra (as duas pontas já aparecem
+  na tela de mensagens); perfil de terceiro, não.
+
 ## Ainda não resolvido
 
 - **Conta privada.** O banco já tem `account_visible()`; a decisão de produto
   está aberta. Inclui a seção "No Engine", que o Murilo quer poder esconder.
-- **Baixar meus dados.** Toda rede tem, e a LGPD (art. 18, portabilidade) pede.
-  O Engine tem exclusão de conta em cascata, mas não exportação.
 - **Coleções dentro de Salvos.** Só vale quando houver volume para justificar.
 - **Salvar anúncio de serviço.** Mesma forma de `saved_cars`, quando a aba de
   Serviços pedir.

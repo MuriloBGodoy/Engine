@@ -324,6 +324,62 @@ function BlockedUsers({ t, userId }) {
 }
 
 /**
+ * Baixar meus dados.
+ *
+ * O Engine já sabia apagar uma conta inteira, mas não sabia devolver o que
+ * ela tem. Toda rede de verdade tem isto, e no Brasil não é cortesia: a LGPD
+ * (art. 18, V) dá à pessoa o direito de levar os dados dela embora.
+ *
+ * Arquivo JSON montado pelo banco e baixado direto do navegador — nada passa
+ * por servidor nosso nem fica guardado em lugar nenhum.
+ */
+function DownloadMyData({ t }) {
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  const baixar = async () => {
+    setBusy(true);
+    try {
+      const dados = await engineDB.exportMyData();
+      const blob = new Blob([JSON.stringify(dados, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `engine-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // O endereço temporário some junto: sem isto o arquivo fica preso na
+      // memória da aba até ela fechar.
+      URL.revokeObjectURL(url);
+      toast(t("settings.data.ready"));
+    } catch (error) {
+      console.error(error);
+      toast(t("settings.status.saveError"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Group title={t("settings.data.title")} footer={t("settings.data.hint")}>
+      <Row icon={Download} label={t("settings.data.download")}>
+        <button
+          type="button"
+          onClick={baixar}
+          disabled={busy}
+          className="min-h-11 shrink-0 rounded-lg border border-[var(--engine-border)] px-3 text-xs font-bold text-[var(--engine-text)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50"
+        >
+          {busy ? <Loader2 size={15} className="animate-spin" /> : t("settings.data.action")}
+        </button>
+      </Row>
+    </Group>
+  );
+}
+
+/**
  * Silenciados.
  *
  * Mesma forma da lista de bloqueados de propósito: são o par leve e o par
@@ -1264,6 +1320,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                 />
               </Group>
               <AdsConsentGroup t={t} />
+              <DownloadMyData t={t} />
               <MutedUsers t={t} userId={user?.uid} />
               <BlockedUsers t={t} userId={user?.uid} />
             </>

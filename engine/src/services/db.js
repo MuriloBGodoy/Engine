@@ -2431,6 +2431,14 @@ export const engineDB = {
    * pessoa e nada mais muda — continuo seguindo, ela continua me vendo, e
    * ela não é avisada. Quem precisa de garantia do banco é o bloqueio.
    */
+  /**
+   * Tudo o que é meu, num JSON só (LGPD art. 18, V — portabilidade).
+   * Quem monta é o banco; o navegador só salva o arquivo.
+   */
+  async exportMyData() {
+    return must(await supabase.rpc("export_my_data"));
+  },
+
   async getMutedUsers(userId = currentUserId) {
     if (!userId) return [];
     try {

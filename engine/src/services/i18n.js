@@ -1665,6 +1665,13 @@ const resources = {
           title: "Minhas coisas",
           hint: "Salvos e arquivadas vivem no seu perfil — estes são só os atalhos.",
         },
+        data: {
+          title: "Seus dados",
+          hint: "Um arquivo com tudo o que é seu aqui: perfil, garagem, publicações, comentários, conversas e listas. Ele é montado na hora e baixa direto no seu aparelho.",
+          download: "Baixar meus dados",
+          action: "Baixar",
+          ready: "Arquivo baixado",
+        },
         about: { title: "Sobre o Engine" },
         plan: {
           title: "Seu plano",
@@ -3500,6 +3507,13 @@ const resources = {
         myStuff: {
           title: "Your stuff",
           hint: "Saved and archived live on your profile — these are just the shortcuts.",
+        },
+        data: {
+          title: "Your data",
+          hint: "One file with everything of yours here: profile, garage, posts, comments, conversations and lists. It is built on the spot and downloads straight to your device.",
+          download: "Download my data",
+          action: "Download",
+          ready: "File downloaded",
         },
         about: { title: "About Engine" },
         plan: {
@@ -5342,6 +5356,13 @@ const resources = {
         myStuff: {
           title: "Tus cosas",
           hint: "Guardados y archivadas viven en tu perfil — esto son solo los atajos.",
+        },
+        data: {
+          title: "Tus datos",
+          hint: "Un archivo con todo lo tuyo aquí: perfil, garaje, publicaciones, comentarios, conversaciones y listas. Se arma al momento y se descarga directo en tu dispositivo.",
+          download: "Descargar mis datos",
+          action: "Descargar",
+          ready: "Archivo descargado",
         },
         about: { title: "Sobre Engine" },
         plan: {
