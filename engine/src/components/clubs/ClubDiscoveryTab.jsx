@@ -194,10 +194,13 @@ export function ClubDiscoveryTab({ onSelectClub, onCreate }) {
           />
           <Section title={t("clubs.sections.all")} clubs={sections?.all} {...sectionProps} />
 
-          {total < 3 ? (
+          {/* Só quando NÃO achou nada. Com um clube na tela, "Funde o
+              primeiro" é mentira, e o convite já tem lugar fixo: o botão
+              Criar, no cabeçalho das sub-abas. (07/11/2026) */}
+          {total === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--engine-border-strong)] px-4 py-6 text-center">
               <p className="text-[14px] font-bold text-[var(--engine-text)]">
-                {total === 0 ? t("clubs.found.none") : t("clubs.found.fewTitle")}
+                {t("clubs.found.none")}
               </p>
               <p className="mx-auto mt-1 max-w-[42ch] text-[12.5px] leading-relaxed text-[var(--engine-text-muted)]">
                 {t("clubs.found.fewCopy")}

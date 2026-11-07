@@ -845,29 +845,23 @@ h5 {
   display: none;
 }
 
+/* Faixa de chips que rola de lado (estilos de clube, abas do clube).
+   Tinha trilho e barra desenhados — uma barra cinza de ponta a ponta debaixo
+   dos chips, que num bloco de 40px de altura pesava mais que o conteúdo.
+   Nenhum app desenha isso numa linha de chips: a barra sai, e quem avisa que
+   há mais para o lado é o próprio chip cortado na borda, mais o arrasto, que
+   é o gesto que a pessoa já tem no dedo. (07/11/2026) */
 .engine-chip-scroll {
-  scrollbar-color: rgba(148, 163, 184, 0.72) rgba(148, 163, 184, 0.18);
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  /* Sem a barra ocupando altura, o chip encosta na borda de baixo: a folga
+     volta aqui para o foco do teclado não ficar cortado. */
+  scroll-padding-inline: 0.25rem;
 }
 
 .engine-chip-scroll::-webkit-scrollbar {
-  height: 8px;
-}
-
-.engine-chip-scroll::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.18);
-}
-
-.engine-chip-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-  background-color: rgba(148, 163, 184, 0.72);
-}
-
-.engine-chip-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(203, 213, 225, 0.92);
+  display: none;
 }
 
 .dark .engine-chip-scroll {
