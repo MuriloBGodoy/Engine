@@ -2867,7 +2867,10 @@ export function Community({ cars = [], settings, user }) {
               setPostModalOpen(true);
             }}
             aria-label={t("feedPost.action")}
-            className="engine-compose-fab sm:hidden"
+            /* Onde ele aparece é decisão do CSS, não daqui: o `sm:hidden`
+               que morava nesta linha perdia para o `display: flex` da
+               classe e nunca escondeu nada. */
+            className="engine-compose-fab"
           >
             <Plus size={24} />
           </button>,

@@ -1841,3 +1841,17 @@ h5 {
     display: none;
   }
 }
+
+/* O botão é do CELULAR — e por quase um ano não foi.
+   O JSX pedia `sm:hidden`, mas `display: flex` aqui em cima nasce depois dos
+   utilitários do Tailwind na folha e vence por ordem, não por peso. Resultado:
+   no desktop o + flutuava solto a 76px do rodapé (a folga da barra de abas,
+   que no desktop não existe) EM CIMA do "Publicar" do trilho lateral — duas
+   portas para a mesma coisa, uma delas pairando no nada. A regra tem que
+   morar aqui, no mesmo lugar que acendeu o display. (07/11/2026) */
+@media (min-width: 640px) {
+  .engine-compose-fab {
+    display: none;
+  }
+}
+
