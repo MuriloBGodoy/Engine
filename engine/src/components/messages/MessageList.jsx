@@ -10,6 +10,7 @@ import {
 } from "../../services/chat";
 import { formatAbsoluteTime } from "../../services/socialTime";
 import { QuoteBubbleBody } from "./ServiceThread";
+import { ChatVideo } from "./ChatVideo";
 
 /**
  * O fio de mensagens — balões, separador de data e rolagem colada no fim.
@@ -140,6 +141,8 @@ function MessageBubble({ message, mine, deletable = mine, editable = false, loca
             className="mb-2 max-h-64 w-full rounded-lg object-cover"
           />
         )}
+
+        {message.video?.path && <ChatVideo video={message.video} mine={mine} t={t} />}
 
         {message.type === "quote" && <QuoteBubbleBody quote={message.quote} mine={mine} locale={locale} />}
 

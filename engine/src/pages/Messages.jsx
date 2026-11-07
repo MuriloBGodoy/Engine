@@ -9,6 +9,7 @@ import {
   Search,
   Send,
   Image,
+  Video,
   UserX,
   CheckCircle2,
   RotateCcw,
@@ -47,10 +48,13 @@ import { EmojiPicker } from "../components/EmojiPicker";
 import { GiphyPicker } from "../components/GiphyPicker";
 import { compressImage, readFileAsDataUrl, blobToDataUrl } from "../services/imageCompression";
 import { imagesFromPaste } from "../services/clipboardImage";
+import { uploadChatVideo } from "../services/chatMedia";
+import { MediaPickerButton } from "../components/MediaPickerButton";
 import { ServiceContextCard, ServiceStatusPill } from "../components/messages/ServiceThread";
 import { ConversationRow } from "../components/messages/ConversationRow";
 import { MessageList } from "../components/messages/MessageList";
 import { QUOTE_DEFAULT_LIMITS } from "../services/quotes";
+import { VIDEO_LIMITS } from "../services/postVideo";
 import "../services/i18n-social-posts";
 import "../services/i18n-message-dock";
 
@@ -59,6 +63,10 @@ import "../services/i18n-message-dock";
 // sou o prestador. Como o Principal/Geral do Instagram para conta
 // profissional: o trabalho não se mistura com os amigos.
 const TABS = ["direct", "services", "clients"];
+// Erros de vídeo que valem mostrar com nome; o resto vira "não deu para
+// enviar" (mesma lista do compositor de post).
+const VIDEO_ERRORS_SHOWN = ["tooBig", "format", "notVideo", "unreadable"];
+const VIDEO_MB = Math.round(VIDEO_LIMITS.maxBytes / (1024 * 1024));
 const STATUS_FILTERS = ["all", "new", "replied", "closed"];
 
 const matchesQuery = (person, term, extra = "") =>
@@ -91,6 +99,7 @@ export function Messages({ user, settings }) {
   const [sending, setSending] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [compressing, setCompressing] = useState(false);
+  const [sendingVideo, setSendingVideo] = useState(false);
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
   const [tab, setTab] = useState("direct");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -99,7 +108,6 @@ export function Messages({ user, settings }) {
   const [editingState, setEditing] = useState(null);
   // Trocar de conversa larga a edição (a mensagem é de outra conversa).
   const editing = editingState?.conversationId === conversationId ? editingState : null;
-  const fileInputRef = useRef(null);
   const composerRef = useRef(null);
 
   const userId = user?.uid || "";
@@ -340,15 +348,14 @@ export function Messages({ user, settings }) {
     if (!ok) return;
 
     try {
-      await deleteMessage(conversationId, message.id);
+      await deleteMessage(conversationId, message.id, message);
     } catch (error) {
       console.error(error);
       toast(t("messages.deleteError"));
     }
   };
 
-  const handleImageSelected = async (event) => {
-    const file = event.target.files?.[0];
+  const handleImageSelected = async (file) => {
     if (!file || !file.type.startsWith("image/")) {
       toast(t("messages.invalidImage"));
       return;
@@ -361,9 +368,23 @@ export function Messages({ user, settings }) {
       console.error(error);
       toast(t("messages.imageError"));
     }
+  };
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  // Vídeo na conversa: sobe para o bucket fechado da conversa e a mensagem
+  // guarda só o caminho (services/chatMedia.js). Sem corte e sem editor — na
+  // DM o vídeo é recado, não publicação.
+  const handleVideoSelected = async (file) => {
+    if (!conversationId || !file || sending) return;
+    setSendingVideo(true);
+    try {
+      const video = await uploadChatVideo(file, { conversationId, userId });
+      await sendMessage(conversationId, { senderId: userId, text: "", video });
+    } catch (error) {
+      console.error(error);
+      const code = VIDEO_ERRORS_SHOWN.includes(error?.code) ? error.code : "upload";
+      toast(t(`socialPosts.videoErrors.${code}`, { mb: VIDEO_MB }));
+    } finally {
+      setSendingVideo(false);
     }
   };
 
@@ -742,26 +763,32 @@ export function Messages({ user, settings }) {
                 onPaste={handlePaste}
                 className="flex shrink-0 items-stretch gap-2 border-t border-[var(--engine-border)] p-3"
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,image/gif"
-                  onChange={handleImageSelected}
-                  className="hidden"
-                  aria-label={t("socialPosts.messages.chooseImage")}
-                />
-  
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={sending || compressing || Boolean(editing)}
+                  <MediaPickerButton
+                    accept="image/*,image/gif"
+                    onFiles={(files) => handleImageSelected(files[0])}
+                    disabled={sending || compressing || sendingVideo || Boolean(editing)}
                     title={t("pasteImage.hint")}
-                    aria-label={t("socialPosts.messages.photo")}
+                    ariaLabel={t("socialPosts.messages.photo")}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
                   >
                     <Image size={18} />
-                  </button>
+                  </MediaPickerButton>
+
+                  <MediaPickerButton
+                    accept="video/mp4,video/quicktime,video/webm,video/*"
+                    onFiles={(files) => handleVideoSelected(files[0])}
+                    disabled={sending || compressing || sendingVideo || Boolean(editing)}
+                    title={t("socialPosts.messages.video")}
+                    ariaLabel={t("socialPosts.messages.video")}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
+                  >
+                    {sendingVideo ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
+                    ) : (
+                      <Video size={18} />
+                    )}
+                  </MediaPickerButton>
   
                   <button
                     type="button"

@@ -1,4 +1,5 @@
 import { must, supabase, watchTable } from "./supabase";
+import { removeChatMedia } from "./chatMedia";
 
 /**
  * Mensagens diretas (DM) do Engine.
@@ -323,12 +324,24 @@ export const startConversation = async (me, other) => {
  */
 export const sendMessage = async (
   conversationId,
-  { senderId, text = "", attachment = null, imageData = null, gifData = null, gifId = null },
+  { senderId, text = "", attachment = null, imageData = null, gifData = null, gifId = null, video = null },
 ) => {
   const body = String(text || "").trim().slice(0, MESSAGE_MAX_LENGTH);
-  if (!conversationId || !senderId || (!body && !attachment && !imageData && !gifData)) return null;
+  if (!conversationId || !senderId || (!body && !attachment && !imageData && !gifData && !video?.path)) {
+    return null;
+  }
 
-  const messageType = gifData ? "gif" : imageData ? "image" : attachment ? "post" : "text";
+  // Vídeo não vai na linha: `video` aqui é só o endereço dele no bucket
+  // fechado da conversa (services/chatMedia.js) e as medidas do player.
+  const messageType = video?.path
+    ? "video"
+    : gifData
+      ? "gif"
+      : imageData
+        ? "image"
+        : attachment
+          ? "post"
+          : "text";
   return must(
     await supabase.rpc("send_message", {
       p_conversation: conversationId,
@@ -338,6 +351,7 @@ export const sendMessage = async (
         ...(attachment ? { attachment } : {}),
         ...(imageData ? { imageData } : {}),
         ...(gifData ? { gifData, gifId } : {}),
+        ...(video?.path ? { video } : {}),
       },
     }),
   );
@@ -357,10 +371,13 @@ export const markConversationRead = async (conversationId, userId) => {
  * lista continuava mostrando o texto apagado. `select()` para saber se a
  * linha saiu de fato: RLS que recusa não dá erro, só apaga zero linhas.
  */
-export const deleteMessage = async (conversationId, messageId) => {
+export const deleteMessage = async (conversationId, messageId, message = null) => {
   if (!conversationId || !messageId) return;
   const rows = must(await supabase.from("messages").delete().eq("id", messageId).select("id"));
   if (!rows?.length) throw Object.assign(new Error("not-found"), { code: "not-found" });
+  // O arquivo do vídeo não é linha do banco: sai à parte, depois que a
+  // mensagem já saiu, e sem travar quem apagou.
+  if (message?.video?.path) removeChatMedia(message.video.path);
 };
 
 /** Editar vale para texto próprio, até 15 minutos depois (o banco confere). */
@@ -389,6 +406,7 @@ const SERVER_PREVIEWS = {
   "📷 Imagem": "socialPosts.messages.previewImage",
   "🎬 GIF": "socialPosts.messages.previewGif",
   "📷 Publicação": "socialPosts.messages.previewPost",
+  "🎥 Vídeo": "socialPosts.messages.previewVideo",
 };
 export const localizedPreview = (text = "", t) =>
   t && SERVER_PREVIEWS[text] ? t(SERVER_PREVIEWS[text]) : text;

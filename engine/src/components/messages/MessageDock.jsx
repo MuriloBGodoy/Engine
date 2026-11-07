@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Image as ImageIcon, Maximize2, MessageCircle, Send, X } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, Maximize2, MessageCircle, Send, Video, X } from "lucide-react";
 import {
   chatErrorKey,
   conversationPartner,
@@ -23,6 +23,9 @@ import { ConversationRow } from "./ConversationRow";
 import { MessageList } from "./MessageList";
 import { blobToDataUrl, compressImage, readFileAsDataUrl } from "../../services/imageCompression";
 import { imagesFromPaste } from "../../services/clipboardImage";
+import { uploadChatVideo } from "../../services/chatMedia";
+import { VIDEO_LIMITS } from "../../services/postVideo";
+import { MediaPickerButton } from "../MediaPickerButton";
 import "../../services/i18n-message-dock";
 import "../../services/i18n-social-posts";
 
@@ -46,6 +49,8 @@ import "../../services/i18n-social-posts";
  */
 
 const DOCK_KEY = "engine:dock:messages";
+const VIDEO_ERRORS_SHOWN = ["tooBig", "format", "notVideo", "unreadable"];
+const VIDEO_MB = Math.round(VIDEO_LIMITS.maxBytes / (1024 * 1024));
 
 const readDockState = () => {
   try {
@@ -78,7 +83,7 @@ export function MessageDock({ user }) {
   const [sending, setSending] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [compressing, setCompressing] = useState(false);
-  const fileRef = useRef(null);
+  const [sendingVideo, setSendingVideo] = useState(false);
 
   const userId = user?.uid || "";
   const locale = i18n.language || "pt-BR";
@@ -187,15 +192,28 @@ export function MessageDock({ user }) {
     }
   };
 
-  const pickImage = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const pickImage = async (file) => {
     if (!file) return;
     try {
       setPreviewImage(await readFileAsDataUrl(file));
     } catch (error) {
       console.error(error);
       toast(t("messages.imageError"));
+    }
+  };
+
+  const pickVideo = async (file) => {
+    if (!activeId || !file || sending || sendingVideo) return;
+    setSendingVideo(true);
+    try {
+      const video = await uploadChatVideo(file, { conversationId: activeId, userId });
+      await sendMessage(activeId, { senderId: userId, text: "", video });
+    } catch (error) {
+      console.error(error);
+      const code = VIDEO_ERRORS_SHOWN.includes(error?.code) ? error.code : "upload";
+      toast(t(`socialPosts.videoErrors.${code}`, { mb: VIDEO_MB }));
+    } finally {
+      setSendingVideo(false);
     }
   };
 
@@ -238,7 +256,7 @@ export function MessageDock({ user }) {
     });
     if (!ok) return;
     try {
-      await deleteMessage(activeId, message.id);
+      await deleteMessage(activeId, message.id, message);
     } catch (error) {
       console.error(error);
       toast(t("messages.deleteError"));
@@ -331,24 +349,30 @@ export function MessageDock({ user }) {
                 onPaste={handlePaste}
                 className="flex shrink-0 items-end gap-1.5 border-t border-[var(--engine-border)] p-2"
               >
-                <input
-                  ref={fileRef}
-                  type="file"
+                <MediaPickerButton
                   accept="image/*,image/gif"
-                  onChange={pickImage}
-                  className="hidden"
-                  aria-label={t("socialPosts.messages.chooseImage")}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={sending || compressing}
+                  onFiles={(files) => pickImage(files[0])}
+                  disabled={sending || compressing || sendingVideo}
                   title={t("pasteImage.hint")}
-                  aria-label={t("socialPosts.messages.photo")}
+                  ariaLabel={t("socialPosts.messages.photo")}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
                 >
                   <ImageIcon size={17} />
-                </button>
+                </MediaPickerButton>
+                <MediaPickerButton
+                  accept="video/mp4,video/quicktime,video/webm,video/*"
+                  onFiles={(files) => pickVideo(files[0])}
+                  disabled={sending || compressing || sendingVideo}
+                  title={t("socialPosts.messages.video")}
+                  ariaLabel={t("socialPosts.messages.video")}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
+                >
+                  {sendingVideo ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
+                  ) : (
+                    <Video size={17} />
+                  )}
+                </MediaPickerButton>
                 <textarea
                   value={draft}
                   rows={1}
