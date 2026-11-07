@@ -195,7 +195,7 @@ export function Register() {
           >
             {countries.map((item) => (
               <option key={item.code} value={item.code}>
-                {item.flag} {item.name}
+                {item.name}
               </option>
             ))}
           </select>

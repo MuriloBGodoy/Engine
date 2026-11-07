@@ -152,7 +152,7 @@ export function CountryPrompt({ user, settings, onSettingsUpdate, onDone }) {
         >
           {options.map((option) => (
             <option key={option.code} value={option.code}>
-              {option.flag} {option.label}
+              {option.label}
             </option>
           ))}
         </select>

@@ -1570,7 +1570,7 @@ function ListingEditorModal({
                   >
                     {countries.map((item) => (
                       <option key={item.code} value={item.code}>
-                        {item.flag} {item.name}
+                        {item.name}
                       </option>
                     ))}
                   </Select>

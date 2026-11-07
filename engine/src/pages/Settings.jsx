@@ -1382,7 +1382,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                     <option value="all">{t("region.all")}</option>
                     {countries.map((item) => (
                       <option key={item.code} value={item.code}>
-                        {item.flag} {item.name}
+                        {item.name}
                       </option>
                     ))}
                   </select>

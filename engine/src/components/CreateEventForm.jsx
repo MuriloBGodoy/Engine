@@ -428,7 +428,7 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
             >
               {countries.map((item) => (
                 <option key={item.code} value={item.code}>
-                  {item.flag} {item.name}
+                  {item.name}
                 </option>
               ))}
             </Select>

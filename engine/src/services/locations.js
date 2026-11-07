@@ -3,19 +3,23 @@
 // outros países trazem as regiões e cidades mais relevantes. Cidades fora da
 // lista continuam funcionando como texto livre (datalist / input).
 
+// Sem bandeira: o emoji de bandeira entrava em todo seletor de país do app
+// (região, telefone, cadastro, evento) e cada sistema desenha o dele — no
+// Windows nem desenha, vira duas letras numa caixinha. O nome do país já diz
+// o que a bandeira diria. (06/11/2026)
 export const countries = [
-  { code: "BR", name: "Brasil", flag: "🇧🇷", dial: "+55" },
-  { code: "PT", name: "Portugal", flag: "🇵🇹", dial: "+351" },
-  { code: "US", name: "Estados Unidos", flag: "🇺🇸", dial: "+1" },
-  { code: "ES", name: "Espanha", flag: "🇪🇸", dial: "+34" },
-  { code: "AR", name: "Argentina", flag: "🇦🇷", dial: "+54" },
-  { code: "MX", name: "México", flag: "🇲🇽", dial: "+52" },
-  { code: "CL", name: "Chile", flag: "🇨🇱", dial: "+56" },
-  { code: "CO", name: "Colômbia", flag: "🇨🇴", dial: "+57" },
-  { code: "GB", name: "Reino Unido", flag: "🇬🇧", dial: "+44" },
-  { code: "FR", name: "França", flag: "🇫🇷", dial: "+33" },
-  { code: "DE", name: "Alemanha", flag: "🇩🇪", dial: "+49" },
-  { code: "IT", name: "Itália", flag: "🇮🇹", dial: "+39" },
+  { code: "BR", name: "Brasil", dial: "+55" },
+  { code: "PT", name: "Portugal", dial: "+351" },
+  { code: "US", name: "Estados Unidos", dial: "+1" },
+  { code: "ES", name: "Espanha", dial: "+34" },
+  { code: "AR", name: "Argentina", dial: "+54" },
+  { code: "MX", name: "México", dial: "+52" },
+  { code: "CL", name: "Chile", dial: "+56" },
+  { code: "CO", name: "Colômbia", dial: "+57" },
+  { code: "GB", name: "Reino Unido", dial: "+44" },
+  { code: "FR", name: "França", dial: "+33" },
+  { code: "DE", name: "Alemanha", dial: "+49" },
+  { code: "IT", name: "Itália", dial: "+39" },
 ];
 
 // regionData[countryCode].states = [{ code, name, cities: [...] }]

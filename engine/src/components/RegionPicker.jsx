@@ -87,7 +87,7 @@ export function RegionPicker({ compact = false, className = "" }) {
               <option value="all">{t("region.all")}</option>
               {countries.map((country) => (
                 <option key={country.code} value={country.code}>
-                  {country.flag} {countryDisplayName(country.code, i18n.language)}
+                  {countryDisplayName(country.code, i18n.language)}
                 </option>
               ))}
             </select>

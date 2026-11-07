@@ -36,7 +36,7 @@ export function PhoneField({
       >
         {DIAL_OPTIONS.map((country) => (
           <option key={country.code} value={country.dial}>
-            {country.flag} {country.dial}
+            {country.code} {country.dial}
           </option>
         ))}
       </select>
