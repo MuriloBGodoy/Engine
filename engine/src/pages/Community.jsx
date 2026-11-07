@@ -53,6 +53,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import "../services/i18n-social-feed";
 import "../services/i18n-post-card";
 import "../services/i18n-social-posts";
+import "../services/i18n-editing";
 import { CaptionEditor } from "../components/social/CaptionEditor";
 import { ReelsFeed } from "../components/social/ReelsFeed";
 import { TrendingTags } from "../components/social/TrendingTags";
@@ -916,7 +917,7 @@ export function GoalCard({
       ? [
           {
             icon: Edit3,
-            label: t("community.editCaption"),
+            label: isFreePost ? t("editing.postMenu") : t("community.editCaption"),
             onClick: () => onEditCaption(goal),
           },
         ]
@@ -1796,6 +1797,12 @@ export function Community({ cars = [], settings, user }) {
   const [remoteGoal, setRemoteGoal] = useState(null);
   const [postToShare, setPostToShare] = useState(null);
   const [captionGoal, setCaptionGoal] = useState(null);
+  // Publicação livre em edição: o compositor inteiro, não só a legenda.
+  const [editGoal, setEditGoal] = useState(null);
+  // Post livre abre o compositor; meta abre só a legenda, porque nela as
+  // fotos são do carro da garagem e republicar já traz o que mudou nele.
+  const abrirEdicao = (goal) =>
+    goal?.kind === POST_KIND_POST ? setEditGoal(goal) : setCaptionGoal(goal);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
   const [mutedUserIds, setMutedUserIds] = useState([]);
   const handledProfileId = useRef("");
@@ -2713,7 +2720,7 @@ export function Community({ cars = [], settings, user }) {
                             onDeleteComment={handleDeleteComment}
                             onOpenPost={openPostAnywhere}
                             onSendToChat={setPostToShare}
-                            onEditCaption={setCaptionGoal}
+                            onEditCaption={abrirEdicao}
                             onReport={handleReportGoal}
                             onReportComment={handleReportComment}
                             onBlock={handleBlockUser}
@@ -2919,7 +2926,7 @@ export function Community({ cars = [], settings, user }) {
             onEditComment: handleEditComment,
             onDeleteComment: handleDeleteComment,
             onSendToChat: setPostToShare,
-            onEditCaption: setCaptionGoal,
+            onEditCaption: abrirEdicao,
             onReport: handleReportGoal,
             onReportComment: handleReportComment,
             onBlock: handleBlockUser,
@@ -2933,6 +2940,22 @@ export function Community({ cars = [], settings, user }) {
           goal={captionGoal}
           onClose={() => setCaptionGoal(null)}
           onSave={handleSaveCaption}
+        />
+      )}
+
+      {/* A `key` garante que cada publicação entra no compositor com o
+          conteúdo DELA, e não com o resto da anterior. */}
+      {editGoal && (
+        <CreateFeedPostModal
+          key={editGoal.id}
+          open
+          goal={editGoal}
+          cars={cars}
+          onClose={() => setEditGoal(null)}
+          onCreated={() => {
+            setEditGoal(null);
+            toast(t("editing.postSaved"));
+          }}
         />
       )}
 

@@ -1940,6 +1940,82 @@ export const engineDB = {
   },
 
   /**
+   * Edita uma publicação livre já no ar — legenda, fotos, vídeo e o carro
+   * ligado a ela.
+   *
+   * Até 07/11/2026 só a legenda podia mudar: trocar uma foto, somar mais uma
+   * ou tirar um vídeo exigia apagar o post e publicar de novo, e aí iam junto
+   * as curtidas, os comentários e a data. Nada que a pessoa escreveu deveria
+   * custar isso.
+   *
+   * Só vale para post livre (`kind: "post"`). Na META quem manda nas fotos é
+   * o carro da garagem, e republicar a meta já traz o que mudou nele — editar
+   * as fotos aqui criaria duas verdades sobre o mesmo carro.
+   *
+   * `video` ausente (undefined) mantém o vídeo que está lá; `null` remove.
+   * O arquivo do vídeo que saiu não é linha do banco: some à parte, depois
+   * que o post já salvou.
+   */
+  async updateCommunityPost(
+    goalId,
+    { text = "", images = [], videoUrl = "", video, car = null } = {},
+    userId = currentUserId,
+  ) {
+    if (!userId || !goalId) throw new Error("Usuário não identificado.");
+
+    const row = must(
+      await supabase
+        .from("community_goals")
+        .select("data, kind, owner_id")
+        .eq("id", String(goalId))
+        .maybeSingle(),
+    );
+    if (!row) throw new Error("Publicação não encontrada.");
+    if (row.owner_id !== userId) throw new Error("Só o dono edita a publicação.");
+    if (row.kind !== POST_KIND_POST) throw new Error("Só post livre pode ser editado assim.");
+
+    const atual = row.data || {};
+    const content = String(text || "").trim().slice(0, captionLimit(row.kind));
+    const photos = images
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .slice(0, MAX_CAR_PHOTOS);
+    const videoFinal = video === undefined ? atual.video || null : video;
+    const link = videoFinal?.path ? "" : String(videoUrl || "").trim().slice(0, 300);
+
+    if (!content && !photos.length && !link && !videoFinal?.path) {
+      throw new Error("Escreva algo ou adicione uma foto.");
+    }
+    if (captionProblem(content)) {
+      throw Object.assign(new Error(`Use no máximo ${MAX_HASHTAGS} hashtags.`), {
+        code: "too-many-hashtags",
+      });
+    }
+
+    const data = {
+      ...atual,
+      note: content,
+      images: photos,
+      image: photos[0] || "",
+      videoUrl: link,
+      carId: car?.id ? String(car.id) : "",
+      title: car ? `${car.brand} ${car.model}`.trim() : "",
+      brand: car?.brand || "",
+      model: car?.model || "",
+      year: car?.year || "",
+    };
+    if (videoFinal?.path) data.video = videoFinal;
+    else delete data.video;
+
+    assertCarFitsDocument(data);
+
+    must(await supabase.from("community_goals").update({ data }).eq("id", String(goalId)));
+
+    const antigo = atual.video;
+    if (antigo?.path && antigo.path !== videoFinal?.path) removePostVideoFiles(antigo);
+  },
+
+  /**
    * Edita só a legenda de uma publicação já no ar. O limite é o da criação:
    * post livre nasce com até 1000 caracteres e meta com 280 — até 02/11/2026
    * a edição cortava tudo em 280, e editar um post comprido apagava o fim.

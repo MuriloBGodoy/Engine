@@ -7,7 +7,10 @@ import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { useRequireAccount } from "./useRequireAccount";
 import { useSocialReport } from "./useSocialReport";
+import "../services/i18n-editing";
 import { CaptionEditor } from "../components/social/CaptionEditor";
+import { CreateFeedPostModal } from "../components/CreateFeedPostModal";
+import { POST_KIND_POST } from "../services/db";
 
 /**
  * Os botões do `GoalCard` fora da Comunidade: a página do post (/post/:id) e
@@ -38,6 +41,8 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
   const [blockedIds, setBlockedIds] = useState([]);
   // Legenda em edição (o "Editar legenda" do menu do post).
   const [captionGoal, setCaptionGoal] = useState(null);
+  // Publicação livre em edição: aí não é só a legenda, é o post inteiro.
+  const [editGoal, setEditGoal] = useState(null);
   const uid = user?.uid || "";
 
   useEffect(() => {
@@ -215,7 +220,11 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
   // Editar a legenda: até 02/11/2026 só o feed tinha o modal — na página do
   // post (onde o toque no celular leva) e no feed do perfil o item nem
   // aparecia no menu.
-  const onEditCaption = (goal) => setCaptionGoal(goal);
+  // Post livre abre o compositor inteiro — fotos, vídeo, carro e legenda.
+  // Meta abre só a legenda: nela quem manda nas fotos é o carro da garagem,
+  // e republicar a meta já traz o que mudou nele.
+  const onEditCaption = (goal) =>
+    goal?.kind === POST_KIND_POST ? setEditGoal(goal) : setCaptionGoal(goal);
   const saveCaption = async (goal, caption) => {
     try {
       await engineDB.updateCommunityGoalNote(goal.id, caption, uid);
@@ -232,9 +241,28 @@ export function usePostActions({ user, returnPath, onChanged, onRemoved }) {
       );
     }
   };
-  const captionDialog = captionGoal ? (
-    <CaptionEditor goal={captionGoal} onClose={() => setCaptionGoal(null)} onSave={saveCaption} />
-  ) : null;
+  const captionDialog = (
+    <>
+      {captionGoal ? (
+        <CaptionEditor goal={captionGoal} onClose={() => setCaptionGoal(null)} onSave={saveCaption} />
+      ) : null}
+      {/* A `key` garante que cada publicação entra no compositor com o
+          conteúdo DELA: o estado nasce do post e não se reaproveita. */}
+      {editGoal ? (
+        <CreateFeedPostModal
+          key={editGoal.id}
+          open
+          goal={editGoal}
+          onClose={() => setEditGoal(null)}
+          onCreated={() => {
+            setEditGoal(null);
+            toast(t("editing.postSaved"));
+            changed(editGoal.id);
+          }}
+        />
+      ) : null}
+    </>
+  );
 
   // O link é sempre o da página do post — no perfil, a barra de endereço
   // aponta para o perfil, não para a publicação.

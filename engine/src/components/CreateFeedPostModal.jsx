@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Car, Clapperboard, ImagePlus, Info, Link2, Loader2, Scissors, Trash2, X } from "lucide-react";
@@ -9,11 +9,13 @@ import { imagesFromPaste } from "../services/clipboardImage";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { MentionTextarea } from "./mentions/MentionTextarea";
+import { MediaPickerButton } from "./MediaPickerButton";
 import { VideoEditor } from "./social/VideoEditor";
 import { VIDEO_LIMITS, probeVideo, uploadPostVideo, videoFileProblem } from "../services/postVideo";
 import { MAX_HASHTAGS, extractHashtags } from "../services/socialText";
 import "../services/i18n-social-posts";
 import "../services/i18n-message-dock";
+import "../services/i18n-editing";
 
 const MAX_PHOTOS = 3;
 const MAX_TEXT = 1000;
@@ -35,21 +37,50 @@ const VIDEO_ERRORS_SHOWN = ["tooBig", "format", "notVideo", "signedOut"];
  * Texto: @ abre a busca de pessoas (o @ entra como texto); #tag vira link
  * para a página da hashtag, até 30 por post.
  */
-export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onCreated }) {
+export function CreateFeedPostModal({
+  open,
+  cars = [],
+  club = null,
+  // Publicação que já está no ar. Com ela o compositor vira editor: mesmos
+  // campos, mesma mídia, mesmos limites — o que muda é o verbo.
+  goal = null,
+  onClose,
+  onCreated,
+}) {
   const { t } = useTranslation();
-  const [text, setText] = useState("");
+  const editing = Boolean(goal);
+  const [text, setText] = useState(() => goal?.note || "");
   const [mentions, setMentions] = useState([]);
-  const [photos, setPhotos] = useState([]);
-  const [videoUrl, setVideoUrl] = useState("");
+  const [photos, setPhotos] = useState(() =>
+    goal?.images?.length ? [...goal.images] : goal?.image ? [goal.image] : [],
+  );
+  const [videoUrl, setVideoUrl] = useState(() => goal?.videoUrl || "");
   // Vídeo enviado: o arquivo, o que o navegador leu dele e a edição.
   const [video, setVideo] = useState(null); // { file, source, edit }
+  // Vídeo que JÁ está na publicação. O arquivo original ficou no aparelho de
+  // quem publicou, então aqui só dá para mantê-lo ou tirá-lo.
+  const [publishedVideo, setPublishedVideo] = useState(() => goal?.video || null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [stage, setStage] = useState("");
-  const [carId, setCarId] = useState("");
+  const [carId, setCarId] = useState(() => (goal?.carId ? String(goal.carId) : ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const fileInputRef = useRef(null);
-  const videoInputRef = useRef(null);
+  const [garage, setGarage] = useState(null);
+
+  // Editar vem do menu do post, que não carrega a garagem junto. Sem a lista
+  // o seletor de carro sumia na edição e o vínculo se perdia ao salvar.
+  const carList = cars.length ? cars : garage || [];
+  useEffect(() => {
+    if (!open || cars.length || garage) return undefined;
+    let alive = true;
+    engineDB
+      .getCars()
+      .then((list) => alive && setGarage(list || []))
+      .catch(() => alive && setGarage([]));
+    return () => {
+      alive = false;
+    };
+  }, [open, cars.length, garage]);
 
   // Voltar no Android fecha o compositor em vez de sair da comunidade.
   useHistoryDismiss(open, onClose);
@@ -70,6 +101,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
     setPhotos([]);
     setVideoUrl("");
     setVideo(null);
+    setPublishedVideo(null);
     setEditorOpen(false);
     setStage("");
     setCarId("");
@@ -99,26 +131,18 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
     }
   };
 
-  const handleFiles = async (event) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = "";
-    await addPhotos(files);
-  };
-
   // Ctrl+V em qualquer ponto do compositor entra pelo mesmo caminho do
   // seletor: um print ou uma foto copiada de outra aba vira anexo sem passar
   // pelo disco. Vídeo não — vídeo tem editor e limite próprios.
   const handlePaste = async (event) => {
-    if (busy || video || photos.length >= MAX_PHOTOS) return;
+    if (busy || video || publishedVideo || photos.length >= MAX_PHOTOS) return;
     const files = imagesFromPaste(event, { max: MAX_PHOTOS - photos.length });
     if (!files.length) return;
     event.preventDefault();
     await addPhotos(files);
   };
 
-  const handleVideoFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const handleVideoFile = async (file) => {
     if (!file) return;
     setError("");
     const problem = videoFileProblem(file);
@@ -137,6 +161,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
       // Vídeo e fotos não se misturam no mesmo post (o player ocupa a mídia).
       setPhotos([]);
       setVideoUrl("");
+      setPublishedVideo(null);
       setVideo({ file, source, edit: null });
       setEditorOpen(true);
     } catch (probeError) {
@@ -153,7 +178,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
     setError("");
 
     try {
-      const car = cars.find((item) => String(item.id) === carId) || null;
+      const car = carList.find((item) => String(item.id) === carId) || null;
       let uploaded = null;
       if (video?.edit) {
         setStage("uploading");
@@ -164,6 +189,26 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
           throw new Error(t(`socialPosts.videoErrors.${code}`, { mb: MB }));
         }
       }
+
+      if (editing) {
+        await engineDB.updateCommunityPost(goal.id, {
+          text,
+          images: photos,
+          videoUrl,
+          // `undefined` mantém o vídeo que já estava lá; `null` tira.
+          video: uploaded || (publishedVideo ? undefined : null),
+          car,
+        });
+        trackEvent("post_editado", {
+          comFoto: photos.length > 0,
+          comCarro: Boolean(car),
+          trocouVideo: Boolean(uploaded),
+        });
+        onCreated?.();
+        onClose();
+        return;
+      }
+
       // O carimbo do clube vem do objeto buscado por id, nunca da URL.
       await engineDB.createCommunityPost({
         text,
@@ -212,7 +257,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
         <header className="flex items-center justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4">
           <div className="min-w-0">
             <h2 className="text-base font-black text-[var(--engine-text)]">
-              {t("feedPost.title")}
+              {editing ? t("editing.postTitle") : t("feedPost.title")}
             </h2>
             {/* Publicar no mural sem enxergar em qual clube é publicar no
                 escuro: o post sai com a sigla e aparece no feed de todo
@@ -270,10 +315,42 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
             </p>
           )}
 
-          <p className="flex items-start gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--engine-text-muted)]">
-            <Info size={14} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" />
-            {t("feedPost.nicheNotice")}
-          </p>
+          {/* A regra do nicho se lê na hora de ESCREVER. Repeti-la em cada
+              correção de vírgula é sermão. */}
+          {!editing && (
+            <p className="flex items-start gap-2 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--engine-text-muted)]">
+              <Info size={14} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" />
+              {t("feedPost.nicheNotice")}
+            </p>
+          )}
+
+          {/* Vídeo que já está no ar: nem o arquivo nem o corte estão aqui,
+              então o cartão só oferece tirar. Tirar e mandar outro continua
+              sendo um caminho. */}
+          {publishedVideo && !video && (
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] p-2">
+              <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-black">
+                <Clapperboard size={18} className="absolute inset-0 m-auto text-white/70" />
+              </div>
+              <div className="min-w-0 flex-1 text-xs">
+                <p className="truncate font-bold text-[var(--engine-text)]">
+                  {t("editing.videoUploaded")}
+                </p>
+                <p className="mt-0.5 leading-relaxed text-[var(--engine-text-muted)]">
+                  {t("editing.videoNoRetrim")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPublishedVideo(null)}
+                  disabled={busy}
+                  className="mt-1 flex min-h-9 items-center gap-1 rounded-lg px-2 font-bold text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)]"
+                >
+                  <Trash2 size={13} />
+                  {t("socialPosts.video.remove")}
+                </button>
+              </div>
+            </div>
+          )}
 
           {video && (
             <div className="flex items-center gap-3 rounded-xl border border-[var(--engine-border)] p-2">
@@ -345,44 +422,30 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
           )}
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={busy || photos.length >= MAX_PHOTOS || Boolean(video)}
-              onClick={() => fileInputRef.current?.click()}
+            <MediaPickerButton
+              accept="image/*"
+              multiple
+              onFiles={addPhotos}
+              disabled={busy || photos.length >= MAX_PHOTOS || Boolean(video || publishedVideo)}
               title={t("pasteImage.hint")}
               className={mediaButton}
             >
               <ImagePlus size={15} />
               {t("feedPost.addPhoto", { count: photos.length, max: MAX_PHOTOS })}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleFiles}
-            />
+            </MediaPickerButton>
 
-            <button
-              type="button"
+            <MediaPickerButton
+              accept="video/mp4,video/quicktime,video/webm,video/*"
+              onFiles={(files) => handleVideoFile(files[0])}
               disabled={busy || photos.length > 0}
-              onClick={() => videoInputRef.current?.click()}
               title={t("socialPosts.video.addHint", { max: VIDEO_LIMITS.maxClipSeconds, mb: MB })}
               className={mediaButton}
             >
               <Clapperboard size={15} />
               {t("socialPosts.video.add")}
-            </button>
-            <input
-              ref={videoInputRef}
-              type="file"
-              accept="video/mp4,video/quicktime,video/webm,video/*"
-              className="hidden"
-              onChange={handleVideoFile}
-            />
+            </MediaPickerButton>
 
-            {cars.length > 0 && (
+            {carList.length > 0 && (
               <label className="engine-field relative flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 sm:col-span-2">
                 <Car size={15} className="shrink-0 text-[var(--engine-text-muted)]" />
                 <select
@@ -391,7 +454,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
                   className="w-full bg-transparent text-xs font-bold text-[var(--engine-text)] outline-none"
                 >
                   <option value="">{t("feedPost.noCar")}</option>
-                  {cars.map((car) => (
+                  {carList.map((car) => (
                     <option key={car.id} value={car.id}>
                       {car.brand} {car.model}
                     </option>
@@ -409,7 +472,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
             </p>
           )}
 
-          {!video && (
+          {!video && !publishedVideo && (
             <label className="engine-field flex items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3">
               <Link2 size={15} className="shrink-0 text-[var(--engine-text-muted)]" />
               <input
@@ -433,7 +496,11 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] text-sm font-black uppercase tracking-widest text-white transition hover:brightness-95 disabled:opacity-60"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : null}
-            {stage === "uploading" ? t("socialPosts.video.uploading") : t("feedPost.publish")}
+            {stage === "uploading"
+              ? t("socialPosts.video.uploading")
+              : editing
+                ? t("editing.save")
+                : t("feedPost.publish")}
           </button>
         </form>
       </div>
