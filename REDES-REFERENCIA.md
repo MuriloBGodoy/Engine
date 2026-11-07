@@ -198,6 +198,22 @@ Cada uma saiu de um conserto de verdade, com a data.
   abaixo do nome dela, é manual no meio do conteúdo: ou o nome resolve, ou o
   nome está errado. Explicação pertence ao **estado vazio**, que é onde ela
   ensina em vez de encher. *(06/11/2026)*
+- **R43.** **Conversa não é destino, é companhia.** Mensagens como item de
+  menu obriga a SAIR do que se está fazendo para responder uma linha. Facebook,
+  LinkedIn e Gmail resolveram isso com a mesma coisa: uma pílula no canto que
+  abre uma janela por cima do resto, com expandir e fechar. No celular a
+  janela não cabe — lá o lugar é o ícone com contador no header.
+  *(07/11/2026)*
+- **R44.** **Se a pessoa já tem a imagem na mão, não peça um arquivo.** Print,
+  recorte, foto copiada de outra aba: exigir "salvar no disco e procurar"
+  antes de enviar é trabalho que o Ctrl+V dispensa. Com uma regra: só é foto
+  quando o clipboard **não** traz `text/plain` — senão um dia colar texto
+  engole o que a pessoa ia escrever. *(07/11/2026)*
+- **R45.** **Utilitário do Tailwind perde para classe própria que acendeu o
+  `display`.** `sm:hidden` no JSX não esconde nada se o `.minha-classe
+  { display: flex }` do CSS vem depois na folha — mesmo peso, vence a ordem.
+  Quem acende o display decide onde apaga, no mesmo arquivo.
+  *(07/11/2026, o + da comunidade, que flutuava no desktop havia meses)*
 
 ## Ainda não resolvido
 
