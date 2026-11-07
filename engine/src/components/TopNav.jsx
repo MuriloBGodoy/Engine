@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
-  MessageCircle,
   Settings,
   ShieldAlert,
   Users,
@@ -16,7 +15,6 @@ import { authPath } from "../services/authRedirect";
 import { useSignOut } from "../hooks/useSignOut";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
-import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { Logo } from "./Logo";
 import { Topbar } from "./TopBar";
@@ -51,7 +49,6 @@ export function TopNav({
   const displayName = profileSettings.displayName || user?.displayName;
   const avatar = profileSettings.avatar || user?.photoURL;
   const username = publicUsername(profileSettings.username, user?.uid);
-  const unreadMessages = useUnreadMessages(user?.uid);
   // Moderação: só para quem o banco diz que é admin (is_service_admin).
   const { isAdmin } = useServiceAdmin(user);
   const moderationActive = location.pathname.startsWith("/moderacao");
@@ -65,12 +62,8 @@ export function TopNav({
     { name: t("nav.dashboard"), path: "/dashboard", icon: LayoutDashboard },
     { name: t("nav.garage"), path: "/garagem", icon: Car },
     { name: t("nav.community"), path: "/community", icon: Users },
-    {
-      name: t("nav.messages"),
-      path: "/messages",
-      icon: MessageCircle,
-      badge: unreadMessages,
-    },
+    // Mensagens saiu da faixa junto com a sidebar (07/11/2026): a janelinha
+    // do canto (MessageDock) atende os dois layouts.
     { name: t("nav.services"), path: "/services", icon: BriefcaseBusiness },
     { name: t("nav.events"), path: "/events", icon: Calendar },
   ];

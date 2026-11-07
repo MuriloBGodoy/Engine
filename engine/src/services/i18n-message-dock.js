@@ -1,7 +1,7 @@
 import i18n from "./i18n";
 
 /**
- * Texto da dica de colar foto (07/11/2026).
+ * Textos da janelinha de mensagens e do colar foto (07/11/2026).
  *
  * Fora do i18n.js pelo mesmo motivo dos outros módulos: aquele arquivo é
  * mexido por várias frentes e colide. Entra por `addResourceBundle` com
@@ -9,6 +9,11 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
+  messageDock: {
+    expand: "Abrir em tela cheia",
+    close: "Fechar",
+    openInbox: "Abrir a caixa",
+  },
   // Dica do botão de foto, nos três compositores que aceitam colar: chat,
   // janelinha e post. Só no title — a aba não se explica, e o campo também
   // não (R42).
@@ -16,10 +21,20 @@ const ptBR = {
 };
 
 const enUS = {
+  messageDock: {
+    expand: "Open full screen",
+    close: "Close",
+    openInbox: "Open the inbox",
+  },
   pasteImage: { hint: "Photo — or paste with Ctrl+V" },
 };
 
 const esES = {
+  messageDock: {
+    expand: "Abrir en pantalla completa",
+    close: "Cerrar",
+    openInbox: "Abrir la bandeja",
+  },
   pasteImage: { hint: "Foto — o pega con Ctrl+V" },
 };
 

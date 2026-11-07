@@ -1855,3 +1855,14 @@ h5 {
   }
 }
 
+/* A janelinha de mensagens (components/messages/MessageDock.jsx).
+   Canto inferior direito, como Facebook e Gmail. Só no desktop: no celular
+   esse canto é do + da comunidade e da barra de abas. Abaixo dos modais
+   (z 100) e acima dos cabeçalhos grudados (z 40). */
+.engine-message-dock {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: 1.25rem;
+  z-index: 60;
+  align-items: flex-end;
+}

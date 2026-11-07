@@ -17,6 +17,7 @@ import "./index.css";
 import { Sidebar } from "./components/Sidebar";
 import { TopNav } from "./components/TopNav";
 import { MobileNav } from "./components/MobileNav";
+import { MessageDock } from "./components/messages/MessageDock";
 import { Topbar } from "./components/TopBar"; // Importando em .jsx
 import { RequireAuth } from "./components/RequireAuth";
 import { Footer } from "./components/Footer";
@@ -945,6 +946,10 @@ function AppLayout({
         />
       )}
       </Suspense>
+
+      {/* A caixa de mensagens acompanha a pessoa pelo app em vez de ser um
+          destino — a janelinha do canto, no desktop (07/11/2026). */}
+      <MessageDock user={user} />
 
       {/* Conquista e concedida no fundo, de tres telas diferentes. O aviso mora
           aqui em cima para nao depender de qual delas estava aberta. */}

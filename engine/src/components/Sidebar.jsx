@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
-  MessageCircle,
   Settings,
   ShieldAlert,
   Sparkles,
@@ -18,7 +17,6 @@ import { authPath } from "../services/authRedirect";
 import { useSignOut } from "../hooks/useSignOut";
 import { publicUsername } from "../services/db";
 import { useTranslation } from "react-i18next";
-import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { Logo } from "./Logo";
 import { GuestLoginHint } from "./GuestLoginHint";
@@ -50,7 +48,6 @@ export function Sidebar({
   const avatar = profileSettings.avatar || user?.photoURL;
   const username = publicUsername(profileSettings.username, user?.uid);
   const showEmail = privacySettings.showEmailInSidebar !== false;
-  const unreadMessages = useUnreadMessages(user?.uid);
   // Moderação: só para quem o banco diz que é admin (is_service_admin).
   const { isAdmin } = useServiceAdmin(user);
 
@@ -63,12 +60,10 @@ export function Sidebar({
     { name: t("nav.dashboard"), path: "/dashboard", icon: LayoutDashboard },
     { name: t("nav.garage"), path: "/garagem", icon: Car },
     { name: t("nav.community"), path: "/community", icon: Users },
-    {
-      name: t("nav.messages"),
-      path: "/messages",
-      icon: MessageCircle,
-      badge: unreadMessages,
-    },
+    // Mensagens saiu daqui em 07/11/2026: conversa não é destino, é
+    // companhia. Agora mora na janelinha do canto (MessageDock), que abre
+    // por cima de qualquer página em vez de tirar a pessoa dela. No celular
+    // continua no header do MobileNav.
     { name: t("nav.services"), path: "/services", icon: BriefcaseBusiness },
     { name: t("nav.events"), path: "/events", icon: Calendar },
     { name: t("nav.settings"), path: "/settings", icon: Settings },

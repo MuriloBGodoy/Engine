@@ -21,7 +21,13 @@ export function ChatAvatar({ person, size = "md" }) {
   const label = data.author || data.name || "Usuário Engine";
   const source = data.avatar || data.avatarInitials;
   const sizeClass =
-    size === "sm" ? "h-8 w-8 text-[10px]" : size === "lg" ? "h-14 w-14 text-base" : "h-11 w-11 text-xs";
+    size === "xs"
+      ? "h-6 w-6 text-[9px]"
+      : size === "sm"
+        ? "h-8 w-8 text-[10px]"
+        : size === "lg"
+          ? "h-14 w-14 text-base"
+          : "h-11 w-11 text-xs";
 
   return (
     <span
