@@ -13,6 +13,8 @@ import {
   Archive,
   Bookmark,
   Settings as Cog,
+  LayoutGrid,
+  AlignLeft,
 } from "lucide-react";
 import { engineDB, POST_KIND_POST } from "../services/db";
 import { GoalCard } from "./Community";
@@ -1087,15 +1089,6 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         <div className="px-4 py-6 sm:px-6">
           {activeTab === "posts" && (
             <div>
-              {/* A diferença entre as duas abas, dita uma vez, em cada uma.
-                  Só aparece quando as duas existem — sem Garagem não há o
-                  que distinguir e a linha vira ruído. */}
-              {(showcaseCars.length > 0 || isOwnProfile) && (
-                <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">
-                  {t(isOwnProfile ? "profileHub.postsHint" : "profileHub.postsHintOther")}
-                </p>
-              )}
-
               {/* Grade é para o que é visual. Publicação só de texto num
                   quadrado 1:1 vira um buraco escuro no meio das fotos — e
                   no Engine ela quase sempre é pergunta ("alguém sabe onde
@@ -1103,26 +1096,41 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   Então: a grade fica com foto e vídeo, e os textos ganham
                   uma lista do lado, a um toque. A tira de escolha só
                   aparece quando existe texto para mostrar. */}
+              {/* A faixa de ícones do perfil do Instagram: de ponta a ponta,
+                  encostada na tira de abas, com o mesmo sublinhado. Entrou
+                  no lugar de duas pílulas vermelhas cheias, que acendiam
+                  mais que a aba selecionada logo acima — duas seleções
+                  disputando a mesma dobra. Sem rótulo some junto o problema
+                  de nomear "Fotos e vídeos" numa caixa estreita.
+
+                  Só existe quando existem os dois tipos: num perfil só de
+                  fotos não há escolha a oferecer. */}
               {textGoals.length > 0 && visualGoals.length > 0 && (
-                <div className="-mt-2 mb-3 flex gap-1.5">
+                <div className="-mx-4 -mt-6 flex border-b border-[var(--engine-border)] sm:-mx-6">
                   {[
-                    { id: "grid", label: t("profileHub.grid"), count: visualGoals.length },
-                    { id: "texts", label: t("profileHub.texts"), count: textGoals.length },
-                  ].map((chip) => (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      onClick={() => setPostsKind(chip.id)}
-                      className={`min-h-9 rounded-full px-3 text-[12.5px] font-bold transition-colors ${
-                        postsKind === chip.id
-                          ? "bg-[var(--engine-accent)] text-white"
-                          : "bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]"
-                      }`}
-                    >
-                      {chip.label}
-                      <span className="ml-1.5 tabular-nums opacity-70">{chip.count}</span>
-                    </button>
-                  ))}
+                    { id: "grid", icon: LayoutGrid, label: t("profileHub.grid") },
+                    { id: "texts", icon: AlignLeft, label: t("profileHub.texts") },
+                  ].map((vista) => {
+                    const ativa = postsKind === vista.id;
+                    const Icone = vista.icon;
+                    return (
+                      <button
+                        key={vista.id}
+                        type="button"
+                        onClick={() => setPostsKind(vista.id)}
+                        title={vista.label}
+                        aria-label={vista.label}
+                        aria-pressed={ativa}
+                        className={`flex h-11 flex-1 items-center justify-center border-b-2 transition-colors ${
+                          ativa
+                            ? "border-[var(--engine-accent)] text-[var(--engine-accent)]"
+                            : "border-transparent text-[var(--engine-text-subtle)] hover:text-[var(--engine-text)]"
+                        }`}
+                      >
+                        <Icone size={18} strokeWidth={ativa ? 2.6 : 2} />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -1130,7 +1138,11 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 /* Grade de 3 colunas encostada nas bordas, como no Instagram:
                    até 30/10/2026 eram cartões com título e barra, que mostravam
                    seis posts por tela e não abriam nada. */
-                <div className="-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6">
+                <div
+                  className={`-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6 ${
+                    textGoals.length ? "mt-0.5" : "-mt-6"
+                  }`}
+                >
                   {visualGoals.map((goal) => (
                     <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
                   ))}
@@ -1138,7 +1150,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               )}
 
               {(postsKind === "texts" || !visualGoals.length) && textGoals.length > 0 && (
-                <div className="space-y-2">
+                <div className={`space-y-2 ${visualGoals.length ? "mt-4" : ""}`}>
                   {textGoals.map((goal) => (
                     <TextPostRow key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
                   ))}
@@ -1288,9 +1300,6 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               objeto permanente, com ficha, preparação, página e busca. */}
           {activeTab === "garage" && (
             <div>
-              <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">
-                {t(isOwnProfile ? "profileHub.garageHint" : "profileHub.garageHintOther")}
-              </p>
               {showcaseCars.length ? (
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {showcaseCars.map((car) => (

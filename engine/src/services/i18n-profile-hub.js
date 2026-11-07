@@ -46,12 +46,6 @@ const ptBR = {
     garageEmptyMine:
       "Ligue “Mostrar na comunidade” no carro da sua garagem e ele aparece aqui, com página própria e na busca.",
     garageGo: "Ir para a garagem",
-    // A diferença que o Murilo pediu para ficar clara, dita onde ela
-    // importa: no topo de cada aba, uma linha, sem manual.
-    postsHint: "O que você contou — com ou sem carro ligado.",
-    postsHintOther: "O que esta pessoa contou — com ou sem carro ligado.",
-    garageHint: "Os carros que você abriu para a comunidade achar.",
-    garageHintOther: "Os carros que esta pessoa abriu para a comunidade achar.",
   },
 };
 
@@ -87,10 +81,6 @@ const enUS = {
     garageEmptyMine:
       "Turn on “Show in the community” on a car in your garage and it shows up here, with its own page and in search.",
     garageGo: "Go to the garage",
-    postsHint: "What you told — with or without a car attached.",
-    postsHintOther: "What this person told — with or without a car attached.",
-    garageHint: "The cars you opened up for the community to find.",
-    garageHintOther: "The cars this person opened up for the community to find.",
   },
 };
 
@@ -126,10 +116,6 @@ const esES = {
     garageEmptyMine:
       "Activa “Mostrar en la comunidad” en un coche de tu garaje y aparece aquí, con página propia y en la búsqueda.",
     garageGo: "Ir al garaje",
-    postsHint: "Lo que contaste — con o sin coche vinculado.",
-    postsHintOther: "Lo que contó esta persona — con o sin coche vinculado.",
-    garageHint: "Los coches que abriste para que la comunidad los encuentre.",
-    garageHintOther: "Los coches que esta persona abrió para que la comunidad los encuentre.",
   },
 };
 

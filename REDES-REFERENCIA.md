@@ -189,6 +189,15 @@ Cada uma saiu de um conserto de verdade, com a data.
 - **R40.** Página que oferece um formato pago precisa dizer se ele é
   **autoatendimento**. Sem essa linha, um catálogo de três formatos se lê
   como produto que já roda sozinho. *(06/11/2026, /anuncie)*
+- **R41.** **Duas seleções acesas na mesma dobra brigam.** Pílula preenchida
+  logo abaixo de uma aba sublinhada acende mais que a aba — o olho não sabe
+  qual manda. Seletor que mora debaixo de outro usa a mesma linguagem do de
+  cima (ícone e sublinhado, de ponta a ponta), nunca uma mais forte.
+  *(06/11/2026)*
+- **R42.** **A aba não se explica.** Frase ensinando o que a aba é, logo
+  abaixo do nome dela, é manual no meio do conteúdo: ou o nome resolve, ou o
+  nome está errado. Explicação pertence ao **estado vazio**, que é onde ela
+  ensina em vez de encher. *(06/11/2026)*
 
 ## Ainda não resolvido
 
