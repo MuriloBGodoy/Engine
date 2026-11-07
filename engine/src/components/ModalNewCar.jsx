@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { X, Save, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
-import axios from "axios";
 import { useTranslation } from "react-i18next";
 import { auth } from "../services/supabase";
 import { CAR_TYPE_GOAL, CAR_TYPE_OWNED, MAX_CAR_PHOTOS } from "../services/db";
@@ -9,11 +8,11 @@ import { MediaPickerButton } from "./MediaPickerButton";
 import { ImageCropper } from "./ImageCropper";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatFipeYear } from "../services/carDisplay";
+import { fipeService } from "../services/fipeService";
 import { localISODate } from "../services/garageInput";
 import { useConfirm } from "./ConfirmProvider";
 import { getStates } from "../services/locations";
 
-const FIPE_BRANDS_URL = "https://parallelum.com.br/fipe/api/v1/carros/marcas";
 
 // Busca por palavras soltas, sem acento e sem caixa: "onix 1.0 aut" acha
 // "ONIX HATCH LTZ 1.0 12V TB Flex 5p Aut.". A GM tem 557 versões na lista e o
@@ -112,18 +111,18 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
 
   const loadBrands = () => {
     setFipeError(null);
-    axios
-      .get(FIPE_BRANDS_URL)
-      .then((res) => setBrands(res.data))
+    fipeService
+      .getBrands()
+      .then(setBrands)
       .catch(() => setFipeError("brands"));
   };
 
   useEffect(() => {
     if (!isOpen) return;
 
-    axios
-      .get(FIPE_BRANDS_URL)
-      .then((res) => setBrands(res.data))
+    fipeService
+      .getBrands()
+      .then(setBrands)
       .catch(() => setFipeError("brands"));
 
     const timer = setTimeout(() => {
@@ -213,11 +212,11 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
     const request = ++requestRef.current;
     setFipeError(null);
     setLoading(true);
-    axios
-      .get(`${FIPE_BRANDS_URL}/${brandId}/modelos`)
-      .then((res) => {
+    fipeService
+      .getModels(brandId)
+      .then((lista) => {
         if (request !== requestRef.current) return;
-        setModels(res.data.modelos || []);
+        setModels(lista || []);
       })
       .catch(() => request === requestRef.current && setFipeError("models"))
       .finally(() => request === requestRef.current && setLoading(false));
@@ -227,11 +226,11 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
     const request = ++requestRef.current;
     setFipeError(null);
     setLoading(true);
-    axios
-      .get(`${FIPE_BRANDS_URL}/${brandId}/modelos/${modelId}/anos`)
-      .then((res) => {
+    fipeService
+      .getYears(brandId, modelId)
+      .then((lista) => {
         if (request !== requestRef.current) return;
-        setYears(res.data || []);
+        setYears(lista || []);
       })
       .catch(() => request === requestRef.current && setFipeError("years"))
       .finally(() => request === requestRef.current && setLoading(false));
@@ -241,18 +240,18 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
     const request = ++requestRef.current;
     setFipeError(null);
     setLoading(true);
-    return axios
-      .get(`${FIPE_BRANDS_URL}/${brandId}/modelos/${modelId}/anos/${yearId}`)
-      .then((res) => {
+    return fipeService
+      .getVehicle(brandId, modelId, yearId)
+      .then((veiculo) => {
         if (request !== requestRef.current) return;
-        const valorLimpo = Number(String(res.data.Valor || "").replace(/\D/g, "")) / 100;
+        const valorLimpo = Number(String(veiculo.Valor || "").replace(/\D/g, "")) / 100;
         if (!valorLimpo) throw new Error("FIPE sem preço");
         setTargetValue(valorLimpo);
         setPriceSource("fipe");
         setPricedAt(localISODate());
         // `CodigoFipe` só existe nesta resposta e é a chave canônica do
         // veículo no Brasil. Vinha sendo descartada junto com o resto.
-        setFipeCode(res.data.CodigoFipe || "");
+        setFipeCode(veiculo.CodigoFipe || "");
       })
       .catch(() => request === requestRef.current && setFipeError("price"))
       .finally(() => request === requestRef.current && setLoading(false));
