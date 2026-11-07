@@ -380,18 +380,36 @@ function CarHero({ car, t, locale, onBack, children }) {
   }, [car, t, locale]);
 
   return (
-    <div className="relative -mx-4 h-48 overflow-hidden bg-linear-to-br from-zinc-700 via-zinc-800 to-zinc-950 sm:mx-0 sm:h-52 sm:rounded-2xl lg:h-56">
+    /* A faixa é larga e baixa: num monitor de 1500px uma foto 4:3 recortada
+       para caber vira uma tira de 4,6:1 e sobra a roda — foi o que o Murilo
+       viu (06/11/2026). Até `sm` o recorte é brando e continua `cover`, que
+       preenche. A partir de `lg` a foto passa a caber inteira (`contain`) e
+       quem preenche a faixa é uma cópia borrada dela atrás, como capa de
+       álbum: nada do carro é cortado e a faixa não fica com buraco. */
+    <div className="relative -mx-4 h-52 overflow-hidden bg-linear-to-br from-zinc-700 via-zinc-800 to-zinc-950 sm:mx-0 sm:h-56 sm:rounded-2xl lg:h-[20rem]">
       {car.image ? (
-        <img
-          src={car.image}
-          alt=""
-          onError={(event) => {
-            event.target.onerror = null;
-            event.target.src = FALLBACK_IMAGE;
-            event.target.classList.add("opacity-60");
-          }}
-          className="h-full w-full object-cover"
-        />
+        <>
+          <img
+            src={car.image}
+            alt=""
+            aria-hidden="true"
+            onError={(event) => {
+              event.target.onerror = null;
+              event.target.style.display = "none";
+            }}
+            className="absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl saturate-150 lg:block"
+          />
+          <img
+            src={car.image}
+            alt=""
+            onError={(event) => {
+              event.target.onerror = null;
+              event.target.src = FALLBACK_IMAGE;
+              event.target.classList.add("opacity-60");
+            }}
+            className="relative h-full w-full object-cover lg:object-contain"
+          />
+        </>
       ) : (
         <div className="flex h-full items-center justify-center pb-12" aria-hidden="true">
           <CarFront size={52} strokeWidth={1.25} className="text-white/35" />
