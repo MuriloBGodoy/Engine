@@ -67,6 +67,7 @@ import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { useIsPremium } from "../hooks/useIsPremium";
 import { openBillingPortal } from "../services/subscription";
 import { ADSENSE_ENABLED, resetAdsConsent, setAdsConsent, useAdsConsent } from "../services/consent";
+import { SUPPORT_MAILTO } from "../services/contact";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-base text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)] sm:text-sm";
@@ -173,9 +174,10 @@ function Group({ title, footer, children }) {
   );
 }
 
-// O mesmo endereço que Termos e Privacidade declaram como contato. Quando o
-// e-mail do domínio estiver no ar, troque aqui e nas duas páginas legais.
-const CONTACT_MAILTO = "mailto:muxdtuber@gmail.com";
+// Em Configurações quem escreve quer ATENDIMENTO, não o contato geral — os
+// dois endereços caem no mesmo lugar hoje, mas separados já na origem dá para
+// filtrar depois sem pedir para ninguém reescrever o assunto.
+const CONTACT_MAILTO = SUPPORT_MAILTO;
 
 function Row({ icon: Icon, label, hint, children, onClick, tone = "default", chevron = false }) {
   const content = (

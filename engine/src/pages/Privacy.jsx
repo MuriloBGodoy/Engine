@@ -1,4 +1,5 @@
 import { LegalPage, LegalSection } from "../components/LegalPage";
+import { PRIVACY_EMAIL, PRIVACY_MAILTO } from "../services/contact";
 
 /**
  * Política de privacidade.
@@ -19,8 +20,8 @@ export function Privacy() {
         <p>
           O Engine é operado por Murilo Godoy. Para qualquer assunto sobre seus
           dados, incluindo os pedidos descritos abaixo, escreva para{" "}
-          <a className="text-[var(--engine-accent)]" href="mailto:muxdtuber@gmail.com">
-            muxdtuber@gmail.com
+          <a className="text-[var(--engine-accent)]" href={PRIVACY_MAILTO}>
+            {PRIVACY_EMAIL}
           </a>
           .
         </p>

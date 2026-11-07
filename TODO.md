@@ -9,12 +9,12 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 
 ## Aberto depois do lote de 04/11/2026
 
-- **E-mail de contato é o Gmail pessoal do Murilo.** `muxdtuber@gmail.com`
-  aparece no rodapé, em Configurações › Sobre o Engine, nos Termos e na
-  Política de privacidade — quatro lugares públicos. Quando o e-mail do
-  domínio estiver no ar (ver a seção abaixo), trocar nos quatro. A constante
-  do app é `CONTACT_MAILTO`, em `pages/Settings.jsx`, e `LINKS.help.contact`,
-  em `components/Footer.jsx`.
+- **E-mail de contato é o Gmail pessoal do Murilo.** Eram SEIS lugares
+  públicos com `muxdtuber@gmail.com` escrito à mão (rodapé, Termos,
+  Privacidade, Configurações, /anuncie e o `billing.js`). Desde 07/11/2026
+  todos leem `services/contact.js`, e a virada para o domínio é uma linha:
+  `DOMINIO_NO_AR = false` → `true`. O passo a passo de montar o e-mail do
+  domínio está em **`SETUP-EMAILS.md`**.
 - **Nada do lote foi testado logado.** Falta percorrer com conta de verdade:
   apagar notificação arrastando, limpar tudo, aba "No Engine" no perfil,
   botão flutuante de publicar, "Buscar atualização" em Configurações, e
@@ -30,7 +30,8 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 ## Domínio enginegarage.com.br (comprado em 03/11/2026)
 
 Registrado no registro.br, válido até 03/11/2027, DNS no próprio registro.br.
-A zona fica travada ("domínio em transição") nas primeiras horas.
+**Conferido em 07/11/2026: a zona está VAZIA** — sem A, sem MX, sem TXT, sem
+`www`. Nada do que está abaixo foi feito ainda.
 
 - [ ] Zona DNS, quando liberar (o editor não aceita `@`; usar o nome cheio):
       `A enginegarage.com.br → 75.2.60.5` e
@@ -38,11 +39,12 @@ A zona fica travada ("domínio em transição") nas primeiras horas.
 - [ ] Netlify: adicionar o domínio (Domain management) para emitir o certificado.
 - [ ] Supabase: virar `site_url` para o domínio novo e `config push`
       (os redirects já foram liberados no commit 5b5d3fe).
-- [ ] E-mail de entrada: ImprovMX grátis, contato@/suporte@/privacidade@
-      redirecionando para enginegarage.app@gmail.com (registros MX + SPF).
-- [ ] E-mail do app: Resend grátis (3 mil/mês) no lugar do remetente de teste
-      do Supabase, que só manda uns poucos por hora. Registros SPF/DKIM.
-- [ ] Responder como contato@ pelo Gmail, usando o SMTP do Resend.
+- [ ] **E-mail: ver `SETUP-EMAILS.md`** (escrito em 07/11/2026, com os
+      registros prontos para colar). Resumo: DNS vai do registro.br para a
+      Cloudflare (DNSSEC off ANTES de trocar o nameserver), Email Routing da
+      Cloudflare para receber tudo no Gmail do Engine, Resend para o app
+      enviar, "enviar como" no Gmail para responder como contato@, e DMARC em
+      `p=none` subindo para `p=reject` depois de duas semanas de relatório.
 - [ ] Depois do domínio: verificação de marca no Google, para a tela de login
       parar de mostrar `evaankeqxykcktxvesbf.supabase.co`.
 

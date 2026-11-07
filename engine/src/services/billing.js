@@ -31,9 +31,10 @@ export const SUPPORT_PIX_KEY = (import.meta.env.VITE_SUPPORT_PIX_KEY || "").trim
 
 /**
  * Canal de atendimento: arrependimento, dúvida de cobrança, proposta comercial.
- * O mesmo endereço que o rodapé, os Termos e a Privacidade já declaram.
+ * Mora em services/contact.js, com os outros; segue exportado daqui porque é
+ * por este nome que as telas de cobrança já o importam.
  */
-export const SUPPORT_EMAIL = "muxdtuber@gmail.com";
+export { SUPPORT_EMAIL } from "./contact";
 
 // Moedas em que centavo não aparece na vitrine: "$ 8.900", não "$ 8.900,00".
 const WHOLE_UNIT_DISPLAY = ["CLP", "COP", "ARS"];

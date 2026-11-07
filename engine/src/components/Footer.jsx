@@ -12,6 +12,7 @@ import {
 import { LogoMark } from "./Logo";
 import { LanguagePicker } from "./LanguagePicker";
 import { ADSENSE_ENABLED, resetAdsConsent } from "../services/consent";
+import { CONTACT_MAILTO } from "../services/contact";
 
 /**
  * Rodapé global do Engine, no espírito dos grandes marketplaces automotivos.
@@ -32,7 +33,7 @@ const LINKS = {
   help: {
     center: SEM_DESTINO, // central de ajuda
     // O mesmo endereço que Termos e Privacidade já declaram como contato.
-    contact: "mailto:muxdtuber@gmail.com",
+    contact: CONTACT_MAILTO,
   },
   company: {
     about: SEM_DESTINO, // página institucional "Sobre"

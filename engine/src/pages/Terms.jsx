@@ -1,4 +1,5 @@
 import { LegalPage, LegalSection } from "../components/LegalPage";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "../services/contact";
 
 /**
  * Termos de uso.
@@ -211,8 +212,8 @@ export function Terms() {
       <LegalSection title="Contato">
         <p>
           Dúvidas sobre estes termos:{" "}
-          <a className="text-[var(--engine-accent)]" href="mailto:muxdtuber@gmail.com">
-            muxdtuber@gmail.com
+          <a className="text-[var(--engine-accent)]" href={CONTACT_MAILTO}>
+            {CONTACT_EMAIL}
           </a>
           .
         </p>
