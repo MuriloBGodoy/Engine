@@ -157,6 +157,31 @@ export async function showcaseBrands() {
   );
 }
 
+/**
+ * Os carros que UMA pessoa pôs na vitrine — a aba Garagem do perfil.
+ *
+ * O perfil mostra publicações; a garagem mostra carros. São coisas
+ * diferentes e por isso são abas diferentes: a publicação é um momento
+ * ("rolê de ontem"), o carro é um objeto permanente com ficha, preparação e
+ * página própria. Misturar os dois numa grade só obrigava a pessoa a abrir
+ * para descobrir o que era.
+ *
+ * Só sai daqui o que o dono ligou em "Mostrar na comunidade" — a garagem
+ * inteira, com gasto e meta, nunca é lida por outra pessoa.
+ */
+export async function listUserShowcase(userId, { limit = 60 } = {}) {
+  if (!userId) return [];
+  const rows = must(
+    await supabase
+      .from("car_showcase")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  );
+  return (rows || []).map(fromRow);
+}
+
 export async function getShowcaseBySlug(slug) {
   const row = must(
     await supabase.from("car_showcase").select("*").eq("slug", String(slug)).maybeSingle(),

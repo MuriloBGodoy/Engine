@@ -108,7 +108,7 @@ export function HashtagPage({ user, settings }) {
 
   return (
     <div className="min-h-screen bg-[var(--engine-bg)]">
-      <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:top-16">
+      <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:top-0">
         <button
           type="button"
           onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/community"))}

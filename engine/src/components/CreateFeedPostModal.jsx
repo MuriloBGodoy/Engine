@@ -382,6 +382,14 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
             )}
           </div>
 
+          {/* Só quando a pessoa liga um carro — e é aí que ela precisa
+              saber que isto NÃO publica o carro. (06/11/2026) */}
+          {carId && (
+            <p className="-mt-1 text-[11.5px] leading-relaxed text-[var(--engine-text-muted)]">
+              {t("feedPost.carHint")}
+            </p>
+          )}
+
           {!video && (
             <label className="engine-field flex items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3">
               <Link2 size={15} className="shrink-0 text-[var(--engine-text-muted)]" />

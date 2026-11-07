@@ -5,16 +5,14 @@ import {
   Heart,
   MessageCircle,
   Share2,
-  Users,
-  UserPlus,
-  UserCheck,
-  Mail,
   Flag,
   UserX,
   ArrowLeft,
   Copy,
   Play,
   Archive,
+  Bookmark,
+  Settings as Cog,
 } from "lucide-react";
 import { engineDB, POST_KIND_POST } from "../services/db";
 import { GoalCard } from "./Community";
@@ -39,9 +37,21 @@ import { useSocialReport } from "../hooks/useSocialReport";
 import { BioWithMentions } from "../components/mentions/BioWithMentions";
 import { EngineBlock } from "../components/mentions/EngineBlock";
 import { useEnginePresence } from "../hooks/useEnginePresence";
+import { PostMenu } from "../components/social/PostMenu";
+import { PeopleSheet } from "../components/social/PeopleSheet";
+import { fetchLikedPosts } from "../services/likedPosts";
+import { listUserShowcase } from "../services/carShowcase";
+import { postCover, postIsVisual } from "../services/postCover";
+import "../services/i18n-profile-hub";
 
 // Banner will be solid color gradient - no default image
 const DEFAULT_BANNER_GRADIENT = "from-[var(--engine-accent)] to-[var(--engine-accent)]/70";
+
+// O rótulo embaixo de cada contador. Vira constante porque agora dois dos
+// três são botões e o terceiro não — sem isso a mesma linha de classes
+// apareceria três vezes e uma delas sairia do passo.
+const statLabelClass =
+  "whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]";
 
 
 // Um item das abas Seguidores/Seguindo. O perfil vem sempre de publicProfiles
@@ -111,8 +121,9 @@ const goalProgress = (goal) =>
  * de um post solto, e é a única coisa que o Instagram não tem.
  */
 function ProfilePostTile({ goal, t, onOpen }) {
-  // Vídeo enviado entra na grade pela capa (como no Instagram).
-  const image = goal.images?.[0] || goal.image || goal.video?.poster || "";
+  // A capa: foto, quadro do vídeo enviado ou a miniatura do YouTube quando
+  // o post é um link de vídeo (ver `services/postCover`).
+  const image = postCover(goal);
   const hasVideo = Boolean(goal.videoUrl || goal.video);
   const many = (goal.images?.length || 0) > 1;
   const isGoal = goal.kind !== POST_KIND_POST;
@@ -200,19 +211,40 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   // "Salvos" e "Arquivadas", e é o que faz o endereço valer como link. Vale
   // na montagem e só: depois disso quem manda é o toque na aba, senão o
   // parâmetro antigo puxaria a pessoa de volta a cada render.
-  const [activeTab, setActiveTab] = useState(
-    () => new URLSearchParams(window.location.search).get("tab") || "posts",
-  );
+  const [activeTab, setActiveTab] = useState(() => {
+    const pedida = new URLSearchParams(window.location.search).get("tab") || "posts";
+    // `?tab=followers` e `?tab=following` continuam valendo como endereço:
+    // viraram folha, não deixaram de existir. A aba volta a ser Publicações
+    // e a folha abre por cima (ver `peopleTab` logo abaixo).
+    return ["followers", "following"].includes(pedida) ? "posts" : pedida;
+  });
   // "No Engine" (clubes, páginas, eventos) virou aba em 04/11/2026: no
   // cabeçalho ele empurrava a bio, o botão de editar e a grade pra baixo, e
   // num celular a pessoa abria o perfil e via um cartão de clube em vez das
   // publicações. A aba só existe quando há o que mostrar.
   const enginePresence = useEnginePresence(profile?.userId || "");
-  // Aba "Salvos": só no próprio perfil, lida quando aberta.
+  // "Minhas coisas" (Salvos, Arquivadas, Curtidas): só no próprio perfil,
+  // lidas quando abertas. Saíram da tira de abas em 06/11/2026 e passaram a
+  // morar no "..." do canto, como em toda rede — não são vitrine, são
+  // gaveta.
   const [savedGoals, setSavedGoals] = useState(null);
   const [archivedGoals, setArchivedGoals] = useState(null);
+  const [likedGoals, setLikedGoals] = useState(null);
   const [savedCars, setSavedCars] = useState(null);
   const [savedKind, setSavedKind] = useState("posts");
+  // Os carros que esta pessoa abriu para a comunidade: a aba Garagem.
+  const [showcaseCars, setShowcaseCars] = useState([]);
+  // Publicação sem foto não cabe num quadrado de grade: a grade mostra o
+  // que é visual e os textos ficam numa lista, a um toque de distância.
+  const [postsKind, setPostsKind] = useState("grid");
+  // Seguidores/Seguindo deixaram de ser abas: abrem pelo contador, numa
+  // folha (ver `PeopleSheet`). "" = fechada.
+  const [peopleTab, setPeopleTab] = useState(() => {
+    const pedida = new URLSearchParams(window.location.search).get("tab") || "";
+    return ["followers", "following"].includes(pedida) ? pedida : "";
+  });
+  // Quem EU sigo — é o que decide o botão de cada linha da folha.
+  const [myFollowing, setMyFollowing] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -235,6 +267,9 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   // Abrimos o feed com push? Então "voltar" é history.back(); se a pessoa
   // chegou por link já com `?p=`, voltar só tira o parâmetro.
   const feedPushed = useRef(false);
+  // Qual @ já foi carregado: é o que distingue "abri outro perfil" de
+  // "recarreguei este".
+  const perfilCarregado = useRef("");
   const lastOpenedTile = useRef("");
   const scrolledToPost = useRef("");
   const [postToShare, setPostToShare] = useState(null);
@@ -306,9 +341,14 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       // conquista nenhuma esse engano não passa, porque o dado que chega é
       // vazio e não sobrescreve nada na tela.
       //
-      // Pular de perfil em perfil pelas listas também não pode deixar o
-      // visitante parado na aba Seguidores do anterior.
-      setActiveTab("posts");
+      // A aba volta para Publicações só quando a PESSOA muda. O efeito
+      // também corre ao recarregar (`reloadKey`) e ao a sessão aparecer, e
+      // ali resetar era errado duas vezes: `?tab=salvos`, que Configurações
+      // usa, era desfeito logo depois de abrir, e restaurar uma publicação
+      // arquivada jogava a pessoa de volta na grade.
+      const mudouDePessoa = perfilCarregado.current !== cleanUsername;
+      perfilCarregado.current = cleanUsername;
+      if (mudouDePessoa) setActiveTab("posts");
       setUserGoals([]);
       setFollowers([]);
       setFollowing([]);
@@ -316,6 +356,13 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       setLikesReceived(0);
       setIsFollowing(false);
       setFollowCounts({ followers: 0, following: 0 });
+      if (mudouDePessoa) {
+        // Esvaziar a vitrine num recarregamento faria a aba Garagem sumir
+        // e voltar; só vale quando é outra pessoa mesmo.
+        setShowcaseCars([]);
+        setPostsKind("grid");
+        setPeopleTab("");
+      }
       engineDB.getFollowCounts(userProfile.userId).then((counts) => {
         if (vivo) setFollowCounts(counts);
       });
@@ -332,14 +379,19 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         // que fica no post é vitrine e pode ser empurrado de um em um pela
         // regra. O degrau se decide pela contagem da subcoleção.
         engineDB.countLikesReceived(userProfile.userId),
+        // Os carros que esta pessoa abriu para a comunidade. Vem junto
+        // porque é ele que decide se a aba Garagem existe — e uma aba que
+        // só aparece depois de tocada não é uma aba.
+        listUserShowcase(userProfile.userId).catch(() => []),
       ])
-        .then(async ([goals, followersList, followingList, conquistas, curtidas]) => {
+        .then(async ([goals, followersList, followingList, conquistas, curtidas, vitrine]) => {
           if (!vivo) return;
           setUserGoals(goals || []);
           setFollowers(followersList || []);
           setFollowing(followingList || []);
           setUnlockedAchievements(conquistas || new Set());
           setLikesReceived(curtidas || 0);
+          setShowcaseCars(vitrine || []);
           // Nome e foto só de quem aparece nas abas Seguidores/Seguindo.
           const ids = [
             ...(followersList || []).map((item) => item.userId || item.followerId),
@@ -357,10 +409,17 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           console.error("Error loading user profile:", error);
         });
 
-      if (currentUserId && currentUserId !== userProfile.userId) {
+      // Quem eu sigo: vale no próprio perfil também, porque a folha de
+      // seguidores precisa saber em cada linha se o botão é "Seguir" ou
+      // "Seguindo".
+      if (currentUserId) {
         engineDB.getUserFollowing(currentUserId).then((currentFollowing) => {
           if (!vivo) return;
-          setIsFollowing((currentFollowing || []).includes(userProfile.userId));
+          const lista = currentFollowing || [];
+          setMyFollowing(new Set(lista));
+          setIsFollowing(
+            currentUserId !== userProfile.userId && lista.includes(userProfile.userId),
+          );
         });
       }
     })();
@@ -379,6 +438,12 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         await engineDB.followUser(currentUserId, profile.userId);
       }
       setIsFollowing(!isFollowing);
+      setMyFollowing((current) => {
+        const next = new Set(current);
+        if (isFollowing) next.delete(profile.userId);
+        else next.add(profile.userId);
+        return next;
+      });
       setFollowCounts((current) => ({
         ...current,
         followers: Math.max(0, current.followers + (isFollowing ? -1 : 1)),
@@ -393,6 +458,76 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       );
     } catch (error) {
       console.error("Error updating follow status:", error);
+      toast(t("socialFixes.writeError"), "error");
+    }
+  };
+
+  // Seguir / deixar de seguir de dentro da folha, sem sair dela. A conta de
+  // seguidores do perfil aberto só muda quando a pessoa mexida é o dono do
+  // perfil — nos outros casos o número daqui não é sobre ela.
+  const handleToggleFollowFrom = async (targetId, seguir) => {
+    if (!targetId || requireAccount()) return;
+    setMyFollowing((current) => {
+      const next = new Set(current);
+      if (seguir) next.add(targetId);
+      else next.delete(targetId);
+      return next;
+    });
+    try {
+      if (seguir) await engineDB.followUser(currentUserId, targetId);
+      else await engineDB.unfollowUser(currentUserId, targetId);
+      if (targetId === profile?.userId) {
+        setIsFollowing(seguir);
+        setFollowCounts((current) => ({
+          ...current,
+          followers: Math.max(0, current.followers + (seguir ? 1 : -1)),
+        }));
+      }
+      if (isOwnProfile) {
+        setFollowing((list) =>
+          seguir ? [...new Set([...list, targetId])] : list.filter((id) => id !== targetId),
+        );
+        setFollowCounts((current) => ({
+          ...current,
+          following: Math.max(0, current.following + (seguir ? 1 : -1)),
+        }));
+      }
+    } catch (error) {
+      console.error(error);
+      setMyFollowing((current) => {
+        const next = new Set(current);
+        if (seguir) next.delete(targetId);
+        else next.add(targetId);
+        return next;
+      });
+      toast(t("socialFixes.writeError"), "error");
+    }
+  };
+
+  // Remover seguidor: o gesto pequeno entre aguentar e bloquear. Não avisa
+  // ninguém e não impede de seguir de novo — o aviso diz isso.
+  const handleRemoveFollower = async (targetId) => {
+    const pessoa = publicProfiles?.[targetId] || {};
+    const nome = pessoa.username || pessoa.author || t("peopleSheet.unknown");
+    const ok = await confirm({
+      title: t("peopleSheet.removeTitle"),
+      message: t("peopleSheet.removeMessage", { user: nome }),
+      confirmLabel: t("peopleSheet.removeConfirm"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!ok) return;
+    try {
+      await engineDB.removeFollower(currentUserId, targetId);
+      setFollowers((list) =>
+        list.filter((item) => (item.userId || item.followerId) !== targetId),
+      );
+      setFollowCounts((current) => ({
+        ...current,
+        followers: Math.max(0, current.followers - 1),
+      }));
+      toast(t("peopleSheet.removed"));
+    } catch (error) {
+      console.error(error);
       toast(t("socialFixes.writeError"), "error");
     }
   };
@@ -460,6 +595,21 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
       alive = false;
     };
   }, [activeTab, isOwnProfile, currentUserId, reloadKey]);
+
+  // Curtidas: rastro, não coleção — por isso mora no "..." e não numa aba.
+  useEffect(() => {
+    if (activeTab !== "liked" || !isOwnProfile || !currentUserId) return undefined;
+    let alive = true;
+    fetchLikedPosts(currentUserId)
+      .then((list) => alive && setLikedGoals(list))
+      .catch((error) => {
+        console.error(error);
+        if (alive) setLikedGoals([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeTab, isOwnProfile, currentUserId]);
 
   useEffect(() => {
     if (activeTab !== "saved" || savedKind !== "cars" || !isOwnProfile || !currentUserId) {
@@ -596,12 +746,21 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   );
   const cleanProfileUsername = String(profile.username || "").replace(/^@/, "");
 
+  // Quem vai para a grade e quem vai para a lista de textos — o mesmo
+  // critério que `ProfilePostTile` usa para decidir o que desenha.
+  const visualGoals = profileGoals.filter(postIsVisual);
+  const textGoals = profileGoals.filter((goal) => !postIsVisual(goal));
+
   if (feedPostId) {
     return (
       <div className="min-h-screen bg-[var(--engine-bg)]">
-        {/* Gruda logo abaixo da barra do app (64px + recorte do iPhone; a do
-            app é z-40 e cobriria esta se as duas usassem top-0). */}
-        <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:top-16">
+        {/* Gruda logo abaixo da barra do app: no celular ela é fixa (64px +
+            recorte do iPhone) e, com as duas em top-0, a do app (z-40)
+            cobriria esta. No desktop NÃO existe barra fixa — a Topbar rola
+            junto com o conteúdo dentro do <main> —, então `lg:top-16`
+            deixava esta aqui pairando 64px abaixo do topo e o post passava
+            por baixo, à vista, na faixa de cima. */}
+        <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:top-0">
           <button
             type="button"
             onClick={closeFeed}
@@ -701,35 +860,72 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               )}
             </div>
 
-            {/* Stats - next to avatar on desktop, below on mobile */}
-            <div className="flex-1">
+            {/* Contadores. Seguidores e Seguindo são BOTÕES: o número é a
+                porta da lista, como em toda rede — foi o que tirou as duas
+                da tira de abas. Posts continua texto: a lista dele já é a
+                tela inteira logo abaixo. */}
+            <div className="min-w-0 flex-1">
               <div className="mb-3 grid grid-cols-3 gap-2 sm:gap-3">
                 <div className="text-center">
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
                     {userGoals.length}
                   </p>
-                  <p className="whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]">
-                    {t("socialFixes.profile.goals")}
-                  </p>
+                  <p className={statLabelClass}>{t("socialFixes.profile.goals")}</p>
                 </div>
-                <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setPeopleTab("followers")}
+                  className="rounded-lg py-0.5 text-center transition hover:bg-[var(--engine-surface-2)]"
+                >
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
                     {followCounts.followers}
                   </p>
-                  <p className="whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]">
-                    {t("socialFixes.profile.followers")}
-                  </p>
-                </div>
-                <div className="text-center">
+                  <p className={statLabelClass}>{t("socialFixes.profile.followers")}</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeopleTab("following")}
+                  className="rounded-lg py-0.5 text-center transition hover:bg-[var(--engine-surface-2)]"
+                >
                   <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
                     {followCounts.following}
                   </p>
-                  <p className="whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]">
-                    {t("socialFixes.profile.following")}
-                  </p>
-                </div>
+                  <p className={statLabelClass}>{t("socialFixes.profile.following")}</p>
+                </button>
               </div>
             </div>
+
+            {/* "..." do perfil: onde mora o que é meu e não é vitrine.
+                Arquivadas, Salvos e Curtidas saíram da tira de abas para cá
+                — ninguém precisa ver que eu tenho 40 posts salvos, e eu não
+                preciso de uma aba para achá-los duas vezes por mês. */}
+            {isOwnProfile && (
+              <PostMenu
+                label={t("profileHub.menu")}
+                items={[
+                  {
+                    label: t("socialPosts.saved.tab"),
+                    icon: Bookmark,
+                    onClick: () => setActiveTab("saved"),
+                  },
+                  {
+                    label: t("community.archivedTab"),
+                    icon: Archive,
+                    onClick: () => setActiveTab("archived"),
+                  },
+                  {
+                    label: t("profileHub.liked"),
+                    icon: Heart,
+                    onClick: () => setActiveTab("liked"),
+                  },
+                  {
+                    label: t("profileHub.settings"),
+                    icon: Cog,
+                    onClick: () => navigate("/settings"),
+                  },
+                ]}
+              />
+            )}
           </div>
 
           {/* Name & Username */}
@@ -830,18 +1026,39 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         {/* Tabs */}
         <div className="border-b border-[var(--engine-border)]">
           <div className="flex gap-6 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+            {/* A tira só tem CONTEÚDO desta pessoa, e cada aba é um tipo de
+                coisa diferente:
+                  Publicações — o que ela contou (com ou sem carro ligado);
+                  Garagem     — os carros que ela abriu para a comunidade;
+                  No Engine   — clube, página, evento;
+                  Conquistas.
+                Seguidores e Seguindo saíram para o contador (são lista de
+                gente, não conteúdo) e Salvos/Arquivadas/Curtidas para o
+                "..." (são minhas, não vitrine). De sete abas para quatro.
+                "Minhas coisas" ainda entra aqui quando o endereço pede
+                (`?tab=saved`, vindo de Configurações) — a aba existe, só
+                não ocupa a tira. */}
             {[
               { id: "posts", label: t("socialFeed.postsTab") },
+              ...(showcaseCars.length || isOwnProfile
+                ? [{ id: "garage", label: t("profileHub.garage") }]
+                : []),
               ...(enginePresence.hasPresence
                 ? [{ id: "engine", label: t("engineBlock.title") }]
                 : []),
-              { id: "followers", label: t("profile.tabs.followers") },
-              { id: "following", label: t("profile.tabs.following") },
               { id: "achievements", label: t("profile.tabs.achievements") },
-              ...(isOwnProfile
+              ...(isOwnProfile && ["saved", "archived", "liked"].includes(activeTab)
                 ? [
-                    { id: "saved", label: t("socialPosts.saved.tab") },
-                    { id: "archived", label: t("community.archivedTab") },
+                    {
+                      id: activeTab,
+                      label: t(
+                        activeTab === "saved"
+                          ? "socialPosts.saved.tab"
+                          : activeTab === "archived"
+                            ? "community.archivedTab"
+                            : "profileHub.liked",
+                      ),
+                    },
                   ]
                 : []),
             ].map((tab) => {
@@ -870,16 +1087,65 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         <div className="px-4 py-6 sm:px-6">
           {activeTab === "posts" && (
             <div>
-              {profileGoals.length ? (
+              {/* A diferença entre as duas abas, dita uma vez, em cada uma.
+                  Só aparece quando as duas existem — sem Garagem não há o
+                  que distinguir e a linha vira ruído. */}
+              {(showcaseCars.length > 0 || isOwnProfile) && (
+                <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">
+                  {t(isOwnProfile ? "profileHub.postsHint" : "profileHub.postsHintOther")}
+                </p>
+              )}
+
+              {/* Grade é para o que é visual. Publicação só de texto num
+                  quadrado 1:1 vira um buraco escuro no meio das fotos — e
+                  no Engine ela quase sempre é pergunta ("alguém sabe onde
+                  acha essa peça?"), que se lê em linha e não em miniatura.
+                  Então: a grade fica com foto e vídeo, e os textos ganham
+                  uma lista do lado, a um toque. A tira de escolha só
+                  aparece quando existe texto para mostrar. */}
+              {textGoals.length > 0 && visualGoals.length > 0 && (
+                <div className="-mt-2 mb-3 flex gap-1.5">
+                  {[
+                    { id: "grid", label: t("profileHub.grid"), count: visualGoals.length },
+                    { id: "texts", label: t("profileHub.texts"), count: textGoals.length },
+                  ].map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => setPostsKind(chip.id)}
+                      className={`min-h-9 rounded-full px-3 text-[12.5px] font-bold transition-colors ${
+                        postsKind === chip.id
+                          ? "bg-[var(--engine-accent)] text-white"
+                          : "bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]"
+                      }`}
+                    >
+                      {chip.label}
+                      <span className="ml-1.5 tabular-nums opacity-70">{chip.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {postsKind === "texts" || !visualGoals.length ? null : (
                 /* Grade de 3 colunas encostada nas bordas, como no Instagram:
                    até 30/10/2026 eram cartões com título e barra, que mostravam
                    seis posts por tela e não abriam nada. */
-                <div className="-mx-4 -mt-6 grid grid-cols-3 gap-0.5 sm:-mx-6">
-                  {profileGoals.map((goal) => (
+                <div className="-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6">
+                  {visualGoals.map((goal) => (
                     <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
                   ))}
                 </div>
-              ) : (
+              )}
+
+              {(postsKind === "texts" || !visualGoals.length) && textGoals.length > 0 && (
+                <div className="space-y-2">
+                  {textGoals.map((goal) => (
+                    <TextPostRow key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
+                  ))}
+                </div>
+              )}
+
+              {!profileGoals.length ? (
                 <div className="flex min-h-64 flex-col items-center justify-center text-center">
                   <p className="text-sm font-bold text-[var(--engine-text)]">
                     {t("socialFixes.profile.noGoals")}
@@ -898,7 +1164,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                     </button>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -1016,41 +1282,92 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             />
           )}
 
-          {activeTab === "followers" && (
-            <div className="space-y-3">
-              {followers.length ? (
-                followers.map((follower) => (
-                  <UserListItem
-                    key={follower.userId || follower.followerId}
-                    userId={follower.userId || follower.followerId}
-                    profiles={publicProfiles}
-                    fallback={follower}
-                  />
-                ))
+          {/* Garagem: os carros que esta pessoa abriu para a comunidade.
+              É a aba que faltava, e é aqui que mora a diferença que a
+              Comunidade precisava — publicação é um momento, carro é um
+              objeto permanente, com ficha, preparação, página e busca. */}
+          {activeTab === "garage" && (
+            <div>
+              <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">
+                {t(isOwnProfile ? "profileHub.garageHint" : "profileHub.garageHintOther")}
+              </p>
+              {showcaseCars.length ? (
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                  {showcaseCars.map((car) => (
+                    <Link
+                      key={car.id}
+                      to={`/carro/${car.slug}`}
+                      className="overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] transition hover:border-[var(--engine-accent)]"
+                    >
+                      <span className="block aspect-[4/3] overflow-hidden bg-[var(--engine-surface-2)]">
+                        {car.image ? (
+                          <img
+                            src={car.image}
+                            alt=""
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : null}
+                      </span>
+                      <span className="block p-2.5">
+                        <span className="block truncate text-[13px] font-extrabold text-[var(--engine-text)]">
+                          {[car.brand, car.model].filter(Boolean).join(" ") || car.slug}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11.5px] font-semibold text-[var(--engine-text-muted)]">
+                          {[car.year, car.city].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               ) : (
-                <div className="flex min-h-64 flex-col items-center justify-center text-center">
-                  <Users size={48} className="mb-3 text-[var(--engine-text-subtle)]" />
+                <div className="flex min-h-56 flex-col items-center justify-center px-6 text-center">
                   <p className="text-sm font-bold text-[var(--engine-text)]">
-                    {currentUserId ? t("socialFixes.profile.noFollowers") : t("socialFixes.profile.signInToSeeList")}
+                    {t("profileHub.garageEmpty")}
                   </p>
+                  {isOwnProfile && (
+                    <>
+                      <p className="mt-1 max-w-sm text-xs leading-relaxed text-[var(--engine-text-muted)]">
+                        {t("profileHub.garageEmptyMine")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/garagem")}
+                        className="mt-4 rounded-lg border border-[var(--engine-border)] px-4 py-2 text-xs font-black uppercase tracking-wide text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+                      >
+                        {t("profileHub.garageGo")}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {activeTab === "following" && (
-            <div className="space-y-3">
-              {following.length ? (
-                following.map((userId) => (
-                  <UserListItem key={userId} userId={userId} profiles={publicProfiles} />
-                ))
-              ) : (
-                <div className="flex min-h-64 flex-col items-center justify-center text-center">
-                  <Users size={48} className="mb-3 text-[var(--engine-text-subtle)]" />
-                  <p className="text-sm font-bold text-[var(--engine-text)]">
-                    {currentUserId ? t("socialFixes.profile.noFollowing") : t("socialFixes.profile.signInToSeeList")}
-                  </p>
+          {activeTab === "liked" && isOwnProfile && (
+            <div>
+              <p className="-mt-2 mb-3 text-xs text-[var(--engine-text-muted)]">
+                {t("profileHub.likedOnlyYou")}
+              </p>
+              {likedGoals === null ? (
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">
+                  {t("common.loading")}
+                </p>
+              ) : likedGoals.length ? (
+                <div className="-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6">
+                  {likedGoals.map((goal) => (
+                    <ProfilePostTile
+                      key={goal.id}
+                      goal={goal}
+                      t={t}
+                      onOpen={(id) => navigate(`/post/${id}`)}
+                    />
+                  ))}
                 </div>
+              ) : (
+                <p className="py-10 text-center text-sm text-[var(--engine-text-muted)]">
+                  {t("profileHub.likedEmpty")}
+                </p>
               )}
             </div>
           )}
@@ -1090,10 +1407,72 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           }}
         />
       )}
+      <PeopleSheet
+        open={Boolean(peopleTab)}
+        tab={peopleTab || "followers"}
+        onTab={setPeopleTab}
+        onClose={() => setPeopleTab("")}
+        followers={followers}
+        following={following}
+        profiles={publicProfiles}
+        counts={followCounts}
+        currentUserId={currentUserId}
+        myFollowing={myFollowing}
+        onToggleFollow={handleToggleFollowFrom}
+        onRemoveFollower={isOwnProfile ? handleRemoveFollower : null}
+        t={t}
+      />
       {reportDialog}
       {postActions.reportDialog}
       {postActions.captionDialog}
     </div>
+  );
+}
+
+/**
+ * Uma publicação sem foto, na lista "Textos" do perfil.
+ *
+ * Linha e não quadrado, pelo mesmo motivo do arquivo: quadrado existe para
+ * passar o olho por imagem, e aqui não há imagem nenhuma. O que a pessoa
+ * procura é a frase.
+ */
+function TextPostRow({ goal, t, onOpen }) {
+  const texto = String(goal.note || goal.title || "").trim();
+  const curtidas = Number(goal.likes) || 0;
+  const comentarios = goal.comments?.length || 0;
+  // Link de vídeo que não entrega miniatura (Instagram, TikTok) cai aqui
+  // por falta de capa, mas não é um post de texto: o selo diz o que é, em
+  // vez de deixar a pessoa descobrir abrindo.
+  const temVideo = Boolean(goal.videoUrl);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(goal.id)}
+      className="flex w-full items-start gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 text-left transition hover:border-[var(--engine-accent)]"
+    >
+      {temVideo && (
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)]">
+          <Play size={15} fill="currentColor" strokeWidth={0} />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-3 text-[13.5px] font-semibold leading-5 text-[var(--engine-text)]">
+          {texto || t("community.archivedNoText")}
+        </p>
+        <p className="mt-1.5 flex items-center gap-3 text-[11.5px] font-semibold text-[var(--engine-text-subtle)]">
+          {goal.createdAt ? <TimeAgo value={goal.createdAt} short /> : null}
+          <span className="inline-flex items-center gap-1">
+            <Heart size={12} />
+            {curtidas}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MessageCircle size={12} />
+            {comentarios}
+          </span>
+        </p>
+      </div>
+    </button>
   );
 }
 

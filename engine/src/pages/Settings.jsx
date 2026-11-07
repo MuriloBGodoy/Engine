@@ -28,6 +28,7 @@ import {
   X,
   Archive,
   Bookmark,
+  Heart,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -53,6 +54,7 @@ import {
 } from "../services/accountDeletion";
 // `footer.company.advertise` mora no pacote de Planos/Apoie/Anuncie.
 import "../services/i18n-billing";
+import "../services/i18n-profile-hub";
 import {
   applyPendingUpdate,
   checkForUpdate,
@@ -1147,6 +1149,12 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   label={t("community.archivedTab")}
                   chevron
                   onClick={() => navigate(`${meuPerfil}?tab=archived`)}
+                />
+                <Row
+                  icon={Heart}
+                  label={t("profileHub.liked")}
+                  chevron
+                  onClick={() => navigate(`${meuPerfil}?tab=liked`)}
                 />
               </Group>
 

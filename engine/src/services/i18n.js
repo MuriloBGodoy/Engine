@@ -207,6 +207,11 @@ const resources = {
           "O feed do Engine é sobre carro: rolê, manutenção, projeto, conquista, dúvida. Publicação fora do tema pode ser removida.",
         addPhoto: "Fotos ({{count}}/{{max}})",
         noCar: "Sem carro vinculado",
+        // A diferença que confundia: ligar o carro aqui é etiqueta da
+        // publicação. Quem quer o CARRO achável na aba Carros liga
+        // "Mostrar na comunidade" na garagem — são duas coisas.
+        carHint:
+          "Isso só etiqueta a publicação. Para o carro aparecer na aba Carros e na busca, ligue “Mostrar na comunidade” nele, na garagem.",
         videoPlaceholder: "Link de vídeo (YouTube, Reels, TikTok)",
         publish: "Publicar",
         notAnImage: "Esse arquivo não é uma imagem.",
@@ -1663,7 +1668,7 @@ const resources = {
         },
         myStuff: {
           title: "Minhas coisas",
-          hint: "Salvos e arquivadas vivem no seu perfil — estes são só os atalhos.",
+          hint: "No seu perfil tudo isto fica no “...” do canto. Aqui são só os atalhos.",
         },
         data: {
           title: "Seus dados",
@@ -2065,6 +2070,8 @@ const resources = {
           "The Engine feed is about cars: drives, maintenance, projects, wins, questions. Off-topic posts may be removed.",
         addPhoto: "Photos ({{count}}/{{max}})",
         noCar: "No car attached",
+        carHint:
+          "This only tags the post. To make the car findable in the Cars tab and in search, turn on “Show in the community” on it, in your garage.",
         videoPlaceholder: "Video link (YouTube, Reels, TikTok)",
         publish: "Post",
         notAnImage: "That file is not an image.",
@@ -3506,7 +3513,7 @@ const resources = {
         },
         myStuff: {
           title: "Your stuff",
-          hint: "Saved and archived live on your profile — these are just the shortcuts.",
+          hint: "On your profile all of this sits behind the “...” in the corner. These are just the shortcuts.",
         },
         data: {
           title: "Your data",
@@ -3908,6 +3915,8 @@ const resources = {
           "El feed de Engine es sobre autos: paseos, mantenimiento, proyectos, logros, dudas. Las publicaciones fuera del tema pueden ser eliminadas.",
         addPhoto: "Fotos ({{count}}/{{max}})",
         noCar: "Sin auto vinculado",
+        carHint:
+          "Esto solo etiqueta la publicación. Para que el coche aparezca en la pestaña Coches y en la búsqueda, activa “Mostrar en la comunidad” en él, en tu garaje.",
         videoPlaceholder: "Enlace de video (YouTube, Reels, TikTok)",
         publish: "Publicar",
         notAnImage: "Ese archivo no es una imagen.",
@@ -5355,7 +5364,7 @@ const resources = {
         },
         myStuff: {
           title: "Tus cosas",
-          hint: "Guardados y archivadas viven en tu perfil — esto son solo los atajos.",
+          hint: "En tu perfil todo esto vive detrás del “...” de la esquina. Aquí solo están los atajos.",
         },
         data: {
           title: "Tus datos",

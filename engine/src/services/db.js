@@ -2489,6 +2489,25 @@ export const engineDB = {
     await this.setFollow(targetUserId, false, followerId);
   },
 
+  /**
+   * Tirar alguém da MINHA lista de seguidores.
+   *
+   * O outro lado de `unfollowUser`: aqui quem apaga o vínculo é o seguido,
+   * não o seguidor (política `seguidores: o seguido tambem pode tirar`,
+   * migration 20261106100000). Vai direto na tabela porque `setFollow`
+   * escreve sempre do ponto de vista de quem segue.
+   */
+  async removeFollower(myUserId, followerUserId) {
+    if (!myUserId || !followerUserId || myUserId === followerUserId) return;
+    must(
+      await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", followerUserId)
+        .eq("target_id", myUserId),
+    );
+  },
+
   // notifyUser/notifyFollow saíram em 25/10/2026: o sino só é escrito pelo
   // banco (função `notify`, chamada por triggers), com tipo fixo.
 

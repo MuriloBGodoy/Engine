@@ -21,7 +21,6 @@ import {
   Flag,
   Heart,
   MapPin,
-  MoreHorizontal,
   Play,
   Plus,
   Search,
@@ -68,6 +67,7 @@ import {
 import { getInitials, withoutAt } from "../services/people";
 import { useCommentComposer } from "../hooks/useCommentComposer";
 import { PersonLink } from "../components/social/PersonLink";
+import { PostMenu } from "../components/social/PostMenu";
 import { setPostArchived } from "../services/archivedPosts";
 import { TimeAgo } from "../components/social/TimeAgo";
 import { PostVideoPlayer } from "../components/social/PostVideoPlayer";
@@ -590,65 +590,6 @@ function PostGallery({ images, videoUrl = "", alt, t, onOpen, onDoubleTap, box =
                 }`}
               />
             ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/**
- * Menu "..." do post. Tira do cartão as ações raras (copiar link, remover)
- * que antes moravam na barra de ícones e a deixavam pesada.
- */
-function PostMenu({ items, label }) {
-  const [open, setOpen] = useState(false);
-  if (!items.length) return null;
-
-  return (
-    <div className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        title={label}
-        aria-label={label}
-        className="-m-1.5 flex h-11 w-11 items-center justify-center rounded-full text-[var(--engine-text-subtle)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] sm:m-0 sm:h-8 sm:w-8"
-      >
-        <MoreHorizontal size={18} />
-      </button>
-
-      {open && (
-        <>
-          {/* Camada de saída: um clique em qualquer lugar fecha o menu. */}
-          <button
-            type="button"
-            aria-hidden="true"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-30 cursor-default"
-          />
-          <div className="engine-pop absolute right-0 top-9 z-40 w-52 overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] shadow-[var(--engine-shadow-lg)]">
-            {items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    item.onClick();
-                  }}
-                  className={`flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[13px] font-semibold transition-colors hover:bg-[var(--engine-surface-2)] ${
-                    item.danger
-                      ? "text-[var(--engine-accent)]"
-                      : "text-[var(--engine-text)]"
-                  }`}
-                >
-                  <Icon size={15} />
-                  {item.label}
-                </button>
-              );
-            })}
           </div>
         </>
       )}
