@@ -164,6 +164,13 @@ export function Advertise({ user }) {
         <h2 id="advertise-formats" className="text-base font-bold text-[var(--engine-text)]">
           {t("billing.advertise.formats.title")}
         </h2>
+        {/* Os três formatos existem como oferta, não como botão: não há
+            autoatendimento, painel nem compra em dois cliques. Sem esta
+            linha a página se lê como catálogo de um produto que já roda
+            sozinho, e não é o caso. (06/11/2026) */}
+        <p className="-mt-1 text-[13px] leading-relaxed text-[var(--engine-text-muted)]">
+          {t("billing.advertise.formats.note")}
+        </p>
         <div className="grid gap-3 md:grid-cols-3">
           {FORMAT_CARDS.map((item) => (
             <article key={item.key} className="engine-card flex flex-col p-5">

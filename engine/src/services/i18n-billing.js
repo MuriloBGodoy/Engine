@@ -269,6 +269,11 @@ const ptBR = {
         "Para oficinas, autopeças, seguradoras, marcas e organizadores de eventos. Patrocínio local, rotulado e sem bagunçar o que o usuário veio ver.",
       formats: {
         title: "Formatos",
+        // Nenhum destes é autoatendimento: não existe botão de comprar, nem
+        // painel. Cada patrocínio é montado com a marca, um a um. Dizer isso
+        // aqui é o que impede a página de parecer um catálogo que já roda
+        // sozinho. (06/11/2026)
+        note: "Nada aqui é autoatendimento: cada patrocínio é combinado e montado junto com a marca, um a um.",
         city: {
           title: "Cota por cidade",
           body: "“Serviços em [cidade] oferecido por [sua marca]”. Sua marca acompanha a busca de serviços de uma cidade inteira.",
@@ -590,6 +595,7 @@ const enUS = {
         "For repair shops, parts stores, insurers, brands and event organizers. Local sponsorship, clearly labeled, without getting in the way of what users came for.",
       formats: {
         title: "Formats",
+        note: "None of this is self-serve: every sponsorship is agreed and set up with the brand, one at a time.",
         city: {
           title: "City sponsorship",
           body: "“Services in [city] brought to you by [your brand]”. Your brand appears alongside service search for an entire city.",
@@ -911,6 +917,7 @@ const esES = {
         "Para talleres, recambios, aseguradoras, marcas y organizadores de eventos. Patrocinio local, identificado y sin estorbar lo que el usuario vino a ver.",
       formats: {
         title: "Formatos",
+        note: "Nada de esto es autoservicio: cada patrocinio se acuerda y se monta junto a la marca, uno a uno.",
         city: {
           title: "Patrocinio por ciudad",
           body: "“Servicios en [ciudad] ofrecido por [tu marca]”. Tu marca acompaña la búsqueda de servicios de toda una ciudad.",
