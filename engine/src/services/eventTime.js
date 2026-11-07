@@ -37,6 +37,28 @@ export const eventInstantFromLocal = (date, time = "") => {
 
 const eventZone = (event) => event?.timeZone || "UTC";
 
+/**
+ * Dia do evento como "AAAA-MM-DD", no fuso em que ele foi marcado — que é o
+ * formato que um `<input type="date">` entende. Sem isto, editar um evento
+ * das 21h de Brasília abria o campo no dia seguinte (o ISO guardado está em
+ * UTC). "en-CA" é o truque: é a localidade cujo formato de data já é
+ * ano-mês-dia.
+ */
+export const eventLocalDate = (event) => {
+  const date = new Date(event?.eventDate);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: eventZone(event),
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+};
+
 /** Dia do evento, no fuso dele. */
 export const formatEventDay = (event, locale, options) => {
   const date = new Date(event?.eventDate);

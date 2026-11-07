@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X, ImagePlus, Plus, Wrench, ExternalLink } from "lucide-react";
+import { X, Plus, Wrench, ExternalLink } from "lucide-react";
 import { auth } from "../services/supabase";
-import { uploadUserPhoto } from "../services/photos";
 import { useToast } from "./ToastProvider";
 import { eventTypeOptions } from "../services/eventTypes";
 import { engineEvents } from "../services/events";
+import { EventPhotoField } from "./events/EventPhotoField";
 import { countries, getStates, getCities } from "../services/locations";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { deviceTimeZone, eventInstantFromLocal } from "../services/eventTime";
@@ -21,7 +21,6 @@ const getMapUrl = (event) =>
 const getDirectionsUrl = (event) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery(event))}`;
 
-const MAX_PHOTOS = 4;
 
 function Field({ label, children, wide = false }) {
   return (
@@ -110,7 +109,6 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
   useHistoryDismiss(true, onCancel);
 
   const [saving, setSaving] = useState(false);
-  const [photoUploading, setPhotoUploading] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -154,45 +152,6 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
     }
   };
 
-  const handlePhotoUpload = async (e) => {
-    const files = e.currentTarget.files;
-    if (!files || files.length === 0) return;
-
-    setPhotoUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        if (form.photos.length >= MAX_PHOTOS) break;
-        if (!file.type.startsWith("image/")) continue;
-        if (file.size > 5 * 1024 * 1024) {
-          showToast(t("events.toast.photoTooBig", { name: file.name }), "error");
-          continue;
-        }
-
-        // Mesmo caminho das outras fotos: reduzida, na pasta da pessoa.
-        const url = await uploadUserPhoto(file, {
-          userId: auth.currentUser?.uid,
-          folder: "events",
-        });
-
-        setForm((prev) => ({
-          ...prev,
-          photos: [...prev.photos, url],
-        }));
-      }
-    } catch {
-      showToast(t("events.toast.uploadError"), "error");
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
-
-  const handlePhotoRemove = (photo) => {
-    setForm((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((p) => p !== photo),
-    }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -234,7 +193,7 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
         location: location,
         state: form.state,
         country: form.country,
-        image: form.photos[0] || "",
+        photos: form.photos,
         isPaid: false,
         ticketPrice: 0,
         maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : 0,
@@ -311,43 +270,11 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
         <div className="grid gap-5 p-4 pb-28 sm:p-6 md:grid-cols-2">
           {/* Fotos */}
           <Field label={t("events.form.photos")} wide>
-            <div className="grid gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3">
-              {form.photos.map((photo) => (
-                <div key={photo} className="relative overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
-                  <img src={photo} alt="" className="h-36 w-full object-cover sm:h-32" />
-                  <button
-                    type="button"
-                    onClick={() => handlePhotoRemove(photo)}
-                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-[var(--engine-accent)]"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              ))}
-              {form.photos.length < MAX_PHOTOS && (
-                <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-center transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]">
-                  {photoUploading ? (
-                    <Wrench className="mb-2 animate-spin text-[var(--engine-accent)]" size={24} />
-                  ) : (
-                    <ImagePlus className="mb-2 text-[var(--engine-accent)]" size={24} />
-                  )}
-                  <span className="text-xs font-black uppercase tracking-widest">
-                    {photoUploading ? t("events.form.uploading") : t("events.form.addPhoto")}
-                  </span>
-                  <span className="mt-1 text-[11px] font-bold text-[var(--engine-text-subtle)]">
-                    Máx {MAX_PHOTOS} imagens
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    disabled={photoUploading}
-                    onChange={handlePhotoUpload}
-                  />
-                </label>
-              )}
-            </div>
+            <EventPhotoField
+              photos={form.photos}
+              onChange={(photos) => setForm((prev) => ({ ...prev, photos }))}
+              disabled={saving}
+            />
           </Field>
 
           {/* Título */}
@@ -523,7 +450,7 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
         <div className="flex flex-col gap-3 border-t border-[var(--engine-border)] p-5 sm:flex-row sm:p-6">
           <button
             type="submit"
-            disabled={saving || photoUploading}
+            disabled={saving}
             className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 text-sm font-bold uppercase text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Wrench className="animate-spin" size={18} /> : <Plus size={18} />}

@@ -59,6 +59,8 @@ const eventToRow = (event) => ({
   ),
 });
 
+export const EVENT_MAX_PHOTOS = 4;
+
 const normalizeEvent = (event) => ({
   title: String(event.title || "").trim().slice(0, 120),
   description: String(event.description || "").trim().slice(0, 1000),
@@ -72,7 +74,17 @@ const normalizeEvent = (event) => ({
   location: String(event.location || "").trim().slice(0, 120),
   state: String(event.state || "").trim().slice(0, 8),
   country: String(event.country || "BR").trim().slice(0, 4),
-  image: String(event.image || "").trim(),
+  // Fotos do evento. O formulário sempre deixou somar até quatro, mas só a
+  // primeira era guardada (`image`): as outras três sumiam no salvar.
+  // `image` continua existindo porque é o que os cartões já leem — agora
+  // sempre a primeira da lista. (07/11/2026)
+  photos: (Array.isArray(event.photos) ? event.photos : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .slice(0, EVENT_MAX_PHOTOS),
+  image: String(
+    (Array.isArray(event.photos) && event.photos[0]) || event.image || "",
+  ).trim(),
   isPaid: Boolean(event.isPaid),
   ticketPrice: Math.max(Number(event.ticketPrice) || 0, 0),
   maxParticipants: Math.max(Number(event.maxParticipants) || 0, 0),

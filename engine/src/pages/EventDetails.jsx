@@ -213,6 +213,11 @@ export function EventDetails() {
     </button>
   ) : null;
 
+  const fotos = Array.isArray(event.photos) && event.photos.length
+    ? event.photos
+    : event.image
+      ? [event.image]
+      : [];
   const typeLabel = eventTypeLabel(t, event.type);
 
   return (
@@ -249,14 +254,21 @@ export function EventDetails() {
         )}
       </div>
 
-      {/* Imagem */}
-      {event.image && (
-        <div className="rounded-xl overflow-hidden h-80 bg-[var(--engine-surface-2)]">
-          <img
-            src={event.image}
-            alt={event.title}
-            className="w-full h-full object-cover"
-          />
+      {/* Fotos. O evento guardava uma so (`image`) ate 07/11/2026, mesmo com o
+          formulario deixando somar quatro: as outras tres sumiam no salvar.
+          Agora a lista e real, e a capa continua sendo a primeira. */}
+      {fotos.length > 0 && (
+        <div className={`grid gap-2 ${fotos.length > 1 ? "sm:grid-cols-2" : ""}`}>
+          {fotos.map((foto, indice) => (
+            <div
+              key={foto}
+              className={`overflow-hidden rounded-xl bg-[var(--engine-surface-2)] ${
+                fotos.length > 1 && indice === 0 ? "sm:col-span-2" : ""
+              } ${fotos.length > 1 && indice > 0 ? "h-48" : "h-80"}`}
+            >
+              <img src={foto} alt={event.title} className="h-full w-full object-cover" />
+            </div>
+          ))}
         </div>
       )}
 

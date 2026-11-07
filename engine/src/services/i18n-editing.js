@@ -3,7 +3,8 @@ import i18n from "./i18n";
 /**
  * Textos de editar o que já está no ar (07/11/2026).
  *
- * "Nada que me faça ter que excluir e postar de novo". Fora do i18n.js pelo mesmo motivo dos outros módulos: aquele
+ * "Nada que me faça ter que excluir e postar de novo": a publicação, o
+ * evento. Fora do i18n.js pelo mesmo motivo dos outros módulos: aquele
  * arquivo é mexido por várias frentes e colide.
  */
 
@@ -24,6 +25,17 @@ const ptBR = {
     // pediria o original. Tirar e mandar outro continua valendo.
     videoUploaded: "Vídeo publicado",
     videoNoRetrim: "Para cortar de outro jeito, tire este e envie de novo.",
+    eventPhotos: "Fotos",
+    eventWhen: "Quando",
+    eventWhere: "Onde",
+    eventType: "Tipo",
+    // Mexer na data ou no lugar de um evento que já tem gente confirmada é
+    // diferente de corrigir um texto — quem marcou no calendário não é
+    // avisado sozinho.
+    eventMovedWarning:
+      "{{count}} pessoa já confirmou presença. Mudar data ou lugar não avisa ninguém — conte no mural do evento.",
+    eventMovedWarning_other:
+      "{{count}} pessoas já confirmaram presença. Mudar data ou lugar não avisa ninguém — conte no mural do evento.",
   },
 };
 
@@ -42,6 +54,14 @@ const enUS = {
     save: "Save",
     videoUploaded: "Published video",
     videoNoRetrim: "To trim it differently, remove this one and upload again.",
+    eventPhotos: "Photos",
+    eventWhen: "When",
+    eventWhere: "Where",
+    eventType: "Type",
+    eventMovedWarning:
+      "{{count}} person already said they are coming. Changing the date or the place notifies no one — say so on the event wall.",
+    eventMovedWarning_other:
+      "{{count}} people already said they are coming. Changing the date or the place notifies no one — say so on the event wall.",
   },
 };
 
@@ -60,6 +80,14 @@ const esES = {
     save: "Guardar",
     videoUploaded: "Vídeo publicado",
     videoNoRetrim: "Para recortarlo de otra forma, quita este y sube otro.",
+    eventPhotos: "Fotos",
+    eventWhen: "Cuándo",
+    eventWhere: "Dónde",
+    eventType: "Tipo",
+    eventMovedWarning:
+      "{{count}} persona ya confirmó. Cambiar la fecha o el lugar no avisa a nadie — cuéntalo en el muro del evento.",
+    eventMovedWarning_other:
+      "{{count}} personas ya confirmaron. Cambiar la fecha o el lugar no avisa a nadie — cuéntalo en el muro del evento.",
   },
 };
 
