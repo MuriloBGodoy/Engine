@@ -143,6 +143,53 @@ Cada uma saiu de um conserto de verdade, com a data.
   ver o que não se via. A conversa inteira entra (as duas pontas já aparecem
   na tela de mensagens); perfil de terceiro, não.
 
+### Perfil: o que é aba, o que é contador, o que é "..."
+
+- **R29.** Lista de GENTE não é aba — abre pelo **contador**. Ninguém abre um
+  perfil para ler nomes; aba é para o conteúdo que a pessoa veio ver. Tirar
+  Seguidores e Seguindo da tira foi o que liberou espaço para Garagem.
+  *(06/11/2026)*
+- **R30.** O que é **meu e não é vitrine** — arquivadas, salvos, curtidas —
+  mora no "..." do canto, nunca numa aba. Ninguém precisa ver que eu tenho
+  40 posts salvos, e eu não preciso de uma aba para achá-los duas vezes por
+  mês. *(06/11/2026)*
+- **R31.** Cada aba do perfil é **um tipo de coisa diferente**. Publicação é
+  um momento; carro é um objeto permanente, com ficha, preparação, página e
+  busca. Enquanto os dois dividiam a mesma grade, só dava para saber o que
+  era abrindo. *(06/11/2026, aba Garagem)*
+- **R32.** Grade é para o que é **visual**. Publicação sem capa num quadrado
+  1:1 vira buraco escuro no meio das fotos — vai para uma lista, onde a frase
+  se lê. *(06/11/2026)*
+- **R33.** Antes de chamar um post de "sem imagem", tentar **derivar** a capa.
+  Vídeo de link do YouTube tem miniatura em endereço previsível; só o que
+  nenhuma plataforma entrega é que é mesmo sem capa. *(06/11/2026)*
+- **R34.** Entre seguir e bloquear falta mais de um degrau: silenciar (R18) e
+  **remover seguidor**. Remover não avisa e não impede de seguir de novo —
+  quem quer barreira bloqueia. *(06/11/2026)*
+
+### Enfeite, recorte e barra
+
+- **R35.** **Bandeira de país é enfeite caro.** Cada sistema desenha a sua, o
+  Windows não desenha nenhuma (vira duas letras numa caixinha) e o nome do
+  país já diz o que ela diria. Fora de todo seletor. *(06/11/2026)*
+- **R36.** Faixa larga e baixa **não recorta foto**: num monitor de 1500px uma
+  foto 4:3 em `cover` vira tira de 4,6:1 e sobra a roda. A foto cabe inteira e
+  quem preenche a faixa é uma cópia borrada dela atrás, como capa de álbum.
+  *(06/11/2026, topo da página do carro)*
+- **R37.** `position: sticky` com recuo fixo assume uma barra fixa que pode
+  não existir. No celular a barra do app é fixa (64px); no desktop ela rola
+  junto com o conteúdo — e `lg:top-16` deixava o cabeçalho pairando com o
+  post passando à vista por baixo. *(06/11/2026)*
+- **R38.** Item de **ferramenta** (moderação) não mora na lista rolável de
+  áreas do app: quando a altura aperta, é ele que fica cortado ao meio. Vai
+  para o bloco fixo da base, que nunca rola. *(06/11/2026)*
+- **R39.** O **vazio tem que dizer a verdade**. "Ninguém segue este perfil"
+  embaixo de um contador que marca 2 é mentira — o certo é dizer que a lista
+  é para quem tem conta. *(06/11/2026)*
+- **R40.** Página que oferece um formato pago precisa dizer se ele é
+  **autoatendimento**. Sem essa linha, um catálogo de três formatos se lê
+  como produto que já roda sozinho. *(06/11/2026, /anuncie)*
+
 ## Ainda não resolvido
 
 - **Conta privada.** O banco já tem `account_visible()`; a decisão de produto
@@ -152,3 +199,13 @@ Cada uma saiu de um conserto de verdade, com a data.
   Serviços pedir.
 - **Primeira sessão.** O que a pessoa vê nos primeiros 30 segundos — é onde a
   densidade baixa mais machuca, e é o que menos foi olhado até agora.
+- **As três portas de publicar carro.** Hoje existem: "Compartilhar meta"
+  (publica a meta como post), o carro vinculado na Nova publicação (etiqueta
+  o post) e "Mostrar na comunidade" no carro (põe na aba Carros). A terceira
+  é a que o Murilo chama de coração. A primeira é herança de quando meta era
+  o único conteúdo, e é ela que enche o feed de cartões quase iguais — cinco
+  metas compartilhadas viram cinco posts do mesmo perfil. **Recomendação:**
+  aposentar a publicação de meta no feed e deixar o carro viver na aba Carros
+  e na aba Garagem do perfil, mantendo "deixar de compartilhar" para quem já
+  publicou. Decisão de produto, não encostada ainda. *(levantado em
+  06/11/2026)*
