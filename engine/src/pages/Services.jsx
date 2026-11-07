@@ -101,6 +101,7 @@ import { ProAccountHub } from "../components/pro/ProAccountHub";
 import { ShopsTab } from "../components/shops/ShopsTab";
 import { ShopSegment } from "../components/shop/ShopBrowse";
 import { ProductEditor } from "../components/shops/ProductEditor";
+import { MediaPickerButton } from "../components/MediaPickerButton";
 import { useMyPro } from "../hooks/useMyPro";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
@@ -1449,7 +1450,14 @@ function ListingEditorModal({
                       </div>
                     ))}
                     {photos.length < MAX_PHOTOS && (
-                      <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-center text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white">
+                      <MediaPickerButton
+                        accept="image/*"
+                        multiple
+                        onFiles={onPhotoUpload}
+                        disabled={photoUploading}
+                        title={t("services.addPhoto")}
+                        className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-center text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-60 dark:text-white"
+                      >
                         {photoUploading ? (
                           <Wrench className="mb-2 animate-spin text-[var(--engine-accent)]" size={24} />
                         ) : (
@@ -1461,15 +1469,7 @@ function ListingEditorModal({
                         <span className="mt-1 text-[11px] font-bold text-[var(--engine-text-muted)]">
                           {t("services.maxImages", { value: MAX_PHOTOS })}
                         </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="sr-only"
-                          disabled={photoUploading}
-                          onChange={onPhotoUpload}
-                        />
-                      </label>
+                      </MediaPickerButton>
                     )}
                   </div>
                 </Field>
@@ -2782,9 +2782,7 @@ export function Services({ user, settings }) {
     resetForm();
   };
 
-  const uploadPhotos = async (event) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = "";
+  const uploadPhotos = async (files) => {
     if (!files.length) return;
     if (!user?.uid) {
       // Só chega aqui quem entrou e teve a sessão encerrada no meio: o

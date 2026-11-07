@@ -1,7 +1,8 @@
-import { useId, useRef } from "react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Camera, Plus, X } from "lucide-react";
 import "../../services/i18n-shop";
+import { useMediaPicker } from "../../hooks/useMediaPicker";
 
 /**
  * Peças pequenas do fluxo Anunciar e da Loja, no visual aprovado em
@@ -174,22 +175,12 @@ export function BigPriceInput({ value, onChange, currencySymbol = "R$", label, l
  */
 export function PhotoGrid({ photos = [], max = 10, onAdd, onRemove, onMakeCover, busy = false }) {
   const { t } = useTranslation();
-  const inputRef = useRef(null);
-  const open = () => inputRef.current?.click();
-  const picker = (
-    <input
-      ref={inputRef}
-      type="file"
-      accept="image/*"
-      multiple
-      className="hidden"
-      onChange={(event) => {
-        const files = Array.from(event.target.files || []);
-        event.target.value = "";
-        if (files.length) onAdd?.(files);
-      }}
-    />
-  );
+  // No celular, abrir pergunta se e foto nova ou da galeria (07/11/2026).
+  const { open, elementos: picker } = useMediaPicker({
+    accept: "image/*",
+    multiple: true,
+    onFiles: (files) => onAdd?.(files),
+  });
 
   if (!photos.length) {
     return (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -40,6 +40,7 @@ import {
   serviceCategories,
 } from "../services/serviceListingDisplay";
 import { serviceListingPath } from "../services/serviceListingPublic";
+import { useMediaPicker } from "../hooks/useMediaPicker";
 import {
   QUOTE_CAR_MAX,
   QUOTE_DEFAULT_LIMITS,
@@ -237,7 +238,6 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
   const [photos, setPhotos] = useState([]);
   const [sending, setSending] = useState(false);
   const [preparing, setPreparing] = useState(false);
-  const fileRef = useRef(null);
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const cities = getCities(country, form.state);
   const descriptionLength = form.description.trim().length;
@@ -245,9 +245,8 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
 
   useEffect(() => () => photos.forEach((photo) => URL.revokeObjectURL(photo.url)), [photos]);
 
-  const addPhotos = async (event) => {
-    const files = Array.from(event.target.files || []).filter(isImageFile).slice(0, maxPhotos - photos.length);
-    event.target.value = "";
+  const addPhotos = async (escolhidos) => {
+    const files = escolhidos.filter(isImageFile).slice(0, maxPhotos - photos.length);
     if (!files.length) return;
     setPreparing(true);
     const next = [];
@@ -264,6 +263,10 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
     setPhotos((current) => [...current, ...next].slice(0, maxPhotos));
     setPreparing(false);
   };
+
+  // No celular, abrir pergunta se e foto nova ou da galeria (07/11/2026):
+  // orcamento quase sempre comeca com uma foto do problema, tirada agora.
+  const fotoPicker = useMediaPicker({ accept: "image/*", multiple: true, onFiles: addPhotos });
 
   const removePhoto = (url) => {
     URL.revokeObjectURL(url);
@@ -412,7 +415,7 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
             {photos.length < maxPhotos && (
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
+                onClick={fotoPicker.open}
                 disabled={preparing}
                 className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--engine-border-strong)] text-[10px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-50"
               >
@@ -421,7 +424,7 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
               </button>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={addPhotos} />
+          {fotoPicker.elementos}
           <span className="text-xs leading-5 text-[var(--engine-text-subtle)]">
             {t("quotes.form.photosHint", { max: maxPhotos })}
           </span>

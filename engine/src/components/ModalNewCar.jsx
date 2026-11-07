@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { auth } from "../services/supabase";
 import { CAR_TYPE_GOAL, CAR_TYPE_OWNED, MAX_CAR_PHOTOS } from "../services/db";
 import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
+import { MediaPickerButton } from "./MediaPickerButton";
 import { ImageCropper } from "./ImageCropper";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatFipeYear } from "../services/carDisplay";
@@ -81,7 +82,6 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
   );
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const fileInputRef = useRef(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [fileForCropping, setFileForCropping] = useState(null);
 
@@ -149,9 +149,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
     return () => clearTimeout(timer);
   }, [isOpen, carToEdit]);
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = "";
+  const handleFileUpload = async (files) => {
     setError("");
     if (!files.length) return;
 
@@ -493,10 +491,11 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
             )}
 
             {photos.length < MAX_CAR_PHOTOS && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
+              <MediaPickerButton
+                accept="image/*"
+                onFiles={handleFileUpload}
                 disabled={uploading}
+                title={t("modalCar.photo")}
                 className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface-2)] transition-colors hover:border-[var(--engine-accent)] disabled:opacity-50 ${
                   photos.length ? "h-20" : "h-40 sm:h-48"
                 }`}
@@ -517,16 +516,8 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                     </span>
                   </>
                 )}
-              </button>
+              </MediaPickerButton>
             )}
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/*"
-              onChange={handleFileUpload}
-            />
           </div>
 
           <div className="space-y-4">

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { auth, updateAuthProfile } from '../services/supabase';
 import { engineDB } from '../services/db';
@@ -10,6 +10,7 @@ import { storeDataUri } from '../services/photos';
 import { useToast } from './ToastProvider';
 import { useHistoryDismiss } from '../hooks/useHistoryDismiss';
 import { MentionTextarea } from './mentions/MentionTextarea';
+import { useMediaPicker } from "../hooks/useMediaPicker";
 import {
   BIO_DISPLAY_MAX,
   bioToEditor,
@@ -74,8 +75,6 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const avatarInputRef = useRef(null);
-  const bannerInputRef = useRef(null);
 
   const countryObj = countries.find(c => c.code === formData.country);
   const stateOptions = countryObj ? getStates(formData.country) : [];
@@ -177,12 +176,24 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
     }
   };
 
+  // No celular, abrir pergunta se e foto nova ou da galeria (07/11/2026) —
+  // retrato de perfil e justamente o que a pessoa quer tirar na hora.
+  const avatarPicker = useMediaPicker({
+    accept: "image/*",
+    capture: "user",
+    onFiles: (files) => handleFileInput("avatar", files[0]),
+  });
+  const bannerPicker = useMediaPicker({
+    accept: "image/*",
+    onFiles: (files) => handleFileInput("banner", files[0]),
+  });
+
   const handleAvatarClick = () => {
-    avatarInputRef.current?.click();
+    avatarPicker.open();
   };
 
   const handleBannerClick = () => {
-    bannerInputRef.current?.click();
+    bannerPicker.open();
   };
 
   const handleDragOver = (e) => {
@@ -328,13 +339,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
                 backgroundPosition: 'center',
               }}
             >
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleFileInput('banner', e.target.files?.[0])}
-              />
+              {bannerPicker.elementos}
               {!preview.banner && (
                 <div className="text-center pointer-events-none">
                   <p className="text-sm font-medium text-[var(--engine-text-muted)]">Clique ou arraste uma imagem</p>
@@ -348,13 +353,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
                 onClick={handleAvatarClick}
                 className="relative w-24 h-24 rounded-full overflow-hidden bg-[var(--engine-surface-2)] border-4 border-[var(--engine-surface)] cursor-pointer transition hover:border-[var(--engine-accent)] flex items-center justify-center group"
               >
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileInput('avatar', e.target.files?.[0])}
-                />
+                {avatarPicker.elementos}
                 {preview.avatar ? (
                   <img
                     src={preview.avatar}

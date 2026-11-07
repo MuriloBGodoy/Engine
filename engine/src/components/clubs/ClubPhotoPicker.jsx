@@ -1,9 +1,10 @@
-import { useImperativeHandle, useRef, useState } from "react";
+import { useImperativeHandle, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Camera, Loader2 } from "lucide-react";
 import { ClubEmblem } from "./ClubEmblem";
 import { ImageCropper } from "../ImageCropper";
+import { useMediaPicker } from "../../hooks/useMediaPicker";
 import { useToast } from "../ToastProvider";
 import { isFileTooBig, isImageFile } from "../../services/photos";
 
@@ -22,14 +23,10 @@ import { isFileTooBig, isImageFile } from "../../services/photos";
 export function ClubPhotoPicker({ ref, kind, onCropped }) {
   const { t } = useTranslation();
   const showToast = useToast();
-  const inputRef = useRef(null);
   const [file, setFile] = useState(null);
 
-  useImperativeHandle(ref, () => ({ open: () => inputRef.current?.click() }), []);
-
-  const handleChange = (event) => {
-    const picked = event.target.files?.[0];
-    event.target.value = "";
+  const handleChange = (files) => {
+    const picked = files?.[0];
     if (!picked) return;
     if (!isImageFile(picked)) {
       showToast(t("clubs.custom.errors.invalidImage"), "error");
@@ -42,9 +39,13 @@ export function ClubPhotoPicker({ ref, kind, onCropped }) {
     setFile(picked);
   };
 
+  // No celular, abrir pergunta se é foto nova ou da galeria (07/11/2026).
+  const { open, elementos } = useMediaPicker({ accept: "image/*", onFiles: handleChange });
+  useImperativeHandle(ref, () => ({ open }), [open]);
+
   return (
     <>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleChange} />
+      {elementos}
       {/* Portal: dentro de um painel com transform/backdrop-filter, o overlay
           fixo do recorte ficaria preso à caixa do painel. */}
       {file

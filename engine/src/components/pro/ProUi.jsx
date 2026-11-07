@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ImagePlus, Loader2, Store, X } from "lucide-react";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { SwitchKnob } from "../shop/ShopPrimitives";
+import { MediaPickerButton } from "../MediaPickerButton";
 
 /**
  * Peças de tela da conta profissional e de Lojas. Versão funcional, nos
@@ -237,27 +238,21 @@ export function ProAvatar({ src = "", name = "", size = 48, square = false }) {
 }
 
 /** Botão de escolher foto (o upload e a limpeza de EXIF são de quem chama). */
-export function PhotoPickButton({ id, label, busy = false, onFiles, multiple = false }) {
+export function PhotoPickButton({ label, busy = false, onFiles, multiple = false }) {
+  // Mesma casca de antes; quem decide camera x galeria no celular e o
+  // MediaPickerButton (07/11/2026).
   return (
-    <label
-      htmlFor={id}
-      className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-4 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+    <MediaPickerButton
+      accept="image/*"
+      multiple={multiple}
+      onFiles={onFiles}
+      disabled={busy}
+      title={label}
+      className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-4 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-text-muted)] hover:text-[var(--engine-text)] disabled:opacity-60"
     >
       {busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <ImagePlus size={16} aria-hidden="true" />}
       {label}
-      <input
-        id={id}
-        type="file"
-        accept="image/*"
-        multiple={multiple}
-        className="sr-only"
-        disabled={busy}
-        onChange={(event) => {
-          const files = Array.from(event.target.files || []);
-          event.target.value = "";
-          if (files.length) onFiles(files);
-        }}
-      />
-    </label>
+    </MediaPickerButton>
   );
 }
+

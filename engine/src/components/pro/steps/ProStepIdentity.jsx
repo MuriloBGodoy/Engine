@@ -6,6 +6,7 @@ import { PRO_HANDLE_PATTERN, checkHandle, cleanHandle } from "../../../services/
 import { SelectField, TextAreaField, TextField } from "../ProUi";
 import { ProfileLogo } from "../../shop/ShopPrimitives";
 import { handleFromName, profileInitials } from "../../../services/shopFormat";
+import { MediaPickerButton } from "../../MediaPickerButton";
 
 /**
  * Passo 1 — quem é. Página: @ próprio (com "está livre?" enquanto digita),
@@ -97,10 +98,10 @@ export function ProStepIdentity({ value, onChange, onUpload, uploading = "", edi
 
       {isPage && (
         <div className="grid grid-cols-2 gap-2.5">
-          <PhotoTile id="pro-logo" busy={uploading === "logo"} onFile={(file) => onUpload(file, "logo")} label={data.logo ? t("shop.page.logoChange") : t("shop.page.logo")}>
+          <PhotoTile busy={uploading === "logo"} onFile={(file) => onUpload(file, "logo")} label={data.logo ? t("shop.page.logoChange") : t("shop.page.logo")}>
             <ProfileLogo src={data.logo} initials={profileInitials(value.name)} className="h-11 w-11 rounded-xl text-[13px]" />
           </PhotoTile>
-          <PhotoTile id="pro-cover" busy={uploading === "cover"} onFile={(file) => onUpload(file, "cover")} label={data.cover ? t("shop.page.coverChange") : t("shop.page.coverUpload")}>
+          <PhotoTile busy={uploading === "cover"} onFile={(file) => onUpload(file, "cover")} label={data.cover ? t("shop.page.coverChange") : t("shop.page.coverUpload")}>
             <span className="block h-11 w-full overflow-hidden rounded-xl bg-[var(--engine-surface-2)]">
               {data.cover && <img src={data.cover} alt="" className="h-full w-full object-cover" />}
             </span>
@@ -132,26 +133,20 @@ export function ProStepIdentity({ value, onChange, onUpload, uploading = "", edi
 }
 
 /** Tile tracejado de enviar logo/capa, com a miniatura do que já foi. */
-function PhotoTile({ id, label, busy, onFile, children }) {
+function PhotoTile({ label, busy, onFile, children }) {
+  // Mesma casca de antes; no celular o MediaPickerButton pergunta se a foto
+  // e nova ou da galeria (07/11/2026).
   return (
-    <label
-      htmlFor={id}
-      className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-3 py-3 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-text-muted)]"
+    <MediaPickerButton
+      accept="image/*"
+      onFiles={(files) => onFile(files[0])}
+      disabled={busy}
+      title={label}
+      className="flex min-h-24 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[var(--engine-border-strong)] bg-[var(--engine-surface)] px-3 py-3 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-text-muted)] disabled:opacity-60"
     >
       {busy ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : children}
       {label}
-      <input
-        id={id}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        disabled={busy}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (file) onFile(file);
-        }}
-      />
-    </label>
+    </MediaPickerButton>
   );
 }
+
