@@ -46,11 +46,13 @@ import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { GiphyPicker } from "../components/GiphyPicker";
 import { compressImage, readFileAsDataUrl, blobToDataUrl } from "../services/imageCompression";
+import { imagesFromPaste } from "../services/clipboardImage";
 import { ServiceContextCard, ServiceStatusPill } from "../components/messages/ServiceThread";
 import { ConversationRow } from "../components/messages/ConversationRow";
 import { MessageList } from "../components/messages/MessageList";
 import { QUOTE_DEFAULT_LIMITS } from "../services/quotes";
 import "../services/i18n-social-posts";
+import "../services/i18n-message-dock";
 
 // Abas da caixa (migration 20261030120000). "Conversas" é a de sempre;
 // "Serviços" são os fios em que eu sou o cliente; "Clientes", os em que eu
@@ -362,6 +364,21 @@ export function Messages({ user, settings }) {
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  // Ctrl+V com uma foto na área de transferência cai na MESMA prévia do
+  // seletor de arquivo: legenda, editor e envio continuam um caminho só.
+  const handlePaste = async (event) => {
+    if (!conversationId || sending || compressing || editing) return;
+    const [file] = imagesFromPaste(event);
+    if (!file) return;
+    event.preventDefault();
+    try {
+      setPreviewImage(await readFileAsDataUrl(file));
+    } catch (error) {
+      console.error(error);
+      toast(t("messages.imageError"));
     }
   };
 
@@ -722,6 +739,7 @@ export function Messages({ user, settings }) {
               )}
               <form
                 onSubmit={handleSend}
+                onPaste={handlePaste}
                 className="flex shrink-0 items-stretch gap-2 border-t border-[var(--engine-border)] p-3"
               >
                 <input
@@ -738,7 +756,7 @@ export function Messages({ user, settings }) {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={sending || compressing || Boolean(editing)}
-                    title={t("socialPosts.messages.photo")}
+                    title={t("pasteImage.hint")}
                     aria-label={t("socialPosts.messages.photo")}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
                   >

@@ -5,6 +5,7 @@ import { Car, Clapperboard, ImagePlus, Info, Link2, Loader2, Scissors, Trash2, X
 import { auth } from "../services/supabase";
 import { engineDB } from "../services/db";
 import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
+import { imagesFromPaste } from "../services/clipboardImage";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { MentionTextarea } from "./mentions/MentionTextarea";
@@ -12,6 +13,7 @@ import { VideoEditor } from "./social/VideoEditor";
 import { VIDEO_LIMITS, probeVideo, uploadPostVideo, videoFileProblem } from "../services/postVideo";
 import { MAX_HASHTAGS, extractHashtags } from "../services/socialText";
 import "../services/i18n-social-posts";
+import "../services/i18n-message-dock";
 
 const MAX_PHOTOS = 3;
 const MAX_TEXT = 1000;
@@ -74,9 +76,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
     setError("");
   };
 
-  const handleFiles = async (event) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = "";
+  const addPhotos = async (files) => {
     if (!files.length) return;
 
     setBusy(true);
@@ -97,6 +97,23 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleFiles = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    await addPhotos(files);
+  };
+
+  // Ctrl+V em qualquer ponto do compositor entra pelo mesmo caminho do
+  // seletor: um print ou uma foto copiada de outra aba vira anexo sem passar
+  // pelo disco. Vídeo não — vídeo tem editor e limite próprios.
+  const handlePaste = async (event) => {
+    if (busy || video || photos.length >= MAX_PHOTOS) return;
+    const files = imagesFromPaste(event, { max: MAX_PHOTOS - photos.length });
+    if (!files.length) return;
+    event.preventDefault();
+    await addPhotos(files);
   };
 
   const handleVideoFile = async (event) => {
@@ -221,6 +238,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
             é a tela inteira e o formulário parava a 70% dela (13/09/2026). */}
         <form
           onSubmit={submit}
+          onPaste={handlePaste}
           className="engine-modal-body engine-scroll engine-safe-bottom space-y-4 px-5 py-5"
         >
           <MentionTextarea
@@ -331,6 +349,7 @@ export function CreateFeedPostModal({ open, cars = [], club = null, onClose, onC
               type="button"
               disabled={busy || photos.length >= MAX_PHOTOS || Boolean(video)}
               onClick={() => fileInputRef.current?.click()}
+              title={t("pasteImage.hint")}
               className={mediaButton}
             >
               <ImagePlus size={15} />
