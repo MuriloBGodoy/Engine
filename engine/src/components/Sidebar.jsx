@@ -174,25 +174,34 @@ export function Sidebar({
             <Sparkles size={18} className="shrink-0" />
             {!collapsed && <span className="truncate">{t("nav.plans")}</span>}
           </Link>
-          {isAdmin && (
-            <Link
-              to="/moderacao"
-              title={collapsed ? t("nav.moderation") : undefined}
-              aria-label={collapsed ? t("nav.moderation") : undefined}
-              className={`flex h-10 items-center rounded-xl text-[13px] font-medium transition-colors ${
-                collapsed ? "mx-auto w-11 justify-center" : "gap-3 px-3"
-              } ${
-                isActivePath("/moderacao")
-                  ? "text-[var(--engine-accent)]"
-                  : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
-              }`}
-            >
-              <ShieldAlert size={18} className="shrink-0" />
-              {!collapsed && <span className="truncate">{t("nav.moderation")}</span>}
-            </Link>
-          )}
         </div>
       </nav>
+
+      {/* Moderação (06/11/2026): saiu da lista rolável.
+          A navegação rola quando a altura aperta, e Moderação era o último
+          item — ficava cortado ao meio na base, que é como o Murilo a viu.
+          Aqui embaixo ela é `shrink-0`: nunca rola, nunca corta. E é onde
+          ela pertence de qualquer jeito — é ferramenta de quem cuida do
+          app, não uma área do app, como Planos logo acima. */}
+      {isAdmin && (
+        <div className="shrink-0 border-t border-[var(--engine-border)] px-3 pt-2">
+          <Link
+            to="/moderacao"
+            title={collapsed ? t("nav.moderation") : undefined}
+            aria-label={collapsed ? t("nav.moderation") : undefined}
+            className={`flex h-10 items-center rounded-xl text-[13px] font-medium transition-colors ${
+              collapsed ? "mx-auto w-11 justify-center" : "gap-3 px-3"
+            } ${
+              isActivePath("/moderacao")
+                ? "bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
+                : "text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)]"
+            }`}
+          >
+            <ShieldAlert size={18} className="shrink-0" />
+            {!collapsed && <span className="truncate">{t("nav.moderation")}</span>}
+          </Link>
+        </div>
+      )}
 
       {/* Recolher / expandir — carrinho que acelera no hover */}
       <div className="shrink-0 px-3 pb-2">
