@@ -214,6 +214,26 @@ Cada uma saiu de um conserto de verdade, com a data.
   { display: flex }` do CSS vem depois na folha — mesmo peso, vence a ordem.
   Quem acende o display decide onde apaga, no mesmo arquivo.
   *(07/11/2026, o + da comunidade, que flutuava no desktop havia meses)*
+- **R46.** **Editar não pode custar o que já aconteceu.** Quando o único jeito
+  de trocar uma foto é apagar e publicar de novo, o preço da correção são as
+  curtidas, os comentários e a data — e aí ninguém corrige, ou pior, apaga.
+  Tudo que é publicado tem que poder ser editado no lugar: legenda, mídia,
+  data, local. *(07/11/2026)*
+- **R47.** **O celular tem câmera, e o seletor de arquivo esquece disso.**
+  `<input type="file">` cai na galeria; `capture` abre SÓ a câmera. Os dois
+  sozinhos erram metade das vezes. No aparelho de toque, perguntar: tirar
+  agora ou escolher da galeria. No computador, abrir direto — lá não existe
+  escolha a fazer. *(07/11/2026)*
+- **R48.** **Conversa privada não guarda arquivo em bucket público.** Foto de
+  DM cabia dentro da linha da mensagem e herdava a RLS da conversa; vídeo não
+  cabe e foi para o Storage. Reaproveitar o bucket dos posts (público) teria
+  vazado vídeo de conversa para quem tivesse o endereço. Bucket fechado,
+  caminho com o id da conversa, leitura pela MESMA regra de ler a conversa.
+  *(07/11/2026)*
+- **R49.** **Campo que aceita e não guarda é mentira do formulário.** O
+  formulário de evento deixava somar quatro fotos desde sempre e salvava uma:
+  as outras três sumiam sem aviso no "publicar". Ou o campo guarda o que
+  aceita, ou aceita só o que guarda. *(07/11/2026)*
 
 ## Ainda não resolvido
 
