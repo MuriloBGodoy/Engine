@@ -157,7 +157,7 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://enginegarage.netlify.app"
+site_url = "https://enginegarage.com.br"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
@@ -208,7 +208,7 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -245,22 +245,15 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Carteiro: o Gmail do Engine, por senha de app (precisa da verificação em
-# duas etapas ligada na conta). Sem SMTP próprio o Supabase só entrega para
-# quem é da equipe do projeto. Para ligar: tire os # do bloco, troque
-# CONTA@gmail.com nas duas linhas, ponha ENGINE_SMTP_PASS=<senha de app> em
-# C:engine-credentialssmtp.env, carregue o arquivo no ambiente e rode
-# `supabase config push`. Junto, suba [auth.rate_limit] email_sent de 2 para 30
-# (o 2 é o teto do carteiro padrão; com SMTP próprio o limite é nosso).
-# Com domínio próprio, troca para o Resend mudando host/porta/user/pass.
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.gmail.com"
-# port = 587
-# user = "CONTA@gmail.com"
-# pass = "env(ENGINE_SMTP_PASS)"
-# admin_email = "CONTA@gmail.com"
-# sender_name = "Engine"
+# Carteiro: Resend SMTP para enginegarage.com.br (ativado em 07/11/2026).
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 587
+user = "resend"
+pass = "env(ENGINE_SMTP_PASS)"
+admin_email = "nao-responda@enginegarage.com.br"
+sender_name = "Engine"
 
 # Modelos com a cara do Engine (em português; e-mail não segue o idioma do app).
 [auth.email.template.recovery]

@@ -29,22 +29,18 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 
 ## Domínio enginegarage.com.br (comprado em 03/11/2026)
 
-Registrado no registro.br, válido até 03/11/2027, DNS no próprio registro.br.
-**Conferido em 07/11/2026: a zona está VAZIA** — sem A, sem MX, sem TXT, sem
-`www`. Nada do que está abaixo foi feito ainda.
+Registrado no registro.br, válido até 03/11/2027.
+**Atualizado em 07/11/2026 (Quinta-Feira):** Zona ativa na Cloudflare, Email Routing ativo com 6 regras + catch-all para `enginegarage.app@gmail.com`, Resend verificado (`sa-east-1`), Netlify com certificado SSL Let's Encrypt ativo e site no ar em https://enginegarage.com.br!
 
-- [ ] Zona DNS, quando liberar (o editor não aceita `@`; usar o nome cheio):
-      `A enginegarage.com.br → 75.2.60.5` e
-      `CNAME www.enginegarage.com.br → enginegarage.netlify.app`.
-- [ ] Netlify: adicionar o domínio (Domain management) para emitir o certificado.
-- [ ] Supabase: virar `site_url` para o domínio novo e `config push`
-      (os redirects já foram liberados no commit 5b5d3fe).
-- [ ] **E-mail: ver `SETUP-EMAILS.md`** (escrito em 07/11/2026, com os
-      registros prontos para colar). Resumo: DNS vai do registro.br para a
-      Cloudflare (DNSSEC off ANTES de trocar o nameserver), Email Routing da
-      Cloudflare para receber tudo no Gmail do Engine, Resend para o app
-      enviar, "enviar como" no Gmail para responder como contato@, e DMARC em
-      `p=none` subindo para `p=reject` depois de duas semanas de relatório.
+- [x] Zona DNS na Cloudflare (`leif.ns.cloudflare.com` / `teresa.ns.cloudflare.com`, zona Active).
+- [x] Netlify: domínio `enginegarage.com.br` (Primary) e `www.enginegarage.com.br`, certificado SSL Let's Encrypt ativo.
+- [x] Resend (`sa-east-1`): domínio `enginegarage.com.br` com status **Verified**, chave SMTP em `C:\engine-credentials\resend.env`.
+- [x] Cloudflare Email Routing: MX/SPF automáticos ativos, regras `contato@`, `suporte@`, `privacidade@`, `anuncie@`, `redes@`, `dmarc@` e catch-all encaminhando para `enginegarage.app@gmail.com`.
+- [x] App: `DOMINIO_NO_AR = true` em `engine/src/services/contact.js` (muxdtuber saiu dos 6 lugares públicos e virou contato@/suporte@/privacidade@).
+- [x] Supabase: `site_url = "https://enginegarage.com.br"`, taxa de envio em 30/h e SMTP configurado para o Resend em `supabase/config.toml`.
+- [ ] Opcional no Gmail (`enginegarage.app@gmail.com`): configurar "Enviar e-mail como" (`contato@enginegarage.com.br`) via `smtp.resend.com:587` para responder mensagens direto pelo Gmail com o endereço do domínio.
+- [ ] Depois do domínio: verificação de marca no Google, para a tela de login
+      parar de mostrar `evaankeqxykcktxvesbf.supabase.co`.
 - [ ] Depois do domínio: verificação de marca no Google, para a tela de login
       parar de mostrar `evaankeqxykcktxvesbf.supabase.co`.
 

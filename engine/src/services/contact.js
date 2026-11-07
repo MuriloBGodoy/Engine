@@ -20,7 +20,7 @@
  */
 
 /** Vira `true` quando o e-mail do domínio entregar o primeiro teste. */
-const DOMINIO_NO_AR = false;
+const DOMINIO_NO_AR = true;
 
 /** O Gmail da marca, dono das contas (Stripe, Supabase, Netlify, redes). */
 export const ENGINE_GMAIL = "enginegarage.app@gmail.com";
