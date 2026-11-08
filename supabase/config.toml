@@ -252,7 +252,7 @@ host = "smtp.resend.com"
 port = 587
 user = "resend"
 pass = "env(ENGINE_SMTP_PASS)"
-admin_email = "nao-responda@enginegarage.com.br"
+admin_email = "no-reply@enginegarage.com.br"
 sender_name = "Engine"
 
 # Modelos com a cara do Engine (em português; e-mail não segue o idioma do app).

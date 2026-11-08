@@ -22,7 +22,7 @@ continua sendo a caixa única — você não ganha mais um lugar para abrir todo
   contato@ suporte@ privacidade@ anuncie@ redes@ (+ qualquer coisa@)
 
   você responde ──►  Gmail "enviar como"  ──►  SMTP do Resend  ──►  sai como contato@
-  o app avisa   ──►  Supabase  ──►  SMTP do Resend  ──►  sai como nao-responda@
+  o app avisa   ──►  Supabase  ──►  SMTP do Resend  ──►  sai como no-reply@
 ```
 
 ---
@@ -36,7 +36,7 @@ continua sendo a caixa única — você não ganha mais um lugar para abrir todo
 | `privacidade@` | titular de dados (LGPD) | Política de privacidade |
 | `anuncie@` | pacotes de anúncio e patrocínio | /anuncie |
 | `redes@` | **identidade das contas de rede social** | nenhum lugar público |
-| `nao-responda@` | remetente do app (confirmação, senha) | e-mails automáticos |
+| `no-reply@` | remetente do app (confirmação, senha) | e-mails automáticos |
 | `dmarc@` | relatório diário de quem tentou falsificar o domínio | registro DMARC |
 | qualquer outra | catch-all, para nada digitado errado se perder | — |
 
@@ -122,7 +122,7 @@ host = "smtp.resend.com"
 port = 587
 user = "resend"
 pass = "env(ENGINE_SMTP_PASS)"
-admin_email = "nao-responda@enginegarage.com.br"
+admin_email = "no-reply@enginegarage.com.br"
 sender_name = "Engine"
 ```
 
