@@ -37,11 +37,8 @@ Registrado no registro.br, válido até 03/11/2027.
 - [x] Cloudflare Email Routing: MX/SPF automáticos ativos, regras `contato@`, `suporte@`, `privacidade@`, `anuncie@`, `redes@`, `dmarc@` e catch-all encaminhando para `enginegarage.app@gmail.com`.
 - [x] App: `DOMINIO_NO_AR = true` em `engine/src/services/contact.js` (muxdtuber saiu dos 6 lugares públicos e virou contato@/suporte@/privacidade@).
 - [x] Supabase: `site_url = "https://enginegarage.com.br"`, taxa de envio em 30/h e SMTP configurado para o Resend em `supabase/config.toml`.
-- [ ] Opcional no Gmail (`enginegarage.app@gmail.com`): configurar "Enviar e-mail como" (`contato@enginegarage.com.br`) via `smtp.resend.com:587` para responder mensagens direto pelo Gmail com o endereço do domínio.
-- [ ] Depois do domínio: verificação de marca no Google, para a tela de login
-      parar de mostrar `evaankeqxykcktxvesbf.supabase.co`.
-- [ ] Depois do domínio: verificação de marca no Google, para a tela de login
-      parar de mostrar `evaankeqxykcktxvesbf.supabase.co`.
+- [x] Opcional no Gmail (`enginegarage.app@gmail.com`): configurar "Enviar e-mail como" (`contato@enginegarage.com.br`) via `smtp.resend.com:587` — configurado e verificado com sucesso em 08/11/2026.
+- [x] Depois do domínio: Google Cloud Console (`engine-512201`) atualizado com o domínio autorizado `enginegarage.com.br`, links de branding e origens JS do cliente OAuth Supabase (`https://enginegarage.com.br` e `https://www.enginegarage.com.br`).
 
 ---
 
