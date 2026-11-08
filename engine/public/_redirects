@@ -1,1 +1,6 @@
+# Força o redirecionamento de qualquer acesso via subdomínio Netlify para o domínio oficial
+https://enginegarage.netlify.app/* https://enginegarage.com.br/:splat 301!
+http://enginegarage.netlify.app/* https://enginegarage.com.br/:splat 301!
+
+# SPA fallback para React Router
 /* /index.html 200

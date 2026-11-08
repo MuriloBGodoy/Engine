@@ -58,3 +58,17 @@
 [[edge_functions]]
   path = "/events/*"
   function = "social-og"
+
+# Redirecionamento forçado do subdomínio Netlify para o domínio oficial
+[[redirects]]
+  from = "https://enginegarage.netlify.app/*"
+  to = "https://enginegarage.com.br/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://enginegarage.netlify.app/*"
+  to = "https://enginegarage.com.br/:splat"
+  status = 301
+  force = true
+
