@@ -47,7 +47,7 @@ Registrado no registro.br, válido até 03/11/2027.
 - [x] Editor de texto na foto (`ImageEditor.jsx`): posicionar o texto
       arrastando com o dedo/mouse, não por sliders X/Y. PC e celular (feito em 30/10/2026 com pinch-zoom e camadas de toque).
 - [x] Comunidade no jeito do Instagram: tocar no post abre o post (página no mobile, modal no desktop); tocar em comentários abre os comentários direto; perfil da pessoa com grade das publicações dela (opção C).
-- [ ] Perguntar o país no primeiro acesso (hoje todo perfil nasce BR).
+- [x] Perguntar o país no primeiro acesso (hoje todo perfil nasce BR) — feito em 30/10/2026 com `CountryPrompt.jsx` integrado no `App.jsx`.
 - [ ] Recalcular o preço da Argentina; decidir EUR €3,99 × €5,99.
 
 ---
