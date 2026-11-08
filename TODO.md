@@ -9,12 +9,7 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 
 ## Aberto depois do lote de 04/11/2026
 
-- **E-mail de contato é o Gmail pessoal do Murilo.** Eram SEIS lugares
-  públicos com `muxdtuber@gmail.com` escrito à mão (rodapé, Termos,
-  Privacidade, Configurações, /anuncie e o `billing.js`). Desde 07/11/2026
-  todos leem `services/contact.js`, e a virada para o domínio é uma linha:
-  `DOMINIO_NO_AR = false` → `true`. O passo a passo de montar o e-mail do
-  domínio está em **`SETUP-EMAILS.md`**.
+- **E-mail de contato no domínio oficial.** Resolvido em 08/11/2026: `services/contact.js` virado para `DOMINIO_NO_AR = true`, publicando `contato@enginegarage.com.br` e demais canais oficiais em todo o app.
 - **Nada do lote foi testado logado.** Falta percorrer com conta de verdade:
   apagar notificação arrastando, limpar tudo, aba "No Engine" no perfil,
   botão flutuante de publicar, "Buscar atualização" em Configurações, e
@@ -48,7 +43,7 @@ Registrado no registro.br, válido até 03/11/2027.
       arrastando com o dedo/mouse, não por sliders X/Y. PC e celular (feito em 30/10/2026 com pinch-zoom e camadas de toque).
 - [x] Comunidade no jeito do Instagram: tocar no post abre o post (página no mobile, modal no desktop); tocar em comentários abre os comentários direto; perfil da pessoa com grade das publicações dela (opção C).
 - [x] Perguntar o país no primeiro acesso (hoje todo perfil nasce BR) — feito em 30/10/2026 com `CountryPrompt.jsx` integrado no `App.jsx`.
-- [ ] Recalcular o preço da Argentina; decidir EUR €3,99 × €5,99.
+- [x] Recalcular o preço da Argentina; decidir EUR €3,99 × €5,99 — decidido em 30/10/2026 em `plans.js` (EUR €5,99 pelo IVA/taxas e ARS recalculado via IPC INDEC).
 
 ---
 
