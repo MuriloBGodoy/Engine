@@ -44,12 +44,9 @@ Registrado no registro.br, válido até 03/11/2027.
 
 ## Pedidos do Murilo (30/10/2026)
 
-- [ ] Editor de texto na foto (`ImageEditor.jsx`): posicionar o texto
-      arrastando com o dedo/mouse, não por sliders X/Y. PC e celular.
-- [ ] Comunidade no jeito do Instagram: tocar no post abre o post; tocar em
-      comentários abre os comentários (hoje abre direto nos comentários e
-      precisa voltar para ver o post). Perfil da pessoa com grade das
-      publicações dela. Estudar o Instagram e ficar pelo menos tão bom.
+- [x] Editor de texto na foto (`ImageEditor.jsx`): posicionar o texto
+      arrastando com o dedo/mouse, não por sliders X/Y. PC e celular (feito em 30/10/2026 com pinch-zoom e camadas de toque).
+- [x] Comunidade no jeito do Instagram: tocar no post abre o post (página no mobile, modal no desktop); tocar em comentários abre os comentários direto; perfil da pessoa com grade das publicações dela (opção C).
 - [ ] Perguntar o país no primeiro acesso (hoje todo perfil nasce BR).
 - [ ] Recalcular o preço da Argentina; decidir EUR €3,99 × €5,99.
 
@@ -58,11 +55,9 @@ Registrado no registro.br, válido até 03/11/2027.
 ## Ideias do Claude (28/10/2026)
 
 **Antes do lançamento (código, rodada curta):**
-- [ ] Tirar EXIF/GPS de toda foto antes do upload (foto do carro na garagem de
-      casa entrega o endereço).
-- [ ] Suspender conta denunciada como menor de idade (ECA Digital): botão na
-      `/moderacao`, conta suspensa não loga nem aparece; hoje só apaga conteúdo.
-- [ ] Link para `/moderacao` no menu, só para admin.
+- [x] Tirar EXIF/GPS de toda foto antes do upload (foto do carro na garagem de casa entrega o endereço) — feito em `cleanImage.js` e `photos.js`.
+- [x] Suspender conta denunciada como menor de idade (ECA Digital): botão na `/moderacao`, conta suspensa não loga nem aparece; listagem e levantamento de suspensão — feito em `Moderation.jsx` e `services/suspension.js`.
+- [x] Link para `/moderacao` no menu, só para admin — feito em `Sidebar.jsx` via `useServiceAdmin`.
 
 **Depois do domínio:**
 - [ ] Tela do Google mostrar "Engine" em vez de `evaankeqxykcktxvesbf.supabase.co`:
