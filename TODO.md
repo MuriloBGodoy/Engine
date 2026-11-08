@@ -22,8 +22,7 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
 - **Privacidade do "No Engine" no perfil.** O Murilo quer poder esconder a
   seção. O banco já sabe esconder (`profile_engine_presence` respeita o
   ajuste), falta a decisão de produto sobre o que fica visível para quem.
-- **`supabase config push`** das URLs de redirecionamento do domínio novo
-  continua pendente: precisa do ok dele.
+- **`supabase config push`** executado em 08/11/2026: `site_url = "https://enginegarage.com.br"`, redirects do domínio próprio liberados, taxa de envio em 30/h e SMTP do Resend ativo.
 
 ---
 
