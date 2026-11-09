@@ -86,12 +86,13 @@ nesta ordem:
 - [x] **Gmail só do Engine**: `enginegarage.app@gmail.com` (criado 25/10/2026). Ele
       vira o dono das contas do Engine (Stripe, Supabase, Netlify, Google,
       Sentry, PostHog), separado dos e-mails pessoais.
-- [ ] **Stripe no CPF** (decidido em 24/10; contador e CNPJ ficam para depois).
-      Com o Gmail novo, pedir: "chama a Quinta-Feira pra configurar o Stripe".
-      O Murilo cria a conta e faz a verificação (CPF, selfie, banco) na janela
-      que ela abrir; ela pega as chaves, liga webhook, portal de cancelamento,
-      e-mails de aviso de teste/renovação, marca e pede o Pix. Passo a passo em
-      `SETUP-PAGAMENTOS.md`.
+- [x] **Stripe no CPF** (configurado em Modo Live em 09/11/2026 com Quinta-Feira):
+      Conta `Engine Garage` (`acct_1UUIbqLHr7sX6mX7`) ativa e verificada; chaves
+      `sk_live_...` e `pk_live_...` salvas em `C:\engine-credentials\stripe.env`;
+      Webhook `we_1UZyqHLHr7sX6mX72O0hrxx7` criado para `https://enginegarage.com.br/.netlify/functions/subscription-webhook-stripe`
+      com os 5 eventos e segredo gravado; Customer Portal configurado (cancelar ao
+      fim do período, trocar cartão, faturas); e-mails de lembrete de trial e
+      renovação ativos; Radar Lite configurado.
       - Quando tiver CNPJ: conta nova no Stripe. Clientes e cartões passam pela
         cópia do painel; as assinaturas eu recrio por script (sem cobrar duas
         vezes) e atualizo `user_plans`.
