@@ -663,7 +663,7 @@ function PostFicha({ goal, t, language, full, isGoal, progress, rating, onRate, 
   const KindIcon = isGoal ? Target : Car;
 
   return (
-    <div className="relative space-y-1.5 px-3 pb-2.5 sm:px-4">
+    <div className="relative space-y-2 px-3 pb-3.5 sm:px-4">
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]">
           <KindIcon size={13} aria-hidden="true" />
@@ -1006,12 +1006,12 @@ export function GoalCard({
       className={
         isModal
           ? "bg-[var(--engine-elevated)]"
-          : `border-b border-[var(--engine-border)] bg-[var(--engine-surface)] transition-colors last:border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-accent)]/40 sm:rounded-2xl sm:border ${
+          : `bg-[var(--engine-surface)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-accent)]/40 sm:rounded-2xl sm:border sm:border-[var(--engine-border)] ${
               openable ? "cursor-pointer hover:bg-[var(--engine-surface-2)]/40" : ""
             }`
       }
     >
-      <header className="flex items-center gap-2.5 px-3 py-2 sm:px-4">
+      <header className="flex items-center gap-2.5 px-3 py-3 sm:px-4">
         <AvatarButton
           person={goal}
           size="sm"
@@ -2692,9 +2692,18 @@ export function Community({ cars = [], settings, user }) {
                   )}
 
                   {filteredGoals.length ? (
-                    /* No celular os posts encostam nas bordas e são separados por
-                       uma linha; a partir de sm voltam a ser cartões soltos. */
-                    <div className="-mx-4 border-y border-[var(--engine-border)] sm:mx-0 sm:space-y-5 sm:border-0">
+                    /* No celular os posts encostam nas bordas; a partir de sm
+                       voltam a ser cartões soltos.
+
+                       09/11/2026: medido na tela, o vão entre um post e o
+                       seguinte era ZERO — a única coisa separando os dois era
+                       um fio de 1px, e a legenda de um colava no cabeçalho do
+                       próximo. Agora passa uma faixa do fundo da página entre
+                       eles, que é como Facebook e Threads separam post de post
+                       no celular: o olho acha a fronteira sem procurar. O fundo
+                       (#08090c) contra o cartão (#101216) tem contraste para
+                       isso nos dois temas. */
+                    <div className="-mx-4 space-y-2 sm:mx-0 sm:space-y-5">
                       {filteredGoals.map((goal, index) => (
                         <Fragment key={goal.id}>
                           <GoalCard
