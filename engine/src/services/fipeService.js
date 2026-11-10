@@ -33,9 +33,62 @@ const V1 = "https://parallelum.com.br/fipe/api/v1/carros";
 const TEMPO_V2 = 12000;
 const TEMPO_V1 = 15000;
 
-/** Backend próprio, quando existir. Sem variável, fala direto com a FIPE. */
-const ENGINE_API_URL = import.meta.env.VITE_API_URL || "";
+/**
+ * Backend próprio, quando existir. Sem variável, fala direto com a FIPE.
+ *
+ * 09/11/2026: a consulta parou de funcionar para todo mundo, e não era a FIPE.
+ * `VITE_API_URL=http://localhost:8080/api` vinha do `engine/.env`, que estava
+ * versionado por engano — então a Netlify compilava o site com ele e o
+ * navegador de cada pessoa tentava falar com a porta 8080 DELA MESMA. Pior:
+ * como o desvio para o backend próprio vinha antes de tudo, a queda v2→v1
+ * logo abaixo virava código morto. A tela girava e desistia.
+ *
+ * Duas travas, para não depender de ninguém lembrar de uma variável:
+ *
+ * 1. Endereço de `localhost` só vale se a página também estiver em localhost.
+ *    Um `.env` de desenvolvimento que escape para um build de produção passa
+ *    a ser ignorado, em vez de derrubar o cadastro de carro.
+ * 2. O backend próprio é um atalho, nunca um beco sem saída: se ele falhar
+ *    por qualquer motivo, a chamada continua para a FIPE pública. Antes, um
+ *    backend fora do ar levava a consulta inteira junto.
+ */
+const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i;
+
+const engineApiBase = () => {
+  const url = (import.meta.env.VITE_API_URL || "").trim();
+  if (!url) return "";
+  if (!LOCAL.test(url)) return url;
+  // Só um navegador servido de localhost consegue alcançar outro localhost.
+  const aqui = typeof window !== "undefined" ? window.location.hostname : "";
+  const emCasa = aqui === "localhost" || aqui === "127.0.0.1" || aqui === "::1";
+  if (emCasa) return url;
+  if (typeof console !== "undefined") {
+    console.warn(
+      `[fipe] VITE_API_URL aponta para ${url}, mas a página está em ${aqui}. ` +
+        "Ignorando e consultando a FIPE pública.",
+    );
+  }
+  return "";
+};
+
+const ENGINE_API_URL = engineApiBase();
 const engineApiUrl = (path) => `${ENGINE_API_URL}${path}`;
+
+/**
+ * Tenta o backend próprio e, se ele negar, entrega o que a FIPE pública
+ * disser. É o que torna o atalho opcional de verdade.
+ */
+async function viaEngineApi(path, normaliza, publico) {
+  if (!ENGINE_API_URL) return publico();
+  try {
+    const { data } = await axios.get(engineApiUrl(path), { timeout: TEMPO_V2 });
+    const pronto = normaliza ? normaliza(data) : data;
+    if (pronto && (!Array.isArray(pronto) || pronto.length)) return pronto;
+    throw new Error("engine-api-vazia");
+  } catch {
+    return publico();
+  }
+}
 
 /** `[{code, name}]` da v2 → `[{codigo, nome}]`, que é o que as telas leem. */
 const listaDaV2 = (dados) =>
@@ -64,58 +117,59 @@ async function comQueda(caminhoV2, normalizaV2, caminhoV1, normalizaV1) {
 }
 
 export const fipeService = {
-  getBrands: async () => {
-    if (ENGINE_API_URL) {
-      return (await axios.get(engineApiUrl("/fipe/brands"))).data;
-    }
-    return comQueda("/brands", listaDaV2, "/marcas", listaDaV1);
-  },
+  getBrands: async () =>
+    viaEngineApi("/fipe/brands", null, () =>
+      comQueda("/brands", listaDaV2, "/marcas", listaDaV1),
+    ),
 
-  getModels: async (brandId) => {
-    if (ENGINE_API_URL) {
-      return (await axios.get(engineApiUrl(`/fipe/brands/${brandId}/models`))).data;
-    }
-    return comQueda(
-      `/brands/${brandId}/models`,
-      listaDaV2,
-      `/marcas/${brandId}/modelos`,
-      // Na v1 os modelos vêm embrulhados em `{ modelos, anos }`.
-      (dados) => listaDaV1(dados?.modelos),
-    );
-  },
+  getModels: async (brandId) =>
+    viaEngineApi(`/fipe/brands/${brandId}/models`, null, () =>
+      comQueda(
+        `/brands/${brandId}/models`,
+        listaDaV2,
+        `/marcas/${brandId}/modelos`,
+        // Na v1 os modelos vêm embrulhados em `{ modelos, anos }`.
+        (dados) => listaDaV1(dados?.modelos),
+      ),
+    ),
 
-  getYears: async (brandId, modelId) => {
-    if (ENGINE_API_URL) {
-      return (await axios.get(engineApiUrl(`/fipe/brands/${brandId}/models/${modelId}/years`)))
-        .data;
-    }
-    return comQueda(
-      `/brands/${brandId}/models/${modelId}/years`,
-      listaDaV2,
-      `/marcas/${brandId}/modelos/${modelId}/anos`,
-      listaDaV1,
-    );
-  },
+  getYears: async (brandId, modelId) =>
+    viaEngineApi(`/fipe/brands/${brandId}/models/${modelId}/years`, null, () =>
+      comQueda(
+        `/brands/${brandId}/models/${modelId}/years`,
+        listaDaV2,
+        `/marcas/${brandId}/modelos/${modelId}/anos`,
+        listaDaV1,
+      ),
+    ),
 
   /**
    * O preço, e com ele o código FIPE — que só aparece nesta resposta e é a
    * chave canônica do veículo no Brasil. Devolve `{ Valor, CodigoFipe }`.
    */
   getVehicle: async (brandId, modelId, yearId) => {
-    if (ENGINE_API_URL) {
-      const { data } = await axios.get(
-        engineApiUrl(`/fipe/brands/${brandId}/models/${modelId}/years/${yearId}/price`),
-      );
-      return { Valor: data?.Valor || data?.price || "", CodigoFipe: data?.CodigoFipe || data?.codeFipe || "" };
-    }
-    return comQueda(
-      `/brands/${brandId}/models/${modelId}/years/${yearId}`,
-      (dados) => {
-        if (!dados?.price) throw new Error("fipe-v2-sem-preco");
-        return { Valor: dados.price, CodigoFipe: dados.codeFipe || "" };
-      },
-      `/marcas/${brandId}/modelos/${modelId}/anos/${yearId}`,
-      (dados) => ({ Valor: dados?.Valor || "", CodigoFipe: dados?.CodigoFipe || "" }),
+    const daEngineApi = (data) => {
+      const valor = data?.Valor || data?.price || "";
+      // Sem preço não há código FIPE, e é o código que o resto do app usa.
+      if (!valor) throw new Error("engine-api-sem-preco");
+      return { Valor: valor, CodigoFipe: data?.CodigoFipe || data?.codeFipe || "" };
+    };
+    return viaEngineApi(
+      `/fipe/brands/${brandId}/models/${modelId}/years/${yearId}/price`,
+      daEngineApi,
+      () =>
+        comQueda(
+          `/brands/${brandId}/models/${modelId}/years/${yearId}`,
+          (dados) => {
+            if (!dados?.price) throw new Error("fipe-v2-sem-preco");
+            return { Valor: dados.price, CodigoFipe: dados.codeFipe || "" };
+          },
+          `/marcas/${brandId}/modelos/${modelId}/anos/${yearId}`,
+          (dados) => ({
+            Valor: dados?.Valor || "",
+            CodigoFipe: dados?.CodigoFipe || "",
+          }),
+        ),
     );
   },
 
