@@ -820,6 +820,25 @@ function AppLayout({
   const { t } = useTranslation();
   const location = useLocation();
   const isMessages = location.pathname.startsWith("/messages");
+  /**
+   * Conversa aberta no celular toma a tela inteira — é o que WhatsApp,
+   * Instagram, Telegram e Messenger fazem, e o que as pessoas esperam.
+   *
+   * 09/11/2026: antes a conversa era uma caixa DENTRO do shell. Sobravam dois
+   * cabeçalhos empilhados (o global e o da conversa), a barra de abas por
+   * baixo, e o `<main>` ainda cobrava o padding dele. A caixa tentava
+   * descontar tudo isso com `100dvh - 10.5rem`, um número que nunca bate — e
+   * o compositor ficava cortado no pé da tela.
+   *
+   * Com a tela inteira não há número a adivinhar: a conversa é dona dos
+   * 100dvh. No desktop nada muda; lá as duas colunas são o padrão certo.
+   *
+   * Só vale com alguém logado: deslogado, `/messages/<id>` mostra a tela de
+   * "crie sua conta", e esconder o cabeçalho e as abas numa tela dessas deixa
+   * a pessoa sem para onde ir.
+   */
+  const isChatThread =
+    Boolean(user) && /^\/messages\/[^/]+/.test(location.pathname);
 
   return (
     <div
@@ -830,12 +849,14 @@ function AppLayout({
       {/* No mobile a rolagem é a do documento (barra de endereço recolhe,
           pull-to-refresh funciona); o painel com rolagem interna só entra
           no desktop, onde a sidebar precisa ficar fixa. */}
-      <MobileNav
-        profileSettings={settings.profile}
-        settings={settings}
-        onSettingsUpdate={onSettingsUpdate}
-        user={user}
-      />
+      {!isChatThread && (
+        <MobileNav
+          profileSettings={settings.profile}
+          settings={settings}
+          onSettingsUpdate={onSettingsUpdate}
+          user={user}
+        />
+      )}
 
       {isTopNav ? (
         <TopNav
@@ -856,9 +877,11 @@ function AppLayout({
       )}
 
       <main
-        className={`engine-app-main engine-scroll flex min-h-0 min-w-0 flex-1 flex-col px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8 ${
-          isTopNav ? "" : "lg:h-[100dvh] lg:overflow-y-auto"
-        }`}
+        className={`engine-app-main engine-scroll flex min-h-0 min-w-0 flex-1 flex-col ${
+          isChatThread
+            ? "p-0 lg:px-10 lg:py-8"
+            : "px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8"
+        } ${isTopNav ? "" : "lg:h-[100dvh] lg:overflow-y-auto"}`}
       >
         {/* No layout sidebar, a Topbar global fica no topo do conteúdo (só
             no desktop — no mobile as mesmas ações vivem no header fixo).
@@ -882,7 +905,9 @@ function AppLayout({
           </div>
         ) : (
           <div
-            className={`engine-container flex flex-1 flex-col ${isTopNav ? "" : "lg:mt-6"}`}
+            className={`engine-container flex flex-1 flex-col ${
+              isChatThread ? "min-h-0" : ""
+            } ${isTopNav ? "" : "lg:mt-6"}`}
           >
             <Suspense fallback={<PageLoading />}>
               <Outlet />

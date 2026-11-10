@@ -1047,17 +1047,32 @@ h5 {
 }
 
 /* ===== Chat =====
-   A tela de mensagens precisa de altura própria: o compositor tem que ficar
-   colado no rodapé e só a lista rola. Descontamos o header/tab bar do mobile
-   e a topbar do desktop do viewport. */
+   A tela de mensagens precisa de altura própria: o compositor fica colado no
+   rodapé e só a lista rola.
+
+   Na LISTA de conversas ainda descontamos o header e a barra de abas do
+   mobile, porque ali o shell do app continua em volta.
+
+   09/11/2026: a CONVERSA ABERTA não desconta mais nada. Ela é uma tela
+   inteira, como em qualquer app de mensagem — o `calc(100dvh - 10.5rem)` era
+   um chute que nunca batia com a altura real do chrome, e a sobra cortava o
+   compositor no pé da tela. Ver `isChatThread` em App.jsx. */
 .engine-chat-shell {
   height: calc(100dvh - 10.5rem - env(safe-area-inset-bottom));
   min-height: 24rem;
 }
 
+/* Conversa aberta no celular: dona da tela, sem número mágico. */
+.engine-chat-shell--immersive {
+  height: 100dvh;
+  min-height: 0;
+}
+
 @media (min-width: 1024px) {
-  .engine-chat-shell {
+  .engine-chat-shell,
+  .engine-chat-shell--immersive {
     height: calc(100vh - 9.5rem);
+    min-height: 24rem;
   }
 }
 

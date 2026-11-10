@@ -110,6 +110,22 @@ export function Messages({ user, settings }) {
   const editing = editingState?.conversationId === conversationId ? editingState : null;
   const composerRef = useRef(null);
 
+  /**
+   * O campo cresce com o texto, até o teto de `max-h-32`.
+   *
+   * 09/11/2026: sem isto o campo tinha uma linha de altura fixa, então um
+   * texto de duas linhas — ou mesmo o próprio "Mensagem..." quando a tela era
+   * estreita — ficava com a segunda linha cortada por baixo da borda. É o
+   * mesmo comportamento de WhatsApp e Instagram: uma linha em repouso, e a
+   * caixa sobe conforme se escreve.
+   */
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
+
   const userId = user?.uid || "";
   const locale = i18n.language || "pt-BR";
   const dayLabels = {
@@ -483,12 +499,20 @@ export function Messages({ user, settings }) {
 
   const showList = !conversationId || isDesktop;
   const showThread = Boolean(conversationId);
+  // Conversa aberta no celular ocupa a tela toda; ver `isChatThread` em App.jsx.
+  const immersive = showThread && !isDesktop;
 
   return (
     <section className="flex flex-1 flex-col" style={{ gridColumn: "1 / -1" }}>
       {/* No celular a caixa encosta nas bordas (ganha largura útil) e volta a
           ser cartão a partir de sm — mesmo padrão do header da comunidade. */}
-      <div className="engine-chat-shell -mx-4 flex overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm">
+      <div
+        className={
+          immersive
+            ? "engine-chat-shell--immersive flex overflow-hidden bg-[var(--engine-surface)] lg:rounded-2xl lg:border lg:border-[var(--engine-border)] lg:shadow-sm"
+            : "engine-chat-shell -mx-4 flex overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm"
+        }
+      >
         {showList && (
           <aside
             className={`flex min-w-0 flex-col border-[var(--engine-border)] lg:w-[340px] lg:flex-none lg:border-r ${
@@ -657,7 +681,11 @@ export function Messages({ user, settings }) {
 
         {showThread ? (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <header className="flex shrink-0 items-center gap-2 border-b border-[var(--engine-border)] p-3 sm:px-4">
+            <header
+              className={`flex shrink-0 items-center gap-2 border-b border-[var(--engine-border)] p-3 sm:px-4 ${
+                immersive ? "pt-[calc(0.75rem+env(safe-area-inset-top))]" : ""
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => navigate("/messages")}
@@ -761,16 +789,18 @@ export function Messages({ user, settings }) {
               <form
                 onSubmit={handleSend}
                 onPaste={handlePaste}
-                className="flex shrink-0 items-stretch gap-2 border-t border-[var(--engine-border)] p-3"
+                className={`flex shrink-0 items-end gap-1.5 border-t border-[var(--engine-border)] p-2 sm:gap-2 sm:p-3 ${
+                  immersive ? "pb-[calc(0.5rem+env(safe-area-inset-bottom))]" : ""
+                }`}
               >
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-0 sm:gap-1">
                   <MediaPickerButton
                     accept="image/*,image/gif"
                     onFiles={(files) => handleImageSelected(files[0])}
                     disabled={sending || compressing || sendingVideo || Boolean(editing)}
                     title={t("pasteImage.hint")}
                     ariaLabel={t("socialPosts.messages.photo")}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 min-[360px]:h-9 min-[360px]:w-9 sm:h-11 sm:w-11"
                   >
                     <Image size={18} />
                   </MediaPickerButton>
@@ -781,7 +811,7 @@ export function Messages({ user, settings }) {
                     disabled={sending || compressing || sendingVideo || Boolean(editing)}
                     title={t("socialPosts.messages.video")}
                     ariaLabel={t("socialPosts.messages.video")}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 min-[360px]:h-9 min-[360px]:w-9 sm:h-11 sm:w-11"
                   >
                     {sendingVideo ? (
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
@@ -796,7 +826,7 @@ export function Messages({ user, settings }) {
                     disabled={sending || Boolean(editing)}
                     title={t("socialPosts.messages.gif")}
                     aria-label={t("socialPosts.messages.gif")}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 font-black text-xs"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 min-[360px]:h-9 min-[360px]:w-9 sm:h-11 sm:w-11 font-black text-xs"
                   >
                     GIF
                   </button>
@@ -820,7 +850,7 @@ export function Messages({ user, settings }) {
                     }
                   }}
                   placeholder={t("messages.composerPlaceholder")}
-                  className="engine-scroll max-h-32 min-h-11 w-full min-w-0 flex-1 resize-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-2 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
+                  className="engine-scroll max-h-32 min-h-10 w-full min-w-[6rem] flex-1 resize-none rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] min-[360px]:px-3.5 sm:min-h-11 sm:px-4"
                   style={{ lineHeight: "1.5" }}
                 />
                 <button
@@ -828,7 +858,7 @@ export function Messages({ user, settings }) {
                   disabled={!draft.trim() || sending}
                   title={editing ? t("socialPosts.messages.saveEdit") : t("messages.send")}
                   aria-label={editing ? t("socialPosts.messages.saveEdit") : t("messages.send")}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95 disabled:opacity-40"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--engine-accent)] text-white transition hover:brightness-95 disabled:opacity-40 min-[360px]:h-10 min-[360px]:w-10 sm:h-11 sm:w-11 sm:rounded-xl"
                 >
                   <Send size={18} />
                 </button>
