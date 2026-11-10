@@ -14,9 +14,10 @@ Lista acionável do que ficou pendente. O **porquê** de cada decisão está no
   apagar notificação arrastando, limpar tudo, aba "No Engine" no perfil,
   botão flutuante de publicar, "Buscar atualização" em Configurações, e
   publicar um carro com preparação escrita para ver a busca achar.
-- **Privacidade do "No Engine" no perfil.** O Murilo quer poder esconder a
-  seção. O banco já sabe esconder (`profile_engine_presence` respeita o
-  ajuste), falta a decisão de produto sobre o que fica visível para quem.
+- **Privacidade do "No Engine" no perfil.** Resolvido em 09/11/2026: mantido o
+  padrão aberto (estimula networking e comunidade), com clubes privados protegidos
+  por membership e o switch `hideEngineBlock` disponível em Configurações › Privacidade
+  para o dono esconder tudo quando quiser.
 - **`supabase config push`** executado em 08/11/2026: `site_url = "https://enginegarage.com.br"`, redirects do domínio próprio liberados, taxa de envio em 30/h e SMTP do Resend ativo.
 
 ---
@@ -96,19 +97,18 @@ nesta ordem:
       - Quando tiver CNPJ: conta nova no Stripe. Clientes e cartões passam pela
         cópia do painel; as assinaturas eu recrio por script (sem cobrar duas
         vezes) e atualizo `user_plans`.
-- [ ] **Colar na Netlify**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+- [x] **Colar na Netlify**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
       `VITE_STRIPE_PUBLISHABLE_KEY`, `SUPABASE_URL`,
-      `SUPABASE_SERVICE_ROLE_KEY` (e depois `VITE_SUPPORT_PIX_KEY`).
-- [ ] **Comprar o domínio** `enginegarage.com.br` (registro.br, só o domínio).
+      `SUPABASE_SERVICE_ROLE_KEY` (configurados em Produção em 09/11/2026 com deploy publicado com sucesso).
+- [x] **Comprar o domínio** `enginegarage.com.br` (registro.br, só o domínio).
       Depois, numa tacada:
-      - e-mails públicos `contato@`, `suporte@`, `privacidade@` encaminhando
-        para o Gmail do Engine (Cloudflare Email Routing ou similar, grátis);
-      - trocar `muxdtuber@gmail.com` nos Termos, na Privacidade e no rodapé;
-      - chave Pix = `contato@enginegarage.com.br` → `VITE_SUPPORT_PIX_KEY`
-        (a seção de doação em /apoie aparece sozinha);
-      - Netlify, Resend como SMTP, `site_url` no Supabase, tela de
-        consentimento do Google, e o webhook do Stripe no domínio novo (ver
-        "Domínio próprio" mais abaixo).
+      - [x] e-mails públicos `contato@`, `suporte@`, `privacidade@` encaminhando
+        para o Gmail do Engine (Cloudflare Email Routing);
+      - [x] trocar `muxdtuber@gmail.com` nos Termos, na Privacidade e no rodapé;
+      - [ ] chave Pix = `contato@enginegarage.com.br` → `VITE_SUPPORT_PIX_KEY`
+        (a seção de doação em /apoie aparece sozinha assim que cadastrar no banco);
+      - [x] Netlify, Resend como SMTP, `site_url` no Supabase, tela de
+        consentimento do Google, e o webhook do Stripe no domínio novo.
 - [ ] **AdSense** — o app já pede consentimento de cookies antes de carregar;
       falta a conta e as variáveis `VITE_ADSENSE_CLIENT` /
       `VITE_ADSENSE_SLOT_DEFAULT`.
