@@ -247,13 +247,13 @@ const ptBR = {
       },
       pix: {
         title: "Doação por Pix",
-        body: "Uma contribuição avulsa, de qualquer valor. É só apoio: não dá benefício nenhum no app. Se quiser algo em troca, o caminho é o Premium.",
+        body: "Uma contribuição voluntária, de qualquer valor, para apoiar o projeto, manter os servidores no ar e acelerar o desenvolvimento do Engine.",
         keyLabel: "Chave Pix",
         copy: "Copiar chave",
         copied: "Chave Pix copiada.",
         copiedShort: "Copiada",
         copyFallback: "Não deu para copiar sozinho. A chave ficou selecionada: copie com o menu do aparelho.",
-        noReward: "Doação não libera recurso, selo nem destaque.",
+        noReward: "Apoio voluntário e espontâneo (não vinculado a planos pagos ou selos).",
         checkName: "Confira os dados do recebedor no app do seu banco antes de confirmar.",
       },
       sponsor: {
@@ -573,13 +573,13 @@ const enUS = {
       },
       pix: {
         title: "Donate via Pix",
-        body: "A one-off contribution of any amount. It is support only: it gives no benefit in the app. If you want something in return, Premium is the way.",
+        body: "A voluntary contribution of any amount to support the project, keep servers running, and accelerate Engine's development.",
         keyLabel: "Pix key",
         copy: "Copy key",
         copied: "Pix key copied.",
         copiedShort: "Copied",
         copyFallback: "We couldn't copy it automatically. The key is selected: copy it with your device menu.",
-        noReward: "Donations don't unlock features, badges or highlights.",
+        noReward: "Voluntary support (not tied to paid plans, features, or badges).",
         checkName: "Check the recipient details in your banking app before confirming.",
       },
       sponsor: {
@@ -895,13 +895,13 @@ const esES = {
       },
       pix: {
         title: "Donación por Pix",
-        body: "Una contribución puntual, de cualquier importe. Es solo apoyo: no da ningún beneficio en la app. Si quieres algo a cambio, el camino es Premium.",
+        body: "Una contribución voluntaria, de cualquier importe, para apoyar el proyecto, mantener los servidores activos y acelerar el desarrollo de Engine.",
         keyLabel: "Clave Pix",
         copy: "Copiar clave",
         copied: "Clave Pix copiada.",
         copiedShort: "Copiada",
         copyFallback: "No se pudo copiar automáticamente. La clave quedó seleccionada: cópiala con el menú del dispositivo.",
-        noReward: "La donación no desbloquea funciones, insignias ni destaques.",
+        noReward: "Apoyo voluntario (no vinculado a planes de pago, funciones o insignias).",
         checkName: "Comprueba los datos del destinatario en la app de tu banco antes de confirmar.",
       },
       sponsor: {
