@@ -105,8 +105,9 @@ nesta ordem:
       - [x] e-mails públicos `contato@`, `suporte@`, `privacidade@` encaminhando
         para o Gmail do Engine (Cloudflare Email Routing);
       - [x] trocar `muxdtuber@gmail.com` nos Termos, na Privacidade e no rodapé;
-      - [ ] chave Pix = `contato@enginegarage.com.br` → `VITE_SUPPORT_PIX_KEY`
-        (a seção de doação em /apoie aparece sozinha assim que cadastrar no banco);
+      - [x] chave Pix = `apoie@enginegarage.com.br` → `VITE_SUPPORT_PIX_KEY`
+        (criada na Cloudflare e configurada no Netlify em 09/11/2026; a seção de doação
+        em /apoie aparece sozinha com QR Code e Copia-e-Cola assim que cadastrada no banco);
       - [x] Netlify, Resend como SMTP, `site_url` no Supabase, tela de
         consentimento do Google, e o webhook do Stripe no domínio novo.
 - [ ] **AdSense** — o app já pede consentimento de cookies antes de carregar;
