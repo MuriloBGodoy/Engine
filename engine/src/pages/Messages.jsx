@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -119,12 +119,38 @@ export function Messages({ user, settings }) {
    * mesmo comportamento de WhatsApp e Instagram: uma linha em repouso, e a
    * caixa sobe conforme se escreve.
    */
-  useEffect(() => {
-    const el = composerRef.current;
+  const ajustaAltura = useCallback((el) => {
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [draft]);
+    const altura = el.scrollHeight;
+    el.style.height = `${altura}px`;
+    // Enquanto o texto couber, não há o que rolar — e a barra de rolagem do
+    // navegador reserva ~12px mesmo vazia. Numa tela de 320px esses 12px
+    // eram justamente o que jogava o "Mensagem..." para uma segunda linha.
+    const teto = parseFloat(getComputedStyle(el).maxHeight);
+    el.style.overflowY = Number.isFinite(teto) && altura > teto ? "auto" : "hidden";
+  }, []);
+
+  /**
+   * O campo entra medido, não só depois da primeira tecla.
+   *
+   * O efeito abaixo escuta `draft`, mas o compositor só aparece quando a
+   * conversa termina de carregar — depois, portanto, da última mudança de
+   * `draft`. Resultado: em repouso o campo ficava com a altura crua do
+   * navegador e com a barra de rolagem reservada. Medir no momento em que o
+   * elemento entra no DOM resolve os dois casos.
+   */
+  const ligaComposer = useCallback(
+    (el) => {
+      composerRef.current = el;
+      ajustaAltura(el);
+    },
+    [ajustaAltura],
+  );
+
+  useEffect(() => {
+    ajustaAltura(composerRef.current);
+  }, [draft, ajustaAltura]);
 
   const userId = user?.uid || "";
   const locale = i18n.language || "pt-BR";
@@ -789,7 +815,7 @@ export function Messages({ user, settings }) {
               <form
                 onSubmit={handleSend}
                 onPaste={handlePaste}
-                className={`flex shrink-0 items-end gap-1.5 border-t border-[var(--engine-border)] p-2 sm:gap-2 sm:p-3 ${
+                className={`flex shrink-0 items-end gap-1 border-t border-[var(--engine-border)] p-2 min-[360px]:gap-1.5 sm:gap-2 sm:p-3 ${
                   immersive ? "pb-[calc(0.5rem+env(safe-area-inset-bottom))]" : ""
                 }`}
               >
@@ -835,7 +861,7 @@ export function Messages({ user, settings }) {
                 </div>
   
                 <textarea
-                  ref={composerRef}
+                  ref={ligaComposer}
                   value={draft}
                   rows={1}
                   onChange={(event) => setDraft(event.target.value)}
@@ -850,7 +876,7 @@ export function Messages({ user, settings }) {
                     }
                   }}
                   placeholder={t("messages.composerPlaceholder")}
-                  className="engine-scroll max-h-32 min-h-10 w-full min-w-[6rem] flex-1 resize-none rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 py-2 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] min-[360px]:px-3.5 sm:min-h-11 sm:px-4"
+                  className="engine-scroll max-h-32 min-h-10 w-full min-w-[6rem] flex-1 resize-none rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-2 py-2 text-sm font-semibold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] min-[360px]:px-3.5 sm:min-h-11 sm:px-4"
                   style={{ lineHeight: "1.5" }}
                 />
                 <button
