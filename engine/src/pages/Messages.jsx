@@ -10,6 +10,8 @@ import {
   Send,
   Image,
   Video,
+  Plus,
+  Camera,
   UserX,
   CheckCircle2,
   RotateCcw,
@@ -49,7 +51,7 @@ import { GiphyPicker } from "../components/GiphyPicker";
 import { compressImage, readFileAsDataUrl, blobToDataUrl } from "../services/imageCompression";
 import { imagesFromPaste } from "../services/clipboardImage";
 import { uploadChatVideo } from "../services/chatMedia";
-import { MediaPickerButton } from "../components/MediaPickerButton";
+import { BottomSheet } from "../components/BottomSheet";
 import { ServiceContextCard, ServiceStatusPill } from "../components/messages/ServiceThread";
 import { ConversationRow } from "../components/messages/ConversationRow";
 import { MessageList } from "../components/messages/MessageList";
@@ -101,6 +103,9 @@ export function Messages({ user, settings }) {
   const [compressing, setCompressing] = useState(false);
   const [sendingVideo, setSendingVideo] = useState(false);
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
+  const [anexosAbertos, setAnexosAbertos] = useState(false);
+  const galeriaRef = useRef(null);
+  const cameraRef = useRef(null);
   const [tab, setTab] = useState("direct");
   const [statusFilter, setStatusFilter] = useState("all");
   const [statusBusy, setStatusBusy] = useState(false);
@@ -428,6 +433,19 @@ export function Messages({ user, settings }) {
     } finally {
       setSendingVideo(false);
     }
+  };
+
+  // Um seletor só para foto e vídeo — é o tipo do arquivo que decide o
+  // caminho. Antes eram dois botões no compositor, cada um com o seu
+  // `accept`: quem abria o da foto não via os vídeos da galeria e achava que
+  // o Engine não mandava vídeo.
+  const receberAnexo = (event) => {
+    const [file] = Array.from(event.target.files || []);
+    event.target.value = "";
+    setAnexosAbertos(false);
+    if (!file) return;
+    if (file.type.startsWith("video/")) handleVideoSelected(file);
+    else handleImageSelected(file);
   };
 
   // Ctrl+V com uma foto na área de transferência cai na MESMA prévia do
@@ -819,47 +837,31 @@ export function Messages({ user, settings }) {
                   immersive ? "pb-[calc(0.5rem+env(safe-area-inset-bottom))]" : ""
                 }`}
               >
-                <div className="flex shrink-0 items-center gap-0 sm:gap-1">
-                  <MediaPickerButton
-                    accept="image/*,image/gif"
-                    onFiles={(files) => handleImageSelected(files[0])}
-                    disabled={sending || compressing || sendingVideo || Boolean(editing)}
-                    title={t("pasteImage.hint")}
-                    ariaLabel={t("socialPosts.messages.photo")}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 min-[360px]:h-9 min-[360px]:w-9 sm:h-11 sm:w-11"
-                  >
-                    <Image size={18} />
-                  </MediaPickerButton>
+                {/* Um "+" no lugar de quatro botões. Medido em 10/11/2026 num
+                    celular de 320px: foto, vídeo, GIF e emoji deixavam 102px
+                    para o campo de texto, e "Mensagem..." mede 98px — por isso
+                    o texto parecia cortado. Com um botão só sobram ~190px.
+                    O emoji fica só no computador: o teclado do celular já tem
+                    emoji, e ali o botão só ocupava lugar. */}
+                <button
+                  type="button"
+                  onClick={() => setAnexosAbertos(true)}
+                  disabled={sending || compressing || sendingVideo || Boolean(editing)}
+                  title={t("messages.attach")}
+                  aria-label={t("messages.attach")}
+                  aria-haspopup="dialog"
+                  aria-expanded={anexosAbertos}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-40 sm:h-11 sm:w-11"
+                >
+                  {sendingVideo || compressing ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
+                  ) : (
+                    <Plus size={19} />
+                  )}
+                </button>
 
-                  <MediaPickerButton
-                    accept="video/mp4,video/quicktime,video/webm,video/*"
-                    onFiles={(files) => handleVideoSelected(files[0])}
-                    disabled={sending || compressing || sendingVideo || Boolean(editing)}
-                    title={t("socialPosts.messages.video")}
-                    ariaLabel={t("socialPosts.messages.video")}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 min-[360px]:h-9 min-[360px]:w-9 sm:h-11 sm:w-11"
-                  >
-                    {sendingVideo ? (
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
-                    ) : (
-                      <Video size={18} />
-                    )}
-                  </MediaPickerButton>
-  
-                  <button
-                    type="button"
-                    onClick={() => setShowGiphyPicker(true)}
-                    disabled={sending || Boolean(editing)}
-                    title={t("socialPosts.messages.gif")}
-                    aria-label={t("socialPosts.messages.gif")}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40 min-[360px]:h-9 min-[360px]:w-9 sm:h-11 sm:w-11 font-black text-xs"
-                  >
-                    GIF
-                  </button>
-  
-                  <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                </div>
-  
+                {isDesktop && <EmojiPicker onEmojiSelect={handleEmojiSelect} />}
+
                 <textarea
                   ref={ligaComposer}
                   value={draft}
@@ -907,6 +909,78 @@ export function Messages({ user, settings }) {
                 onClose={() => setShowGiphyPicker(false)}
               />
             )}
+
+            {/* Os dois campos ficam FORA da folha: a folha fecha assim que a
+                pessoa escolhe o que quer, e um input que some junto com ela
+                nunca chega a abrir o seletor do sistema. */}
+            <input
+              ref={galeriaRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={receberAnexo}
+              className="hidden"
+              tabIndex={-1}
+            />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={receberAnexo}
+              className="hidden"
+              tabIndex={-1}
+            />
+
+            <BottomSheet
+              open={anexosAbertos}
+              onClose={() => setAnexosAbertos(false)}
+              ariaLabel={t("messages.attach")}
+              bare
+            >
+              <div className="grid grid-cols-4 gap-x-2 gap-y-4 pb-1 pt-1">
+                {[
+                  {
+                    chave: "midia",
+                    icone: <Image size={21} />,
+                    rotulo: t("messages.attachPhotoVideo"),
+                    acao: () => {
+                      setAnexosAbertos(false);
+                      galeriaRef.current?.click();
+                    },
+                  },
+                  {
+                    chave: "camera",
+                    icone: <Camera size={21} />,
+                    rotulo: t("messages.attachCamera"),
+                    acao: () => {
+                      setAnexosAbertos(false);
+                      cameraRef.current?.click();
+                    },
+                  },
+                  {
+                    chave: "gif",
+                    icone: <span className="text-[11px] font-black">GIF</span>,
+                    rotulo: t("socialPosts.messages.gif"),
+                    acao: () => {
+                      setAnexosAbertos(false);
+                      setShowGiphyPicker(true);
+                    },
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.chave}
+                    type="button"
+                    onClick={item.acao}
+                    className="flex min-h-[4.5rem] flex-col items-center gap-1.5 rounded-xl p-1 text-[11px] font-bold leading-tight text-[var(--engine-text-muted)] transition active:scale-95"
+                  >
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-accent)]">
+                      {item.icone}
+                    </span>
+                    <span className="w-full text-center">{item.rotulo}</span>
+                  </button>
+                ))}
+              </div>
+            </BottomSheet>
           </div>
         ) : (
           <div className="hidden min-w-0 flex-1 flex-col items-center justify-center px-6 text-center lg:flex">

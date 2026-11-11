@@ -1019,6 +1019,62 @@ h5 {
   }
 }
 
+/* ===== Folha de baixo (BottomSheet) =====
+   A camada de escolha do celular: sobe de baixo, fica debaixo do polegar e
+   fecha arrastando. Deixa uma faixa da página à mostra em cima (78dvh), que
+   é o que diz para a pessoa que ela não mudou de tela.
+
+   No computador não existe polegar nem borda de baixo: a partir de 640px a
+   mesma folha vira caixa centralizada, com o conteúdo igual. */
+.engine-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: engine-fade-in 0.18s ease-out;
+}
+
+.engine-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(78dvh, 36rem);
+  overflow: hidden;
+  border: 1px solid var(--engine-border);
+  border-width: 1px 0 0 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--engine-elevated);
+  box-shadow: var(--engine-shadow-lg);
+  animation: engine-sheet-up 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  /* Volta sozinha para o lugar quando o arrasto não chegou ao corte. O
+     arrasto em si desliga esta transição (style inline no componente). */
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 640px) {
+  .engine-sheet-scrim {
+    align-items: center;
+    padding: 1rem;
+  }
+
+  .engine-sheet {
+    width: min(420px, 100%);
+    max-height: min(84vh, 42rem);
+    border-width: 1px;
+    border-radius: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engine-sheet,
+  .engine-sheet-scrim {
+    animation: none;
+  }
+}
+
 @keyframes engine-fade-in {
   from {
     opacity: 0;
