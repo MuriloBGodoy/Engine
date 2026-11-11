@@ -113,6 +113,35 @@ export const changedReviewKeys = (original, next) => {
   );
 };
 
+/**
+ * Link no texto livre do anúncio (título, descrição, nome, tags).
+ *
+ * Desde 11/11/2026 o anúncio vai ao ar na hora, e o banco só manda para a fila
+ * o que o filtro automático apontar (migração
+ * 20261111120000_service_listings_publish_first.sql). Link solto no texto é um
+ * dos apontamentos: o anúncio tem campo de site e de vídeo, e link no meio da
+ * descrição é como se leva a pessoa para fora e se troca o destino depois.
+ *
+ * Esta é a ÚNICA regra do filtro espelhada aqui, e de propósito: ela não é
+ * segredo e a tela consegue avisar antes, poupando uma ida à fila. A lista de
+ * termos barrados fica só no banco — lista de bloqueio dentro do bundle é
+ * lista de bloqueio publicada. O resultado das outras regras a tela descobre
+ * pelo status que o banco devolve, que ela já relê.
+ *
+ * Mesma expressão da função public.service_listing_risk. Mudou uma, muda a
+ * outra.
+ */
+const LINK_IN_TEXT =
+  /(https?:\/\/|www\.|wa\.me|t\.me|bit\.ly|encurtador|[a-z0-9][a-z0-9-]*\.(com|com\.br|net|org|io|me|xyz|top|shop|site|link|app|online)([/ ,;]|$))/;
+
+export const freeTextHasLink = (listing = {}) =>
+  LINK_IN_TEXT.test(
+    [listing.title, listing.description, listing.providerName, ...(listing.tags || [])]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase(),
+  );
+
 /** Todos os status de moderação; "suspended" = tirado do ar pela moderação. */
 export const MODERATION_STATUSES = [
   "pending",

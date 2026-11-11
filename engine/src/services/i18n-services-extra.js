@@ -109,8 +109,18 @@ const ptBR = {
         "Você mudou: {{fields}}. O anúncio sai do ar até a moderação revisar, em até {{hours}} horas. Preço, horário, contato, redes e área atendida dá para mudar sem sair do ar.",
       confirm: "Enviar para aprovação",
     },
+    linkWarning: {
+      title: "Tem link na descrição",
+      message:
+        "Link solto no texto manda o anúncio para revisão, e aí ele não vai ao ar na hora. O campo Site é o lugar dele.",
+      confirm: "Publicar assim mesmo",
+      cancel: "Vou tirar o link",
+    },
     submitted: {
       title: "Recebido!",
+      titleLive: "Seu anúncio está no ar",
+      liveCopy:
+        "Já aparece na vitrine para quem procura serviço na sua cidade. Preço, horário e contato você muda quando quiser, sem sair do ar.",
       titleEdit: "Alterações enviadas",
       sla: "Seu anúncio será revisado em até {{hours}} horas.",
       copy: "Avisamos aqui no Engine quando ele for ao ar. Você acompanha o status em Meus anúncios.",
@@ -325,8 +335,18 @@ const enUS = {
         "You changed: {{fields}}. The listing goes offline until moderation reviews it, within {{hours}} hours. Price, hours, contact, social handles and service area can change without going offline.",
       confirm: "Send for review",
     },
+    linkWarning: {
+      title: "There's a link in the description",
+      message:
+        "A loose link in the text sends the listing to review, so it won't go live right away. The Website field is where it belongs.",
+      confirm: "Publish anyway",
+      cancel: "I'll remove the link",
+    },
     submitted: {
       title: "Received!",
+      titleLive: "Your listing is live",
+      liveCopy:
+        "It already shows up for people looking for a service in your city. Price, hours and contact details you can change any time, without going offline.",
       titleEdit: "Changes sent",
       sla: "Your listing will be reviewed within {{hours}} hours.",
       copy: "We'll let you know here on Engine when it goes live. Track its status in My listings.",
@@ -541,8 +561,18 @@ const esES = {
         "Cambiaste: {{fields}}. El anuncio sale de línea hasta que la moderación lo revise, en hasta {{hours}} horas. Precio, horario, contacto, redes y zona de atención se pueden cambiar sin salir de línea.",
       confirm: "Enviar a revisión",
     },
+    linkWarning: {
+      title: "Hay un enlace en la descripción",
+      message:
+        "Un enlace suelto en el texto envía el anuncio a revisión, y así no se publica al instante. El campo Sitio es su lugar.",
+      confirm: "Publicar así",
+      cancel: "Voy a quitar el enlace",
+    },
     submitted: {
       title: "¡Recibido!",
+      titleLive: "Tu anuncio está publicado",
+      liveCopy:
+        "Ya aparece para quien busca un servicio en tu ciudad. Precio, horario y contacto los cambias cuando quieras, sin salir de línea.",
       titleEdit: "Cambios enviados",
       sla: "Tu anuncio será revisado en hasta {{hours}} horas.",
       copy: "Te avisamos aquí en Engine cuando se publique. Sigue el estado en Mis anuncios.",

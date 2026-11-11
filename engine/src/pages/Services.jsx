@@ -85,6 +85,7 @@ import {
   APPROVAL_SLA_HOURS,
   PRICE_MAX_LENGTH,
   changedReviewKeys,
+  freeTextHasLink,
   listingEditNeedsReview,
 } from "../services/serviceListingRules";
 import {
@@ -1280,7 +1281,13 @@ function FormSection({ title, copy, children }) {
   );
 }
 
-function SubmittedPanel({ isNew, onOpenMyListings, onClose }) {
+/**
+ * Depois de salvar. São três desfechos desde 11/11/2026, quando o anúncio
+ * passou a ir ao ar na hora: publicado (`live`), novo na fila porque o filtro
+ * apontou algo, ou edição enviada. Só os dois últimos falam de prazo — prometer
+ * revisão em 24h para quem já está no ar é confundir quem não precisa esperar.
+ */
+function SubmittedPanel({ isNew, live, onOpenMyListings, onClose }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center px-5 py-10 text-center sm:px-10 sm:py-14">
@@ -1288,14 +1295,26 @@ function SubmittedPanel({ isNew, onOpenMyListings, onClose }) {
         <CheckCircle2 size={32} aria-hidden="true" />
       </span>
       <h2 className="mt-5 text-xl font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
-        {isNew ? t("services.submitted.title") : t("services.submitted.titleEdit")}
+        {live
+          ? t("services.submitted.titleLive")
+          : isNew
+            ? t("services.submitted.title")
+            : t("services.submitted.titleEdit")}
       </h2>
-      <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-[var(--engine-text)]">
-        {t("services.submitted.sla", { hours: APPROVAL_SLA_HOURS })}
-      </p>
-      <p className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
-        {t("services.submitted.copy")}
-      </p>
+      {live ? (
+        <p className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+          {t("services.submitted.liveCopy")}
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-[var(--engine-text)]">
+            {t("services.submitted.sla", { hours: APPROVAL_SLA_HOURS })}
+          </p>
+          <p className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--engine-text-muted)]">
+            {t("services.submitted.copy")}
+          </p>
+        </>
+      )}
       <div className="mt-7 grid w-full max-w-sm gap-2.5">
         <button
           type="button"
@@ -1422,7 +1441,12 @@ function ListingEditorModal({
         </div>
 
         {submitted ? (
-          <SubmittedPanel isNew={submitted.isNew} onOpenMyListings={onOpenMyListings} onClose={onCancel} />
+          <SubmittedPanel
+            isNew={submitted.isNew}
+            live={submitted.live}
+            onOpenMyListings={onOpenMyListings}
+            onClose={onCancel}
+          />
         ) : (
           <>
             <div className="grid gap-8 p-4 pb-28 sm:p-6 md:grid-cols-2">
@@ -2942,6 +2966,22 @@ export function Services({ user, settings }) {
       return;
     }
 
+    // Link solto no texto manda o anúncio para a fila (filtro do banco). Dá
+    // para avisar antes e poupar a espera — o campo Site existe para isso.
+    if (freeTextHasLink(form)) {
+      const ok = await confirm({
+        title: t("services.linkWarning.title"),
+        message: t("services.linkWarning.message"),
+        confirmLabel: t("services.linkWarning.confirm"),
+        cancelLabel: t("services.linkWarning.cancel"),
+        tone: "neutral",
+      });
+      if (!ok) {
+        faltando("svc-description", t("services.linkWarning.title"));
+        return;
+      }
+    }
+
     // Publicado como página: o nome do anúncio é o da página.
     const asPage = pro.pages.find((entry) => entry.profile.id === form.profileId)?.profile || null;
     const candidate = {
@@ -2976,6 +3016,9 @@ export function Services({ user, settings }) {
       if (!form.id) clearListingDraft();
       if (queued) {
         setSubmitted({ isNew: !form.id });
+      } else if (!form.id) {
+        // Anúncio novo que passou pelo filtro: já está na vitrine.
+        setSubmitted({ isNew: true, live: true });
       } else {
         flash(t("services.flash.liveUpdated"));
         closeEditor();
