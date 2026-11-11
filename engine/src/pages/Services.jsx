@@ -454,7 +454,7 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
       {/* `shrink-0`: sem ele a faixa de 160px media 120px num card e 96px no
           outro, conforme o texto de cada anuncio. Foto de tamanho diferente em
           cada card e o que fazia a grade parecer torta. */}
-      <div className="relative h-[160px] shrink-0 overflow-hidden bg-[var(--engine-surface-2)] sm:h-[180px]">
+      <div className="relative h-[132px] shrink-0 overflow-hidden bg-[var(--engine-surface-2)] sm:h-[180px]">
         <ListingPhoto
           key={activePhoto || "sem-foto"}
           src={activePhoto}
@@ -465,7 +465,9 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
         {photos.length > 0 && (
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         )}
-        <span className="absolute left-3 top-3 rounded-full bg-[var(--engine-accent)] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+        {/* `max-w` + `truncate`: num cartão de 174px, "Polimento, vitrificação
+            e detailing" quebrava em três linhas e vazava para fora da foto. */}
+        <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-[var(--engine-accent)] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white sm:left-3 sm:top-3 sm:px-3 sm:text-[10px] sm:tracking-widest">
           {getServiceCategoryLabel(listing.category, t)}
         </span>
         {/* Compartilhar direto do card: é o gesto de quem achou um bom
@@ -477,7 +479,9 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
             variant="overlay"
             asOwner={isMine}
             source="card"
-            className="absolute bottom-2 right-2 z-10"
+            /* Fora do celular: num cartão de 174px ele cobre a foto e disputa
+               o toque com o próprio cartão. Compartilhar continua no detalhe. */
+            className="absolute bottom-2 right-2 z-10 max-sm:hidden"
           />
         )}
         {photos.length > 1 && (
@@ -529,11 +533,17 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
         )}
       </div>
 
-      <div className="flex flex-1 flex-col justify-between gap-3 p-3.5 sm:p-4">
+      {/* No celular a grade é de duas colunas, e aí o cartão tem ~175px de
+          largura: cabem foto, título, prestador, cidade e preço, nada mais.
+          Modo, horário, descrição, tags e os botões continuam existindo —
+          aparecem a partir de 640px e no detalhe, que é onde quem está
+          decidindo vai parar. Nove informações num cartão de 175px não são
+          nove informações: são nenhuma. */}
+      <div className="flex flex-1 flex-col justify-between gap-2 p-2.5 sm:gap-3 sm:p-4">
         <div className="min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <h2 className="line-clamp-2 text-base font-extrabold italic leading-5 tracking-tight text-[var(--engine-text)] sm:text-lg sm:leading-6 dark:text-white">
+              <h2 className="line-clamp-2 text-[13.5px] font-extrabold italic leading-[1.25] tracking-tight text-[var(--engine-text)] sm:text-lg sm:leading-6 dark:text-white">
                 {listing.title}
               </h2>
               <p className="mt-1 truncate text-xs font-semibold text-[var(--engine-text-subtle)]">
@@ -543,12 +553,21 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
             </div>
           </div>
 
-          <p className="mt-2 line-clamp-2 text-xs font-medium leading-4 text-[var(--engine-text-muted)]">
+          <p className="mt-2 hidden line-clamp-2 text-xs font-medium leading-4 text-[var(--engine-text-muted)] sm:block">
             {listing.description}
           </p>
         </div>
 
-        <div className="grid gap-2 text-xs font-semibold text-[var(--engine-text-muted)]">
+        {/* A cidade é o único dos três que fica no celular: é o que decide se
+            a pessoa consegue chegar lá. */}
+        <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-[var(--engine-text-muted)] sm:hidden">
+          <MapPin className="shrink-0 text-emerald-500" size={13} />
+          <span className="truncate">
+            {listing.city || listing.serviceArea || t("services.locationFallback")}
+          </span>
+        </div>
+
+        <div className="hidden gap-2 text-xs font-semibold text-[var(--engine-text-muted)] sm:grid">
           <div className="flex min-w-0 items-center gap-2">
             <ModeIcon className="shrink-0 text-[var(--engine-accent)]" size={15} />
             <span className="truncate">{t(modeLabelKeys[listing.serviceMode] || modeLabelKeys.hybrid)}</span>
@@ -565,12 +584,14 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
           </div>
         </div>
 
-        <div className="space-y-2.5 border-t border-[var(--engine-border)] pt-2.5">
+        <div className="space-y-2.5 border-t border-[var(--engine-border)] pt-2 sm:pt-2.5">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--engine-text-subtle)]">
+            <span className="hidden text-[10px] font-bold uppercase tracking-wider text-[var(--engine-text-subtle)] sm:block">
               {t("services.priceLabel")}
             </span>
-            <p className="text-sm font-black italic text-[var(--engine-accent)]">
+            {/* No celular o preço é a âncora do cartão, então ele é o que
+                cresce quando o resto encolhe. */}
+            <p className="text-[15px] font-black italic leading-tight text-[var(--engine-accent)] sm:text-sm">
               {listing.price || t("services.priceFallback")}
             </p>
           </div>
@@ -584,7 +605,7 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="hidden flex-wrap gap-1.5 sm:flex">
             {(listing.tags || []).slice(0, 2).map((tag) => (
               <span
                 key={`${listing.id}-${tag}`}
@@ -599,7 +620,7 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
               entram as ações dele. Rótulo some quando o card fica estreito
               (container query), nunca corta no meio. */}
           {isMine ? (
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="hidden grid-cols-2 gap-2 pt-1 sm:grid">
               <button
                 type="button"
                 onClick={(event) => {
@@ -624,7 +645,7 @@ function ServiceCard({ listing, isMine, user, onEdit, onDelete, onOpen }) {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-1.5 pt-1 @[20rem]:gap-2">
+            <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-1.5 pt-1 @[20rem]:gap-2 sm:grid">
               <a
                 href={getWhatsAppHref(listing, t)}
                 onClick={(event) => {
@@ -2977,9 +2998,18 @@ export function Services({ user, settings }) {
   };
 
   return (
-    <section className="space-y-5 pb-28 sm:space-y-8 sm:pb-10">
+    /* No celular a ordem da tela é outra, e por isso o `flex` com `order` em
+       vez do `space-y` de antes (margem entre irmãos não sobrevive a troca de
+       ordem). Medido em 11/11/2026 num aparelho de 390px: antes do primeiro
+       serviço vinham a faixa de números, o painel do anunciante, o segmento
+       Serviços/Lojas e o cartão de orçamento — a primeira tela de um
+       marketplace não mostrava nenhum anúncio. Agora busca, categorias e
+       resultados vêm primeiro; o painel de quem anuncia e o convite de
+       orçamento descem para depois da lista, e continuam a um gesto de
+       distância. De 640px para cima a ordem volta a ser a do código. */
+    <section className="flex flex-col gap-5 pb-28 sm:gap-8 sm:pb-10">
 
-      <header className="-mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
+      <header className="order-6 -mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:order-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
         {/* No celular o título em caixa alta mais o subtítulo tomavam a tela
             inteira antes de qualquer anúncio aparecer. Lá o cabeçalho é uma
             linha; a explicação fica para o desktop, onde sobra espaço. */}
@@ -3030,17 +3060,23 @@ export function Services({ user, settings }) {
       </header>
 
       {/* Serviços | Lojas no segmento do protótipo aprovado (01/11/2026). */}
-      <ShopSegment value={tab === "shops" ? "shops" : "services"} onChange={switchTab} />
+      <div className="order-1 sm:order-none">
+        <ShopSegment value={tab === "shops" ? "shops" : "services"} onChange={switchTab} />
+      </div>
 
       {tab === "shops" && <ShopsTab user={user} region={region} onNewProduct={() => openProductEditor()} />}
 
       {tab === "services" && (
       <>
-      <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
+      <div className="order-5 sm:order-none">
+        <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
+      </div>
 
-      <div className="engine-card p-4 sm:p-5">
-        {/* Cabeçalho: alterna a exibição dos filtros avançados */}
-        <div className="flex items-center justify-between gap-3">
+      <div className="engine-card order-2 flex flex-col p-4 sm:order-none sm:p-5">
+        {/* Cabeçalho: alterna a exibição dos filtros avançados. No celular ele
+            desce para baixo da busca — quem chega quer digitar ou tocar numa
+            categoria, não configurar filtro. */}
+        <div className="order-2 mt-3 flex items-center justify-between gap-3 sm:order-none sm:mt-0">
           <button
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
@@ -3074,7 +3110,7 @@ export function Services({ user, settings }) {
         </div>
 
         {/* Busca — sempre visível */}
-        <label className="mt-4 flex h-12 items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 transition-colors focus-within:border-[var(--engine-accent)]">
+        <label className="order-1 flex h-12 items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 transition-colors focus-within:border-[var(--engine-accent)] sm:order-none sm:mt-4">
           <Search size={18} className="shrink-0 text-[var(--engine-text-subtle)]" />
           <input
             value={query}
@@ -3084,9 +3120,46 @@ export function Services({ user, settings }) {
           />
         </label>
 
+        {/* Atalho de categoria na própria tela. As 21 categorias com ícone já
+            existiam, mas só dentro do painel de filtros, que começa fechado —
+            e quem chega sem saber o nome do que procura ("funileiro" ou
+            "martelinho"?) precisa justamente desse atalho antes de tudo. As 8
+            primeiras ficam à mão; "ver todas" abre o painel com a lista
+            inteira. É o que OLX e Marketplace põem no topo da primeira tela. */}
+        <div className="engine-scroll order-3 -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 sm:order-none">
+          {serviceCategories.slice(0, 8).map((item) => {
+            const active = category === item.value;
+            const Icon = categoryIcons[item.value] || Store;
+            return (
+              <button
+                key={`atalho-${item.value}`}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setCategory(active ? "all" : item.value)}
+                className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition ${
+                  active
+                    ? "border-[var(--engine-accent)] bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]"
+                    : "border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] hover:border-[var(--engine-border-strong)] hover:text-[var(--engine-text)]"
+                }`}
+              >
+                <Icon size={15} strokeWidth={active ? 2.4 : 2} className="shrink-0" />
+                <span className="whitespace-nowrap">{t(item.labelKey)}</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-[var(--engine-border-strong)] px-3 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+          >
+            <span className="whitespace-nowrap">{t("services.allCategories")}</span>
+            <ChevronRight size={14} className="shrink-0" />
+          </button>
+        </div>
+
         {/* Filtros avançados — recolhíveis */}
         <div
-          className={`grid transition-all duration-300 ease-out ${
+          className={`order-4 grid transition-all duration-300 ease-out sm:order-none ${
             filtersOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
           }`}
         >
@@ -3233,7 +3306,7 @@ export function Services({ user, settings }) {
       {regionResult.widened && (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-sm font-semibold leading-6 text-[var(--engine-text)]"
+          className="order-3 flex items-start gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-sm font-semibold leading-6 text-[var(--engine-text)] sm:order-none"
         >
           <MapPin size={18} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" aria-hidden="true" />
           <span>
@@ -3247,7 +3320,12 @@ export function Services({ user, settings }) {
         </div>
       )}
 
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
+      {/* Duas colunas no celular. Até aqui a grade era `minmax(280px, 1fr)`,
+          que num aparelho de 390px resolve para UMA coluna — e uma coluna de
+          cartão alto mostra um serviço e meio por tela. Com duas, a foto
+          continua grande e a pessoa compara quatro de uma vez, que é como
+          OLX e Marketplace mostram. De 640px para cima nada muda. */}
+      <div className="order-4 grid grid-cols-2 gap-2.5 sm:order-none sm:gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
         {filteredListings.length ? (
           filteredListings.map((listing, index) => (
             <Fragment key={listing.id}>
@@ -3267,7 +3345,7 @@ export function Services({ user, settings }) {
             </Fragment>
           ))
         ) : (
-          <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface)] p-8 text-center sm:col-span-2 xl:col-span-3 2xl:col-span-4">
+          <div className="col-span-2 flex min-h-[280px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface)] p-6 text-center sm:p-8 xl:col-span-3 2xl:col-span-4">
             <BriefcaseBusiness className="mb-4 text-[var(--engine-accent)]" size={42} />
             <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
               {approvedListings.length ? t("services.emptyTitle") : t("services.region.emptyAllTitle")}

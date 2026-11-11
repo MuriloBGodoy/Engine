@@ -5636,6 +5636,7 @@ const servicesPt = {
     hybrid: "Mostra mapa do local e também a região de deslocamento.",
   },
   filtersTitle: "Filtros",
+  allCategories: "Ver todas",
   clearFilters: "Limpar filtros",
   filters: {
     all: "Todos",
@@ -5864,6 +5865,7 @@ const servicesEn = {
     hybrid: "Shows the shop map and the travel region.",
   },
   filtersTitle: "Filters",
+  allCategories: "See all",
   clearFilters: "Clear filters",
   filters: { all: "All", allCountries: "All countries", allStates: "All states", allCities: "All cities", hybrid: "Location and mobile", mobile: "Comes to you", place: "Physical location" },
   status: { approved: "Approved", pending: "In review", changesRequested: "Changes needed", rejected: "Rejected" },
@@ -5951,6 +5953,7 @@ const servicesEs = {
     hybrid: "Muestra el mapa del local y también la zona de desplazamiento.",
   },
   filtersTitle: "Filtros",
+  allCategories: "Ver todas",
   clearFilters: "Limpiar filtros",
   priceLabel: "Precio",
   statusLabel: "Estado",
