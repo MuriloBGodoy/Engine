@@ -12,6 +12,7 @@ import {
   Video,
   Plus,
   Camera,
+  Sticker,
   UserX,
   CheckCircle2,
   RotateCcw,
@@ -959,7 +960,9 @@ export function Messages({ user, settings }) {
                   },
                   {
                     chave: "gif",
-                    icone: <span className="text-[11px] font-black">GIF</span>,
+                    // Ícone, e não as três letras: com "GIF" dentro do círculo
+                    // e "GIF" embaixo, o botão dizia a mesma coisa duas vezes.
+                    icone: <Sticker size={21} />,
                     rotulo: t("socialPosts.messages.gif"),
                     acao: () => {
                       setAnexosAbertos(false);
