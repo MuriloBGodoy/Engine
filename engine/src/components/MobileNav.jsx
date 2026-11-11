@@ -3,8 +3,8 @@ import {
   Car,
   BriefcaseBusiness,
   Home,
-  LayoutDashboard,
   LogIn,
+  Search,
   MessageCircle,
   Settings,
   Users,
@@ -75,9 +75,15 @@ export function MobileNav({
   const here = `${location.pathname}${location.search}`;
   const settingsActive = location.pathname.startsWith("/settings");
 
+  // Buscar no lugar de Painel, decidido em 11/11/2026. Painel repetia o que a
+  // Home já dizia, e os números do carro fazem mais sentido dentro da ficha
+  // dele; a rota /dashboard continua existindo e o menu do desktop a mantém.
+  // No lugar entrou a única tela que abre as oito rotas sem porta de entrada
+  // no celular: clube, evento, orçamento, vitrine do carro, perfil de
+  // prestador, produto, planos e anuncie.
   const menuItems = [
     { name: t("nav.home"), path: "/", icon: Home },
-    { name: t("nav.dashboard"), path: "/dashboard", icon: LayoutDashboard },
+    { name: t("nav.search"), path: "/buscar", icon: Search },
     { name: t("nav.garage"), path: "/garagem", icon: Car },
     { name: t("nav.community"), path: "/community", icon: Users },
     { name: t("nav.services"), path: "/services", icon: BriefcaseBusiness },

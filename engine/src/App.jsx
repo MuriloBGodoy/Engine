@@ -54,6 +54,7 @@ const SpecSheetModal = lazyNamed(() => import("./components/specsheet/SpecSheetM
 const DashboardPage = lazyNamed(() => import("./pages/DashboardPage"), "DashboardPage");
 const Settings = lazyNamed(() => import("./pages/Settings"), "Settings");
 const Community = lazyNamed(() => import("./pages/Community"), "Community");
+const Buscar = lazyNamed(() => import("./pages/Buscar"), "Buscar");
 const Messages = lazyNamed(() => import("./pages/Messages"), "Messages");
 const ResetPassword = lazyNamed(() => import("./pages/ResetPassword"), "ResetPassword");
 const Events = lazyNamed(() => import("./pages/Events"), "Events");
@@ -673,6 +674,11 @@ function App() {
               </RequireAuth>
             }
           />
+          {/* Busca: a aba que entrou no lugar de Painel na barra do celular
+              (11/11/2026). Aberta a visitante, como Comunidade — é a porta
+              de entrada de clube, evento, serviço e perfil, e pedir conta
+              antes de deixar procurar fecha a porta na cara de quem chegou. */}
+          <Route path="/buscar" element={<Buscar />} />
           <Route
             path="/community"
             element={<Community cars={cars} settings={settings} user={user} />}

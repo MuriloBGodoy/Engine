@@ -2452,7 +2452,16 @@ export function Services({ user, settings }) {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
+  // `?cat=` deixa um link já chegar filtrado — é por aí que a grade de
+  // categorias da Busca manda a pessoa para cá. Valor desconhecido vira
+  // "all", para link velho ou torto não mostrar tela vazia.
+  const [category, setCategory] = useState(() => {
+    // Lido da URL direto, e não do `useSearchParams`: este estado nasce antes
+    // daquele gancho na ordem do componente, e só precisa do valor inicial.
+    const pedida = new URLSearchParams(window.location.search).get("cat") || "";
+    const valida = pedida ? normalizeServiceCategory(pedida) : "";
+    return valida && valida !== "other" ? valida : pedida === "other" ? "other" : "all";
+  });
   const [mode, setMode] = useState("all");
   // A região ativa (header) semeia o filtro de localização dos Serviços: ao
   // abrir, já vem pré-filtrado pela região do usuário. Depois ele pode mexer
