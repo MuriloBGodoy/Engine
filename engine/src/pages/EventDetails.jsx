@@ -230,7 +230,9 @@ export function EventDetails() {
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-3xl font-bold text-[var(--engine-text)] flex-1 truncate">{event.title}</h1>
+        <h1 className="min-w-0 flex-1 text-balance text-xl font-bold leading-tight text-[var(--engine-text)] sm:text-3xl sm:leading-tight">
+          {event.title}
+        </h1>
         {/* Compartilhar o evento (DM do Engine, WhatsApp, X, copiar...). */}
         <button
           type="button"

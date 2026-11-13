@@ -62,6 +62,7 @@ import {
   quoteErrorKey,
   replyToQuoteRequest,
 } from "../services/quotes";
+import { Select } from "../components/ui/Select";
 
 /**
  * Pedido de orçamento — /services/orcamentos.
@@ -319,14 +320,14 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
       <form id="quote-form" onSubmit={submit} className="grid gap-5">
         <label className="grid gap-2">
           <span className={labelClass}>{t("quotes.form.category")}</span>
-          <select value={form.category} onChange={set("category")} required className={`${fieldClass} h-12`}>
+          <Select value={form.category} onChange={set("category")} required className={`${fieldClass} h-12`}>
             <option value="">{t("quotes.form.choose")}</option>
             {serviceCategories.map((category) => (
               <option key={category.value} value={category.value}>
                 {t(category.labelKey)}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <fieldset className="grid gap-2">
@@ -433,7 +434,7 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
         <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
           <label className="grid gap-2">
             <span className={labelClass}>{t("quotes.form.state")}</span>
-            <select
+            <Select
               value={form.state}
               onChange={(event) => setForm((current) => ({ ...current, state: event.target.value, city: "" }))}
               required
@@ -445,7 +446,7 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
                   {state.code}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="grid gap-2">
             <span className={labelClass}>{t("quotes.form.city")}</span>

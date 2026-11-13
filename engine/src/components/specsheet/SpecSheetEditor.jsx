@@ -18,6 +18,7 @@ import {
   validateSpecSheet,
 } from "../../services/carSpecSheet";
 import { fieldLabel, issueLabel, modLabel, stageLabel } from "./labels";
+import { Select } from "../ui/Select";
 
 /**
  * Aspiracao ganha botao e o resto ganha lista, e isso nao e inconsistencia.
@@ -178,7 +179,7 @@ function NumberField({ field, entry, factoryCell, issues, onChange }) {
           className="min-h-[44px] w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] px-3 text-[16px] font-bold tabular-nums text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)]"
         />
         {field.units ? (
-          <select
+          <Select
             aria-label={t("specSheet.editor.unit")}
             value={entry.unit}
             onChange={(event) => onChange({ unit: event.target.value })}
@@ -189,7 +190,7 @@ function NumberField({ field, entry, factoryCell, issues, onChange }) {
                 {unit}
               </option>
             ))}
-          </select>
+          </Select>
         ) : (
           <span className="shrink-0 text-[13px] font-black text-[var(--engine-text-muted)]">
             {field.unit}
@@ -432,7 +433,7 @@ export function SpecSheetEditor({ car, resolved, focusVersion = false, saving, e
                 >
                   {fieldLabel(t, field.id)}
                 </label>
-                <select
+                <Select
                   id={`version-${field.id}`}
                   value={current}
                   onChange={(event) => setVersion(field.id, event.target.value)}
@@ -454,7 +455,7 @@ export function SpecSheetEditor({ car, resolved, focusVersion = false, saving, e
                           : `${value}V`}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             );
           })}

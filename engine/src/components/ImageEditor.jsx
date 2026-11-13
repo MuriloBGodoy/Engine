@@ -7,6 +7,7 @@ import {
   quarterTurnScale,
   rotatePointClockwise,
 } from "../services/imageEditorGeometry";
+import { Select } from "./ui/Select";
 
 const FILTERS = [
   { name: "Original", css: "none" },
@@ -220,7 +221,7 @@ function TextStyleControls({ value, onChange }) {
         {value.stroke && (
           <ColorDot value={value.strokeColor} onChange={(c) => onChange({ strokeColor: c })} label={t("imageEditor.outlineColor")} />
         )}
-        <select
+        <Select
           value={value.fontFamily}
           onChange={(e) => onChange({ fontFamily: e.target.value })}
           aria-label={t("imageEditor.font")}
@@ -231,7 +232,7 @@ function TextStyleControls({ value, onChange }) {
               {font}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {/* Tamanho (o atalho no celular é a pinça na própria foto) */}

@@ -22,6 +22,7 @@ import {
   reminderTitle,
   reminderTone,
 } from "../../services/reminderLabels";
+import { Select } from "../ui/Select";
 
 const fieldClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3.5 py-2.5 text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -165,18 +166,18 @@ export function ReminderSettingsModal({ car, onClose, onSave }) {
             <div className="grid grid-cols-[1fr_auto] gap-3">
               <label className="space-y-1">
                 <span className={labelClass}>{t("reminders.settings.uf")}</span>
-                <select value={draft.uf} onChange={(e) => patch("uf", e.target.value)} className={fieldClass}>
+                <Select value={draft.uf} onChange={(e) => patch("uf", e.target.value)} className={fieldClass}>
                   <option value="">{t("reminders.settings.ufNone")}</option>
                   {states.map((state) => (
                     <option key={state.code} value={state.code}>
                       {state.code} · {state.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label className="space-y-1">
                 <span className={labelClass}>{t("reminders.settings.plateDigit")}</span>
-                <select
+                <Select
                   value={draft.plateDigit}
                   onChange={(e) => patch("plateDigit", e.target.value)}
                   className={`${fieldClass} w-24`}
@@ -187,7 +188,7 @@ export function ReminderSettingsModal({ car, onClose, onSave }) {
                       {digit}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             </div>
             <p className="text-[11px] text-[var(--engine-text-muted)]">{t("reminders.settings.plateHint")}</p>

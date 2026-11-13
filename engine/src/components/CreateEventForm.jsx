@@ -9,6 +9,7 @@ import { EventPhotoField } from "./events/EventPhotoField";
 import { countries, getStates, getCities } from "../services/locations";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { deviceTimeZone, eventInstantFromLocal } from "../services/eventTime";
+import { Select as EngineSelect } from "./ui/Select";
 
 const mapQuery = (event) =>
   [event.address, event.city].filter(Boolean).join(",");
@@ -53,9 +54,9 @@ function TextArea(props) {
 
 function Select(props) {
   return (
-    <select
+    <EngineSelect
       {...props}
-      className="min-h-12 w-full appearance-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 pr-9 text-sm font-bold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:focus:bg-[var(--engine-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="min-h-12 w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 pr-3 text-sm font-bold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:focus:bg-[var(--engine-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
     />
   );
 }

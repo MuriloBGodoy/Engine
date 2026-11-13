@@ -8,6 +8,7 @@ import { engineDB } from "../services/db";
 import { countries } from "../services/locations";
 import { captureError } from "../services/observability";
 import { markCountryAsked } from "../services/countryPrompt";
+import { Select } from "./ui/Select";
 
 /**
  * "Em que país você está?" — perguntado UMA vez por conta (30/10/2026).
@@ -143,7 +144,7 @@ export function CountryPrompt({ user, settings, onSettingsUpdate, onDone }) {
         <label htmlFor="country-prompt-select" className="mb-1.5 mt-5 block text-[13px] font-semibold">
           {t("countryPrompt.label")}
         </label>
-        <select
+        <Select
           id="country-prompt-select"
           value={country}
           disabled={saving}
@@ -155,7 +156,7 @@ export function CountryPrompt({ user, settings, onSettingsUpdate, onDone }) {
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
         {detected && detected === country && (
           <p className="mt-1.5 text-xs text-[var(--engine-text-muted)]">{t("countryPrompt.detected")}</p>
         )}

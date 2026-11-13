@@ -269,7 +269,7 @@ const resources = {
         },
       },
       premium: {
-        tag: "Engine Premium",
+        tag: "Engine Pro",
         title: "Assine e libere tudo",
         benefitNoAds: "Navegue sem anúncio nenhum",
         benefitPublish: "Divulgue seus serviços para quem procura na sua região",
@@ -315,6 +315,8 @@ const resources = {
         appName: "Engine",
         close: "Fechar",
         options: "Opções",
+        filter: "Filtrar",
+        noMatch: "Nada encontrado",
         clear: "Limpar",
         save: "Salvar",
         saving: "Salvando...",
@@ -450,6 +452,7 @@ const resources = {
         celebration: { share: "Compartilhar", close: "Fechar" },
       },
       profile: {
+        supporter: "Apoiador",
         loadFailed: "Não consegui abrir este perfil agora. A pessoa existe; foi a leitura que falhou.",
         retry: "Tentar de novo",
         tabs: {
@@ -1629,6 +1632,7 @@ const resources = {
         copyPrompt: "Copie o link da meta",
         shareText: "Minha meta no Engine está em",
         weekTop: "Top da semana",
+        weekTopEmpty: "Ainda não há metas com curtidas suficientes. Publique a sua e apareça aqui.",
         rankingTitle: "Ranking Engine",
         rankingSubtitle:
           "Pontuação baseada em progresso, curtidas, nota e constância.",
@@ -1714,7 +1718,7 @@ const resources = {
         plan: {
           title: "Seu plano",
           free: "Grátis",
-          freeHint: "Tudo o que existe no Engine é grátis e continua grátis. Toque para ver o Pro e o Premium.",
+          freeHint: "Tudo o que existe no Engine é grátis e continua grátis. Toque para ver o Premium e o Pro.",
           trialUntil: "Teste grátis até {{date}}. A primeira cobrança é nesse dia, e avisamos antes.",
           renewsOn: "Renova automaticamente em {{date}}.",
           cancelledUntil: "Cancelado. Continua valendo até {{date}} e depois volta para o grátis.",
@@ -1826,7 +1830,7 @@ const resources = {
           },
           kept: "As mensagens que você enviou continuam na conversa da outra pessoa, como no WhatsApp.",
           foundedClubs: "Você fundou: {{clubs}}. Esses clubes serão arquivados e saem da lista de clubes.",
-          premium: "Excluir a conta não cancela a assinatura Premium. Cancele antes pelo contato do rodapé.",
+          premium: "Excluir a conta não cancela a sua assinatura. Cancele antes pelo contato do rodapé.",
           passwordLabel: "Digite sua senha para confirmar",
           socialLabel: "Para confirmar, digite o e-mail da sua conta ({{provider}}).",
           confirm: "Excluir minha conta",
@@ -2162,7 +2166,7 @@ const resources = {
         },
       },
       premium: {
-        tag: "Engine Premium",
+        tag: "Engine Pro",
         title: "Subscribe and unlock everything",
         benefitNoAds: "Browse with no ads at all",
         benefitPublish: "Promote your services to people searching in your area",
@@ -2208,6 +2212,8 @@ const resources = {
         appName: "Engine",
         close: "Close",
         options: "Options",
+        filter: "Filter",
+        noMatch: "Nothing found",
         clear: "Clear",
         save: "Save",
         saving: "Saving...",
@@ -2340,6 +2346,7 @@ const resources = {
         celebration: { share: "Share", close: "Close" },
       },
       profile: {
+        supporter: "Supporter",
         loadFailed: "Couldn't open this profile right now. The person exists; loading failed.",
         retry: "Try again",
         tabs: {
@@ -3508,6 +3515,7 @@ const resources = {
         copyPrompt: "Copy the goal link",
         shareText: "My Engine goal is at",
         weekTop: "Top this week",
+        weekTopEmpty: "No goals with enough likes yet. Post yours and show up here.",
         rankingTitle: "Engine Ranking",
         rankingSubtitle:
           "Score based on progress, likes, rating, and consistency.",
@@ -3592,7 +3600,7 @@ const resources = {
         plan: {
           title: "Your plan",
           free: "Free",
-          freeHint: "Everything in Engine is free and stays free. Tap to see Pro and Premium.",
+          freeHint: "Everything in Engine is free and stays free. Tap to see Premium and Pro.",
           trialUntil: "Free trial until {{date}}. Your first charge is on that day, and we'll remind you first.",
           renewsOn: "Renews automatically on {{date}}.",
           cancelledUntil: "Cancelled. Still active until {{date}}, then back to free.",
@@ -3704,7 +3712,7 @@ const resources = {
           },
           kept: "Messages you sent stay in the other person's conversation, like on WhatsApp.",
           foundedClubs: "You founded: {{clubs}}. These clubs will be archived and leave the club list.",
-          premium: "Deleting your account does not cancel Premium. Cancel it first through the contact in the footer.",
+          premium: "Deleting your account does not cancel your subscription. Cancel it first through the contact in the footer.",
           passwordLabel: "Enter your password to confirm",
           socialLabel: "To confirm, type your account email ({{provider}}).",
           confirm: "Delete my account",
@@ -4040,7 +4048,7 @@ const resources = {
         },
       },
       premium: {
-        tag: "Engine Premium",
+        tag: "Engine Pro",
         title: "Suscríbete y desbloquea todo",
         benefitNoAds: "Navega sin ningún anuncio",
         benefitPublish: "Promociona tus servicios a quien busca en tu zona",
@@ -4086,6 +4094,8 @@ const resources = {
         appName: "Engine",
         close: "Cerrar",
         options: "Opciones",
+        filter: "Filtrar",
+        noMatch: "Nada encontrado",
         clear: "Limpiar",
         save: "Guardar",
         saving: "Guardando...",
@@ -4222,6 +4232,7 @@ const resources = {
         celebration: { share: "Compartir", close: "Cerrar" },
       },
       profile: {
+        supporter: "Apoyo",
         loadFailed: "No pude abrir este perfil ahora. La persona existe; falló la carga.",
         retry: "Intentar de nuevo",
         tabs: {
@@ -5391,6 +5402,7 @@ const resources = {
         copyPrompt: "Copia el link de la meta",
         shareText: "Mi meta en Engine está en",
         weekTop: "Top de la semana",
+        weekTopEmpty: "Todavía no hay metas con suficientes me gusta. Publica la tuya y aparece aquí.",
         rankingTitle: "Ranking Engine",
         rankingSubtitle:
           "Puntuación basada en progreso, likes, nota y constancia.",
@@ -5476,7 +5488,7 @@ const resources = {
         plan: {
           title: "Tu plan",
           free: "Gratis",
-          freeHint: "Todo lo que existe en Engine es gratis y sigue gratis. Toca para ver Pro y Premium.",
+          freeHint: "Todo lo que existe en Engine es gratis y sigue gratis. Toca para ver Premium y Pro.",
           trialUntil: "Prueba gratis hasta el {{date}}. El primer cobro es ese día, y te avisamos antes.",
           renewsOn: "Se renueva automáticamente el {{date}}.",
           cancelledUntil: "Cancelado. Sigue activo hasta el {{date}} y luego vuelve a gratis.",
@@ -5588,7 +5600,7 @@ const resources = {
           },
           kept: "Los mensajes que enviaste siguen en la conversación de la otra persona, como en WhatsApp.",
           foundedClubs: "Fundaste: {{clubs}}. Esos clubes se archivarán y saldrán de la lista de clubes.",
-          premium: "Eliminar la cuenta no cancela Premium. Cancélalo antes mediante el contacto del pie de página.",
+          premium: "Eliminar la cuenta no cancela tu suscripción. Cancélala antes mediante el contacto del pie de página.",
           passwordLabel: "Escribe tu contraseña para confirmar",
           socialLabel: "Para confirmar, escribe el correo de tu cuenta ({{provider}}).",
           confirm: "Eliminar mi cuenta",
@@ -6403,8 +6415,8 @@ applyLocalePatch("pt-BR", "pt-BR", {
     label: "Anúncio",
     removeCta: "Remover anúncios",
     house: {
-      title: "Engine Premium",
-      desc: "Navegue sem anúncios e ganhe as ferramentas do Premium.",
+      title: "Engine Pro",
+      desc: "Navegue sem anúncios e ganhe as ferramentas do Pro.",
       cta: "Ver os planos",
     },
     consent: {
@@ -6499,8 +6511,8 @@ applyLocalePatch("en-US", "en-US", {
     label: "Ad",
     removeCta: "Remove ads",
     house: {
-      title: "Engine Premium",
-      desc: "Browse ad-free and get the Premium tools.",
+      title: "Engine Pro",
+      desc: "Browse ad-free and get the Pro tools.",
       cta: "See the plans",
     },
     consent: {
@@ -6595,8 +6607,8 @@ applyLocalePatch("es-ES", "es-ES", {
     label: "Anuncio",
     removeCta: "Quitar anuncios",
     house: {
-      title: "Engine Premium",
-      desc: "Navega sin anuncios y obtén las herramientas de Premium.",
+      title: "Engine Pro",
+      desc: "Navega sin anuncios y obtén las herramientas de Pro.",
       cta: "Ver los planes",
     },
     consent: {

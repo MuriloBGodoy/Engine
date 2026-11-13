@@ -13,6 +13,7 @@ import { passwordLevel } from "../services/passwordStrength";
 import { countries, getStates, DEFAULT_COUNTRY } from "../services/locations";
 import { isPhoneValueValid } from "../services/phone";
 import { acceptTerms } from "../services/onboarding";
+import { Select } from "../components/ui/Select";
 
 export function Register() {
   const { t } = useTranslation();
@@ -185,7 +186,7 @@ export function Register() {
         </label>
         <label className="auth-field">
           <span>{t("auth.country")}</span>
-          <select
+          <Select
             value={country}
             onChange={(event) => {
               setCountry(event.target.value);
@@ -198,11 +199,11 @@ export function Register() {
                 {item.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="auth-field">
           <span>{t("auth.state")}</span>
-          <select
+          <Select
             value={state}
             onChange={(event) => setState(event.target.value)}
             disabled={!stateOptions.length}
@@ -218,7 +219,7 @@ export function Register() {
                 {item.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="auth-field auth-span-two">
           <span>{t("common.email")}</span>

@@ -353,7 +353,6 @@ export function MessageDock({ user }) {
                   accept="image/*,image/gif"
                   onFiles={(files) => pickImage(files[0])}
                   disabled={sending || compressing || sendingVideo}
-                  title={t("pasteImage.hint")}
                   ariaLabel={t("socialPosts.messages.photo")}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] disabled:opacity-40"
                 >

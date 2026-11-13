@@ -94,11 +94,11 @@ const ptBR = {
         "A venda dos planos ainda não abriu. Os benefícios pagos estão em construção; os preços abaixo são os previstos para quando abrir. Tudo o que existe hoje é grátis.",
       premium: {
         honestNoAds:
-          "Os benefícios do Premium ainda não existem no app: estão marcados como “Em breve”. Por isso ele ainda não está à venda.",
+          "Os benefícios do Pro ainda não existem no app: estão marcados como “Em breve”. Por isso ele ainda não está à venda.",
       },
       pro: {
         honestNoAds:
-          "Publicar serviço e ver as métricas básicas já é grátis. As ferramentas do Pro ainda não existem no app: estão marcadas como “Em breve”, e ele ainda não está à venda.",
+          "Publicar serviço e ver as métricas básicas já é grátis. As ferramentas do Premium ainda não existem no app: estão marcadas como “Em breve”, e ele ainda não está à venda.",
       },
     },
     advertise: {
@@ -193,11 +193,11 @@ const enUS = {
         "Plans are not on sale yet. The paid benefits are still being built; the prices below are the planned ones. Everything that exists today is free.",
       premium: {
         honestNoAds:
-          "Premium benefits do not exist in the app yet: they are marked “Coming soon”. That is why it is not on sale yet.",
+          "Pro benefits do not exist in the app yet: they are marked “Coming soon”. That is why it is not on sale yet.",
       },
       pro: {
         honestNoAds:
-          "Publishing a service and seeing basic metrics is already free. Pro tools do not exist in the app yet: they are marked “Coming soon”, and it is not on sale yet.",
+          "Publishing a service and seeing basic metrics is already free. Premium tools do not exist in the app yet: they are marked “Coming soon”, and it is not on sale yet.",
       },
     },
     advertise: {
@@ -292,11 +292,11 @@ const esES = {
         "La venta de los planes aún no abrió. Los beneficios de pago están en construcción; los precios de abajo son los previstos. Todo lo que existe hoy es gratis.",
       premium: {
         honestNoAds:
-          "Los beneficios de Premium aún no existen en la app: están marcados como “Próximamente”. Por eso todavía no está a la venta.",
+          "Los beneficios de Pro aún no existen en la app: están marcados como “Próximamente”. Por eso todavía no está a la venta.",
       },
       pro: {
         honestNoAds:
-          "Publicar un servicio y ver las métricas básicas ya es gratis. Las herramientas de Pro aún no existen en la app: están marcadas como “Próximamente”, y todavía no está a la venta.",
+          "Publicar un servicio y ver las métricas básicas ya es gratis. Las herramientas de Premium aún no existen en la app: están marcadas como “Próximamente”, y todavía no está a la venta.",
       },
     },
     advertise: {

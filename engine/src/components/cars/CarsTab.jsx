@@ -141,7 +141,7 @@ export function CarsTab({ region, user }) {
       )}
 
       {empty && (
-        <div className="rounded-2xl border border-dashed border-[var(--engine-border)] p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-[var(--engine-border)] p-6 text-center sm:p-8">
           <p className="text-sm font-bold text-[var(--engine-text)]">
             {searching ? t("cars.noMatchTitle") : t("cars.emptyTitle")}
           </p>

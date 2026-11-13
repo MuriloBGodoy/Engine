@@ -19,6 +19,7 @@ import {
   serializeBio,
   syncBioMentions,
 } from '../services/mentions';
+import { Select } from "./ui/Select";
 
 // Salva pelo mesmo caminho das Configurações (engineDB.saveSettings), que
 // reserva o @, grava os ajustes e espelha o perfil público. Antes o modal
@@ -471,7 +472,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-[var(--engine-text)]">País</label>
-                  <select
+                  <Select
                     value={formData.country}
                     onChange={(e) => handleCountryChange(e.target.value)}
                     className="w-full px-3 py-2.5 mt-2 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm transition focus:outline-none focus:border-[var(--engine-accent)]"
@@ -479,11 +480,11 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
                     {countries.map(c => (
                       <option key={c.code} value={c.code}>{c.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-[var(--engine-text)]">Estado</label>
-                  <select
+                  <Select
                     value={formData.state}
                     onChange={(e) => handleStateChange(e.target.value)}
                     className="w-full px-3 py-2.5 mt-2 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm transition focus:outline-none focus:border-[var(--engine-accent)]"
@@ -492,7 +493,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
                     {stateOptions.map(s => (
                       <option key={s.code} value={s.code}>{s.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div>

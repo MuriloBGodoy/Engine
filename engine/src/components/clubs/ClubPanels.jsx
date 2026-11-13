@@ -13,6 +13,7 @@ import { clubPlaceLabel, clubStyleLabel } from "../../services/clubStyles";
 import { formatFipeYear } from "../../services/carDisplay";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { PersonLink } from "../social/PersonLink";
+import { Select } from "../ui/Select";
 
 /**
  * Link digitado pela direção vira `href` só se for http(s). Sem isso um
@@ -492,7 +493,7 @@ export function ClubMemberList({ club, members, total, loading, roles = [], myRo
                 <label className="sr-only" htmlFor={`role-${member.uid}`}>
                   {t("clubRoles.assignLabel", { name: member.displayName })}
                 </label>
-                <select
+                <Select
                   id={`role-${member.uid}`}
                   value={member.roleId}
                   onChange={(event) => onAssign?.(member, event.target.value)}
@@ -503,7 +504,7 @@ export function ClubMemberList({ club, members, total, loading, roles = [], myRo
                       {roleLabel(t, option)}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <button
                   type="button"
                   onClick={() => onRemove?.(member)}

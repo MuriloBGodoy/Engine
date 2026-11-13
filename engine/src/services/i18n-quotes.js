@@ -11,6 +11,7 @@ const ptBR = {
   quotes: {
     entry: {
       eyebrow: "Novo",
+      short: "Descreva e os prestadores da região respondem",
       title: "Peça orçamento sem ligar para ninguém",
       copy: "Descreva o que o carro precisa. Prestadores da sua cidade respondem com preço e prazo, e você compara.",
       cta: "Pedir orçamento",
@@ -181,6 +182,7 @@ const enUS = {
   quotes: {
     entry: {
       eyebrow: "New",
+      short: "Describe it and local providers reply",
       title: "Get quotes without calling around",
       copy: "Describe what your car needs. Providers in your city reply with price and timing, and you compare.",
       cta: "Request a quote",
@@ -351,6 +353,7 @@ const esES = {
   quotes: {
     entry: {
       eyebrow: "Nuevo",
+      short: "Descríbelo y los proveedores de la zona responden",
       title: "Pide presupuesto sin llamar a nadie",
       copy: "Describe lo que necesita tu coche. Profesionales de tu ciudad responden con precio y plazo, y tú comparas.",
       cta: "Pedir presupuesto",

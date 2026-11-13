@@ -13,7 +13,7 @@ import { MoreHorizontal } from "lucide-react";
  * `items`: `[{ label, icon, onClick, danger? }]`. Sem item nenhum, não
  * desenha botão: menu vazio é pior que menu ausente.
  */
-export function PostMenu({ items, label, align = "right" }) {
+export function PostMenu({ items, label, align = "right", triggerClass = "" }) {
   const [open, setOpen] = useState(false);
   if (!items.length) return null;
 
@@ -26,7 +26,7 @@ export function PostMenu({ items, label, align = "right" }) {
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="-m-1.5 flex h-11 w-11 items-center justify-center rounded-full text-[var(--engine-text-subtle)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] sm:m-0 sm:h-8 sm:w-8"
+        className={triggerClass || "-m-1.5 flex h-11 w-11 items-center justify-center rounded-full text-[var(--engine-text-subtle)] transition-colors hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] sm:m-0 sm:h-8 sm:w-8"}
       >
         <MoreHorizontal size={18} />
       </button>
@@ -43,7 +43,7 @@ export function PostMenu({ items, label, align = "right" }) {
           />
           <div
             role="menu"
-            className={`engine-pop absolute top-9 z-40 w-52 overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] shadow-[var(--engine-shadow-lg)] ${
+            className={`engine-pop absolute top-full z-40 mt-1.5 w-52 overflow-hidden rounded-xl border border-[var(--engine-border)] bg-[var(--engine-elevated)] shadow-[var(--engine-shadow-lg)] ${
               align === "left" ? "left-0" : "right-0"
             }`}
           >

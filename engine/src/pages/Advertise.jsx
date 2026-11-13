@@ -13,6 +13,7 @@ import {
   submitSponsorLead,
 } from "../services/billing";
 import { captureError } from "../services/observability";
+import { Select } from "../components/ui/Select";
 
 const fieldClass =
   "w-full min-h-12 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[15px] text-[var(--engine-text)] outline-none transition-colors placeholder:text-[var(--engine-text-muted)] focus:border-[var(--engine-accent)]";
@@ -359,7 +360,7 @@ export function Advertise({ user }) {
               </div>
 
               <Field id="lead-format" label={t("billing.advertise.form.format")}>
-                <select
+                <Select
                   id="lead-format"
                   value={form.format}
                   onChange={update("format")}
@@ -370,7 +371,7 @@ export function Advertise({ user }) {
                       {t(`billing.advertise.form.formats.${key}`)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
 
               <Field

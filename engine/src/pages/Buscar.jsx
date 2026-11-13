@@ -15,7 +15,7 @@ import { engineDB } from "../services/db";
 import { useProfileSearch } from "../hooks/useProfileSearch";
 import { discoverClubs, clubImageUrl } from "../services/clubs";
 import { engineEvents } from "../services/events";
-import { profilePath } from "../services/people";
+import { profilePath, withoutAt } from "../services/people";
 import { ListingPhoto } from "../components/services/ListingParts";
 import {
   categoryIcons,
@@ -292,7 +292,7 @@ export function Buscar() {
         </label>
 
         {buscando && (
-          <div className="engine-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div className="engine-scroll-x -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {ABAS.map((item) => (
               <button
                 key={item.chave}
@@ -399,7 +399,7 @@ export function Buscar() {
                   to={profilePath(pessoa.username)}
                   figura={<Avatar src={pessoa.avatar} nome={pessoa.author} />}
                   titulo={pessoa.author || pessoa.username}
-                  linha2={pessoa.username ? `@${pessoa.username}` : ""}
+                  linha2={pessoa.username ? `@${withoutAt(pessoa.username)}` : ""}
                 />
               ))}
             </Secao>

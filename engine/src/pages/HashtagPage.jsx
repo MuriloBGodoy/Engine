@@ -143,16 +143,16 @@ export function HashtagPage({ user, settings }) {
 
       <div className="mx-auto w-full max-w-2xl sm:py-5">
         {!tag ? (
-          <p className="px-4 py-16 text-center text-sm font-semibold text-[var(--engine-text-muted)]">
+          <p className="px-4 py-10 text-center sm:py-16 text-sm font-semibold text-[var(--engine-text-muted)]">
             {t("socialPosts.tags.invalid")}
           </p>
         ) : status === "loading" ? (
-          <p className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-[var(--engine-text-muted)]">
+          <p className="flex items-center justify-center gap-2 px-4 py-10 text-sm sm:py-16 text-[var(--engine-text-muted)]">
             <Loader2 size={16} className="animate-spin" />
             {t("common.loading")}
           </p>
         ) : !visible.length ? (
-          <div className="space-y-6 px-4 py-12 text-center">
+          <div className="space-y-6 px-4 py-8 text-center sm:py-12">
             <p className="text-sm font-semibold text-[var(--engine-text-muted)]">
               {status === "error" ? t("socialPosts.tags.loadError") : t("socialPosts.tags.empty")}
             </p>

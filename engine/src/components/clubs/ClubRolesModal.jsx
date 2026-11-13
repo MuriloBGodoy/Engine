@@ -15,6 +15,7 @@ import {
   roleLabel,
   sortRoles,
 } from "../../services/clubRoles";
+import { Select } from "../ui/Select";
 
 /**
  * Cargos do clube (só o Fundador): nome, cor da paleta, permissões, ordem
@@ -289,7 +290,7 @@ function RolesContent({ club, onClose, onSaved }) {
             <label htmlFor="club-entry-role" className="text-[12px] font-bold text-[var(--engine-text)]">
               {t("clubRoles.entryRole")}
             </label>
-            <select
+            <Select
               id="club-entry-role"
               value={entryRole}
               onChange={(event) => setEntry(event.target.value)}
@@ -301,7 +302,7 @@ function RolesContent({ club, onClose, onSaved }) {
                   {roleLabel(t, role)}
                 </option>
               ))}
-            </select>
+            </Select>
             <p className="text-[11.5px] text-[var(--engine-text-muted)]">{t("clubRoles.entryRoleHint")}</p>
           </div>
         </div>

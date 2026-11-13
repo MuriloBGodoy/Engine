@@ -15,6 +15,9 @@ import i18n from "./i18n";
 
 const ptBR = {
   services: {
+    // Subtítulo da barra do vendedor no celular, onde não cabe rótulo.
+    sellerLive_one: "{{count}} anúncio no ar",
+    sellerLive_other: "{{count}} anúncios no ar",
     moderation: {
       panelTitle: "Moderação",
       sent: "Enviado {{value}}",
@@ -244,6 +247,8 @@ const ptBR = {
 
 const enUS = {
   services: {
+    sellerLive_one: "{{count}} listing live",
+    sellerLive_other: "{{count}} listings live",
     moderation: {
       panelTitle: "Moderation",
       sent: "Sent {{value}}",
@@ -469,6 +474,8 @@ const enUS = {
 
 const esES = {
   services: {
+    sellerLive_one: "{{count}} anuncio en el aire",
+    sellerLive_other: "{{count}} anuncios en el aire",
     moderation: {
       panelTitle: "Moderación",
       sent: "Enviado {{value}}",

@@ -16,6 +16,7 @@ import { MAX_HASHTAGS, extractHashtags } from "../services/socialText";
 import "../services/i18n-social-posts";
 import "../services/i18n-message-dock";
 import "../services/i18n-editing";
+import { Select } from "./ui/Select";
 
 const MAX_PHOTOS = 3;
 const MAX_TEXT = 1000;
@@ -427,7 +428,6 @@ export function CreateFeedPostModal({
               multiple
               onFiles={addPhotos}
               disabled={busy || photos.length >= MAX_PHOTOS || Boolean(video || publishedVideo)}
-              title={t("pasteImage.hint")}
               className={mediaButton}
             >
               <ImagePlus size={15} />
@@ -448,7 +448,7 @@ export function CreateFeedPostModal({
             {carList.length > 0 && (
               <label className="engine-field relative flex min-h-11 items-center gap-2 rounded-xl border border-[var(--engine-border)] px-3 sm:col-span-2">
                 <Car size={15} className="shrink-0 text-[var(--engine-text-muted)]" />
-                <select
+                <Select
                   value={carId}
                   onChange={(event) => setCarId(event.target.value)}
                   className="w-full bg-transparent text-xs font-bold text-[var(--engine-text)] outline-none"
@@ -459,7 +459,7 @@ export function CreateFeedPostModal({
                       {car.brand} {car.model}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             )}
           </div>

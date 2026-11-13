@@ -106,7 +106,7 @@ export function ProductGrid({ children }) {
 }
 
 /** Estado vazio da vitrine, com uma saída quando há filtro. */
-export function ShopEmpty({ title, body, actionLabel, onAction }) {
+export function ShopEmpty({ title, body, actionLabel, onAction, children }) {
   return (
     <div className="engine-card px-5 py-7 text-center">
       <b className="block text-[15px] text-[var(--engine-text)]">{title}</b>
@@ -120,6 +120,7 @@ export function ShopEmpty({ title, body, actionLabel, onAction }) {
           {actionLabel}
         </button>
       )}
+      {children}
     </div>
   );
 }

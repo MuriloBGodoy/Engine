@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink, Globe, Store } from "lucide-react";
 import { FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
+import { withoutAt } from "../../services/people";
 import {
   categoryIcons,
   getDirectionsUrl,
@@ -33,18 +34,24 @@ export function TikTokIcon({ size = 18, className = "" }) {
 /** Portfólio do prestador: redes, site e vídeo do serviço. */
 export function PortfolioLinks({ listing, t, large = false }) {
   const videoId = youtubeId(listing.videoUrl);
+  // O prestador escreve "@minhaoficina" tanto quanto "minhaoficina", e o campo
+  // aceita os dois. Sem tirar o @, o rotulo saia "@@minhaoficina" e o endereco
+  // ia para instagram.com/@minhaoficina e tiktok.com/@@minhaoficina — nenhum
+  // dos dois existe, e quem perdia a visita era o prestador.
+  const instagram = withoutAt(listing.instagram);
+  const tiktok = withoutAt(listing.tiktok);
   const links = [
-    listing.instagram && {
+    instagram && {
       key: "instagram",
       icon: InstagramIcon,
-      label: `@${listing.instagram}`,
-      href: `https://instagram.com/${listing.instagram}`,
+      label: `@${instagram}`,
+      href: `https://instagram.com/${instagram}`,
     },
-    listing.tiktok && {
+    tiktok && {
       key: "tiktok",
       icon: TikTokIcon,
-      label: `@${listing.tiktok}`,
-      href: `https://tiktok.com/@${listing.tiktok}`,
+      label: `@${tiktok}`,
+      href: `https://tiktok.com/@${tiktok}`,
     },
     listing.website && {
       key: "website",

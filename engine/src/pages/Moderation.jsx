@@ -13,6 +13,7 @@ import {
 import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
+import { Select } from "../components/ui/Select";
 
 /**
  * Fila de moderação do social (/moderacao): denúncias de post, comentário,
@@ -60,13 +61,13 @@ function SuspendForm({ defaultReason = "other", busy, onSubmit, onCancel }) {
     >
       <label className="block">
         <span className="mb-1 block text-xs font-bold text-[var(--engine-text)]">{t("moderation.suspend.reason")}</span>
-        <select value={reason} onChange={(event) => setReason(event.target.value)} className={`${inputClass} h-11`}>
+        <Select value={reason} onChange={(event) => setReason(event.target.value)} className={`${inputClass} h-11`}>
           {SUSPENSION_REASONS.map((code) => (
             <option key={code} value={code}>
               {t(`suspension.reasons.${code}`)}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className="block">
         <span className="mb-1 block text-xs font-bold text-[var(--engine-text)]">{t("moderation.suspend.note")}</span>

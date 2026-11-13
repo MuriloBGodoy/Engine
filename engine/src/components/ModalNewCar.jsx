@@ -12,6 +12,7 @@ import { fipeService } from "../services/fipeService";
 import { localISODate } from "../services/garageInput";
 import { useConfirm } from "./ConfirmProvider";
 import { getStates } from "../services/locations";
+import { Select } from "./ui/Select";
 
 
 // Busca por palavras soltas, sem acento e sem caixa: "onix 1.0 aut" acha
@@ -557,7 +558,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
             </div>
 
             <div className="space-y-4">
-              <select
+              <Select
                 onChange={(e) => handleBrandChange(e.target.value)}
                 required={!carToEdit}
                 value={selectedBrand}
@@ -573,7 +574,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                     {b.nome}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {/* Filtro digitável: a lista da marca tem até ~560 versões e o
                   select nativo não busca. A busca filtra a lista que já veio
@@ -603,7 +604,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                 </label>
               )}
 
-              <select
+              <Select
                 onChange={(e) => handleModelChange(e.target.value)}
                 disabled={!models.length && !carToEdit}
                 required={!carToEdit}
@@ -620,9 +621,9 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                     {m.nome}
                   </option>
                 ))}
-              </select>
+              </Select>
 
-              <select
+              <Select
                 onChange={(e) => handleYearSelection(e.target.value)}
                 disabled={!years.length && !carToEdit}
                 required={!carToEdit}
@@ -639,7 +640,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                     {formatFipeYear(y.nome, t("car.zeroKm"))}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {fipeError && (
                 <div
@@ -727,7 +728,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                 {t("reminders.carForm.section")}
               </p>
               <div className="grid grid-cols-[1fr_auto] gap-3">
-                <select
+                <Select
                   value={reminderUf}
                   onChange={(e) => setReminderUf(e.target.value)}
                   aria-label={t("reminders.settings.uf")}
@@ -739,8 +740,8 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                       {state.code} · {state.name}
                     </option>
                   ))}
-                </select>
-                <select
+                </Select>
+                <Select
                   value={plateDigit}
                   onChange={(e) => setPlateDigit(e.target.value)}
                   aria-label={t("reminders.settings.plateDigit")}
@@ -752,7 +753,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                       {digit}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <p className="ml-1 text-[11px] text-[var(--engine-text-muted)]">
                 {t("reminders.carForm.hint")} {t("reminders.settings.plateHint")}

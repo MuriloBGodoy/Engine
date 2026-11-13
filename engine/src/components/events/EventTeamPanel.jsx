@@ -5,6 +5,7 @@ import { Crown, Loader2, LogOut, Search, UserPlus, X } from "lucide-react";
 import { engineDB } from "../../services/db";
 import { engineEvents } from "../../services/events";
 import { useToast } from "../ToastProvider";
+import { Select } from "../ui/Select";
 
 /**
  * Equipe do evento: Organizador, co-organizadores, staff e convidados, com
@@ -141,7 +142,7 @@ export function EventTeamPanel({ event, team, myUid, onChanged }) {
                 </span>
               </button>
               {canChange ? (
-                <select
+                <Select
                   aria-label={t("eventTeam.changeRole")}
                   value={member.role}
                   disabled={Boolean(busy)}
@@ -151,7 +152,7 @@ export function EventTeamPanel({ event, team, myUid, onChanged }) {
                   {roleChoices.map((role) => (
                     <option key={role} value={role}>{t(`eventTeam.roles.${role}`)}</option>
                   ))}
-                </select>
+                </Select>
               ) : null}
               {canRemove ? (
                 <button
@@ -187,7 +188,7 @@ export function EventTeamPanel({ event, team, myUid, onChanged }) {
                 className="min-h-10 w-full rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] pl-8 pr-3 text-[13px] text-[var(--engine-text)] outline-none focus:border-[var(--engine-accent)]"
               />
             </div>
-            <select
+            <Select
               aria-label={t("eventTeam.changeRole")}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
@@ -196,7 +197,7 @@ export function EventTeamPanel({ event, team, myUid, onChanged }) {
               {roleChoices.map((role) => (
                 <option key={role} value={role}>{t(`eventTeam.roles.${role}`)}</option>
               ))}
-            </select>
+            </Select>
           </div>
           {results.length ? (
             <ul className="space-y-1">

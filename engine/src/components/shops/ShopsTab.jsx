@@ -150,7 +150,7 @@ export function ShopsTab({ user, region, onNewProduct }) {
           </Chip>
         ))}
       </ChipRow>
-      <ChipRow>
+      <ChipRow className="pt-3" label={t("shop.browse.condition")}>
         {[
           { value: "all", label: t("shops.anyCondition") },
           { value: "new", label: t("shops.condition.new") },
@@ -206,9 +206,28 @@ export function ShopsTab({ user, region, onNewProduct }) {
         <ShopEmpty
           title={products.length ? t("shops.emptyFiltered") : t("shop.browse.emptyAll")}
           body={t("shop.browse.emptyBody")}
-          actionLabel={category !== "all" ? t("shop.browse.allCategories") : undefined}
+          actionLabel={products.length > 0 && category !== "all" ? t("shop.browse.allCategories") : undefined}
           onAction={() => setCategory("all")}
-        />
+        >
+          {/* Vitrine vazia DE VERDADE (nao e filtro): a porta para anunciar
+              mora aqui, igual ao bloco vazio da aba Serviços.
+
+              Sem ela, quem abria Lojas num celular com nenhum anúncio não
+              tinha saída: a barra do vendedor some abaixo de 640px quando a
+              pessoa não tem anúncio, e o "Anunciar" do topo só aparece a
+              partir de 1024px. Como a vitrine nasce vazia, esse era o estado
+              de todo mundo que entrasse pela primeira vez. */}
+          {!products.length && (
+            <button
+              type="button"
+              onClick={onNewProduct}
+              className="mt-3.5 inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-4 text-sm font-bold text-white transition hover:brightness-95"
+            >
+              <Plus size={16} aria-hidden="true" />
+              {t("shop.browse.advertise")}
+            </button>
+          )}
+        </ShopEmpty>
       )}
     </div>
   );

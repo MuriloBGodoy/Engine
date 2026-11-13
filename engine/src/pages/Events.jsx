@@ -11,6 +11,7 @@ import { getStates } from "../services/locations";
 import { eventTypeOptions } from "../services/eventTypes";
 import { getClub } from "../services/clubs";
 import { authPath } from "../services/authRedirect";
+import { Select } from "../components/ui/Select";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -159,7 +160,7 @@ export function Events({ embedded = false, user = null }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label className={labelClass}>{t("events.filters.type")}</label>
-            <select
+            <Select
               value={filters.type}
               onChange={(e) =>
                 setFilters((prev) => ({
@@ -174,12 +175,12 @@ export function Events({ embedded = false, user = null }) {
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
             <label className={labelClass}>{t("events.filters.state")}</label>
-            <select
+            <Select
               value={filters.state}
               onChange={(e) =>
                 setFilters((prev) => ({
@@ -195,15 +196,15 @@ export function Events({ embedded = false, user = null }) {
                   {state.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       )}
 
       {/* Eventos */}
       {loading ? (
-        <div className="text-center py-20">
-          <Loader2 size={48} className="mx-auto text-[var(--engine-accent)] animate-spin mb-4" />
+        <div className="py-12 text-center sm:py-20">
+          <Loader2 size={36} className="mx-auto mb-4 animate-spin text-[var(--engine-accent)] sm:size-12" />
           <p className="text-[var(--engine-text-muted)]">{t("events.loading")}</p>
         </div>
       ) : events.length === 0 && activeTab === "mine" ? (
@@ -224,7 +225,7 @@ export function Events({ embedded = false, user = null }) {
           </button>
         </div>
       ) : events.length === 0 ? (
-        <div className="text-center py-20 engine-card p-8">
+        <div className="engine-card p-6 py-10 text-center sm:p-8 sm:py-20">
           <p className="text-lg font-semibold text-[var(--engine-text)] mb-2">
             {t("events.emptyTitle")}
           </p>

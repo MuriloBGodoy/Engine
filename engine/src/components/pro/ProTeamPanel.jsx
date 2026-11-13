@@ -12,6 +12,7 @@ import {
 import { useConfirm } from "../ConfirmProvider";
 import { useToast } from "../ToastProvider";
 import { PrimaryButton, ProAvatar, SelectField, Sheet, TextField } from "./ProUi";
+import { Select } from "../ui/Select";
 
 /**
  * Equipe da página. owner mexe em tudo; admin convida e tira editor; editor
@@ -98,7 +99,7 @@ export function ProTeamPanel({ profile, myRole, user, onClose, onLeft }) {
                   </p>
                 </div>
                 {isOwner && !self ? (
-                  <select
+                  <Select
                     aria-label={t("pro.team.role")}
                     value={member.role}
                     disabled={busy}
@@ -110,7 +111,7 @@ export function ProTeamPanel({ profile, myRole, user, onClose, onLeft }) {
                         {t(`pro.roles.${value}`)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
                   <span className="rounded-full bg-[var(--engine-surface-2)] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--engine-text-muted)]">
                     {t(`pro.roles.${member.role}`)}

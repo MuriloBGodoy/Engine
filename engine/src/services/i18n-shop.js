@@ -221,6 +221,7 @@ const ptBR = {
       near: "Perto de",
       all: "Todas",
       categories: "Categorias",
+      condition: "Condição",
       storesNear: "Lojas perto de você",
       seeAll: "Ver todas",
       latest: "Novidades",
@@ -232,6 +233,7 @@ const ptBR = {
       emptyFit: "Nada em {{category}} pro seu {{car}} ainda",
       emptyBody: "Quando alguém anunciar, aparece aqui.",
       allCategories: "Ver todas as categorias",
+      newProduct: "Novo produto",
       advertise: "Anunciar",
     },
     categories: {
@@ -464,6 +466,7 @@ const enUS = {
       near: "Near",
       all: "All",
       categories: "Categories",
+      condition: "Condition",
       storesNear: "Shops near you",
       seeAll: "See all",
       latest: "Latest",
@@ -475,6 +478,7 @@ const enUS = {
       emptyFit: "Nothing in {{category}} for your {{car}} yet",
       emptyBody: "When someone posts one, it shows up here.",
       allCategories: "See all categories",
+      newProduct: "New product",
       advertise: "Post",
     },
     categories: {
@@ -707,6 +711,7 @@ const esES = {
       near: "Cerca de",
       all: "Todas",
       categories: "Categorías",
+      condition: "Estado",
       storesNear: "Tiendas cerca de ti",
       seeAll: "Ver todas",
       latest: "Novedades",
@@ -718,6 +723,7 @@ const esES = {
       emptyFit: "Todavía no hay nada en {{category}} para tu {{car}}",
       emptyBody: "Cuando alguien anuncie, sale aquí.",
       allCategories: "Ver todas las categorías",
+      newProduct: "Nuevo producto",
       advertise: "Anunciar",
     },
     categories: {

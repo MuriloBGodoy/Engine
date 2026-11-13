@@ -11,6 +11,7 @@ import {
 } from "../services/carShowcase";
 import { engineDB } from "../services/db";
 import { PersonLink } from "../components/social/PersonLink";
+import { profilePath, withoutAt } from "../services/people";
 import { useSavedCars } from "../hooks/useSavedCars";
 import { useRequireAccount } from "../hooks/useRequireAccount";
 import { auth } from "../services/supabase";
@@ -105,7 +106,7 @@ export function CarShowcasePage() {
   };
 
   if (car === undefined) {
-    return <div className="py-16 text-center text-sm text-[var(--engine-text-muted)]">…</div>;
+    return <div className="py-10 text-center text-sm text-[var(--engine-text-muted)] sm:py-16">…</div>;
   }
 
   if (car === null) {
@@ -151,10 +152,10 @@ export function CarShowcasePage() {
           </p>
           {owner && (
             <Link
-              to={owner.username ? `/community/@${owner.username}` : "/community"}
+              to={profilePath(owner.username) || "/community"}
               className="mt-1 inline-block text-[13px] font-bold text-[var(--engine-accent-text)]"
             >
-              {t("cars.ownerSince")} {owner.author || `@${owner.username}`}
+              {t("cars.ownerSince")} {owner.author || `@${withoutAt(owner.username)}`}
             </Link>
           )}
         </div>
@@ -249,7 +250,7 @@ export function CarShowcasePage() {
                   username={item.username}
                   className="text-[13px] font-bold text-[var(--engine-text)] hover:text-[var(--engine-accent)]"
                 >
-                  {item.author || `@${item.username}`}
+                  {item.author || `@${withoutAt(item.username)}`}
                 </PersonLink>
                 <p className="whitespace-pre-wrap break-words text-[13.5px] leading-5 text-[var(--engine-text)]">
                   {item.text}

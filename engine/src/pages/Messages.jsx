@@ -610,7 +610,7 @@ export function Messages({ user, settings }) {
                 </div>
               )}
               {currentTab === "clients" && (
-                <div className="engine-scroll -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+                <div className="engine-scroll-x -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
                   {STATUS_FILTERS.map((key) => (
                     <button
                       key={key}

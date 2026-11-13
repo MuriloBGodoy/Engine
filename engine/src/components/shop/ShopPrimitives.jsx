@@ -100,14 +100,36 @@ export function Chip({ selected, onClick, children, icon, className = "" }) {
 }
 
 /** Fileira de pílulas que rola de lado no celular. */
+/**
+ * Fileira de pílulas que rola de lado, com rótulo opcional.
+ *
+ * O rótulo era só `aria-label` — existia para o leitor de tela e para mais
+ * ninguém. Na aba Lojas isso empilhava duas fileiras mudas, categoria e
+ * condição, uma debaixo da outra: "Peças, Rodas e pneus… / Novo e usado,
+ * Novo, Usado" lia como UMA lista só, e nada dizia que são dois filtros
+ * diferentes. Agora o rótulo é desenhado quando existe, na mesma legenda
+ * miúda em caixa alta que o resto do app usa.
+ *
+ * Sem rótulo o componente continua exatamente como era — uma fileira e nada
+ * em volta —, que é como a vitrine do perfil o usa.
+ */
 export function ChipRow({ children, className = "", label }) {
-  return (
+  const fileira = (
     <div
       role={label ? "group" : undefined}
       aria-label={label}
-      className={`flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      className={`flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${label ? "" : className}`}
     >
       {children}
+    </div>
+  );
+  if (!label) return fileira;
+  return (
+    <div className={className}>
+      <p className="pb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--engine-text-subtle)]">
+        {label}
+      </p>
+      {fileira}
     </div>
   );
 }

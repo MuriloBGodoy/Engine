@@ -5,6 +5,7 @@ import { useRegion } from "../hooks/RegionProvider";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { countryDisplayName, regionShortLabel } from "../services/region";
 import { countries, getStates } from "../services/locations";
+import { Select } from "./ui/Select";
 
 /**
  * Pílula de localização no estilo Webmotors/OLX: mostra a região ativa e abre
@@ -78,7 +79,7 @@ export function RegionPicker({ compact = false, className = "" }) {
 
           <label className="region-pop-field">
             <span>{t("region.country")}</span>
-            <select
+            <Select
               value={region.country}
               onChange={(event) =>
                 setRegion({ country: event.target.value, state: "all" })
@@ -90,13 +91,13 @@ export function RegionPicker({ compact = false, className = "" }) {
                   {countryDisplayName(country.code, i18n.language)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
 
           {stateList.length > 0 && (
             <label className="region-pop-field">
               <span>{t("region.state")}</span>
-              <select
+              <Select
                 value={region.state}
                 onChange={(event) =>
                   setRegion({ country: region.country, state: event.target.value })
@@ -108,7 +109,7 @@ export function RegionPicker({ compact = false, className = "" }) {
                     {state.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
 

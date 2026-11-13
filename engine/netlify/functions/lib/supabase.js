@@ -81,6 +81,45 @@ export async function setUserPlan(
       updated_at: new Date().toISOString(),
     });
   if (error) throw error;
+
+  await espelharApoiador(userId, plan);
+}
+
+/**
+ * Marca (ou desmarca) o selo de Apoiador no perfil PÚBLICO.
+ *
+ * O plano mora em `user_plans`, que só o servidor lê — ninguém consegue ver o
+ * plano de outra pessoa, e é assim que tem de ser. Mas um selo que só o dono
+ * enxerga não é selo: metade do que a pessoa compra quando assina cedo é que
+ * os outros vejam que ela chegou primeiro.
+ *
+ * Então o que vai para o perfil público é um booleano e nada mais: `supporter`
+ * dentro do `data` que já existe. Não vaza plano, nem valor, nem vencimento —
+ * só "esta pessoa apoia". Por ser uma chave dentro de um JSONB que já está lá,
+ * não precisou de migração nenhuma.
+ *
+ * Perfil que ainda não existe (cadastro pela metade) é ignorado de propósito:
+ * criar meia linha de perfil aqui faria aparecer um fantasma na busca.
+ */
+async function espelharApoiador(userId, plan) {
+  const apoia = plan !== "free";
+  const client = db();
+  const { data, error } = await client
+    .from("public_profiles")
+    .select("data")
+    .eq("user_id", String(userId))
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return;
+
+  const atual = data.data || {};
+  if (Boolean(atual.supporter) === apoia) return;
+
+  const { error: falha } = await client
+    .from("public_profiles")
+    .update({ data: { ...atual, supporter: apoia } })
+    .eq("user_id", String(userId));
+  if (falha) throw falha;
 }
 
 export const json = (body, status = 200) =>

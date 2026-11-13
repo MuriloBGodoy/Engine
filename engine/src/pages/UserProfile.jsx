@@ -15,6 +15,8 @@ import {
   Settings as Cog,
   LayoutGrid,
   AlignLeft,
+  MapPin,
+  Sparkles,
 } from "lucide-react";
 import { engineDB, POST_KIND_POST } from "../services/db";
 import { GoalCard } from "./Community";
@@ -49,11 +51,33 @@ import "../services/i18n-profile-hub";
 // Banner will be solid color gradient - no default image
 const DEFAULT_BANNER_GRADIENT = "from-[var(--engine-accent)] to-[var(--engine-accent)]/70";
 
-// O rótulo embaixo de cada contador. Vira constante porque agora dois dos
-// três são botões e o terceiro não — sem isso a mesma linha de classes
+// O rótulo e o número embaixo de cada contador. Viram constante porque dois
+// dos três são botões e o terceiro não, e sem isso a mesma linha de classes
 // apareceria três vezes e uma delas sairia do passo.
+//
+// O rótulo não leva mais `whitespace-nowrap`: até 11/11/2026 ele levava, e
+// numa linha que carregava a foto de 80px, os três contadores E o menu dos
+// três pontos, as palavras ficavam da largura da própria coluna —
+// "Seguidores" e "Seguindo" eram lidos como uma palavra só. O menu desceu
+// para a linha de ações; se ainda assim faltar largura (tradução comprida,
+// aparelho de 320px), o rótulo quebra em duas linhas em vez de invadir o
+// vizinho.
 const statLabelClass =
-  "whitespace-nowrap text-[10px] font-bold tracking-tight text-[var(--engine-text-muted)] min-[360px]:text-[11px] min-[420px]:text-[10px] min-[420px]:uppercase min-[420px]:tracking-normal sm:text-[11px]";
+  "text-[11px] font-medium lowercase leading-tight text-[var(--engine-text-muted)] sm:text-xs";
+
+// O número era `--engine-accent` em peso 900: três contadores parados
+// gritando mais alto que o nome da pessoa logo abaixo. Vermelho no Engine é
+// cor de ação, e contador parado não é ação.
+const statValueClass =
+  "text-[17px] font-extrabold leading-tight tabular-nums text-[var(--engine-text)] sm:text-lg";
+
+// As duas ações principais do perfil, de peso igual nos dois casos: "Editar
+// perfil / Compartilhar" no seu, "Seguir / Mensagem" no dos outros. Antes o
+// seu tinha um botão vermelho de ponta a ponta para editar o próprio perfil
+// — a ação menos urgente da tela com o peso visual máximo.
+const profileActionBase =
+  "flex min-h-10 flex-1 items-center justify-center rounded-lg px-3 text-[13px] font-bold transition";
+const profileActionClass = `${profileActionBase} border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] hover:border-[var(--engine-border-strong)]`;
 
 
 // Um item das abas Seguidores/Seguindo. O perfil vem sempre de publicProfiles
@@ -534,6 +558,15 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
     }
   };
 
+  // Compartilhar o perfil. Virou função porque agora é chamada de dois
+  // lugares: o botão do seu perfil e o menu do perfil dos outros.
+  const shareProfile = () =>
+    openShareSheet({
+      url: shareUrls.profile(profile.username),
+      title: `${profile.author}${profile.username ? ` (${profile.username})` : ""}`,
+      kind: "profile",
+    });
+
   const handleReportProfile = () => {
     if (!profile || requireAccount()) return;
     openReport({ targetType: "profile", targetId: profile.userId, reportedUserId: profile.userId });
@@ -812,7 +845,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             </div>
           ))}
           {!profileGoals.length && (
-            <p className="px-4 py-16 text-center text-sm font-semibold text-[var(--engine-text-muted)]">
+            <p className="px-4 py-10 text-center text-sm font-semibold text-[var(--engine-text-muted)] sm:py-16">
               {t("community.postMissing")}
             </p>
           )}
@@ -865,75 +898,54 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             {/* Contadores. Seguidores e Seguindo são BOTÕES: o número é a
                 porta da lista, como em toda rede — foi o que tirou as duas
                 da tira de abas. Posts continua texto: a lista dele já é a
-                tela inteira logo abaixo. */}
-            <div className="min-w-0 flex-1">
-              <div className="mb-3 grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="text-center">
-                  <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
-                    {userGoals.length}
-                  </p>
-                  <p className={statLabelClass}>{t("socialFixes.profile.goals")}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPeopleTab("followers")}
-                  className="rounded-lg py-0.5 text-center transition hover:bg-[var(--engine-surface-2)]"
-                >
-                  <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
-                    {followCounts.followers}
-                  </p>
-                  <p className={statLabelClass}>{t("socialFixes.profile.followers")}</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPeopleTab("following")}
-                  className="rounded-lg py-0.5 text-center transition hover:bg-[var(--engine-surface-2)]"
-                >
-                  <p className="text-lg font-black text-[var(--engine-accent)] sm:text-xl">
-                    {followCounts.following}
-                  </p>
-                  <p className={statLabelClass}>{t("socialFixes.profile.following")}</p>
-                </button>
-              </div>
-            </div>
+                tela inteira logo abaixo.
 
-            {/* "..." do perfil: onde mora o que é meu e não é vitrine.
-                Arquivadas, Salvos e Curtidas saíram da tira de abas para cá
-                — ninguém precisa ver que eu tenho 40 posts salvos, e eu não
-                preciso de uma aba para achá-los duas vezes por mês. */}
-            {isOwnProfile && (
-              <PostMenu
-                label={t("profileHub.menu")}
-                items={[
-                  {
-                    label: t("socialPosts.saved.tab"),
-                    icon: Bookmark,
-                    onClick: () => setActiveTab("saved"),
-                  },
-                  {
-                    label: t("community.archivedTab"),
-                    icon: Archive,
-                    onClick: () => setActiveTab("archived"),
-                  },
-                  {
-                    label: t("profileHub.liked"),
-                    icon: Heart,
-                    onClick: () => setActiveTab("liked"),
-                  },
-                  {
-                    label: t("profileHub.settings"),
-                    icon: Cog,
-                    onClick: () => navigate("/settings"),
-                  },
-                ]}
-              />
-            )}
+                Três colunas em `flex-1 min-w-0`, dividindo por igual o que
+                sobra da foto. O menu dos três pontos saiu desta linha em
+                11/11/2026 e foi para a linha de ações: eram três coisas
+                disputando uma linha só, e quem perdia era o rótulo. */}
+            <div className="flex min-w-0 flex-1 items-start">
+              <div className="min-w-0 flex-1 px-1 py-0.5 text-center">
+                <p className={statValueClass}>{userGoals.length}</p>
+                <p className={statLabelClass}>{t("socialFixes.profile.goals")}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPeopleTab("followers")}
+                className="min-w-0 flex-1 rounded-lg px-1 py-0.5 text-center transition hover:bg-[var(--engine-surface-2)]"
+              >
+                <p className={statValueClass}>{followCounts.followers}</p>
+                <p className={statLabelClass}>{t("socialFixes.profile.followers")}</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeopleTab("following")}
+                className="min-w-0 flex-1 rounded-lg px-1 py-0.5 text-center transition hover:bg-[var(--engine-surface-2)]"
+              >
+                <p className={statValueClass}>{followCounts.following}</p>
+                <p className={statLabelClass}>{t("socialFixes.profile.following")}</p>
+              </button>
+            </div>
           </div>
 
           {/* Name & Username */}
           <div className="mb-3">
-            <h2 className="text-base font-black text-[var(--engine-text)] sm:text-lg">
-              {profile.author || "Usuário Engine"}
+            <h2 className="flex min-w-0 items-center gap-1.5 text-base font-black text-[var(--engine-text)] sm:text-lg">
+              <span className="min-w-0 truncate">{profile.author || "Usuário Engine"}</span>
+              {/* Selo de Apoiador: quem assina cedo aparece. É o único
+                  benefício do plano que existe no ato da assinatura — os
+                  outros ainda estão sendo construídos —, então ele precisa
+                  estar onde os outros veem, não escondido em Configurações. */}
+              {profile.supporter && (
+                <span
+                  title={t("billing.features.founder.supporterBadge")}
+                  aria-label={t("billing.features.founder.supporterBadge")}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--engine-accent-soft)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[var(--engine-accent-text)]"
+                >
+                  <Sparkles size={11} aria-hidden="true" />
+                  {t("profile.supporter")}
+                </span>
+              )}
             </h2>
             <p className="text-sm font-medium text-[var(--engine-text-muted)]">
               {(profile.username || "engine").replace(/^@/, "") ? `@${(profile.username || "engine").replace(/^@/, "")}` : "@engine"}
@@ -950,84 +962,80 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             viewerId={currentUserId || ""}
           />
 
-          {/* Location */}
+          {/* Cidade, com alfinete. Solta, em cinza pequeno, ela flutuava sem
+              dizer que era um lugar. */}
           {profile.city && (
-            <p className="mb-4 text-xs text-[var(--engine-text-muted)]">
+            <p className="mb-4 flex items-center gap-1 text-xs text-[var(--engine-text-muted)]">
+              <MapPin size={12} className="shrink-0" aria-hidden="true" />
               {profile.city}
             </p>
           )}
 
-          {/* Action Buttons - Full width on mobile */}
-          <div className="flex w-full gap-2 sm:gap-3">
+          {/* Linha de ações: a MESMA forma nos dois perfis — duas ações de
+              peso igual e um menu. No seu: Editar e Compartilhar. No dos
+              outros: Seguir e Mensagem.
+
+              Até 11/11/2026 o perfil alheio punha CINCO botões nesta linha:
+              denunciar, bloquear e compartilhar eram quadrados fixos de 44px
+              que não encolhem, e sobravam uns 80px para "SEGUINDO" e
+              "MENSAGEM" em caixa alta, que quebravam no meio da palavra
+              ("SEGUIND / O"). As três ações raras foram para o menu, que é
+              onde o Instagram, o X e o WhatsApp põem exatamente essas três. */}
+          <div className="flex w-full items-stretch gap-2 sm:gap-3">
             {isOwnProfile ? (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="flex-1 rounded-lg bg-[var(--engine-accent)] py-2 text-xs font-black uppercase tracking-wide text-white transition hover:brightness-95 sm:py-2.5"
-              >
-                {t("socialFixes.profile.edit")}
-              </button>
+              <>
+                <button type="button" onClick={() => setIsEditing(true)} className={profileActionClass}>
+                  {t("socialFixes.profile.edit")}
+                </button>
+                <button type="button" onClick={shareProfile} className={profileActionClass}>
+                  {t("socialPosts.share.action")}
+                </button>
+              </>
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={handleFollow}
-                  className={`flex-1 rounded-lg py-2 text-xs font-black uppercase tracking-wide transition sm:py-2.5 ${
+                  className={
                     isFollowing
-                      ? "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                      : "bg-[var(--engine-accent)] text-white hover:brightness-95"
-                  }`}
+                      ? profileActionClass
+                      : `${profileActionBase} bg-[var(--engine-accent)] text-white hover:brightness-95`
+                  }
                 >
                   {isFollowing ? t("community.following") : t("community.follow")}
                 </button>
-                <button
-                  onClick={handleMessage}
-                  className="flex-1 rounded-lg border border-[var(--engine-border)] py-2 text-xs font-black uppercase tracking-wide text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:py-2.5"
-                >
+                <button type="button" onClick={handleMessage} className={profileActionClass}>
                   {t("socialFixes.profile.message")}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleReportProfile}
-                  title={t("socialFixes.profile.report")}
-                  aria-label={t("socialFixes.profile.report")}
-                  className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                >
-                  <Flag size={16} />
-                </button>
-                {currentUserId && (
-                  <button
-                    type="button"
-                    onClick={handleBlockProfile}
-                    title={t("community.block")}
-                    aria-label={t("community.block")}
-                    className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-                  >
-                    <UserX size={16} />
-                  </button>
-                )}
               </>
             )}
-            {/* Compartilhar o perfil (dentro e fora do Engine). */}
-            <button
-              type="button"
-              onClick={() =>
-                openShareSheet({
-                  url: shareUrls.profile(profile.username),
-                  title: `${profile.author}${profile.username ? ` (${profile.username})` : ""}`,
-                  kind: "profile",
-                })
+            <PostMenu
+              label={t("profileHub.menu")}
+              triggerClass="flex w-10 shrink-0 items-center justify-center self-stretch rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-border-strong)] hover:text-[var(--engine-text)]"
+              items={
+                isOwnProfile
+                  ? [
+                      { label: t("socialPosts.saved.tab"), icon: Bookmark, onClick: () => setActiveTab("saved") },
+                      { label: t("community.archivedTab"), icon: Archive, onClick: () => setActiveTab("archived") },
+                      { label: t("profileHub.liked"), icon: Heart, onClick: () => setActiveTab("liked") },
+                      { label: t("profileHub.settings"), icon: Cog, onClick: () => navigate("/settings") },
+                    ]
+                  : [
+                      { label: t("socialPosts.share.action"), icon: Share2, onClick: shareProfile },
+                      { label: t("socialFixes.profile.report"), icon: Flag, onClick: handleReportProfile },
+                      ...(currentUserId
+                        ? [{ label: t("community.block"), icon: UserX, onClick: handleBlockProfile, danger: true }]
+                        : []),
+                    ]
               }
-              title={t("socialPosts.share.action")}
-              aria-label={t("socialPosts.share.action")}
-              className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-            >
-              <Share2 size={16} />
-            </button>
+            />
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-[var(--engine-border)]">
-          <div className="flex gap-6 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-stretch border-b border-[var(--engine-border)]">
+          <div className="relative min-w-0 flex-1">
+          <div className="flex gap-5 overflow-x-auto px-4 pr-8 [scrollbar-width:none] sm:gap-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
             {/* A tira só tem CONTEÚDO desta pessoa, e cada aba é um tipo de
                 coisa diferente:
                   Publicações — o que ela contou (com ou sem carro ligado);
@@ -1072,7 +1080,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   // tira rola na horizontal (ver `activeTabRef` acima).
                   ref={isActive ? activeTabRef : undefined}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`shrink-0 whitespace-nowrap border-b-2 py-4 text-sm font-bold uppercase tracking-wide transition ${
+                  className={`shrink-0 whitespace-nowrap border-b-2 py-3.5 text-[13px] font-bold tracking-tight transition sm:text-sm ${
                     isActive
                       ? "border-[var(--engine-accent)] text-[var(--engine-accent)]"
                       : "border-transparent text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
@@ -1083,6 +1091,51 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               );
             })}
           </div>
+          {/* Esmaecido na borda direita: a tira rola e nada avisava —
+              "CONQUIST⁄" cortado no meio parecia defeito. Ele mora sobre o
+              respiro do fim da tira (o `pr-8` acima), nunca sobre texto. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--engine-bg)] to-transparent"
+          />
+        </div>
+
+        {/* Grade / lista: entrou na PRÓPRIA tira de abas, à direita, e sem
+            sublinhado. Até 11/11/2026 era uma segunda tira logo abaixo, com
+            um segundo sublinhado vermelho — duas seleções acesas na mesma
+            dobra, e o olho sem saber qual respondia ao toque.
+
+            Fica fora do rolador para não sumir quando as abas passarem da
+            largura da tela. Só existe quando existem os dois tipos: num
+            perfil só de fotos não há escolha a oferecer. */}
+        {activeTab === "posts" && textGoals.length > 0 && visualGoals.length > 0 && (
+          <div className="flex shrink-0 items-center gap-0.5 pr-2 sm:pr-4">
+            {[
+              { id: "grid", icon: LayoutGrid, label: t("profileHub.grid") },
+              { id: "texts", icon: AlignLeft, label: t("profileHub.texts") },
+            ].map((vista) => {
+              const ativa = postsKind === vista.id;
+              const Icone = vista.icon;
+              return (
+                <button
+                  key={vista.id}
+                  type="button"
+                  onClick={() => setPostsKind(vista.id)}
+                  title={vista.label}
+                  aria-label={vista.label}
+                  aria-pressed={ativa}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+                    ativa
+                      ? "text-[var(--engine-accent)]"
+                      : "text-[var(--engine-text-subtle)] hover:text-[var(--engine-text)]"
+                  }`}
+                >
+                  <Icone size={18} strokeWidth={ativa ? 2.6 : 2} />
+                </button>
+              );
+            })}
+          </div>
+        )}
         </div>
 
         {/* Tab Content */}
@@ -1096,53 +1149,12 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                   Então: a grade fica com foto e vídeo, e os textos ganham
                   uma lista do lado, a um toque. A tira de escolha só
                   aparece quando existe texto para mostrar. */}
-              {/* A faixa de ícones do perfil do Instagram: de ponta a ponta,
-                  encostada na tira de abas, com o mesmo sublinhado. Entrou
-                  no lugar de duas pílulas vermelhas cheias, que acendiam
-                  mais que a aba selecionada logo acima — duas seleções
-                  disputando a mesma dobra. Sem rótulo some junto o problema
-                  de nomear "Fotos e vídeos" numa caixa estreita.
-
-                  Só existe quando existem os dois tipos: num perfil só de
-                  fotos não há escolha a oferecer. */}
-              {textGoals.length > 0 && visualGoals.length > 0 && (
-                <div className="-mx-4 -mt-6 flex border-b border-[var(--engine-border)] sm:-mx-6">
-                  {[
-                    { id: "grid", icon: LayoutGrid, label: t("profileHub.grid") },
-                    { id: "texts", icon: AlignLeft, label: t("profileHub.texts") },
-                  ].map((vista) => {
-                    const ativa = postsKind === vista.id;
-                    const Icone = vista.icon;
-                    return (
-                      <button
-                        key={vista.id}
-                        type="button"
-                        onClick={() => setPostsKind(vista.id)}
-                        title={vista.label}
-                        aria-label={vista.label}
-                        aria-pressed={ativa}
-                        className={`flex h-11 flex-1 items-center justify-center border-b-2 transition-colors ${
-                          ativa
-                            ? "border-[var(--engine-accent)] text-[var(--engine-accent)]"
-                            : "border-transparent text-[var(--engine-text-subtle)] hover:text-[var(--engine-text)]"
-                        }`}
-                      >
-                        <Icone size={18} strokeWidth={ativa ? 2.6 : 2} />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
 
               {postsKind === "texts" || !visualGoals.length ? null : (
                 /* Grade de 3 colunas encostada nas bordas, como no Instagram:
                    até 30/10/2026 eram cartões com título e barra, que mostravam
                    seis posts por tela e não abriam nada. */
-                <div
-                  className={`-mx-4 grid grid-cols-3 gap-0.5 sm:-mx-6 ${
-                    textGoals.length ? "mt-0.5" : "-mt-6"
-                  }`}
-                >
+                <div className="-mx-4 -mt-6 grid grid-cols-3 gap-0.5 sm:-mx-6">
                   {visualGoals.map((goal) => (
                     <ProfilePostTile key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
                   ))}
@@ -1150,7 +1162,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
               )}
 
               {(postsKind === "texts" || !visualGoals.length) && textGoals.length > 0 && (
-                <div className={`space-y-2 ${visualGoals.length ? "mt-4" : ""}`}>
+                <div className="space-y-2">
                   {textGoals.map((goal) => (
                     <TextPostRow key={goal.id} goal={goal} t={t} onOpen={openFeedAt} />
                   ))}

@@ -87,7 +87,7 @@ export function ClubsTab({ searchParams, setSearchParams, user = null }) {
           ) : null}
 
           {loading && !clubs.length ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-[var(--engine-text-muted)]">
+            <div className="flex items-center justify-center gap-2 py-8 text-[var(--engine-text-muted)] sm:py-12">
               <Loader2 size={18} className="animate-spin" />
               {t("clubs.loading")}
             </div>

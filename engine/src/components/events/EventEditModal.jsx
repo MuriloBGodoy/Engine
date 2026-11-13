@@ -10,6 +10,7 @@ import { useToast } from "../ToastProvider";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { EventPhotoField } from "./EventPhotoField";
 import "../../services/i18n-editing";
+import { Select } from "../ui/Select";
 
 /**
  * Editar o evento (organizador e co-organizadores; o banco confere).
@@ -145,13 +146,13 @@ function EditContent({ event, onClose, onSaved }) {
           </label>
           <label className="grid gap-1.5">
             <span className={label}>{t("editing.eventType")}</span>
-            <select value={form.type} onChange={set("type")} className={field}>
+            <Select value={form.type} onChange={set("type")} className={field}>
               {eventTypeOptions(t).map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="grid gap-1.5">
             <span className={label}>{t("eventTeam.edit.description")}</span>
@@ -177,14 +178,14 @@ function EditContent({ event, onClose, onSaved }) {
           </label>
           <label className="grid gap-1.5">
             <span className={label}>{t("events.form.state")}</span>
-            <select value={form.state} onChange={set("state")} className={field}>
+            <Select value={form.state} onChange={set("state")} className={field}>
               <option value="">—</option>
               {estados.map((uf) => (
                 <option key={uf.code} value={uf.code}>
                   {uf.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
 
           {/* O aviso só aparece quando o quando/onde está realmente prestes a

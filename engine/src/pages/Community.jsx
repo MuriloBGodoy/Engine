@@ -1048,11 +1048,17 @@ export function GoalCard({
                   assim que a crew aparece no feed geral (CLUBES-CONTRATO §2). */}
               <ClubTag tag={goal.clubTag} className="shrink-0" />
               {goal.clubTag && goal.createdAt ? <span aria-hidden="true">·</span> : null}
+              {/* No feed, "há 3 dias" — é o que importa quando se está passando
+                  o olho. Com o post ABERTO, a data por extenso: a pessoa veio
+                  ver esta publicação, e aí "11 de junho de 2024" diz mais que
+                  "há 3 dias". É a convenção do Instagram e do X, e continua
+                  alternando no clique. */}
               {goal.createdAt ? (
                 <TimeAgo
                   value={goal.createdAt}
                   editedAt={goal.editedAt}
-                  short
+                  short={!isModal}
+                  absolute={isModal}
                   className="shrink-0 hover:text-[var(--engine-text)]"
                 />
               ) : null}
@@ -1758,7 +1764,7 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
             />
           </div>
         ) : (
-          <p className="px-4 py-16 text-center text-sm font-semibold text-[var(--engine-text-muted)]">
+          <p className="px-4 py-10 text-center text-sm font-semibold text-[var(--engine-text-muted)] sm:py-16">
             {loading ? t("common.loading") : t("community.postMissing")}
           </p>
         )}
@@ -2738,9 +2744,12 @@ export function Community({ cars = [], settings, user }) {
                           {/* Card patrocinado nativo — entra no meio do feed
                               (padrão Webmotors), rotulado e discreto. */}
                           {index === 3 && (
-                            <div className="px-4 py-4 sm:px-0 sm:py-0">
-                              <AdSlot slot="community-feed" format="native" user={user} />
-                            </div>
+                            <AdSlot
+                              slot="community-feed"
+                              format="native"
+                              user={user}
+                              className="px-4 py-4 sm:px-0 sm:py-0"
+                            />
                           )}
                         </Fragment>
                       ))}
@@ -3001,7 +3010,7 @@ function RailStat({ icon, value, label }) {
 
 function EmptyFeed({ t }) {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface)] p-8 text-center lg:col-span-2 xl:col-span-1 2xl:col-span-2  ">
+    <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--engine-border)] bg-[var(--engine-surface)] p-6 text-center sm:min-h-[320px] sm:p-8 lg:col-span-2 xl:col-span-1 2xl:col-span-2">
       <Search className="mb-4 text-[var(--engine-accent)]" size={40} />
       <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
         {t("community.noSearchResults")}
@@ -3020,6 +3029,15 @@ function SidebarRanking({ ranking, t }) {
         <Trophy size={18} className="text-[var(--engine-accent)]" />
         {t("community.weekTop")}
       </h2>
+      {/* Sem ninguém no ranking, o `slice` devolvia lista vazia e sobrava um
+          cabeçalho numa caixa oca — que parece defeito, não "ainda não tem".
+          Um app que acabou de nascer vive nesse estado, então ele precisa
+          dizer o que falta para sair dele. */}
+      {!ranking.length ? (
+        <p className="text-sm font-medium leading-relaxed text-[var(--engine-text-muted)]">
+          {t("community.weekTopEmpty")}
+        </p>
+      ) : (
       <div className="space-y-3">
         {ranking.slice(0, 3).map((goal, index) => (
           <div key={goal.id} className="flex items-center gap-3">
@@ -3039,12 +3057,13 @@ function SidebarRanking({ ranking, t }) {
                 <PersonLink username={goal.username} className="hover:text-[var(--engine-accent)]">
                   {goal.username}
                 </PersonLink>
-                {` · ${goal.likes} likes · ${getProgress(goal).toFixed(0)}%`}
+                {` · ${goal.likes} ${t("community.likes")} · ${getProgress(goal).toFixed(0)}%`}
               </p>
             </div>
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 }
@@ -3089,64 +3108,85 @@ function Suggestions({ t, following, onFollow }) {
   );
 }
 
+/**
+ * Ranking Engine na coluna do feed. Só entra quando o trilho lateral NÃO
+ * está na tela (abaixo de 1280px), ou seja: este painel é de celular e
+ * tablet — e era onde ele menos cabia.
+ *
+ * Até 12/11/2026 era um cartão com borda contendo um cartão com borda por
+ * colocado, cada um com 16px de padding, um número de 56px e três métricas
+ * em grade de 3 colunas: ~170px por linha, duas linhas e meia por tela de
+ * celular, e dois fios de 1px a 4px de distância um do outro. Agora é uma
+ * LISTA — a mesma anatomia do "Top da semana" do trilho, que já funcionava:
+ * posição, carro, quem é, e o percentual na ponta direita.
+ */
 function RankingPanel({ ranking, t }) {
   return (
-    <div className="rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-4 sm:p-6">
-      <div className="mb-5 flex items-end justify-between gap-4 sm:mb-6">
+    <section className="-mx-4 border-y border-[var(--engine-border)] bg-[var(--engine-surface)] sm:mx-0 sm:rounded-2xl sm:border">
+      <header className="flex items-start gap-2.5 px-4 pb-3 pt-4 sm:px-6 sm:pt-5">
+        <Trophy size={18} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" />
         <div className="min-w-0">
-          <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--engine-text)] dark:text-white">
             {t("community.rankingTitle")}
           </h2>
-          <p className="mt-1 text-sm font-medium text-[var(--engine-text-muted)]">
+          <p className="mt-1 text-[13px] font-medium leading-5 text-[var(--engine-text-muted)]">
             {t("community.rankingSubtitle")}
           </p>
         </div>
-        <Trophy size={30} className="shrink-0 text-[var(--engine-accent)] sm:size-9" />
-      </div>
+      </header>
 
-      <div className="space-y-4">
+      <ol className="divide-y divide-[var(--engine-border)] border-t border-[var(--engine-border)]">
         {ranking.map((goal, index) => {
           const progress = getProgress(goal);
           return (
-            <div
-              key={goal.id}
-              className="grid gap-4 rounded-xl border border-[var(--engine-border)] p-4 md:grid-cols-[64px_1fr_160px] md:items-center "
-            >
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-xl font-black italic text-white ">
-                #{index + 1}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-lg font-black italic text-[var(--engine-text)] dark:text-white">
+            <li key={goal.id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--engine-accent)] text-xs font-black text-white">
+                {index + 1}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-[var(--engine-text)] dark:text-white">
                   {getVehicleTitleShort(goal)}
+                  {goal.year ? (
+                    <span className="font-semibold text-[var(--engine-text-subtle)]">
+                      {` · ${formatFipeYear(goal.year, t("car.zeroKm"))}`}
+                    </span>
+                  ) : null}
                 </p>
-                <PersonLink
-                  username={goal.username}
-                  className="block text-xs font-bold uppercase tracking-widest text-[var(--engine-text-subtle)] hover:text-[var(--engine-accent)]"
+                {/* Quem é, curtidas e nota numa linha de 11px. Em grade de
+                    três colunas cada número ganhava 1/3 da largura e o peso
+                    de manchete; aqui eles são o rodapé do nome, que é o que
+                    a pessoa procura. */}
+                <p className="mt-px truncate text-[11px] font-medium text-[var(--engine-text-subtle)]">
+                  <PersonLink username={goal.username} className="hover:text-[var(--engine-accent)]">
+                    {goal.username}
+                  </PersonLink>
+                  {` · ${goal.likes} ${t("community.likes")} · `}
+                  <span className="font-bold tabular-nums text-amber-500">
+                    {goal.rating.toFixed(1)}
+                  </span>
+                </p>
+                <span
+                  role="progressbar"
+                  aria-valuenow={Math.round(progress)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="mt-2 block h-1 overflow-hidden rounded-full bg-[var(--engine-surface-2)]"
                 >
-                  {goal.author} / {goal.username}
-                </PersonLink>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--engine-surface-2)] dark:bg-red-950/30">
-                  <div
-                    className="h-full rounded-full bg-[var(--engine-accent)]"
+                  <span
+                    className="block h-full rounded-full bg-[var(--engine-accent)]"
                     style={{ width: `${progress}%` }}
                   />
-                </div>
+                </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center md:grid-cols-1 md:text-right">
-                <p className="text-sm font-black text-[var(--engine-accent)]">
-                  {progress.toFixed(1)}%
-                </p>
-                <p className="text-sm font-black text-[var(--engine-text)] dark:text-white">
-                  {goal.likes} likes
-                </p>
-                <p className="text-sm font-black text-amber-500">
-                  {goal.rating.toFixed(1)} {t("community.rating")}
-                </p>
-              </div>
-            </div>
+
+              <span className="shrink-0 text-[13px] font-black tabular-nums text-[var(--engine-accent-text)]">
+                {progress.toFixed(0)}%
+              </span>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ol>
+    </section>
   );
 }

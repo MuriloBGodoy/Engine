@@ -4,6 +4,7 @@ import { ImagePlus, Loader2, Store, X } from "lucide-react";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { SwitchKnob } from "../shop/ShopPrimitives";
 import { MediaPickerButton } from "../MediaPickerButton";
+import { Select } from "../ui/Select";
 
 /**
  * Peças de tela da conta profissional e de Lojas. Versão funcional, nos
@@ -108,13 +109,13 @@ export function TextAreaField({ id, label, value, onChange, hint, optional, maxL
 export function SelectField({ id, label, value, onChange, options, hint, optional }) {
   return (
     <FieldLabel htmlFor={id} label={label} hint={hint} optional={optional}>
-      <select id={id} value={value ?? ""} onChange={(event) => onChange(event.target.value)} className={`${inputClass} min-h-[52px]`}>
+      <Select id={id} value={value ?? ""} onChange={(event) => onChange(event.target.value)} className={`${inputClass} min-h-[52px]`}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
-      </select>
+      </Select>
     </FieldLabel>
   );
 }

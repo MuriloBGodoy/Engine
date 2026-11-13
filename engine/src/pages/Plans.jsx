@@ -4,6 +4,7 @@ import { Trans, useTranslation } from "react-i18next";
 import {
   ArrowRight,
   BadgeCheck,
+  BellRing,
   Check,
   Clock3,
   Globe,
@@ -26,41 +27,68 @@ import {
   formatLongDate,
   formatPrice,
 } from "../services/billing";
-import { ADSENSE_ENABLED } from "../services/consent";
 import { authPath } from "../services/authRedirect";
+import { SUPPORT_MAILTO } from "../services/contact";
 
 const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
 const CheckoutSheet = lazyNamed(() => import("../components/billing/CheckoutSheet"), "CheckoutSheet");
 
-// O que já existe no app e é grátis para sempre. Todos com status "available".
-const FREE_FEATURES = ["garage", "specs", "simulator", "community", "clubsEvents", "services"];
-
-// Benefícios do mapa do Premium (23/10/2026). Só "sem anúncios" existe hoje;
-// o resto aparece marcado como "Em breve" até existir de verdade no app.
-// "Sem anúncios" só é benefício quando o site TEM anúncio. Sem AdSense
-// configurado, a produção não mostra nenhum (AdSlot não desenha), e vender o
-// Premium por isso seria cobrar para tirar o que não existe (auditoria geral,
-// 25/10/2026). Decisão do plano: a venda do Premium não abre agora.
-const PREMIUM_FEATURES = [
-  { key: "noAds", available: ADSENSE_ENABLED },
-  { key: "fipeAlert", available: false },
-  { key: "maintenance", available: false },
-  { key: "totalCost", available: false },
-  { key: "comparator", available: false },
-  { key: "resale", available: false },
-  { key: "supporterBadge", available: false },
+/**
+ * O que já existe no app e é grátis para sempre.
+ *
+ * Cresceu de 6 para 8 linhas em 12/11/2026, e nenhuma delas foi construída
+ * nesse dia: orçamento, avaliações e manutenção programada já estavam no ar
+ * há semanas — só que listadas nos cartões PAGOS, com selo de "Em breve".
+ * Elas estavam na coluna errada, e isso contrariava a regra escrita no topo
+ * de lib/plans.js: o que já existe fica grátis, os planos só acrescentam.
+ *
+ * O efeito é duplo: o cartão do meio para de prometer o que já se entrega, e
+ * o Grátis vira o que ele de fato é — a maior parte do Engine.
+ */
+const FREE_FEATURES = [
+  "garage",
+  "specs",
+  "simulator",
+  "maintenance",
+  "quotes",
+  "reviews",
+  "community",
+  "services",
 ];
 
-const PRO_FEATURES = [
-  { key: "allPremium", available: ADSENSE_ENABLED },
-  { key: "monthlyMetrics", available: false },
-  { key: "monthlyReport", available: false },
-  { key: "quotes", available: false },
-  { key: "coupon", available: false },
-  { key: "reviews", available: false },
+/**
+ * O que a camada de entrada entrega NO ATO de assinar — as três são reais e
+ * não dependem de nada ser construído antes.
+ *
+ * Até 12/11/2026 este cartão era uma lista de sete benefícios com SEIS selos
+ * de "Em breve" em sequência. Seis selos iguais um embaixo do outro não leem
+ * como "vem aí", leem como "não tem nada aqui" — e o único que não tinha selo
+ * ("sem anúncios") também não valia, porque não existe anúncio no app para
+ * tirar. Era um cartão pedindo cartão de crédito em troca de uma promessa.
+ *
+ * O que vem depois continua escrito, mas numa frase em vez de em seis selos:
+ * uma frase de futuro soa como plano, seis selos soam como buraco.
+ */
+const FOUNDER_FEATURES = [
+  { key: "supporterBadge", available: true },
+  { key: "priceLock", available: true },
+  { key: "earlyAccess", available: true },
 ];
 
-const PREMIUM_OPTIONS = ["premium_yearly", "premium_pass_3m", "premium_pass_1m"];
+const PREMIUM_OPTIONS = [
+  "premium_monthly",
+  "premium_yearly",
+  "premium_pass_3m",
+  "premium_pass_1m",
+];
+
+/** Quanto o anual poupa contra 12 mensais, em % inteiro (33 = "economize 33%"). */
+function yearlySavingPercent(currency) {
+  const mensal = OFFERS.premium_monthly.amount[currency];
+  const anual = OFFERS.premium_yearly.amount[currency];
+  if (!mensal || !anual) return 0;
+  return Math.round((1 - anual / (mensal * 12)) * 100);
+}
 
 /** "peso mexicano", "libra esterlina"… no idioma da tela; o código, se o navegador não souber. */
 function currencyName(currency, language) {
@@ -165,8 +193,10 @@ export function Plans({ user }) {
   const [checkoutOffer, setCheckoutOffer] = useState(null);
 
   const isGuest = !user;
-  // À venda só quando houver chave do Stripe E algo a entregar (anúncio).
-  const billingOpen = Boolean(STRIPE_PUBLISHABLE_KEY) && ADSENSE_ENABLED;
+  // Chave do Stripe = dá para cobrar. O que cada oferta tem para entregar é
+  // outra pergunta, e quem responde é o `onSale` dela (ver lib/plans.js).
+  const billingOpen = Boolean(STRIPE_PUBLISHABLE_KEY);
+  const onSale = (offerId) => Boolean(OFFERS[offerId]?.onSale);
   const hasSubscription = plan !== "free" && subscription?.kind === "subscription";
   const hasPass = plan === "premium" && subscription?.kind === "pass";
   const trialUsed = Boolean(subscription?.trialEnd);
@@ -174,7 +204,10 @@ export function Plans({ user }) {
   const price = (id) => money(OFFERS[id].amount[currency]);
   const founderPrice = money(OFFERS.pro_monthly.founderAmount[currency]);
 
-  const planName = plan === "pro" ? "Engine Pro" : plan === "premium" ? "Engine Premium" : "";
+  // "pro" e "premium" aqui são os ids INTERNOS: "premium" é a camada de
+  // entrada (dono do carro) e "pro" é a de cima (prestador). Os nomes de
+  // vitrine trocaram de lado em 12/11/2026; os ids, não — ver lib/plans.js.
+  const planName = plan === "pro" ? "Engine Premium" : plan === "premium" ? "Engine Pro" : "";
 
   /** Botão de compra de uma oferta, com os estados que não podem quebrar. */
   const buyButton = (offerId, label) => {
@@ -185,11 +218,17 @@ export function Plans({ user }) {
         </Button>
       );
     }
-    if (!billingOpen) {
+    if (!billingOpen || !onSale(offerId)) {
+      // Um "Assinar" desabilitado é a pior saída possível: convida e recusa
+      // no mesmo gesto. Aqui a pessoa sai com um caminho na mão.
       return (
-        <Button disabled className="w-full">
-          {t("billing.plans.cta.soon")}
-        </Button>
+        <a
+          href={SUPPORT_MAILTO}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-[var(--engine-border-strong)] text-[13px] font-semibold text-[var(--engine-text-muted)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] sm:h-10"
+        >
+          <BellRing size={15} aria-hidden="true" />
+          {t("billing.plans.cta.notify")}
+        </a>
       );
     }
     if (!sellable) {
@@ -272,7 +311,12 @@ export function Plans({ user }) {
   } else {
     premiumFooter = buyButton(
       premiumOffer,
-      premiumOffer === "premium_yearly" ? t("billing.plans.cta.subscribePremium") : t("billing.plans.cta.buyPass"),
+      // Mensal e anual sao assinatura; os passes, compra avulsa. Ate o mensal
+      // existir (12/11/2026) so havia o anual, e qualquer outra opcao caia em
+      // "Comprar passe" — o mensal estrearia com o botao errado.
+      premiumOffer === "premium_yearly" || premiumOffer === "premium_monthly"
+        ? t("billing.plans.cta.subscribePremium")
+        : t("billing.plans.cta.buyPass"),
     );
   }
 
@@ -337,7 +381,7 @@ export function Plans({ user }) {
       {!billingOpen && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--engine-border-strong)] px-4 py-3.5 text-[13px] leading-relaxed text-[var(--engine-text-muted)]">
           <Info size={17} className="mt-0.5 shrink-0" />
-          <p>{t(ADSENSE_ENABLED ? "billing.plans.notOpen" : "billing.plans.notOpenNoAds")}</p>
+          <p>{t("billing.plans.notOpen")}</p>
         </div>
       )}
 
@@ -372,21 +416,37 @@ export function Plans({ user }) {
           tone="highlight"
           badge={t("billing.plans.premium.badge")}
           eyebrow={t("billing.plans.premium.eyebrow")}
-          name="Engine Premium"
+          name="Engine Pro"
           audience={t("billing.plans.premium.audience")}
+          /* O número grande é SEMPRE por mês nas assinaturas — inclusive na
+             anual, onde ele é o equivalente mensal e o valor cobrado vai na
+             linha de baixo. Até 12/11/2026 a anual mostrava "R$ 79,90 por
+             ano" em corpo 40, ao lado de um "R$ 25,00 por mês" no cartão
+             vizinho: o olho compara os dois números grandes, lê 79 contra 25
+             e conclui que o plano do dono do carro é o caro — quando ele
+             custa um quarto. Número grande só compara com número grande se
+             os dois forem da mesma unidade. */
           price={
-            premiumOffer === "premium_yearly" ? (
-              <BigPrice value={price("premium_yearly")} suffix={t("billing.plans.perYear")} />
+            premiumOffer === "premium_monthly" ? (
+              <BigPrice value={price("premium_monthly")} suffix={t("billing.plans.perMonth")} />
+            ) : premiumOffer === "premium_yearly" ? (
+              <BigPrice
+                value={money(Math.round(OFFERS.premium_yearly.amount[currency] / 12))}
+                suffix={t("billing.plans.perMonth")}
+              />
             ) : (
               <BigPrice value={price(premiumOffer)} suffix={t("billing.plans.oneTime")} />
             )
           }
           priceNote={
-            premiumOffer === "premium_yearly"
-              ? t("billing.plans.premium.yearlyNote", {
-                  monthly: money(Math.round(OFFERS.premium_yearly.amount[currency] / 12)),
-                })
-              : t(`billing.plans.premium.passNote.${premiumOffer}`)
+            premiumOffer === "premium_monthly"
+              ? t("billing.plans.premium.monthlyNote")
+              : premiumOffer === "premium_yearly"
+                ? t("billing.plans.premium.yearlyNote", {
+                    yearly: price("premium_yearly"),
+                    percent: yearlySavingPercent(currency),
+                  })
+                : t(`billing.plans.premium.passNote.${premiumOffer}`)
           }
           footer={premiumFooter}
         >
@@ -415,12 +475,19 @@ export function Plans({ user }) {
                       className="h-4 w-4 shrink-0 accent-[var(--engine-accent)]"
                     />
                     <span className="min-w-0 flex-1 font-semibold">{premiumOptionText(id)}</span>
+                    {/* O desconto vive na opção, não só na nota: é aqui que a
+                        escolha acontece. */}
                     {id === "premium_yearly" && (
+                      <span className="shrink-0 rounded-full bg-[var(--engine-accent)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+                        {t("billing.plans.premium.save", { percent: yearlySavingPercent(currency) })}
+                      </span>
+                    )}
+                    {id === "premium_monthly" && (
                       <span className="shrink-0 text-[11px] font-semibold text-[var(--engine-text-muted)]">
                         {t("billing.plans.premium.renews")}
                       </span>
                     )}
-                    {id !== "premium_yearly" && (
+                    {id !== "premium_yearly" && id !== "premium_monthly" && (
                       <span className="shrink-0 text-[11px] font-semibold text-[var(--engine-text-muted)]">
                         {t("billing.plans.premium.noRenew")}
                       </span>
@@ -430,16 +497,17 @@ export function Plans({ user }) {
               })}
             </div>
           </fieldset>
-          <p className="mb-4 text-xs leading-relaxed text-[var(--engine-text-muted)]">
-            {t(ADSENSE_ENABLED ? "billing.plans.premium.honest" : "billing.plans.premium.honestNoAds")}
+          <FeatureList t={t} base="billing.features.founder" items={FOUNDER_FEATURES} />
+          <p className="mt-5 border-t border-[var(--engine-border)] pt-4 text-xs leading-relaxed text-[var(--engine-text-muted)]">
+            <span className="font-bold text-[var(--engine-text)]">{t("billing.plans.building.label")}</span>{" "}
+            {t("billing.plans.building.entry")}
           </p>
-          <FeatureList t={t} base="billing.features.premium" items={PREMIUM_FEATURES} />
         </PlanCard>
 
         {/* Pro — prestador de serviço. */}
         <PlanCard
           eyebrow={t("billing.plans.pro.eyebrow")}
-          name="Engine Pro"
+          name="Engine Premium"
           audience={t("billing.plans.pro.audience")}
           price={<BigPrice value={price("pro_monthly")} suffix={t("billing.plans.perMonth")} />}
           priceNote={
@@ -449,20 +517,22 @@ export function Plans({ user }) {
           }
           footer={proFooter}
         >
-          <div className="mb-5 flex items-start gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
+          <div className="flex items-start gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-3">
             <Wrench size={17} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" />
             <p className="text-[13px] leading-relaxed text-[var(--engine-text)]">
-              {t("billing.plans.pro.founder", {
-                founderPrice,
-                slots: FOUNDER_SLOTS,
-                price: price("pro_monthly"),
-              })}
+              {t("billing.plans.building.provider")}
             </p>
           </div>
-          <p className="mb-4 text-xs leading-relaxed text-[var(--engine-text-muted)]">
-            {t(ADSENSE_ENABLED ? "billing.plans.pro.honest" : "billing.plans.pro.honestNoAds")}
+          <p className="mt-4 text-xs leading-relaxed text-[var(--engine-text-muted)]">
+            {t("billing.plans.building.providerWhy")}
           </p>
-          <FeatureList t={t} base="billing.features.pro" items={PRO_FEATURES} />
+          <p className="mt-3 text-xs leading-relaxed text-[var(--engine-text-muted)]">
+            {t("billing.plans.pro.founder", {
+              founderPrice,
+              slots: FOUNDER_SLOTS,
+              price: price("pro_monthly"),
+            })}
+          </p>
         </PlanCard>
       </div>
 

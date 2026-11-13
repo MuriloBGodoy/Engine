@@ -26,11 +26,12 @@ const subscribe = (fn) => {
  * É um `<button>` de propósito: o cartão do feed abre o post em clique fora
  * de botão/link, e tocar no horário não deve abrir nada.
  */
-export function TimeAgo({ value, editedAt = "", className = "", short = false }) {
+export function TimeAgo({ value, editedAt = "", className = "", short = false, absolute = false }) {
   const { t, i18n } = useTranslation();
   const language = i18n.language || "pt-BR";
   const [, setTick] = useState(0);
-  const [absolute, setAbsolute] = useState(false);
+  // `absolute` só define por onde começa; o clique continua alternando.
+  const [mostrarData, setMostrarData] = useState(absolute);
 
   useEffect(() => subscribe(() => setTick((n) => n + 1)), []);
 
@@ -45,13 +46,13 @@ export function TimeAgo({ value, editedAt = "", className = "", short = false })
       type="button"
       onClick={(event) => {
         event.stopPropagation();
-        setAbsolute((current) => !current);
+        setMostrarData((current) => !current);
       }}
       title={title}
       aria-label={title}
       className={`inline-flex min-w-0 items-center whitespace-nowrap text-left ${className}`}
     >
-      <time dateTime={new Date(value).toISOString()}>{absolute ? full : relative}</time>
+      <time dateTime={new Date(value).toISOString()}>{mostrarData ? full : relative}</time>
       {/* Espaço explícito com white-space: pre: dentro do inline-flex o espaço
           do começo do item era cortado e saía "há 2 h· editado". */}
       {editedAt ? <span className="whitespace-pre">{" "}·{" "}{t("community.edited")}</span> : null}

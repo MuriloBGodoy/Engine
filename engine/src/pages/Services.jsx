@@ -97,6 +97,7 @@ import { authPath } from "../services/authRedirect";
 import { BioLinkCard, ShareListingButton } from "../components/services/ShareListing";
 import { ListingMonthPanel } from "../components/services/ListingMonthPanel";
 import { QuoteEntryCard } from "../components/services/QuoteEntryCard";
+import { withoutAt } from "../services/people";
 import { MessageProviderButton } from "../components/services/MessageProvider";
 import { ProAccountHub } from "../components/pro/ProAccountHub";
 import { ShopsTab } from "../components/shops/ShopsTab";
@@ -104,6 +105,7 @@ import { ShopSegment } from "../components/shop/ShopBrowse";
 import { ProductEditor } from "../components/shops/ProductEditor";
 import { MediaPickerButton } from "../components/MediaPickerButton";
 import { useMyPro } from "../hooks/useMyPro";
+import { Select as EngineSelect } from "../components/ui/Select";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
@@ -360,9 +362,9 @@ function TextArea(props) {
 
 function Select(props) {
   return (
-    <select
+    <EngineSelect
       {...props}
-      className="min-h-12 w-full appearance-none rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 pr-9 text-sm font-bold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:focus:bg-[var(--engine-elevated)]"
+      className="min-h-12 w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 pr-3 text-sm font-bold text-[var(--engine-text)] outline-none transition focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:focus:bg-[var(--engine-elevated)]"
     />
   );
 }
@@ -1405,7 +1407,7 @@ function ListingEditorModal({
                   {/* Anunciar como você ou como uma página em que estou na
                       equipe. Perfil não muda depois de publicado. */}
                   {pageOptions.length > 0 && !form.id && (
-                    <select
+                    <Select
                       aria-label={t("pro.publishAs")}
                       value={form.profileId || ""}
                       onChange={(event) => onChange("profileId", event.target.value)}
@@ -1417,7 +1419,7 @@ function ListingEditorModal({
                             {entry.profile.name} (@{entry.profile.handle})
                           </option>
                         ))}
-                    </select>
+                    </Select>
                   )}
                   <p className="truncate text-sm font-bold italic text-[var(--engine-text)] dark:text-white">
                     {publishName || t("services.engineUser")}
@@ -2145,7 +2147,7 @@ function QueueRow({ listing, actions, onOpen, extra = null }) {
             .join(" · ")}
         </p>
         <p className="mt-1 text-xs font-semibold text-[var(--engine-text-muted)]">
-          {[listing.whatsapp, listing.instagram && `@${listing.instagram}`].filter(Boolean).join(" · ") ||
+          {[listing.whatsapp, listing.instagram && `@${withoutAt(listing.instagram)}`].filter(Boolean).join(" · ") ||
             t("services.noPhone")}
         </p>
         {listing.moderationNote && listing.moderationStatus !== "pending" && (
@@ -3061,7 +3063,7 @@ export function Services({ user, settings }) {
        distância. De 640px para cima a ordem volta a ser a do código. */
     <section className="flex flex-col gap-5 pb-28 sm:gap-8 sm:pb-10">
 
-      <header className="order-6 -mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:order-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
+      <header className="order-8 -mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:order-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
         {/* No celular o título em caixa alta mais o subtítulo tomavam a tela
             inteira antes de qualquer anúncio aparecer. Lá o cabeçalho é uma
             linha; a explicação fica para o desktop, onde sobra espaço. */}
@@ -3095,7 +3097,23 @@ export function Services({ user, settings }) {
             </div>
           )}
         </div>
+      </header>
 
+      {/* Serviços | Lojas no segmento do protótipo aprovado (01/11/2026). */}
+      <div className="order-1 sm:order-none">
+        <ShopSegment value={tab === "shops" ? "shops" : "services"} onChange={switchTab} />
+      </div>
+
+      {/* A barra do vendedor subiu para cá em 11/11/2026. Ela vivia dentro do
+          <header>, que no celular é o ÚLTIMO bloco da página: o prestador
+          rolava a vitrine inteira para chegar nos próprios anúncios, que é
+          justamente o que ele abriu a aba para ver.
+
+          Sem nenhum anúncio ela não aparece no celular (`max-sm:hidden`): um
+          contador zerado no topo não informa nada, e quem convida a criar o
+          primeiro é o botão do bloco vazio, logo abaixo. No desktop sobra
+          largura e ela continua aparecendo sempre. */}
+      <div className={`order-2 sm:order-none ${myListings.length ? "" : "max-sm:hidden"}`}>
         <SellerBar
           sellerProfile={sellerProfile}
           listingCount={myListings.length}
@@ -3106,25 +3124,28 @@ export function Services({ user, settings }) {
           guest={!user?.uid}
           onOpenProfile={() => (user?.uid ? setSellerProfileOpen(true) : setGateOpen(true))}
           onOpenListings={() => setSellerListingsOpen(true)}
-          onCreate={() => openEditor()}
+          kind={tab === "shops" ? "shops" : "services"}
+          onCreate={() => (tab === "shops" ? openProductEditor() : openEditor())}
           onOpenApprovals={() => navigate("/services/approvals")}
         />
-      </header>
-
-      {/* Serviços | Lojas no segmento do protótipo aprovado (01/11/2026). */}
-      <div className="order-1 sm:order-none">
-        <ShopSegment value={tab === "shops" ? "shops" : "services"} onChange={switchTab} />
       </div>
 
-      {tab === "shops" && <ShopsTab user={user} region={region} onNewProduct={() => openProductEditor()} />}
+      {/* order-3: entre a barra do vendedor (2) e o conteúdo de Serviços
+          (4 em diante). Sem isso a vitrine subia na frente da própria chave
+          Serviços|Lojas no celular, e o título da página ia para o fim. */}
+      {tab === "shops" && (
+        <div className="order-3 sm:order-none">
+          <ShopsTab user={user} region={region} onNewProduct={() => openProductEditor()} />
+        </div>
+      )}
 
       {tab === "services" && (
       <>
-      <div className="order-5 sm:order-none">
+      <div className="order-4 sm:order-none">
         <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
       </div>
 
-      <div className="engine-card order-2 flex flex-col p-4 sm:order-none sm:p-5">
+      <div className="engine-card order-3 flex flex-col p-4 sm:order-none sm:p-5">
         {/* Cabeçalho: alterna a exibição dos filtros avançados. No celular ele
             desce para baixo da busca — quem chega quer digitar ou tocar numa
             categoria, não configurar filtro. */}
@@ -3178,7 +3199,16 @@ export function Services({ user, settings }) {
             "martelinho"?) precisa justamente desse atalho antes de tudo. As 8
             primeiras ficam à mão; "ver todas" abre o painel com a lista
             inteira. É o que OLX e Marketplace põem no topo da primeira tela. */}
-        <div className="engine-scroll order-3 -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 sm:order-none">
+        <div className="order-3 mt-3 flex items-start gap-2 sm:order-none">
+        <div
+          className="engine-scroll-x -mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto px-1 pb-1"
+          style={{
+            // A última pílula se apaga na borda em vez de ser cortada em
+            // seco: o mesmo aviso de "tem mais, arraste", sem parecer erro.
+            maskImage: "linear-gradient(to right, #000 calc(100% - 28px), transparent)",
+            WebkitMaskImage: "linear-gradient(to right, #000 calc(100% - 28px), transparent)",
+          }}
+        >
           {serviceCategories.slice(0, 8).map((item) => {
             const active = category === item.value;
             const Icon = categoryIcons[item.value] || Store;
@@ -3199,14 +3229,26 @@ export function Services({ user, settings }) {
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-[var(--engine-border-strong)] px-3 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
-          >
-            <span className="whitespace-nowrap">{t("services.allCategories")}</span>
-            <ChevronRight size={14} className="shrink-0" />
-          </button>
+        </div>
+        {/* Fora do rolador de propósito: é a saída de quem não achou a
+            categoria na lista curta, então é a última que pode sumir — dentro
+            dele, ela saía cortada pela direita em qualquer largura onde os
+            oito atalhos não coubessem.
+
+            Só a partir de `sm`: no celular ela é redundante, porque o botão
+            "Filtros" logo acima abre o MESMO painel (os dois chamam
+            `setFiltersOpen`) e nunca sai da tela. Fixa ali, ela comia 100 dos
+            390px e sobrava espaço para uma pílula e meia de categoria. */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          title={t("services.allCategories")}
+          aria-label={t("services.allCategories")}
+          className="hidden h-10 shrink-0 items-center gap-1.5 rounded-full sm:flex border border-dashed border-[var(--engine-border-strong)] px-3 text-xs font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+        >
+          <span className="whitespace-nowrap">{`+${serviceCategories.length - 8}`}</span>
+          <ChevronRight size={14} className="shrink-0" />
+        </button>
         </div>
 
         {/* Filtros avançados — recolhíveis */}
@@ -3228,7 +3270,7 @@ export function Services({ user, settings }) {
                       size={18}
                       className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--engine-text-subtle)]"
                     />
-                    <select
+                    <Select
                       value={countryFilter}
                       onChange={(event) => {
                         setCountryFilter(event.target.value);
@@ -3243,7 +3285,7 @@ export function Services({ user, settings }) {
                           {country.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="relative">
@@ -3251,7 +3293,7 @@ export function Services({ user, settings }) {
                       size={18}
                       className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--engine-text-subtle)]"
                     />
-                    <select
+                    <Select
                       value={stateFilter}
                       onChange={(event) => {
                         setStateFilter(event.target.value);
@@ -3266,7 +3308,7 @@ export function Services({ user, settings }) {
                           {state.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="relative">
@@ -3274,7 +3316,7 @@ export function Services({ user, settings }) {
                       size={18}
                       className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--engine-text-subtle)]"
                     />
-                    <select
+                    <Select
                       value={cityFilter}
                       onChange={(event) => setCityFilter(event.target.value)}
                       disabled={!cityOptions.length}
@@ -3286,7 +3328,7 @@ export function Services({ user, settings }) {
                           {city}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -3358,7 +3400,7 @@ export function Services({ user, settings }) {
       {regionResult.widened && (
         <div
           role="status"
-          className="order-3 flex items-start gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-sm font-semibold leading-6 text-[var(--engine-text)] sm:order-none"
+          className="order-5 flex items-start gap-3 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] p-4 text-sm font-semibold leading-6 text-[var(--engine-text)] sm:order-none"
         >
           <MapPin size={18} className="mt-0.5 shrink-0 text-[var(--engine-accent)]" aria-hidden="true" />
           <span>
@@ -3377,7 +3419,7 @@ export function Services({ user, settings }) {
           cartão alto mostra um serviço e meio por tela. Com duas, a foto
           continua grande e a pessoa compara quatro de uma vez, que é como
           OLX e Marketplace mostram. De 640px para cima nada muda. */}
-      <div className="order-4 grid grid-cols-2 gap-2.5 sm:order-none sm:gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
+      <div className="order-6 grid grid-cols-2 gap-2.5 sm:order-none sm:gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
         {filteredListings.length ? (
           filteredListings.map((listing, index) => (
             <Fragment key={listing.id}>
@@ -3415,6 +3457,32 @@ export function Services({ user, settings }) {
                 {t("services.clearFilters")}
               </button>
             )}
+
+            {/* Vitrine vazia DE VERDADE (nao e filtro): as duas saidas, aqui.
+                Ate 11/11/2026 este bloco so dizia que nao tinha nada, e o
+                convite para anunciar morava na barra do vendedor la no fim da
+                pagina, com o cartao de orcamento entre os dois. Eram tres
+                caixas respondendo a mesma pergunta — "e agora, o que eu faco?"
+                — empilhadas. Agora e uma. */}
+            {!approvedListings.length && (
+              <div className="mt-6 grid w-full max-w-xs gap-2">
+                <button
+                  type="button"
+                  onClick={() => (user?.uid ? openEditor() : setGateOpen(true))}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-4 text-sm font-bold text-white transition hover:brightness-95"
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  {t("services.newService")}
+                </button>
+                <Link
+                  to="/services/orcamentos?new=1"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--engine-border)] px-4 text-sm font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] dark:text-white"
+                >
+                  <ClipboardList size={16} aria-hidden="true" />
+                  {t("quotes.entry.cta")}
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3422,7 +3490,10 @@ export function Services({ user, settings }) {
       {/* Cidade vazia, alargou, ou ainda é pouca gente: convite para indicar
           o Engine a um prestador que a pessoa já conhece. */}
       {(regionResult.widened || filteredListings.length < 3) && (
-        <InviteProviderCard place={regionResult.requestedLabel} />
+        <InviteProviderCard
+          place={regionResult.requestedLabel}
+          className="order-7 sm:order-none"
+        />
       )}
       </>
       )}
@@ -3648,9 +3719,13 @@ function readSellerPanelOpen(key) {
 }
 
 /**
- * Barra do vendedor no rodapé do hero. Por padrão é uma faixa só: quem é,
- * o status, "Meus anúncios" e "Novo serviço". O link da bio e as aprovações
- * (admin) ficam no "Painel do vendedor", que lembra se ficou aberto.
+ * Barra do vendedor: quem é, o status, "Meus anúncios" e "Novo serviço". O
+ * link da bio e as aprovações (admin) ficam no "Painel do vendedor", que
+ * lembra se ficou aberto.
+ *
+ * No celular, para quem tem conta, ela é uma LINHA; a faixa larga é do
+ * desktop e do visitante. Até 11/11/2026 ela morava no rodapé do hero, que
+ * no celular desce para o fim da página — ver o comentário na chamada.
  */
 function SellerBar({
   sellerProfile,
@@ -3664,8 +3739,14 @@ function SellerBar({
   onCreate,
   onOpenApprovals,
   guest = false,
+  kind = "services",
 }) {
   const { t } = useTranslation();
+  // A barra é a mesma nas duas abas, mas "criar" não é: em Lojas o botão
+  // precisa abrir o editor de PRODUTO. Até 12/11/2026 ele chamava sempre o
+  // editor de serviço, então na aba Lojas o "+" entregava a tela errada —
+  // e o rótulo mentia junto, dizendo "Novo serviço".
+  const createLabel = kind === "shops" ? t("shop.browse.newProduct") : t("services.newService");
   const [panelOpen, setPanelOpen] = useState(() => readSellerPanelOpen(storageKey));
   const hasPanel = Boolean(bioListing) || isAdmin;
   const showPending = isAdmin && pendingApprovalsCount > 0;
@@ -3681,8 +3762,11 @@ function SellerBar({
     }
   };
 
+  // Botão só de seta: o nome vive no `title` e no `aria-label`, aparece ao
+  // parar o mouse em cima e é lido em voz alta. `justify-center` porque sem
+  // texto o conteúdo precisa achar o meio sozinho.
   const toggleClass =
-    "min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-3 text-xs font-bold text-[var(--engine-text)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-ring)] dark:text-white";
+    "min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface)] px-2.5 text-xs font-bold text-[var(--engine-text)] transition-colors hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--engine-ring)] dark:text-white";
 
   const toggleInner = (labelClass) => (
     <>
@@ -3704,13 +3788,71 @@ function SellerBar({
   );
 
   return (
-    <div className="border-t border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
+    <div className="overflow-hidden rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)]">
+      {/* CELULAR, com conta: uma linha só, ~56px. Antes eram duas alturas —
+          nome em cima, "Meus anúncios" e "Novo serviço" de ponta a ponta
+          embaixo — num bloco que já era o último da página. A foto abre o
+          perfil de vendedor, o texto abre os anúncios, o "+" cria. */}
+      {!guest && (
+        <div className="flex items-center gap-2 p-2.5 sm:hidden">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            title={t("services.editProfile")}
+            aria-label={t("services.editProfile")}
+            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--engine-accent)] text-xs font-bold uppercase text-white"
+          >
+            {sellerProfile.avatar ? (
+              <img src={sellerProfile.avatar} alt="" className="h-full w-full object-cover" />
+            ) : (
+              getInitials(sellerProfile.displayName)
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenListings}
+            className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left"
+          >
+            <span className="truncate text-sm font-extrabold text-[var(--engine-text)] dark:text-white">
+              {t("services.myListings")}
+            </span>
+            <span className="truncate text-[11px] font-semibold text-[var(--engine-text-muted)]">
+              {listingCount
+                ? t("services.sellerLive", { count: listingCount })
+                : sellerProfile.displayName || t("services.ready")}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onCreate}
+            title={createLabel}
+            aria-label={createLabel}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent)] text-white transition hover:brightness-95"
+          >
+            <Plus size={18} aria-hidden="true" />
+          </button>
+          {hasPanel && (
+            <button
+              type="button"
+              onClick={togglePanel}
+              aria-expanded={expanded}
+              aria-controls="seller-panel"
+              aria-label={t("services.sellerPanel")}
+              title={t("services.sellerPanel")}
+              className="flex h-10 w-8 shrink-0 items-center justify-center text-[var(--engine-text-muted)]"
+            >
+              {toggleInner("sr-only")}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Visitante: tudo numa linha só. Empilhado, o convite virava um bloco
           alto com um botão vermelho de ponta a ponta antes de qualquer
           anúncio — peso de dono numa tela de quem só está olhando. */}
       <div
-        className={`flex gap-3 p-4 sm:flex-row sm:items-center sm:px-8 ${
-          guest ? "flex-row items-center" : "flex-col"
+        className={`gap-3 p-4 sm:flex sm:flex-row sm:items-center sm:px-8 ${
+          guest ? "flex flex-row items-center" : "hidden"
         }`}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -3794,7 +3936,7 @@ function SellerBar({
             className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-3 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-95 sm:px-4"
           >
             <Plus size={16} aria-hidden="true" className="shrink-0" />
-            <span className="truncate">{t("services.newService")}</span>
+            <span className="truncate">{createLabel}</span>
           </button>
           {hasPanel && (
             <button
@@ -3806,7 +3948,7 @@ function SellerBar({
               title={t("services.sellerPanel")}
               className={`hidden sm:inline-flex ${toggleClass}`}
             >
-              {toggleInner("hidden lg:inline")}
+              {toggleInner("sr-only")}
             </button>
           )}
         </div>

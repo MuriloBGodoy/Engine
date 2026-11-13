@@ -19,6 +19,7 @@ import {
   isValidClubTag,
   normalizeClubTag,
 } from "../../services/clubStyles";
+import { Select } from "../ui/Select";
 
 /**
  * Fundar um clube, com prévia ao vivo.
@@ -315,7 +316,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
                 <label className={labelClass} htmlFor="club-state">
                   {t("clubs.form.state")}
                 </label>
-                <select
+                <Select
                   id="club-state"
                   value={draft.state}
                   onChange={(event) => set({ state: event.target.value })}
@@ -327,7 +328,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
                       {state.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 

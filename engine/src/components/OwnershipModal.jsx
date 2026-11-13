@@ -14,6 +14,7 @@ import { getStates, getStateName } from "../services/locations";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatCarName, formatFipeYear } from "../services/carDisplay";
 import { useToast } from "./ToastProvider";
+import { Select } from "./ui/Select";
 
 /*
  * Simulador enxuto, 06/10/2026.
@@ -619,7 +620,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               chegava nele antes de ler um número incompleto. */}
           <Section title={t("ownership.lean.whereTitle")} hint={t("ownership.lean.whereHint")}>
             <Field label={t("ownership.fields.state")} htmlFor="engine-own-state">
-              <select
+              <Select
                 id="engine-own-state"
                 value={state}
                 onChange={(event) => setState(event.target.value)}
@@ -631,7 +632,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                     {s.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </Section>
 
@@ -747,7 +748,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 />
               </Field>
               <Field label={t("ownership.fields.fuelType")} htmlFor="engine-own-fuel">
-                <select
+                <Select
                   id="engine-own-fuel"
                   value={inputs.fuelType}
                   onChange={(event) => set("fuelType", event.target.value)}
@@ -758,7 +759,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                       {t(`ownership.fuel.${fuel}`)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field
                 label={isElectric ? t("ownership.lean.consumptionElectric") : t("ownership.fields.consumption")}

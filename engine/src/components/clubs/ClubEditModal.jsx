@@ -24,6 +24,7 @@ import {
   clubStyleLabel,
   normalizeEmblem,
 } from "../../services/clubStyles";
+import { Select } from "../ui/Select";
 
 /**
  * "Personalizar" o clube depois de fundado: logo, capa, cores, símbolo e as
@@ -357,7 +358,7 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
                   </div>
                   <div className="space-y-1.5">
                     <label className={labelClass} htmlFor="club-edit-state">{t("clubs.form.state")}</label>
-                    <select
+                    <Select
                       id="club-edit-state"
                       value={draft.state}
                       onChange={(event) => set({ state: event.target.value })}
@@ -367,7 +368,7 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
                       {states.map((state) => (
                         <option key={state.code} value={state.code}>{state.name}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid gap-3.5 sm:grid-cols-2">

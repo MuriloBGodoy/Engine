@@ -28,7 +28,13 @@ export const formatRelativeTime = (value, language = "pt-BR", { short = false } 
   const absSeconds = Math.abs(diffSeconds);
   try {
     const rtf = new Intl.RelativeTimeFormat(language, {
-      numeric: "auto",
+      // `auto` troca número por palavra: 7 dias viram "sem. passada" em
+      // português e "last wk." em inglês. Num carimbo de feed isso é pior
+      // de duas maneiras — ocupa mais espaço e informa menos, porque
+      // "semana passada" cobre de 7 a 13 dias. Na forma curta, que é a do
+      // feed, o número fica: "1 sem.". Na longa `auto` continua, porque
+      // ali "ontem" realmente lê melhor que "há 1 dia".
+      numeric: short ? "always" : "auto",
       style: short ? "short" : "long",
     });
     for (const [unit, size] of UNITS) {

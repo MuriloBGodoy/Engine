@@ -68,11 +68,12 @@ import { useIsPremium } from "../hooks/useIsPremium";
 import { openBillingPortal } from "../services/subscription";
 import { ADSENSE_ENABLED, resetAdsConsent, setAdsConsent, useAdsConsent } from "../services/consent";
 import { SUPPORT_MAILTO } from "../services/contact";
+import { Select } from "../components/ui/Select";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 py-3 text-base text-[var(--engine-text)] placeholder-[var(--engine-text-subtle)] outline-none transition-colors focus:border-[var(--engine-accent)] sm:text-sm";
 const selectClass =
-  "max-w-[11rem] truncate rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] py-2 pl-3 pr-9 text-base font-semibold text-[var(--engine-text)] outline-none focus:border-[var(--engine-accent)] sm:max-w-[14rem] sm:text-sm";
+  "max-w-[11rem] truncate rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] py-2 pl-3 pr-3 text-base font-semibold text-[var(--engine-text)] outline-none focus:border-[var(--engine-accent)] sm:max-w-[14rem] sm:text-sm";
 const primaryButton =
   "flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-50";
 const secondaryButton =
@@ -149,6 +150,35 @@ function SwitchRow({ icon: Icon, label, hint, checked, onChange }) {
         />
       </span>
     </button>
+  );
+}
+
+/**
+ * Uma seção de Configurações.
+ *
+ * Até 12/11/2026 as quatro seções eram ABAS: uma tira de pílulas no topo e só
+ * uma seção na tela por vez. No celular a tira rolava na horizontal e a
+ * quarta ("Preferências") nascia fora de vista — para achar o idioma era
+ * preciso descobrir que a tira andava. E abrir uma pílula trocava a URL, o
+ * que fazia o botão "voltar" do aparelho andar dentro da própria tela em vez
+ * de sair dela.
+ *
+ * Nenhum app de rede social faz isso: Instagram, WhatsApp e os Ajustes do
+ * telefone põem tudo numa rolagem só, com títulos pelo caminho. Rolar é mais
+ * barato que escolher — e aqui são 4 seções, não 40.
+ *
+ * O `?section=` continua valendo: quem chega por um link (o aviso de
+ * privacidade do bloco de menções, por exemplo) cai rolado na seção certa.
+ */
+function SettingsSection({ id, icon: Icon, title, children }) {
+  return (
+    <section id={`settings-${id}`} className="scroll-mt-24 space-y-4">
+      <h2 className="flex items-center gap-2.5 px-1 text-[17px] font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
+        {Icon && <Icon size={19} aria-hidden="true" className="shrink-0 text-[var(--engine-accent)]" />}
+        {title}
+      </h2>
+      <div className="space-y-6">{children}</div>
+    </section>
   );
 }
 
@@ -641,7 +671,7 @@ function PlanGroup({ t, i18n, user }) {
   let label = t("settings.plan.free");
   let hint = t("settings.plan.freeHint");
   if (plan !== "free") {
-    label = plan === "pro" ? "Engine Pro" : "Engine Premium";
+    label = plan === "pro" ? "Engine Premium" : "Engine Pro";
     if (sub?.kind === "pass") hint = t("settings.plan.passUntil", { date: date(sub.currentPeriodEnd) });
     else if (sub?.cancelAtPeriodEnd) hint = t("settings.plan.cancelledUntil", { date: date(sub.currentPeriodEnd) });
     else if (inTrial) hint = t("settings.plan.trialUntil", { date: date(sub.trialEnd) });
@@ -995,7 +1025,6 @@ export function Settings({ user, settings, onSettingsUpdate }) {
   const { region, setRegion } = useRegion();
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("section");
-  const activeSection = SECTIONS.includes(requested) ? requested : "account";
   // Volta do checkout do Stripe (return_url em subscription-create). O plano
   // em si chega pelo webhook e aparece sozinho em "Seu plano".
   const checkoutResult = searchParams.get("assinatura");
@@ -1020,17 +1049,14 @@ export function Settings({ user, settings, onSettingsUpdate }) {
   const providerIds = (user?.providerData || []).map((item) => item.providerId);
   const usesPassword = providerIds.includes("password");
 
-  const sections = [
-    { id: "account", label: t("settings.sections.account"), icon: UserRound },
-    { id: "notifications", label: t("settings.sections.notifications"), icon: Bell },
-    { id: "privacy", label: t("settings.sections.privacy"), icon: EyeOff },
-    { id: "app", label: t("settings.sections.app"), icon: Palette },
-  ];
-
-  const selectSection = (id) => {
-    setOpenForm("");
-    setSearchParams(id === "account" ? {} : { section: id }, { replace: true });
-  };
+  // Link com ?section=: rola até ela e limpa o parâmetro, para o "voltar" do
+  // aparelho sair da tela em vez de desfazer a rolagem.
+  useEffect(() => {
+    if (!requested || !SECTIONS.includes(requested)) return;
+    const alvo = document.getElementById(`settings-${requested}`);
+    alvo?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setSearchParams({}, { replace: true });
+  }, [requested, setSearchParams]);
 
   // Como nos apps grandes, cada chave grava sozinha — não existe botão
   // "Salvar" para esquecer de apertar. A tela muda na hora; se o servidor
@@ -1108,33 +1134,12 @@ export function Settings({ user, settings, onSettingsUpdate }) {
         <PageHeader eyebrow="Engine Control" title={t("settings.title")} subtitle={t("settings.subtitle")} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[230px_1fr] lg:gap-8">
-        <nav className="engine-rail -mx-4 gap-2 px-4 lg:mx-0 lg:sticky lg:top-8 lg:block lg:space-y-1 lg:self-start lg:overflow-visible lg:px-0">
-          {sections.map((section) => {
-            const Icon = section.icon;
-            const isActive = activeSection === section.id;
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => selectSection(section.id)}
-                aria-current={isActive ? "page" : undefined}
-                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors lg:w-full lg:gap-3 lg:px-4 lg:py-3 ${
-                  isActive
-                    ? "bg-[var(--engine-accent)] text-white"
-                    : "border border-[var(--engine-border)] text-[var(--engine-text-muted)] hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-text)] lg:border-0"
-                }`}
-              >
-                <Icon size={17} className="shrink-0" />
-                {section.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="max-w-2xl space-y-6">
-          {activeSection === "account" && (
-            <>
+      <div className="mx-auto max-w-2xl space-y-10">
+          <SettingsSection
+            id="account"
+            icon={UserRound}
+            title={t("settings.sections.account")}
+          >
               {/* As minhas coisas: salvos e arquivo. Existem como aba do
                   perfil, mas ninguém procura "arquivadas" num perfil — a
                   cabeça da pessoa manda ela para Configurações, que é onde
@@ -1258,11 +1263,13 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   onClick={() => setDeleteOpen(true)}
                 />
               </Group>
-            </>
-          )}
+          </SettingsSection>
 
-          {activeSection === "notifications" && (
-            <>
+          <SettingsSection
+            id="notifications"
+            icon={Bell}
+            title={t("settings.sections.notifications")}
+          >
               <Group footer={t("settings.notifications.pauseHint")}>
                 <SwitchRow
                   icon={BellOff}
@@ -1304,11 +1311,13 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   onClick={() => navigate("/garagem")}
                 />
               </Group>
-            </>
-          )}
+          </SettingsSection>
 
-          {activeSection === "privacy" && (
-            <>
+          <SettingsSection
+            id="privacy"
+            icon={EyeOff}
+            title={t("settings.sections.privacy")}
+          >
               <Group title={t("settings.privacy.title")}>
                 <SwitchRow
                   label={t("settings.privacy.hideValues")}
@@ -1333,11 +1342,13 @@ export function Settings({ user, settings, onSettingsUpdate }) {
               <DownloadMyData t={t} />
               <MutedUsers t={t} userId={user?.uid} />
               <BlockedUsers t={t} userId={user?.uid} />
-            </>
-          )}
+          </SettingsSection>
 
-          {activeSection === "app" && (
-            <>
+          <SettingsSection
+            id="app"
+            icon={Palette}
+            title={t("settings.sections.app")}
+          >
               <Group title={t("settings.app.appearance")}>
                 <Row label={t("settings.fields.theme")}>
                   <Segmented
@@ -1352,7 +1363,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   />
                 </Row>
                 <Row label={t("settings.fields.navLayout")} hint={t("settings.app.navHint")}>
-                  <select
+                  <Select
                     className={selectClass}
                     aria-label={t("settings.fields.navLayout")}
                     value={prefs.navLayout || "sidebar"}
@@ -1360,13 +1371,13 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   >
                     <option value="sidebar">{t("settings.options.navSidebar")}</option>
                     <option value="topnav">{t("settings.options.navTopnav")}</option>
-                  </select>
+                  </Select>
                 </Row>
               </Group>
 
               <Group title={t("settings.app.languageRegion")} footer={t("settings.app.regionHint")}>
                 <Row label={t("settings.fields.language")}>
-                  <select
+                  <Select
                     className={selectClass}
                     aria-label={t("settings.fields.language")}
                     // Idioma salvo que saiu da lista ("ja-JP") aparece como o
@@ -1380,10 +1391,10 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                         {t(option.labelKey)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </Row>
                 <Row label={t("region.country")}>
-                  <select
+                  <Select
                     className={selectClass}
                     aria-label={t("region.country")}
                     value={region.country}
@@ -1395,11 +1406,11 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                         {item.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </Row>
                 {states.length > 0 && (
                   <Row label={t("region.state")}>
-                    <select
+                    <Select
                       className={selectClass}
                       aria-label={t("region.state")}
                       value={region.state}
@@ -1411,14 +1422,14 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                           {item.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Row>
                 )}
               </Group>
 
               <Group title={t("settings.app.garage")}>
                 <Row label={t("settings.fields.garageOrder")}>
-                  <select
+                  <Select
                     className={selectClass}
                     aria-label={t("settings.fields.garageOrder")}
                     value={prefs.defaultGarageSort || "progress-desc"}
@@ -1430,7 +1441,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                     <option value="progress-asc">{t("settings.options.lowestProgress")}</option>
                     <option value="target-desc">{t("settings.options.highestValue")}</option>
                     <option value="name-asc">{t("settings.options.nameAZ")}</option>
-                  </select>
+                  </Select>
                 </Row>
               </Group>
 
@@ -1467,9 +1478,7 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   }}
                 />
               </Group>
-            </>
-          )}
-        </div>
+          </SettingsSection>
       </div>
 
       <DeleteAccountDialog

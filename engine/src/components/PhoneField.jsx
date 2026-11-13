@@ -1,5 +1,6 @@
 import { countries } from "../services/locations";
 import { maskPhone, splitPhone } from "../services/phone";
+import { Select } from "./ui/Select";
 
 /**
  * Campo de telefone com seletor de código de país (+55, +351, …) + máscara.
@@ -28,7 +29,7 @@ export function PhoneField({
 
   return (
     <div className="phone-row">
-      <select
+      <Select
         aria-label="País"
         className={selectClassName}
         value={dial}
@@ -39,7 +40,7 @@ export function PhoneField({
             {country.code} {country.dial}
           </option>
         ))}
-      </select>
+      </Select>
       <input
         id={inputId}
         type="tel"

@@ -36,20 +36,24 @@ const ptBR = {
   billing: {
     offers: {
       pro_monthly: {
+        name: "Engine Premium — mensal",
+        what: "Assinatura mensal do Engine Premium, para quem presta serviço. Inclui tudo do Pro.",
+      },
+      premium_monthly: {
         name: "Engine Pro — mensal",
-        what: "Assinatura mensal do Engine Pro, para quem presta serviço. Inclui tudo do Premium.",
+        what: "Assinatura mensal do Engine Pro, para o dono do carro.",
       },
       premium_yearly: {
-        name: "Engine Premium — anual",
-        what: "Assinatura anual do Engine Premium, para o dono do carro.",
+        name: "Engine Pro — anual",
+        what: "Assinatura anual do Engine Pro, para o dono do carro.",
       },
       premium_pass_1m: {
-        name: "Engine Premium — passe de 1 mês",
-        what: "Passe de 1 mês do Engine Premium. Pagamento único.",
+        name: "Engine Pro — passe de 1 mês",
+        what: "Passe de 1 mês do Engine Pro. Pagamento único.",
       },
       premium_pass_3m: {
-        name: "Engine Premium — passe de 3 meses",
-        what: "Passe de 3 meses do Engine Premium. Pagamento único.",
+        name: "Engine Pro — passe de 3 meses",
+        what: "Passe de 3 meses do Engine Pro. Pagamento único.",
       },
     },
     plans: {
@@ -68,17 +72,18 @@ const ptBR = {
       supportLink: "Quer apoiar sem assinar? Veja <support>outras formas de apoiar o Engine</support>.",
       cta: {
         soon: "Assinatura em breve",
+          notify: "Me avise quando abrir",
         login: "Entre para assinar",
         manage: "Configurações › Seu plano",
         register: "Criar conta grátis",
         current: "Seu plano atual",
-        includedInPro: "Incluído no seu Pro",
+        includedInPro: "Incluído no seu Premium",
         passActiveYearly:
           "Seu passe vale até {{date}}. Para não pagar o mesmo período duas vezes, o anual fica disponível quando ele acabar — ou estenda com outro passe.",
-        subscribePremium: "Assinar o Premium",
+        subscribePremium: "Assinar o Pro",
         buyPass: "Comprar passe",
         switchHint: "Você já tem uma assinatura. Para trocar de plano, cancele a atual primeiro.",
-        subscribePro: "Assinar o Pro",
+        subscribePro: "Assinar o Premium",
         startTrial: "Começar {{days}} dias grátis",
       },
       free: {
@@ -88,45 +93,61 @@ const ptBR = {
         forever: "para sempre",
         always: "Continua com você em qualquer plano.",
       },
+        building: {
+          label: "Em construção:",
+          entry: "alerta e histórico da FIPE do seu carro, caderneta de manutenção e custo projetado em 3 e 5 anos. Você não paga nada a mais quando saírem.",
+          provider: "As ferramentas de quem vive disso: de onde veio cada cliente, relatório mensal, cupom rastreável e destaque na vitrine.",
+          providerWhy: "Ainda não está à venda, e o motivo é honesto: medir audiência só vale quando há audiência para medir. Abre quando a vitrine tiver movimento — e quem entrar primeiro paga preço de fundador.",
+        },
       premium: {
         badge: "Para o dono do carro",
-        eyebrow: "Premium",
+        eyebrow: "Pro",
         audience: "Para quem tem carro ou está decidindo qual comprar.",
-        yearlyNote: "Equivale a {{monthly}} por mês. Renova todo ano até você cancelar.",
+        yearlyNote: "Cobrado {{yearly}} uma vez por ano — {{percent}}% abaixo de pagar mês a mês. Renova todo ano até você cancelar.",
+        monthlyNote: "Renova todo mês até você cancelar. Cancele quando quiser.",
         passNote: {
           premium_pass_1m: "Vale 1 mês. Não renova e não guarda cartão.",
           premium_pass_3m: "Vale 3 meses. Não renova e não guarda cartão.",
         },
         chooseLabel: "Escolha como pagar",
         option: {
+          premium_monthly: "Mensal · {{price}}",
           premium_yearly: "Anual · {{price}}",
           premium_pass_3m: "Passe de 3 meses · {{price}}",
           premium_pass_1m: "Passe de 1 mês · {{price}}",
         },
+        save: "−{{percent}}%",
         renews: "renova",
         noRenew: "não renova",
         honest:
-          "Hoje o Premium tira os anúncios. Os outros itens ainda não existem no app: estão marcados como “Em breve”. Assine pelo que ele já entrega.",
+          "Hoje o Pro tira os anúncios. Os outros itens ainda não existem no app: estão marcados como “Em breve”. Assine pelo que ele já entrega.",
       },
       pro: {
-        eyebrow: "Pro",
+        eyebrow: "Premium",
         audience: "Para quem presta serviço: oficina, estética, funilaria, mecânico.",
         trialNote: "{{days}} dias grátis para começar. Depois, cobrança mensal até você cancelar.",
         trialUsed: "Você já usou o teste grátis: a cobrança começa no dia da assinatura.",
         founder:
           "Preço de fundador: os {{slots}} primeiros assinantes pagam {{founderPrice}}/mês em vez de {{price}}, enquanto a assinatura continuar ativa. Se ainda houver vaga, o checkout já mostra o valor menor.",
         honest:
-          "Publicar serviço e ver as métricas básicas já é grátis. As ferramentas do Pro ainda não existem no app: estão marcadas como “Em breve”. Hoje o Pro entrega o mesmo que o Premium.",
+          "Publicar serviço e ver as métricas básicas já é grátis. As ferramentas do Premium ainda não existem no app: estão marcadas como “Em breve”. Hoje o Premium entrega o mesmo que o Pro.",
       },
     },
     features: {
       free: {
         garage: "Garagem com seus carros e metas de compra",
         specs: "Ficha técnica da versão do seu carro",
-        simulator: "Simulador de custo completo, com os juros totais do financiamento",
-        community: "Comunidade e Mensagens",
-        clubsEvents: "Clubes e Eventos",
-        services: "Publicar seu serviço, com métricas básicas",
+        simulator: "Simulador de custo real, com os juros totais do financiamento",
+        maintenance: "Manutenção programada e lembretes de IPVA e licenciamento",
+        quotes: "Pedir e receber orçamento",
+        reviews: "Avaliar e ser avaliado",
+        community: "Comunidade, Mensagens, Clubes e Eventos",
+        services: "Publicar seu serviço",
+      },
+      founder: {
+        supporterBadge: "Selo de Apoiador no seu perfil",
+        priceLock: "Este preço travado para sempre, mesmo quando subir",
+        earlyAccess: "Tudo que sair, assim que sair, sem pagar a mais",
       },
       premium: {
         noAds: "Sem anúncios",
@@ -138,7 +159,7 @@ const ptBR = {
         supporterBadge: "Selo de Apoiador no perfil",
       },
       pro: {
-        allPremium: "Tudo do Premium",
+        allPremium: "Tudo do Pro",
         monthlyMetrics: "Métricas mês a mês e de onde veio cada cliente",
         monthlyReport: "Relatório mensal",
         quotes: "Pedidos de orçamento",
@@ -150,10 +171,10 @@ const ptBR = {
       title: "Antes de assinar",
       renewal: {
         title: "Renovação automática",
-        body: "O Pro (mensal) e o Premium anual renovam sozinhos no fim de cada período, no mesmo cartão, até você cancelar.",
+        body: "As assinaturas — Premium e Pro, mensal ou anual — renovam sozinhas no fim de cada período, no mesmo cartão, até você cancelar. Os passes não renovam.",
       },
       trial: {
-        title: "Teste grátis do Pro",
+        title: "Teste grátis do Premium",
         body: "{{days}} dias grátis, uma vez por pessoa. Durante o teste nada é cobrado; a primeira cobrança é no dia em que ele acaba, e avisamos por e-mail antes. Cancelou durante o teste? Não paga nada.",
       },
       pass: {
@@ -166,11 +187,11 @@ const ptBR = {
       },
       refund: {
         title: "Direito de arrependimento",
-        body: "Desistiu? Devolvemos o valor integral se você pedir em até 7 dias da contratação. No Pro, vale também até 7 dias depois da primeira cobrança após o teste. Vale para assinaturas e passes. Para pedir, escreva para {{email}}.",
+        body: "Desistiu? Devolvemos o valor integral se você pedir em até 7 dias da contratação. No Premium, vale também até 7 dias depois da primeira cobrança após o teste. Vale para assinaturas e passes. Para pedir, escreva para {{email}}.",
       },
       founder: {
         title: "Preço de fundador",
-        body: "Os {{slots}} primeiros assinantes do Pro pagam {{founderPrice}}/mês depois do teste, em vez de {{price}}, enquanto a assinatura continuar ativa. A vaga é conferida no checkout, que mostra o valor exato antes de você pagar.",
+        body: "Os {{slots}} primeiros assinantes do Premium pagam {{founderPrice}}/mês depois do teste, em vez de {{price}}, enquanto a assinatura continuar ativa. A vaga é conferida no checkout, que mostra o valor exato antes de você pagar.",
       },
       links: "Ao assinar, valem os <terms>Termos de Uso</terms> e a <privacy>Política de Privacidade</privacy>.",
     },
@@ -186,9 +207,9 @@ const ptBR = {
       labelCancel: "Cancelar",
       labelRefund: "Arrependimento",
       todayPremium:
-        "Navegar sem anúncios. Os outros benefícios do Premium ainda não existem — estão marcados como “Em breve” na página de Planos.",
+        "Selo de Apoiador no seu perfil, este preço travado para sempre e tudo que sair incluído, sem pagar a mais. Alerta de FIPE, caderneta de manutenção e custo projetado estão em construção.",
       todayPro:
-        "Navegar sem anúncios. Métricas mês a mês, relatório, pedidos de orçamento e as outras ferramentas do Pro ainda não existem — estão marcados como “Em breve”.",
+        "As ferramentas de quem presta serviço ainda estão em construção — de onde veio cada cliente, relatório mensal e cupom rastreável.",
       priceMonthly: "{{price}} por mês ({{founderPrice}} por mês no preço de fundador, se ainda houver vaga).",
       priceYearly: "{{price}} por ano.",
       pricePass: "{{price}}, pagamento único.",
@@ -225,8 +246,8 @@ const ptBR = {
       subtitle:
         "O Engine é grátis e vai continuar grátis. Se ele te ajuda, dá para ajudar de volta — de dois jeitos.",
       premium: {
-        title: "O jeito principal: assinar o Premium",
-        body: "Assinar o Premium (a partir de {{price}} por ano) é a forma de apoio que paga as contas todo mês. Hoje ele tira os anúncios; o resto do que vem com ele está em construção.",
+        title: "O jeito principal: assinar o Pro",
+        body: "Assinar o Pro (a partir de {{price}} por mês) é a forma de apoio que paga as contas todo mês. Você entra com o preço travado para sempre e recebe tudo que sair, assim que sair.",
         cta: "Ver os planos",
       },
       where: {
@@ -364,20 +385,24 @@ const enUS = {
   billing: {
     offers: {
       pro_monthly: {
+        name: "Engine Premium — monthly",
+        what: "Monthly Engine Premium subscription, for service providers. Includes everything in Pro.",
+      },
+      premium_monthly: {
         name: "Engine Pro — monthly",
-        what: "Monthly Engine Pro subscription, for service providers. Includes everything in Premium.",
+        what: "Monthly Engine Pro subscription, for car owners.",
       },
       premium_yearly: {
-        name: "Engine Premium — yearly",
-        what: "Yearly Engine Premium subscription, for car owners.",
+        name: "Engine Pro — yearly",
+        what: "Yearly Engine Pro subscription, for car owners.",
       },
       premium_pass_1m: {
-        name: "Engine Premium — 1-month pass",
-        what: "1-month Engine Premium pass. One-time payment.",
+        name: "Engine Pro — 1-month pass",
+        what: "1-month Engine Pro pass. One-time payment.",
       },
       premium_pass_3m: {
-        name: "Engine Premium — 3-month pass",
-        what: "3-month Engine Premium pass. One-time payment.",
+        name: "Engine Pro — 3-month pass",
+        what: "3-month Engine Pro pass. One-time payment.",
       },
     },
     plans: {
@@ -395,17 +420,18 @@ const enUS = {
       supportLink: "Want to help without subscribing? See <support>other ways to support Engine</support>.",
       cta: {
         soon: "Subscriptions coming soon",
+          notify: "Tell me when it opens",
         login: "Sign in to subscribe",
         manage: "Settings › Your plan",
         register: "Create a free account",
         current: "Your current plan",
-        includedInPro: "Included in your Pro",
+        includedInPro: "Included in your Premium",
         passActiveYearly:
           "Your pass is valid until {{date}}. So you don't pay twice for the same period, the yearly plan opens up when it ends — or extend it with another pass.",
-        subscribePremium: "Subscribe to Premium",
+        subscribePremium: "Subscribe to Pro",
         buyPass: "Buy pass",
         switchHint: "You already have a subscription. To switch plans, cancel the current one first.",
-        subscribePro: "Subscribe to Pro",
+        subscribePro: "Subscribe to Premium",
         startTrial: "Start {{days}} days free",
       },
       free: {
@@ -415,45 +441,61 @@ const enUS = {
         forever: "forever",
         always: "Stays with you on any plan.",
       },
+        building: {
+          label: "Being built:",
+          entry: "FIPE price alerts and history for your car, a maintenance logbook and projected cost over 3 and 5 years. You pay nothing extra when they ship.",
+          provider: "The tools for people who live off this: where each customer came from, a monthly report, a trackable coupon and featured placement.",
+          providerWhy: "Not on sale yet, and the reason is honest: measuring an audience only matters once there is an audience to measure. It opens when the marketplace has traffic — and whoever joins first pays the founder price.",
+        },
       premium: {
         badge: "For car owners",
-        eyebrow: "Premium",
+        eyebrow: "Pro",
         audience: "For people who own a car or are deciding which one to buy.",
-        yearlyNote: "Works out to {{monthly}} a month. Renews every year until you cancel.",
+        yearlyNote: "Billed {{yearly}} once a year — {{percent}}% less than paying monthly. Renews every year until you cancel.",
+        monthlyNote: "Renews every month until you cancel. Cancel anytime.",
         passNote: {
           premium_pass_1m: "Lasts 1 month. Does not renew and keeps no card on file.",
           premium_pass_3m: "Lasts 3 months. Does not renew and keeps no card on file.",
         },
         chooseLabel: "Choose how to pay",
         option: {
+          premium_monthly: "Monthly · {{price}}",
           premium_yearly: "Yearly · {{price}}",
           premium_pass_3m: "3-month pass · {{price}}",
           premium_pass_1m: "1-month pass · {{price}}",
         },
+        save: "−{{percent}}%",
         renews: "renews",
         noRenew: "no renewal",
         honest:
-          "Today Premium removes ads. The other items don't exist in the app yet: they are marked “Coming soon”. Subscribe for what it already delivers.",
+          "Today Pro removes ads. The other items don't exist in the app yet: they are marked “Coming soon”. Subscribe for what it already delivers.",
       },
       pro: {
-        eyebrow: "Pro",
+        eyebrow: "Premium",
         audience: "For service providers: repair shops, detailing, body shops, mechanics.",
         trialNote: "{{days}} days free to start. Then billed monthly until you cancel.",
         trialUsed: "You have already used the free trial: billing starts on the day you subscribe.",
         founder:
           "Founder price: the first {{slots}} subscribers pay {{founderPrice}}/month instead of {{price}}, as long as the subscription stays active. If a spot is still open, checkout already shows the lower price.",
         honest:
-          "Listing a service and seeing basic metrics is already free. The Pro tools don't exist in the app yet: they are marked “Coming soon”. Today Pro delivers the same as Premium.",
+          "Listing a service and seeing basic metrics is already free. The Premium tools don't exist in the app yet: they are marked “Coming soon”. Today Premium delivers the same as Pro.",
       },
     },
     features: {
       free: {
-        garage: "Garage with your cars and purchase goals",
-        specs: "Spec sheet for your car's exact version",
-        simulator: "Full cost simulator, including total loan interest",
-        community: "Community and Messages",
-        clubsEvents: "Clubs and Events",
-        services: "List your service, with basic metrics",
+        garage: "Garage with your cars and buying goals",
+        specs: "Spec sheet for your exact trim",
+        simulator: "Real cost simulator, with the full financing interest",
+        maintenance: "Scheduled maintenance and tax reminders",
+        quotes: "Request and receive quotes",
+        reviews: "Review and be reviewed",
+        community: "Community, Messages, Clubs and Events",
+        services: "List your service",
+      },
+      founder: {
+        supporterBadge: "Supporter badge on your profile",
+        priceLock: "This price locked forever, even when it goes up",
+        earlyAccess: "Everything that ships, the day it ships, at no extra cost",
       },
       premium: {
         noAds: "No ads",
@@ -465,7 +507,7 @@ const enUS = {
         supporterBadge: "Supporter badge on your profile",
       },
       pro: {
-        allPremium: "Everything in Premium",
+        allPremium: "Everything in Pro",
         monthlyMetrics: "Month-by-month metrics and where each customer came from",
         monthlyReport: "Monthly report",
         quotes: "Quote requests",
@@ -477,10 +519,10 @@ const enUS = {
       title: "Before you subscribe",
       renewal: {
         title: "Automatic renewal",
-        body: "Pro (monthly) and Premium yearly renew automatically at the end of each period, on the same card, until you cancel.",
+        body: "Subscriptions — Premium and Pro, monthly or yearly — renew automatically at the end of each period, on the same card, until you cancel. Passes do not renew.",
       },
       trial: {
-        title: "Pro free trial",
+        title: "Premium free trial",
         body: "{{days}} days free, once per person. Nothing is charged during the trial; the first charge happens the day it ends, and we email you beforehand. Cancel during the trial and you pay nothing.",
       },
       pass: {
@@ -493,11 +535,11 @@ const enUS = {
       },
       refund: {
         title: "Right of withdrawal",
-        body: "Changed your mind? We refund the full amount if you ask within 7 days of subscribing. For Pro, this also applies within 7 days of the first charge after the trial. It covers subscriptions and passes. To ask, email {{email}}.",
+        body: "Changed your mind? We refund the full amount if you ask within 7 days of subscribing. For Premium, this also applies within 7 days of the first charge after the trial. It covers subscriptions and passes. To ask, email {{email}}.",
       },
       founder: {
         title: "Founder price",
-        body: "The first {{slots}} Pro subscribers pay {{founderPrice}}/month after the trial instead of {{price}}, as long as the subscription stays active. The spot is checked at checkout, which shows the exact amount before you pay.",
+        body: "The first {{slots}} Premium subscribers pay {{founderPrice}}/month after the trial instead of {{price}}, as long as the subscription stays active. The spot is checked at checkout, which shows the exact amount before you pay.",
       },
       links: "Subscriptions are governed by the <terms>Terms of Use</terms> and the <privacy>Privacy Policy</privacy>.",
     },
@@ -513,9 +555,9 @@ const enUS = {
       labelCancel: "Cancel",
       labelRefund: "Withdrawal",
       todayPremium:
-        "Browsing without ads. The other Premium benefits don't exist yet — they are marked “Coming soon” on the Plans page.",
+        "Supporter badge on your profile, this price locked forever and everything that ships included, at no extra cost. FIPE alerts, the maintenance logbook and projected cost are being built.",
       todayPro:
-        "Browsing without ads. Month-by-month metrics, reports, quote requests and the other Pro tools don't exist yet — they are marked “Coming soon”.",
+        "The tools for service providers are still being built — where each customer came from, a monthly report and a trackable coupon.",
       priceMonthly: "{{price}} per month ({{founderPrice}} per month at the founder price, if a spot is still open).",
       priceYearly: "{{price}} per year.",
       pricePass: "{{price}}, one-time payment.",
@@ -551,8 +593,8 @@ const enUS = {
       title: "Engine is kept running by the people who use it",
       subtitle: "Engine is free and will stay free. If it helps you, you can help back — in two ways.",
       premium: {
-        title: "The main way: subscribe to Premium",
-        body: "Subscribing to Premium (from {{price}} a year) is the kind of support that pays the bills every month. Today it removes ads; the rest of what comes with it is being built.",
+        title: "The main way: subscribe to Pro",
+        body: "Subscribing to Pro (from {{price}} a month) is the kind of support that pays the bills every month. You lock this price forever and get everything that ships, the day it ships.",
         cta: "See plans",
       },
       where: {
@@ -686,20 +728,24 @@ const esES = {
   billing: {
     offers: {
       pro_monthly: {
+        name: "Engine Premium — mensual",
+        what: "Suscripción mensual de Engine Premium, para quien presta servicios. Incluye todo lo de Pro.",
+      },
+      premium_monthly: {
         name: "Engine Pro — mensual",
-        what: "Suscripción mensual de Engine Pro, para quien presta servicios. Incluye todo lo de Premium.",
+        what: "Suscripción mensual de Engine Pro, para el dueño del coche.",
       },
       premium_yearly: {
-        name: "Engine Premium — anual",
-        what: "Suscripción anual de Engine Premium, para el dueño del coche.",
+        name: "Engine Pro — anual",
+        what: "Suscripción anual de Engine Pro, para el dueño del coche.",
       },
       premium_pass_1m: {
-        name: "Engine Premium — pase de 1 mes",
-        what: "Pase de 1 mes de Engine Premium. Pago único.",
+        name: "Engine Pro — pase de 1 mes",
+        what: "Pase de 1 mes de Engine Pro. Pago único.",
       },
       premium_pass_3m: {
-        name: "Engine Premium — pase de 3 meses",
-        what: "Pase de 3 meses de Engine Premium. Pago único.",
+        name: "Engine Pro — pase de 3 meses",
+        what: "Pase de 3 meses de Engine Pro. Pago único.",
       },
     },
     plans: {
@@ -717,17 +763,18 @@ const esES = {
       supportLink: "¿Quieres apoyar sin suscribirte? Mira <support>otras formas de apoyar a Engine</support>.",
       cta: {
         soon: "Suscripción próximamente",
+          notify: "Avísame cuando abra",
         login: "Inicia sesión para suscribirte",
         manage: "Configuración › Tu plan",
         register: "Crear cuenta gratis",
         current: "Tu plan actual",
-        includedInPro: "Incluido en tu Pro",
+        includedInPro: "Incluido en tu Premium",
         passActiveYearly:
           "Tu pase vale hasta el {{date}}. Para no pagar dos veces el mismo periodo, el anual estará disponible cuando termine — o amplíalo con otro pase.",
-        subscribePremium: "Suscribirme a Premium",
+        subscribePremium: "Suscribirme a Pro",
         buyPass: "Comprar pase",
         switchHint: "Ya tienes una suscripción. Para cambiar de plan, cancela primero la actual.",
-        subscribePro: "Suscribirme a Pro",
+        subscribePro: "Suscribirme a Premium",
         startTrial: "Empezar {{days}} días gratis",
       },
       free: {
@@ -737,45 +784,61 @@ const esES = {
         forever: "para siempre",
         always: "Sigue contigo en cualquier plan.",
       },
+        building: {
+          label: "En construcción:",
+          entry: "alertas e historial de precio de tu coche, libreta de mantenimiento y coste proyectado a 3 y 5 años. No pagas nada más cuando salgan.",
+          provider: "Las herramientas de quien vive de esto: de dónde vino cada cliente, informe mensual, cupón rastreable y destaque en el escaparate.",
+          providerWhy: "Todavía no está a la venta, y el motivo es honesto: medir audiencia solo vale cuando hay audiencia que medir. Abre cuando el escaparate tenga movimiento — y quien entre primero paga precio de fundador.",
+        },
       premium: {
         badge: "Para el dueño del coche",
-        eyebrow: "Premium",
+        eyebrow: "Pro",
         audience: "Para quien tiene coche o está decidiendo cuál comprar.",
-        yearlyNote: "Equivale a {{monthly}} al mes. Se renueva cada año hasta que canceles.",
+        yearlyNote: "Se cobra {{yearly}} una vez al año — {{percent}}% menos que pagar mes a mes. Se renueva cada año hasta que canceles.",
+        monthlyNote: "Se renueva cada mes hasta que canceles. Cancela cuando quieras.",
         passNote: {
           premium_pass_1m: "Vale 1 mes. No se renueva y no guarda la tarjeta.",
           premium_pass_3m: "Vale 3 meses. No se renueva y no guarda la tarjeta.",
         },
         chooseLabel: "Elige cómo pagar",
         option: {
+          premium_monthly: "Mensual · {{price}}",
           premium_yearly: "Anual · {{price}}",
           premium_pass_3m: "Pase de 3 meses · {{price}}",
           premium_pass_1m: "Pase de 1 mes · {{price}}",
         },
+        save: "−{{percent}}%",
         renews: "se renueva",
         noRenew: "no se renueva",
         honest:
-          "Hoy Premium quita los anuncios. Los demás elementos aún no existen en la app: están marcados como “Próximamente”. Suscríbete por lo que ya ofrece.",
+          "Hoy Pro quita los anuncios. Los demás elementos aún no existen en la app: están marcados como “Próximamente”. Suscríbete por lo que ya ofrece.",
       },
       pro: {
-        eyebrow: "Pro",
+        eyebrow: "Premium",
         audience: "Para quien presta servicios: talleres, detailing, chapa y pintura, mecánicos.",
         trialNote: "{{days}} días gratis para empezar. Después, cobro mensual hasta que canceles.",
         trialUsed: "Ya usaste la prueba gratis: el cobro empieza el día de la suscripción.",
         founder:
           "Precio de fundador: los primeros {{slots}} suscriptores pagan {{founderPrice}}/mes en lugar de {{price}}, mientras la suscripción siga activa. Si aún hay plaza, el pago ya muestra el precio menor.",
         honest:
-          "Publicar un servicio y ver las métricas básicas ya es gratis. Las herramientas de Pro aún no existen en la app: están marcadas como “Próximamente”. Hoy Pro ofrece lo mismo que Premium.",
+          "Publicar un servicio y ver las métricas básicas ya es gratis. Las herramientas de Premium aún no existen en la app: están marcadas como “Próximamente”. Hoy Premium ofrece lo mismo que Pro.",
       },
     },
     features: {
       free: {
         garage: "Garaje con tus coches y metas de compra",
         specs: "Ficha técnica de la versión de tu coche",
-        simulator: "Simulador de costes completo, con los intereses totales del préstamo",
-        community: "Comunidad y Mensajes",
-        clubsEvents: "Clubes y Eventos",
-        services: "Publicar tu servicio, con métricas básicas",
+        simulator: "Simulador de coste real, con los intereses totales de la financiación",
+        maintenance: "Mantenimiento programado y recordatorios de impuestos",
+        quotes: "Pedir y recibir presupuestos",
+        reviews: "Valorar y ser valorado",
+        community: "Comunidad, Mensajes, Clubes y Eventos",
+        services: "Publicar tu servicio",
+      },
+      founder: {
+        supporterBadge: "Distintivo de Apoyo en tu perfil",
+        priceLock: "Este precio congelado para siempre, aunque suba",
+        earlyAccess: "Todo lo que salga, en cuanto salga, sin pagar de más",
       },
       premium: {
         noAds: "Sin anuncios",
@@ -787,7 +850,7 @@ const esES = {
         supporterBadge: "Insignia de Apoyo en el perfil",
       },
       pro: {
-        allPremium: "Todo lo de Premium",
+        allPremium: "Todo lo de Pro",
         monthlyMetrics: "Métricas mes a mes y de dónde vino cada cliente",
         monthlyReport: "Informe mensual",
         quotes: "Solicitudes de presupuesto",
@@ -799,10 +862,10 @@ const esES = {
       title: "Antes de suscribirte",
       renewal: {
         title: "Renovación automática",
-        body: "Pro (mensual) y Premium anual se renuevan solos al final de cada periodo, con la misma tarjeta, hasta que canceles.",
+        body: "Las suscripciones — Premium y Pro, mensual o anual — se renuevan solas al final de cada periodo, con la misma tarjeta, hasta que canceles. Los pases no se renuevan.",
       },
       trial: {
-        title: "Prueba gratis de Pro",
+        title: "Prueba gratis de Premium",
         body: "{{days}} días gratis, una vez por persona. Durante la prueba no se cobra nada; el primer cobro es el día en que termina, y te avisamos por correo antes. ¿Cancelas durante la prueba? No pagas nada.",
       },
       pass: {
@@ -815,11 +878,11 @@ const esES = {
       },
       refund: {
         title: "Derecho de desistimiento",
-        body: "¿Te arrepientes? Devolvemos el importe íntegro si lo pides en un plazo de 7 días desde la contratación. En Pro, también hasta 7 días después del primer cobro tras la prueba. Vale para suscripciones y pases. Para pedirlo, escribe a {{email}}.",
+        body: "¿Te arrepientes? Devolvemos el importe íntegro si lo pides en un plazo de 7 días desde la contratación. En Premium, también hasta 7 días después del primer cobro tras la prueba. Vale para suscripciones y pases. Para pedirlo, escribe a {{email}}.",
       },
       founder: {
         title: "Precio de fundador",
-        body: "Los primeros {{slots}} suscriptores de Pro pagan {{founderPrice}}/mes tras la prueba, en lugar de {{price}}, mientras la suscripción siga activa. La plaza se comprueba en el pago, que muestra el importe exacto antes de pagar.",
+        body: "Los primeros {{slots}} suscriptores de Premium pagan {{founderPrice}}/mes tras la prueba, en lugar de {{price}}, mientras la suscripción siga activa. La plaza se comprueba en el pago, que muestra el importe exacto antes de pagar.",
       },
       links: "Al suscribirte, rigen los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
     },
@@ -835,9 +898,9 @@ const esES = {
       labelCancel: "Cancelar",
       labelRefund: "Desistimiento",
       todayPremium:
-        "Navegar sin anuncios. Los demás beneficios de Premium aún no existen — están marcados como “Próximamente” en la página de Planes.",
+        "Distintivo de Apoyo en tu perfil, este precio congelado para siempre y todo lo que salga incluido, sin pagar de más. Las alertas de precio, la libreta de mantenimiento y el coste proyectado están en construcción.",
       todayPro:
-        "Navegar sin anuncios. Las métricas mes a mes, el informe, las solicitudes de presupuesto y las demás herramientas de Pro aún no existen — están marcadas como “Próximamente”.",
+        "Las herramientas de quien presta servicios aún están en construcción — de dónde vino cada cliente, informe mensual y cupón rastreable.",
       priceMonthly: "{{price}} al mes ({{founderPrice}} al mes con precio de fundador, si aún hay plaza).",
       priceYearly: "{{price}} al año.",
       pricePass: "{{price}}, pago único.",
@@ -873,8 +936,8 @@ const esES = {
       title: "A Engine lo mantienen en pie quienes lo usan",
       subtitle: "Engine es gratis y seguirá siéndolo. Si te ayuda, puedes ayudar de vuelta — de dos formas.",
       premium: {
-        title: "La forma principal: suscribirte a Premium",
-        body: "Suscribirte a Premium (desde {{price}} al año) es el apoyo que paga las cuentas cada mes. Hoy quita los anuncios; el resto de lo que incluye está en construcción.",
+        title: "La forma principal: suscribirte a Pro",
+        body: "Suscribirte a Pro (desde {{price}} al mes) es el apoyo que paga las cuentas cada mes. Entras con el precio congelado para siempre y recibes todo lo que salga, en cuanto salga.",
         cta: "Ver los planes",
       },
       where: {

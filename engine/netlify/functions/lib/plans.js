@@ -52,7 +52,57 @@
  *   preço argentino fica em ~49% do americano em dólar, como manda a PPP.
  *   Refazer a cada trimestre enquanto a inflação de lá estiver nesse ritmo.
  *
+ * --- Troca de nomes e de preço (12/11/2026) ---------------------------------
+ *
+ * ATENÇÃO DE QUEM LÊ ESTE ARQUIVO DEPOIS: os identificadores internos NÃO
+ * acompanharam os nomes de vitrine. Dentro do código e dentro do banco:
+ *
+ *     plan: "premium"  = a camada de ENTRADA, de quem TEM CARRO
+ *     plan: "pro"      = a camada de CIMA, de quem PRESTA SERVIÇO
+ *                        (inclui tudo da de entrada)
+ *
+ * e as ofertas seguem com os ids `premium_*` e `pro_monthly`. O que mudou em
+ * 12/11/2026 foi só o NOME que a pessoa lê: a camada de entrada virou "Engine
+ * Pro" e a de cima virou "Engine Premium". Os ids ficaram onde estavam de
+ * propósito — eles estão gravados em `user_plans.plan` e na metadata das
+ * assinaturas do Stripe, e renomear valor de banco por causa de rótulo é
+ * trocar um texto por um incidente.
+ *
+ * Por que a troca: na vitrine os três cartões precisavam subir de preço da
+ * esquerda para a direita, e com "Premium" custando menos que "Pro" a escada
+ * só fechava invertendo os rótulos. Decisão do dono.
+ *
+ * Preços novos (em reais; as outras moedas saíram da razão de cada uma com o
+ * real e precisam de uma passada antes de vender fora do Brasil):
+ *
+ *  - Entrada, agora "Engine Pro", de quem tem carro: R$ 19,90/mês, anual
+ *    R$ 159,90 (~33% abaixo de 12 mensais), passes de 1 e 3 meses. Antes era
+ *    só anual, a R$ 79,90.
+ *  - Topo, agora "Engine Premium", de quem presta serviço: segue R$ 25,00/mês,
+ *    com preço de fundador de R$ 15,00 e 30 dias de teste.
+ *
+ * O anual passou a se apresentar como DESCONTO e não como um número solto: a
+ * vitrine punha "R$ 79,90 por ano" em corpo 40 ao lado de "R$ 25,00 por mês"
+ * em corpo 40, e o olho lê 79 contra 25 sem reparar na unidade.
+ *
  * Mínimo do Stripe: ver STRIPE_MIN_CHARGE e scripts/check-plans.mjs.
+ */
+/**
+ * Uma oferta só aparece com botão de compra quando `onSale` é true.
+ *
+ * Isto existe porque "está pronto para cobrar" (Stripe configurado) e "tem o
+ * que entregar" são duas perguntas diferentes, e até 12/11/2026 o código
+ * respondia as duas com a mesma variável: a venda inteira estava amarrada em
+ * `ADSENSE_ENABLED`, porque na época o único benefício real de assinar era
+ * tirar o anúncio. O efeito colateral é que NINGUÉM conseguia pagar por nada
+ * enquanto o Google não aprovasse o AdSense — nem pelo que não tem a ver com
+ * anúncio nenhum.
+ *
+ * Agora cada oferta responde por si. Quem está à venda hoje é a camada de
+ * entrada, e não pelo que ela promete e sim pelo que ela entrega na hora:
+ * selo de apoiador, este preço travado para sempre, e tudo que sair incluído.
+ * A camada do prestador fica fechada até a vitrine ter movimento — métrica de
+ * audiência em cima de zero visita não se sustenta nem no discurso.
  */
 export const FOUNDER_SLOTS = 30;
 export const PRO_TRIAL_DAYS = 30;
@@ -64,35 +114,53 @@ export const OFFERS = {
     plan: "pro",
     kind: "subscription",
     interval: "month",
-    name: "Engine Pro",
-    description: "Para quem presta serviço: métricas mês a mês, pedidos de orçamento e tudo do Premium.",
+    name: "Engine Premium",
+    description: "Para quem presta serviço: métricas mês a mês, pedidos de orçamento e tudo do Pro.",
     amount: { BRL: 2500, USD: 600, EUR: 599, GBP: 499, MXN: 5900, CLP: 2690, COP: 890000, ARS: 449000 },
     founderAmount: { BRL: 1500, USD: 400, EUR: 399, GBP: 349, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
     trialDays: PRO_TRIAL_DAYS,
+    onSale: false,
   },
   premium_yearly: {
     plan: "premium",
     kind: "subscription",
     interval: "year",
-    name: "Engine Premium (anual)",
+    name: "Engine Pro (anual)",
     description: "Para o dono do carro: alertas de FIPE, manutenção programada, custo total e sem anúncios.",
-    amount: { BRL: 7990, USD: 1990, EUR: 1999, GBP: 1699, MXN: 19900, CLP: 8990, COP: 2990000, ARS: 1499000 },
+    amount: { BRL: 9990, USD: 2490, EUR: 2499, GBP: 1999, MXN: 24900, CLP: 10990, COP: 3690000, ARS: 1869000 },
+    onSale: true,
+  },
+  premium_monthly: {
+    plan: "premium",
+    kind: "subscription",
+    interval: "month",
+    name: "Engine Pro (mensal)",
+    description: "Para o dono do carro: alertas de FIPE, manutenção programada, custo total e sem anúncios.",
+    // A mensal é a âncora, e as outras moedas seguem o preço de vitrine
+    // local dela. O anual fica ~16% abaixo de 12 mensais em todas — e esse
+    // número não está escrito em lugar nenhum: `yearlySavingPercent` em
+    // Plans.jsx calcula na hora, a partir destes dois valores. Mexer aqui
+    // basta; a tela se corrige sozinha.
+    amount: { BRL: 990, USD: 249, EUR: 249, GBP: 199, MXN: 2490, CLP: 1090, COP: 370000, ARS: 189000 },
+    onSale: true,
   },
   premium_pass_1m: {
     plan: "premium",
     kind: "pass",
     months: 1,
-    name: "Engine Premium — passe de 1 mês",
+    name: "Engine Pro — passe de 1 mês",
     description: "Pagamento único, sem renovação automática.",
-    amount: { BRL: 1490, USD: 399, EUR: 399, GBP: 349, MXN: 3900, CLP: 1790, COP: 590000, ARS: 299000 },
+    amount: { BRL: 1290, USD: 349, EUR: 349, GBP: 279, MXN: 3490, CLP: 1490, COP: 490000, ARS: 249000 },
+    onSale: true,
   },
   premium_pass_3m: {
     plan: "premium",
     kind: "pass",
     months: 3,
-    name: "Engine Premium — passe de 3 meses",
+    name: "Engine Pro — passe de 3 meses",
     description: "Pagamento único, sem renovação automática.",
-    amount: { BRL: 3490, USD: 899, EUR: 899, GBP: 749, MXN: 8900, CLP: 3990, COP: 1390000, ARS: 679000 },
+    amount: { BRL: 3290, USD: 869, EUR: 869, GBP: 699, MXN: 8490, CLP: 3790, COP: 1290000, ARS: 629000 },
+    onSale: true,
   },
 };
 
