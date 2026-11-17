@@ -9,6 +9,12 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
+  emoji: { title: "Emojis", recent: "Recentes" },
+  pullToRefresh: {
+    pull: "Puxe para atualizar",
+    release: "Solte para atualizar",
+    loading: "Atualizando",
+  },
   mediaPicker: {
     title: "Adicionar",
     takeNow: "Tirar foto agora",
@@ -37,9 +43,29 @@ const ptBR = {
     eventMovedWarning_other:
       "{{count}} pessoas já confirmaram presença. Mudar data ou lugar não avisa ninguém — conte no mural do evento.",
   },
+  plateHider: {
+    tab: "Esconder placa",
+    cropTab: "Cortar",
+    hint: "Arraste o dedo por cima da placa — ou de qualquer coisa que você não quer mostrar.",
+    hintTap: "Arraste para esconder mais. Toque em cima de um bloco para tirar.",
+    undo: "Desfazer",
+    // A tarja é aplicada no arquivo, não na exibição. Vale dizer: é o que
+    // separa esconder de fingir que escondeu.
+    done: "A placa sai apagada do arquivo que sobe — não dá para recuperar depois.",
+    reCrop: "Você mexeu no corte, então os blocos saíram de lugar e foram apagados. Esconda de novo.",
+    download: "Baixar esta foto",
+    downloaded: "Foto salva.",
+    downloadError: "Não deu para baixar a foto.",
+  },
 };
 
 const enUS = {
+  emoji: { title: "Emojis", recent: "Recent" },
+  pullToRefresh: {
+    pull: "Pull to refresh",
+    release: "Release to refresh",
+    loading: "Refreshing",
+  },
   mediaPicker: {
     title: "Add",
     takeNow: "Take a photo now",
@@ -63,9 +89,27 @@ const enUS = {
     eventMovedWarning_other:
       "{{count}} people already said they are coming. Changing the date or the place notifies no one — say so on the event wall.",
   },
+  plateHider: {
+    tab: "Hide plate",
+    cropTab: "Crop",
+    hint: "Drag your finger over the plate — or anything else you would rather not show.",
+    hintTap: "Drag to hide more. Tap a block to remove it.",
+    undo: "Undo",
+    done: "The plate is erased from the file that gets uploaded — it cannot be recovered later.",
+    reCrop: "You changed the crop, so the blocks no longer lined up and were cleared. Hide it again.",
+    download: "Download this photo",
+    downloaded: "Photo saved.",
+    downloadError: "Could not download the photo.",
+  },
 };
 
 const esES = {
+  emoji: { title: "Emojis", recent: "Recientes" },
+  pullToRefresh: {
+    pull: "Desliza para actualizar",
+    release: "Suelta para actualizar",
+    loading: "Actualizando",
+  },
   mediaPicker: {
     title: "Añadir",
     takeNow: "Hacer una foto ahora",
@@ -88,6 +132,18 @@ const esES = {
       "{{count}} persona ya confirmó. Cambiar la fecha o el lugar no avisa a nadie — cuéntalo en el muro del evento.",
     eventMovedWarning_other:
       "{{count}} personas ya confirmaron. Cambiar la fecha o el lugar no avisa a nadie — cuéntalo en el muro del evento.",
+  },
+  plateHider: {
+    tab: "Ocultar matrícula",
+    cropTab: "Recortar",
+    hint: "Arrastra el dedo sobre la matrícula — o sobre cualquier cosa que no quieras mostrar.",
+    hintTap: "Arrastra para ocultar más. Toca un bloque para quitarlo.",
+    undo: "Deshacer",
+    done: "La matrícula sale borrada del archivo que se sube — no se puede recuperar después.",
+    reCrop: "Cambiaste el recorte, así que los bloques se desalinearon y se borraron. Ocúltala de nuevo.",
+    download: "Descargar esta foto",
+    downloaded: "Foto guardada.",
+    downloadError: "No se pudo descargar la foto.",
   },
 };
 

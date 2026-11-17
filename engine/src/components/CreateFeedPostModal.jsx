@@ -1,22 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Car, Clapperboard, ImagePlus, Info, Link2, Loader2, Scissors, Trash2, X } from "lucide-react";
+import { Car, Clapperboard, EyeOff, ImagePlus, Info, Link2, Loader2, Scissors, Trash2, X } from "lucide-react";
 import { auth } from "../services/supabase";
 import { engineDB } from "../services/db";
-import { isFileTooBig, isImageFile, uploadUserPhoto } from "../services/photos";
+import { isFileTooBig, isImageFile, removeStoredPhoto, uploadUserPhoto } from "../services/photos";
 import { imagesFromPaste } from "../services/clipboardImage";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { MentionTextarea } from "./mentions/MentionTextarea";
 import { MediaPickerButton } from "./MediaPickerButton";
 import { VideoEditor } from "./social/VideoEditor";
+import { PlateHiderSheet } from "./PlateHiderSheet";
+import "../services/i18n-editing";
 import { VIDEO_LIMITS, probeVideo, uploadPostVideo, videoFileProblem } from "../services/postVideo";
 import { MAX_HASHTAGS, extractHashtags } from "../services/socialText";
 import "../services/i18n-social-posts";
 import "../services/i18n-message-dock";
 import "../services/i18n-editing";
 import { Select } from "./ui/Select";
+import { DragHandle } from "./DragHandle";
 
 const MAX_PHOTOS = 3;
 const MAX_TEXT = 1000;
@@ -63,6 +66,13 @@ export function CreateFeedPostModal({
   const [publishedVideo, setPublishedVideo] = useState(() => goal?.video || null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [stage, setStage] = useState("");
+  // O arquivo local de cada foto que ESTA sessão subiu, pelo endereço dela.
+  // É o que permite esconder a placa depois de a foto já estar no Storage:
+  // sem o arquivo original só sobraria baixar de novo a foto pública.
+  const arquivosLocais = useRef(new Map());
+  const [placaDe, setPlacaDe] = useState("");
+  // 0..100 da recodificação do vídeo. Só aparece no estágio "preparing".
+  const [prepPercent, setPrepPercent] = useState(0);
   const [carId, setCarId] = useState(() => (goal?.carId ? String(goal.carId) : ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -123,10 +133,38 @@ export function CreateFeedPostModal({
           userId: auth.currentUser?.uid,
           folder: "posts",
         });
+        arquivosLocais.current.set(url, file);
         setPhotos((current) => [...current, url].slice(0, MAX_PHOTOS));
       }
     } catch (uploadError) {
       setError(uploadError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Troca a foto por uma versão com a placa escondida.
+   *
+   * A tratada sobe como arquivo novo e a antiga é APAGADA do Storage. Sem
+   * apagar, a foto com a placa legível continuaria no bucket público,
+   * alcançável por quem tivesse o endereço — e aí esconder a placa não teria
+   * escondido nada.
+   */
+  const trocarPorSemPlaca = async (urlAntiga, arquivo) => {
+    setBusy(true);
+    setError("");
+    try {
+      const nova = await uploadUserPhoto(arquivo, {
+        userId: auth.currentUser?.uid,
+        folder: "posts",
+      });
+      arquivosLocais.current.set(nova, arquivo);
+      setPhotos((current) => current.map((item) => (item === urlAntiga ? nova : item)));
+      arquivosLocais.current.delete(urlAntiga);
+      await removeStoredPhoto(urlAntiga);
+    } catch (erro) {
+      setError(erro.message);
     } finally {
       setBusy(false);
     }
@@ -182,9 +220,21 @@ export function CreateFeedPostModal({
       const car = carList.find((item) => String(item.id) === carId) || null;
       let uploaded = null;
       if (video?.edit) {
-        setStage("uploading");
+        // "Preparando" primeiro: é a recodificação no aparelho, que pode
+        // levar o tempo do próprio vídeo. O estágio vira "enviando" na
+        // primeira vez que o progresso chega a 100% — ou já de saída, quando
+        // o aparelho não recodifica e o arquivo sobe como está.
+        setPrepPercent(0);
+        setStage("preparing");
         try {
-          uploaded = await uploadPostVideo(video.file, video.edit, { userId: auth.currentUser?.uid });
+          uploaded = await uploadPostVideo(video.file, video.edit, {
+            userId: auth.currentUser?.uid,
+            onEncodeProgress: (fracao) => {
+              const pct = Math.round(Math.min(1, Math.max(0, fracao)) * 100);
+              setPrepPercent(pct);
+              if (pct >= 100) setStage("uploading");
+            },
+          });
         } catch (uploadError) {
           const code = VIDEO_ERRORS_SHOWN.includes(uploadError?.code) ? uploadError.code : "upload";
           throw new Error(t(`socialPosts.videoErrors.${code}`, { mb: MB }));
@@ -255,6 +305,7 @@ export function CreateFeedPostModal({
         className="engine-modal-panel engine-pop sm:max-w-lg"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex items-center justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4">
           <div className="min-w-0">
             <h2 className="text-base font-black text-[var(--engine-text)]">
@@ -405,6 +456,19 @@ export function CreateFeedPostModal({
                   className="relative overflow-hidden rounded-xl border border-[var(--engine-border)]"
                 >
                   <img src={photo} alt="" className="h-24 w-full object-cover" />
+                  {/* Esconder a placa só aparece nas fotos que ESTA sessão
+                      subiu: para a foto de um post sendo editado, o arquivo
+                      original não está mais aqui. */}
+                  {arquivosLocais.current.has(photo) && (
+                    <button
+                      type="button"
+                      onClick={() => setPlacaDe(photo)}
+                      className="absolute bottom-0 left-0 right-0 flex h-7 items-center justify-center gap-1 bg-black/70 text-[10.5px] font-bold uppercase tracking-wider text-white transition hover:bg-black/85"
+                    >
+                      <EyeOff size={11} />
+                      {t("plateHider.tab")}
+                    </button>
+                  )}
                   {/* Alvo de 44x44 com o círculo visual de 28px dentro: o
                       botão media 28x28 (13/09/2026). */}
                   <button
@@ -490,20 +554,35 @@ export function CreateFeedPostModal({
             </p>
           )}
 
+          {stage === "preparing" && (
+            <p className="mb-1 text-center text-[11.5px] leading-4 text-[var(--engine-text-muted)]">
+              {t("socialPosts.video.preparingHint")}
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={busy || tooManyTags}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--engine-accent)] text-sm font-black uppercase tracking-widest text-white transition hover:brightness-95 disabled:opacity-60"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : null}
-            {stage === "uploading"
-              ? t("socialPosts.video.uploading")
-              : editing
-                ? t("editing.save")
-                : t("feedPost.publish")}
+            {stage === "preparing"
+              ? t("socialPosts.video.preparing", { percent: prepPercent })
+              : stage === "uploading"
+                ? t("socialPosts.video.uploading")
+                : editing
+                  ? t("editing.save")
+                  : t("feedPost.publish")}
           </button>
         </form>
       </div>
+
+      <PlateHiderSheet
+        open={Boolean(placaDe)}
+        onClose={() => setPlacaDe("")}
+        file={placaDe ? arquivosLocais.current.get(placaDe) : null}
+        onApply={async (arquivo) => trocarPorSemPlaca(placaDe, arquivo)}
+      />
 
       {editorOpen && video && (
         <VideoEditor
