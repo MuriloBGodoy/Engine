@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { onAuthChange } from "./services/supabase";
 import { CAR_TYPE_OWNED, engineDB } from "./services/db";
@@ -32,6 +32,7 @@ import { useToast } from "./components/ToastProvider";
 import { applySavedLanguage } from "./services/languageChoice";
 import { getConsentStatus } from "./services/onboarding";
 import { getMySuspension } from "./services/suspension";
+import { refreshShowcase } from "./services/carShowcase";
 
 // Carregamento sob demanda. Até 25/09/2026 o app inteiro era UM arquivo de
 // 2,9 MB (870 KB gzip) — nada pintava antes dele baixar e ser lido, e a Mia
@@ -72,6 +73,8 @@ const Moderation = lazyNamed(() => import("./pages/Moderation"), "Moderation");
 const Plans = lazyNamed(() => import("./pages/Plans"), "Plans");
 const Support = lazyNamed(() => import("./pages/Support"), "Support");
 const Advertise = lazyNamed(() => import("./pages/Advertise"), "Advertise");
+const About = lazyNamed(() => import("./pages/About"), "About");
+const Help = lazyNamed(() => import("./pages/Help"), "Help");
 const Onboarding = lazyNamed(() => import("./pages/Onboarding"), "Onboarding");
 const AccountSuspended = lazyNamed(() => import("./pages/AccountSuspended"), "AccountSuspended");
 
@@ -96,12 +99,39 @@ const markIntroSeen = (uid) => {
  * Numa SPA a troca de tela não recarrega a página, então o pageview não sai
  * de graça: precisa ser disparado a cada mudança de rota.
  */
+/**
+ * Registra a visita E leva a tela para o topo a cada troca de página.
+ *
+ * Num app de página única nada rola sozinho: o React troca o conteúdo e a
+ * barra de rolagem fica exatamente onde estava. Quem rolava o feed e tocava
+ * no @ de alguém caía no perfil JÁ no meio — às vezes depois do fim, numa
+ * faixa vazia, parecendo que a página não carregou. Vale para qualquer
+ * caminho novo: ficha do carro, anúncio, clube.
+ *
+ * Voltar é o contrário: ali a pessoa espera reencontrar o ponto de onde
+ * saiu, então o POP (botão/gesto de voltar) é deixado em paz — e o próprio
+ * navegador cuida dele.
+ *
+ * Rola as duas coisas porque o app tem dois roladores: no celular quem rola
+ * é a janela; a partir de 1024px, com a barra lateral, quem rola é o
+ * `<main class="engine-app-main">`, de altura fixa.
+ *
+ * A âncora (#secao) tem a última palavra: se o link aponta para um pedaço da
+ * página, ir para o topo desfaria justamente o que ele pediu.
+ */
 function RouteTracker() {
   const location = useLocation();
+  const navigationType = useNavigationType();
 
   useEffect(() => {
     trackPageView(location.pathname);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (navigationType === "POP" || location.hash) return;
+    window.scrollTo(0, 0);
+    document.querySelector(".engine-app-main")?.scrollTo(0, 0);
+  }, [location.pathname, location.hash, navigationType]);
 
   return null;
 }
@@ -315,6 +345,10 @@ function App() {
     try {
       const updated = { ...car, specs };
       await engineDB.saveCar(updated);
+      // A ficha é o que a página pública do carro tem para contar. Sem esta
+      // linha ela só aparecia lá fora para quem preenchesse ANTES de ligar a
+      // vitrine — e ninguém faz nessa ordem.
+      await refreshShowcase(updated);
       const updatedCars = await recarregarCarros();
       setSpecsCar(updatedCars?.find((item) => item.id === car.id) || updated);
       return true;
@@ -616,7 +650,10 @@ function App() {
             />
           }
         >
-          <Route path="/" element={<Home user={user} cars={cars} settings={settings} />} />
+          <Route
+            path="/"
+            element={<Home user={user} cars={cars} settings={settings} onRefresh={recarregarCarros} />}
+          />
           <Route
             path="/garagem"
             element={
@@ -678,7 +715,7 @@ function App() {
               (11/11/2026). Aberta a visitante, como Comunidade — é a porta
               de entrada de clube, evento, serviço e perfil, e pedir conta
               antes de deixar procurar fecha a porta na cara de quem chegou. */}
-          <Route path="/buscar" element={<Buscar />} />
+          <Route path="/buscar" element={<Buscar user={user} />} />
           <Route
             path="/community"
             element={<Community cars={cars} settings={settings} user={user} />}
@@ -762,6 +799,10 @@ function App() {
           <Route path="/planos" element={<Plans user={user} />} />
           <Route path="/apoie" element={<Support />} />
           <Route path="/anuncie" element={<Advertise user={user} />} />
+          {/* Sobre e Ajuda, pelo mesmo motivo: o rodapé leva a elas e quem
+              chega do Instagram ainda não tem conta. (17/11/2026) */}
+          <Route path="/sobre" element={<About user={user} />} />
+          <Route path="/ajuda" element={<Help />} />
           <Route
             path="/settings"
             element={

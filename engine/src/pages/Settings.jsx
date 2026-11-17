@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
@@ -14,6 +14,8 @@ import {
   FileText,
   RefreshCw,
   HeartHandshake,
+  Info,
+  LifeBuoy,
   KeyRound,
   Loader2,
   LogOut,
@@ -26,6 +28,7 @@ import {
   Trash2,
   UserRound,
   X,
+  Search,
   Archive,
   Bookmark,
   Heart,
@@ -68,6 +71,8 @@ import { useIsPremium } from "../hooks/useIsPremium";
 import { openBillingPortal } from "../services/subscription";
 import { ADSENSE_ENABLED, resetAdsConsent, setAdsConsent, useAdsConsent } from "../services/consent";
 import { SUPPORT_MAILTO } from "../services/contact";
+import { FaInstagram } from "react-icons/fa6";
+import { ENGINE_SOCIAL, INSTAGRAM_HANDLE, temRede } from "../services/social";
 import { Select } from "../components/ui/Select";
 
 const inputClass =
@@ -112,12 +117,52 @@ const providerLabels = {
 // A LINHA inteira é o interruptor, como nos Ajustes do iOS: o desenho de
 // 48×28 sozinho ficava abaixo dos 44–48 px de toque, e tocar no texto não
 // fazia nada.
+/* ------------------------------------------------------------- busca ---- */
+
+/**
+ * Procurar em Configurações.
+ *
+ * A tela tem 36 linhas em quatro seções, e a pessoa que quer desligar uma
+ * notificação não sabe se isso mora em "Notificações" ou em "Privacidade" —
+ * ela sabe a PALAVRA. É o campo que o Ajustes do iOS e o do Instagram têm
+ * no topo, pelo mesmo motivo.
+ *
+ * Como funciona, e por que assim: cada linha carrega em `data-texto` o
+ * próprio rótulo, a dica embaixo dele E os títulos da seção e do grupo em
+ * que está. Então procurar "privacidade" acha as linhas daquela seção
+ * inteira, e procurar "idioma" acha a linha, venha ela de onde vier.
+ *
+ * O filtro é uma folha de estilo escrita na hora, não um `if` espalhado por
+ * 1.500 linhas: uma regra esconde linha que não casa, outra esconde grupo
+ * que ficou sem linha, outra esconde seção que ficou sem grupo. Mexer numa
+ * linha nova no futuro não exige lembrar da busca — basta ela ser uma `Row`.
+ *
+ * O texto é achatado (sem acento, minúsculo) dos dois lados, senão "servico"
+ * não acharia "Serviços" — o seletor de atributo do CSS ignora caixa, mas
+ * não ignora acento.
+ */
+const achatar = (texto = "") =>
+  String(texto || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+// Só letras, números e espaço entram no seletor: o resto é descartado em vez
+// de escapado. Nada que a pessoa digite pode virar sintaxe de CSS.
+const paraSeletor = (texto = "") => achatar(texto).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+
+/** A trilha até aqui: "Conta  Minhas coisas". Alimenta o `data-texto`. */
+const TrilhaBusca = createContext("");
+
 function SwitchRow({ icon: Icon, label, hint, checked, onChange }) {
   const hintId = useId();
+  const trilha = useContext(TrilhaBusca);
   return (
     <button
       type="button"
       role="switch"
+      data-texto={achatar(`${label || ""} ${typeof hint === "string" ? hint : ""} ${trilha}`)}
       aria-checked={checked}
       aria-describedby={hint ? hintId : undefined}
       onClick={() => onChange(!checked)}
@@ -172,12 +217,14 @@ function SwitchRow({ icon: Icon, label, hint, checked, onChange }) {
  */
 function SettingsSection({ id, icon: Icon, title, children }) {
   return (
-    <section id={`settings-${id}`} className="scroll-mt-24 space-y-4">
+    <section id={`settings-${id}`} data-secao className="scroll-mt-24 space-y-4">
       <h2 className="flex items-center gap-2.5 px-1 text-[17px] font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
         {Icon && <Icon size={19} aria-hidden="true" className="shrink-0 text-[var(--engine-accent)]" />}
         {title}
       </h2>
-      <div className="space-y-6">{children}</div>
+      <div className="space-y-6">
+        <TrilhaBusca.Provider value={title}>{children}</TrilhaBusca.Provider>
+      </div>
     </section>
   );
 }
@@ -185,15 +232,16 @@ function SettingsSection({ id, icon: Icon, title, children }) {
 // Lista agrupada, o desenho de Ajustes do iOS e do Instagram: um título
 // pequeno, linhas separadas por fio, nota de rodapé explicando o grupo.
 function Group({ title, footer, children }) {
+  const secao = useContext(TrilhaBusca);
   return (
-    <section className="space-y-2">
+    <section data-grupo className="space-y-2">
       {title && (
         <h3 className="px-1 text-xs font-bold uppercase tracking-wider text-[var(--engine-text-muted)]">
           {title}
         </h3>
       )}
       <div className="engine-card divide-y divide-[var(--engine-border)] overflow-hidden p-0">
-        {children}
+        <TrilhaBusca.Provider value={`${secao} ${title || ""}`}>{children}</TrilhaBusca.Provider>
       </div>
       {footer && (
         <p className="px-1 text-xs leading-relaxed text-[var(--engine-text-muted)]">
@@ -210,6 +258,10 @@ function Group({ title, footer, children }) {
 const CONTACT_MAILTO = SUPPORT_MAILTO;
 
 function Row({ icon: Icon, label, hint, children, onClick, tone = "default", chevron = false }) {
+  // O que a busca procura nesta linha: o rótulo, a dica e os títulos da
+  // seção e do grupo acima dela (ver `achatar`).
+  const trilha = useContext(TrilhaBusca);
+  const texto = achatar(`${label || ""} ${typeof hint === "string" ? hint : ""} ${trilha}`);
   const content = (
     <>
       {Icon && (
@@ -246,6 +298,7 @@ function Row({ icon: Icon, label, hint, children, onClick, tone = "default", che
     return (
       <button
         type="button"
+        data-texto={texto}
         onClick={onClick}
         className={`${rowClass} transition-colors hover:bg-[var(--engine-surface-2)] active:bg-[var(--engine-surface-2)]`}
       >
@@ -253,7 +306,11 @@ function Row({ icon: Icon, label, hint, children, onClick, tone = "default", che
       </button>
     );
   }
-  return <div className={rowClass}>{content}</div>;
+  return (
+    <div data-texto={texto} className={rowClass}>
+      {content}
+    </div>
+  );
 }
 
 function Segmented({ value, options, onChange, label }) {
@@ -1123,6 +1180,19 @@ export function Settings({ user, settings, onSettingsUpdate }) {
     }
   };
 
+  // O que foi digitado na busca (ver `achatar` e `paraSeletor`).
+  const [busca, setBusca] = useState("");
+  // Uma condição por palavra, todas exigidas e em qualquer ordem: quem digita
+  // "idioma app" quer a linha que fala das duas coisas, e nenhuma linha tem
+  // essas palavras grudadas nessa ordem. Com uma condição só, procurar duas
+  // palavras não achava nada.
+  const condicao = paraSeletor(busca)
+    .split(" ")
+    .filter(Boolean)
+    .map((palavra) => `[data-texto*="${palavra}"]`)
+    .join("");
+  const naoCasa = condicao.replace(/\]\[/g, "]):not([").replace(/^\[/, ":not([").replace(/\]$/, "])");
+
   const prefs = settings?.preferences || {};
   const notif = settings?.notifications || {};
   const privacy = settings?.privacy || {};
@@ -1134,7 +1204,51 @@ export function Settings({ user, settings, onSettingsUpdate }) {
         <PageHeader eyebrow="Engine Control" title={t("settings.title")} subtitle={t("settings.subtitle")} />
       </div>
 
-      <div className="mx-auto max-w-2xl space-y-10">
+      {/* A folha que faz o filtro. Três regras, nesta ordem de leitura:
+          esconde linha que não casa, esconde grupo que ficou sem linha
+          visível, esconde seção que ficou sem nada. A quarta mostra o aviso
+          de "não achei" quando a tela inteira ficou sem resultado. */}
+      {condicao && (
+        <style>{`
+          #engine-settings [data-texto]${naoCasa} { display: none; }
+          #engine-settings [data-grupo]:not(:has(${condicao})) { display: none; }
+          #engine-settings [data-secao]:not(:has(${condicao})) { display: none; }
+          #engine-settings:not(:has(${condicao})) [data-busca-vazia] { display: block; }
+        `}</style>
+      )}
+
+      <div className="mx-auto max-w-2xl">
+        <label className="flex h-12 items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 transition-colors focus-within:border-[var(--engine-accent)]">
+          <Search size={18} aria-hidden="true" className="shrink-0 text-[var(--engine-text-subtle)]" />
+          <input
+            id="settings-busca"
+            type="search"
+            value={busca}
+            onChange={(event) => setBusca(event.target.value)}
+            placeholder={t("settings.search.placeholder")}
+            autoComplete="off"
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[var(--engine-text)] outline-none placeholder:text-[var(--engine-text-subtle)]"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => setBusca("")}
+              aria-label={t("common.clear")}
+              className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--engine-text-muted)]"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
+        </label>
+      </div>
+
+      <div id="engine-settings" className="mx-auto max-w-2xl space-y-10">
+        <p
+          data-busca-vazia
+          className="hidden rounded-2xl border border-dashed border-[var(--engine-border)] p-8 text-center text-sm font-semibold text-[var(--engine-text-muted)]"
+        >
+          {t("settings.search.empty", { term: busca.trim() })}
+        </p>
           <SettingsSection
             id="account"
             icon={UserRound}
@@ -1331,6 +1445,16 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   checked={Boolean(privacy.hideEngineBlock)}
                   onChange={(value) => updateSetting("privacy", "hideEngineBlock", value)}
                 />
+                {/* A carteira na página pública. O mesmo interruptor existe
+                    dentro da própria carteira: quem está olhando o cartão é
+                    quem se pergunta quem o vê, e mandar essa pessoa procurar
+                    aqui seria perder a resposta. Os dois leem esta chave. */}
+                <SwitchRow
+                  label={t("carteira.settingLabel")}
+                  hint={t("carteira.settingHint")}
+                  checked={!privacy.hideCarteira}
+                  onChange={(value) => updateSetting("privacy", "hideCarteira", !value)}
+                />
                 <SwitchRow
                   label={t("settings.privacy.showEmail")}
                   hint={t("settings.privacy.showEmailHint")}
@@ -1463,6 +1587,21 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                   chevron
                   onClick={() => navigate("/privacidade")}
                 />
+                {/* Ajuda e Sobre entraram em 17/11/2026. No celular quem
+                    tem conta não vê rodapé nenhum, então sem estas duas
+                    linhas as páginas existiriam sem caminho até elas. */}
+                <Row
+                  icon={LifeBuoy}
+                  label={t("footer.help.center")}
+                  chevron
+                  onClick={() => navigate("/ajuda")}
+                />
+                <Row
+                  icon={Info}
+                  label={t("footer.company.about")}
+                  chevron
+                  onClick={() => navigate("/sobre")}
+                />
                 <Row
                   icon={Megaphone}
                   label={t("footer.company.advertise")}
@@ -1477,6 +1616,20 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                     window.location.href = CONTACT_MAILTO;
                   }}
                 />
+                {/* A rede oficial. Só aparece quando existe endereço, e no
+                    celular esta é a ÚNICA porta: quem tem conta não vê
+                    rodapé. (17/11/2026) */}
+                {temRede(ENGINE_SOCIAL.instagram) && (
+                  <Row
+                    icon={FaInstagram}
+                    label="Instagram"
+                    hint={INSTAGRAM_HANDLE}
+                    chevron
+                    onClick={() => {
+                      window.open(ENGINE_SOCIAL.instagram, "_blank", "noopener,noreferrer");
+                    }}
+                  />
+                )}
               </Group>
           </SettingsSection>
       </div>

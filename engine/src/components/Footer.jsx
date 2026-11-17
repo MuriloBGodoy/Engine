@@ -13,6 +13,7 @@ import { LogoMark } from "./Logo";
 import { LanguagePicker } from "./LanguagePicker";
 import { ADSENSE_ENABLED, resetAdsConsent } from "../services/consent";
 import { CONTACT_MAILTO } from "../services/contact";
+import { ENGINE_SOCIAL } from "../services/social";
 
 /**
  * Rodapé global do Engine, no espírito dos grandes marketplaces automotivos.
@@ -31,12 +32,12 @@ const temDestino = (href) => Boolean(href) && href !== "#";
 
 const LINKS = {
   help: {
-    center: SEM_DESTINO, // central de ajuda
+    center: "/ajuda", // existe desde 17/11/2026 (pages/Help.jsx)
     // O mesmo endereço que Termos e Privacidade já declaram como contato.
     contact: CONTACT_MAILTO,
   },
   company: {
-    about: SEM_DESTINO, // página institucional "Sobre"
+    about: "/sobre", // existe desde 17/11/2026 (pages/About.jsx)
     careers: SEM_DESTINO, // trabalhe com a gente / vagas
     plans: "/planos",
     support: "/apoie",
@@ -46,14 +47,10 @@ const LINKS = {
     terms: "/termos",
     privacy: "/privacidade",
   },
-  social: {
-    linkedin: SEM_DESTINO,
-    facebook: SEM_DESTINO,
-    instagram: SEM_DESTINO,
-    tiktok: SEM_DESTINO,
-    x: SEM_DESTINO,
-    youtube: SEM_DESTINO,
-  },
+  // As redes saíram daqui para services/social.js em 17/11/2026: elas também
+  // aparecem em Configurações, e no celular quem tem conta não vê rodapé
+  // nenhum. Endereço vazio continua sumindo do ícone, como antes.
+  social: ENGINE_SOCIAL,
   app: {
     googlePlay: SEM_DESTINO, // link da Google Play (TWA)
     appStore: SEM_DESTINO, // link da App Store
@@ -261,6 +258,9 @@ export function Footer({ user = null }) {
         {[
           { href: LINKS.legal.terms, label: t("footer.legal.terms") },
           { href: LINKS.legal.privacy, label: t("footer.legal.privacy") },
+          // Ajuda entrou em 17/11/2026: visitante no celular não tem
+          // Configurações, e sem isto a central ficava inalcançável para ele.
+          { href: LINKS.help.center, label: t("footer.help.center") },
           { href: LINKS.help.contact, label: t("footer.help.contact") },
         ]
           .filter((item) => temDestino(item.href))
