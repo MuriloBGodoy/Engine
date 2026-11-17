@@ -31,6 +31,10 @@ const ptBR = {
         "Sem som: o vídeo toca mudo para todo mundo. O arquivo enviado continua sendo o original, com o áudio — se o som tem algo que não deve ser público, não envie este vídeo.",
       useVideo: "Usar vídeo",
       uploading: "Enviando vídeo…",
+      // A recodificação é em tempo real: 40 s de vídeo levam 40 s. Dizer
+      // o quanto já foi é o que diferencia "esperando" de "travou".
+      preparing: "Preparando o vídeo… {{percent}}%",
+      preparingHint: "Deixando o vídeo leve para subir rápido. Leva mais ou menos o tempo do próprio vídeo.",
       cantPlay: "Este navegador não consegue tocar este vídeo.",
       linkInstead: "ou cole um link do YouTube",
     },
@@ -149,6 +153,8 @@ const enUS = {
         "No sound: the video plays muted for everyone. The uploaded file is still the original, with audio — if the sound has something that shouldn't be public, don't upload this video.",
       useVideo: "Use video",
       uploading: "Uploading video…",
+      preparing: "Preparing the video… {{percent}}%",
+      preparingHint: "Making the video light so it uploads fast. It takes about as long as the video itself.",
       cantPlay: "This browser can't play this video.",
       linkInstead: "or paste a YouTube link",
     },
@@ -267,6 +273,8 @@ const esES = {
         "Sin sonido: el vídeo se reproduce silenciado para todos. El archivo subido sigue siendo el original, con audio: si el sonido tiene algo que no debe ser público, no subas este vídeo.",
       useVideo: "Usar vídeo",
       uploading: "Subiendo vídeo…",
+      preparing: "Preparando el vídeo… {{percent}}%",
+      preparingHint: "Dejando el vídeo liviano para subir rápido. Tarda más o menos lo que dura el vídeo.",
       cantPlay: "Este navegador no puede reproducir este vídeo.",
       linkInstead: "o pega un enlace de YouTube",
     },

@@ -1,16 +1,16 @@
 import { must, supabase } from "./supabase";
 import { uploadToStorage } from "./photos";
+import { podeRecodificar, precisaRecodificar, recodificarTrecho } from "./videoEncode";
 
 /**
  * Vídeo enviado no post (não só link do YouTube).
  *
  * Tudo no navegador, sem transcodificar no servidor:
- *   - o arquivo sobe como veio (bucket `videos`, pasta `users/<uid>/posts/`);
- *   - corte, "sem som" e capa são METADADOS no post — o player toca só o
- *     trecho escolhido e força o mudo. O arquivo guardado é o original.
- *     Cortar de verdade no aparelho exigiria ffmpeg.wasm (~30 MB de download,
- *     minutos de CPU num celular) ou regravar em tempo real pelo
- *     MediaRecorder, que o Safari do iPhone não faz a partir de um <video>.
+ *   - quando o aparelho sabe (ver `videoEncode.js`), o trecho escolhido é
+ *     RECODIFICADO antes de subir: 720p, só o pedaço, com o som. 120 MB de
+ *     1080p viram uns 20 MB. Quando não sabe, o arquivo sobe como veio e o
+ *     corte continua sendo só metadado — o player toca o trecho certo.
+ *   - "sem som" e capa seguem sendo metadados do post.
  *   - a capa é um quadro do vídeo desenhado num canvas e salvo como JPEG no
  *     bucket de fotos (passa pela mesma limpeza das fotos).
  *
@@ -20,8 +20,18 @@ import { uploadToStorage } from "./photos";
 
 export const VIDEO_BUCKET = "videos";
 export const VIDEO_LIMITS = {
-  // O bucket recusa acima disso (file_size_limit da migration).
-  maxBytes: 50 * 1024 * 1024,
+  // O bucket recusa acima disso (file_size_limit da migration). 120 MB é o
+  // que faz caber a promessa da tela: 60 s gravados em 1080p por um celular
+  // Android dão 100–130 MB, e com o teto antigo de 50 MB quase nenhum vídeo
+  // de carro passava — a tela pedia "grave em resolução menor", que ninguém
+  // faz. Migration 20261113200000.
+  maxBytes: 120 * 1024 * 1024,
+  // O teto só vale para quem vai subir o arquivo COMO ESTÁ. Quem recodifica
+  // no aparelho (`videoEncode.js`) manda um arquivo de 15–25 MB no lugar, e
+  // aí recusar o original por tamanho seria recusar um vídeo que caberia.
+  // 400 MB é onde isso para de valer a pena: é 3 minutos de 4K, que é o
+  // limite de duração da origem de qualquer forma.
+  maxSourceBytes: 400 * 1024 * 1024,
   // Arquivo de origem: mais que isso seria guardar minutos para tocar 60 s.
   maxSourceSeconds: 180,
   maxClipSeconds: 60,
@@ -50,7 +60,8 @@ export const videoFileProblem = (file) => {
   const byName = /\.(mp4|m4v|mov|webm)$/i.test(file.name || "");
   if (type && !VIDEO_TYPES.includes(type) && !(type.startsWith("video/") && byName)) return "format";
   if (!type && !byName) return "notVideo";
-  if (file.size > VIDEO_LIMITS.maxBytes) return "tooBig";
+  const teto = podeRecodificar() ? VIDEO_LIMITS.maxSourceBytes : VIDEO_LIMITS.maxBytes;
+  if (file.size > teto) return "tooBig";
   return "";
 };
 
@@ -165,17 +176,41 @@ export const clampTrim = (duration, start, end) => {
  * (`data.video`). `edit` = { duration, trimStart, trimEnd, muted, width,
  * height, posterBlob }.
  */
-export const uploadPostVideo = async (file, edit, { userId }) => {
+export const uploadPostVideo = async (file, edit, { userId, onEncodeProgress } = {}) => {
   if (!userId) throw videoError("signedOut");
   const problem = videoFileProblem(file);
   if (problem) throw videoError(problem);
 
-  const contentType = contentTypeFor(file);
+  const pedido = clampTrim(edit.duration, edit.trimStart, edit.trimEnd);
+  let corpo = file;
+  let recodificado = null;
+
+  // A recodificação é tentativa, não etapa: falhou, o original sobe.
+  if (precisaRecodificar(file, { ...edit, duration: edit.duration }, pedido)) {
+    recodificado = await recodificarTrecho(file, {
+      trimStart: pedido.trimStart,
+      trimEnd: pedido.trimEnd,
+      muted: edit.muted,
+      onProgress: onEncodeProgress,
+    }).catch(() => null);
+    if (recodificado) corpo = recodificado.blob;
+  }
+
+  // Original grande demais E a recodificação não rolou: aí é tooBig de
+  // verdade, e é melhor dizer agora do que gastar o 4G da pessoa para o
+  // bucket recusar no fim.
+  if (!recodificado && corpo.size > VIDEO_LIMITS.maxBytes) throw videoError("tooBig");
+
+  // Fim do preparo, inclusive quando não houve recodificação nenhuma: é este
+  // aviso que faz a tela trocar "preparando" por "enviando".
+  onEncodeProgress?.(1);
+
+  const contentType = recodificado ? recodificado.type : contentTypeFor(file);
   const stamp = `${Date.now()}-${crypto.randomUUID()}`;
   const path = `users/${userId}/posts/${stamp}.${extensionFor(contentType)}`;
   must(
     await withTimeout(
-      supabase.storage.from(VIDEO_BUCKET).upload(path, file, {
+      supabase.storage.from(VIDEO_BUCKET).upload(path, corpo, {
         contentType,
         cacheControl: "31536000",
         upsert: false,
@@ -196,7 +231,23 @@ export const uploadPostVideo = async (file, edit, { userId }) => {
     }
   }
 
-  const { trimStart, trimEnd } = clampTrim(edit.duration, edit.trimStart, edit.trimEnd);
+  // Recodificado, o arquivo JÁ é o trecho: o corte volta para 0..duração e o
+  // tamanho é o de destino. Sem isso o player cortaria de novo o que já
+  // estava cortado e tocaria os primeiros segundos do trecho só.
+  if (recodificado) {
+    return {
+      path,
+      ...(posterPath ? { posterPath } : {}),
+      duration: recodificado.duration,
+      trimStart: 0,
+      trimEnd: recodificado.duration,
+      muted: Boolean(edit.muted),
+      width: recodificado.width,
+      height: recodificado.height,
+    };
+  }
+
+  const { trimStart, trimEnd } = pedido;
   return {
     path,
     ...(posterPath ? { posterPath } : {}),

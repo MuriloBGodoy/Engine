@@ -1,5 +1,6 @@
 import { must, supabase } from "./supabase";
 import { VIDEO_LIMITS, VIDEO_TYPES, probeVideo } from "./postVideo";
+import { podeRecodificar, precisaRecodificar, recodificarTrecho } from "./videoEncode";
 
 /**
  * Vídeo na conversa.
@@ -22,7 +23,16 @@ import { VIDEO_LIMITS, VIDEO_TYPES, probeVideo } from "./postVideo";
  * Sem corte e sem editor, ao contrário do post: na conversa o vídeo é recado,
  * não publicação. O limite é o tamanho do arquivo, que é o que o bucket
  * recusa de qualquer jeito.
+ *
+ * O vídeo É recodificado quando o aparelho sabe (`videoEncode.js`): o mesmo
+ * 1080p de 120 MB vira uns 20 MB, e isto aqui conta no mesmo tráfego do app.
+ * Só até ~70 s de duração, porque a recodificação é em tempo real e a
+ * conversa não tem barra de progresso — 70 s de ampulheta é o máximo que dá
+ * para pedir de alguém mandando um recado.
  */
+
+/** Acima disto, na conversa, o vídeo sobe como veio. Ver a nota acima. */
+const MAX_SEGUNDOS_RECODIFICAR = 70;
 
 export const CHAT_MEDIA_BUCKET = "chat-media";
 
@@ -50,7 +60,8 @@ export const chatVideoProblem = (file) => {
   const byName = /\.(mp4|m4v|mov|webm)$/i.test(file.name || "");
   if (type && !VIDEO_TYPES.includes(type) && !(type.startsWith("video/") && byName)) return "format";
   if (!type && !byName) return "notVideo";
-  if (file.size > VIDEO_LIMITS.maxBytes) return "tooBig";
+  const teto = podeRecodificar() ? VIDEO_LIMITS.maxSourceBytes : VIDEO_LIMITS.maxBytes;
+  if (file.size > teto) return "tooBig";
   return "";
 };
 
@@ -85,10 +96,36 @@ export async function uploadChatVideo(file, { conversationId, userId }) {
     throw erro;
   }
 
-  const contentType = contentTypeFor(file);
+  // Recodificar é tentativa: falhou, o original sobe.
+  let corpo = file;
+  let recodificado = null;
+  if (
+    medidas.duration > 0 &&
+    medidas.duration <= MAX_SEGUNDOS_RECODIFICAR &&
+    precisaRecodificar(file, medidas, { trimStart: 0, trimEnd: medidas.duration })
+  ) {
+    recodificado = await recodificarTrecho(file, {
+      trimStart: 0,
+      trimEnd: medidas.duration,
+    }).catch(() => null);
+    if (recodificado) {
+      corpo = recodificado.blob;
+      medidas = { ...medidas, width: recodificado.width, height: recodificado.height };
+    }
+  }
+
+  // Grande demais e sem recodificação: dizer agora, antes de gastar o 4G de
+  // quem manda para o bucket recusar no fim.
+  if (!recodificado && corpo.size > VIDEO_LIMITS.maxBytes) {
+    const erro = new Error("tooBig");
+    erro.code = "tooBig";
+    throw erro;
+  }
+
+  const contentType = recodificado ? recodificado.type : contentTypeFor(file);
   const path = `conversations/${conversationId}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extensionFor(contentType)}`;
   must(
-    await supabase.storage.from(CHAT_MEDIA_BUCKET).upload(path, file, {
+    await supabase.storage.from(CHAT_MEDIA_BUCKET).upload(path, corpo, {
       contentType,
       cacheControl: "31536000",
       upsert: false,
