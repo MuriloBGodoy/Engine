@@ -108,7 +108,11 @@ export function ProductGrid({ children }) {
 /** Estado vazio da vitrine, com uma saída quando há filtro. */
 export function ShopEmpty({ title, body, actionLabel, onAction, children }) {
   return (
-    <div className="engine-card px-5 py-7 text-center">
+    /* `text-center` centraliza TEXTO, não caixa: um filho `<div>` com largura
+       própria (o bloco de botões que a aba Lojas passa em `children`) ficava
+       colado na esquerda enquanto o título e a legenda ficavam no meio — o
+       cartão inteiro parecia torto. A coluna flex centraliza os dois. */
+    <div className="engine-card flex flex-col items-center px-5 py-7 text-center">
       <b className="block text-[15px] text-[var(--engine-text)]">{title}</b>
       {body && <p className="mt-1.5 text-sm text-[var(--engine-text-muted)]">{body}</p>}
       {actionLabel && onAction && (

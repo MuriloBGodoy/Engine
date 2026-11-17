@@ -13,6 +13,11 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
+  proDirectory: {
+    noPlace: "Atende sob consulta",
+    mine: "você",
+    manage: "Gerenciar",
+  },
   shop: {
     flow: {
       start: "Anunciar",
@@ -258,6 +263,11 @@ const ptBR = {
 };
 
 const enUS = {
+  proDirectory: {
+    noPlace: "Area on request",
+    mine: "you",
+    manage: "Manage",
+  },
   shop: {
     flow: {
       start: "Post a listing",
@@ -503,6 +513,11 @@ const enUS = {
 };
 
 const esES = {
+  proDirectory: {
+    noPlace: "Zona a consultar",
+    mine: "tú",
+    manage: "Gestionar",
+  },
   shop: {
     flow: {
       start: "Anunciar",

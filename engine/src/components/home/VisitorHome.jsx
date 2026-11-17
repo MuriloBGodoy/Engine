@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { cityLabel } from "../../services/people";
 import {
   ArrowRight,
   BadgeCheck,
@@ -340,7 +341,7 @@ function AuthorLine({ post }) {
       )}
       <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--engine-text-muted)]">
         {post.author}
-        {post.city && post.city !== "Engine Garage" ? ` · ${post.city}` : ""}
+        {cityLabel(post.city) ? ` · ${cityLabel(post.city)}` : ""}
       </span>
       {post.likes > 0 && (
         <span className="inline-flex items-center gap-1 text-[12px] text-[var(--engine-text-muted)]">

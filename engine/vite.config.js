@@ -83,4 +83,20 @@ export default defineConfig({
       },
     }),
   ],
+  // Porta fixa, e falha se estiver ocupada.
+  //
+  // Sem isto o Vite cai para a porta seguinte quando a 5173 está em uso, e
+  // aí o login para de funcionar sem avisar: a lista de URLs de retorno do
+  // Supabase Auth tem exatamente `http://localhost:5173`. Em qualquer outra
+  // porta o Supabase recusa o `redirect_to` em silêncio e manda a pessoa
+  // para o Site URL — ou seja, quem tentava entrar no localhost acabava
+  // logado no site publicado.
+  //
+  // `strictPort` troca essa falha silenciosa por um erro na cara: se a 5173
+  // está ocupada é porque já existe um servidor de dev rodando, e o certo é
+  // usar aquele em vez de abrir um segundo numa porta onde nada entra.
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
 })

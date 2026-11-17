@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Edit3, Flag, MessageCircle, MoreHorizontal, Send, Trash2, X } from "lucide-react";
+import { Check, Edit3, Flag, MessageCircle, MoreHorizontal, Send, Trash2, X } from "lucide-react";
 import { POST_KIND_POST } from "../../services/db";
 import { getInitials, isImageUrl, withoutAt } from "../../services/people";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
@@ -413,30 +413,50 @@ export function CommentRow({
           )}
         </div>
         {isEditing ? (
+          /* Uma linha, não três. O campo tinha 40px e dois botões em caixa
+             alta EMBAIXO dele — três fileiras empilhadas para corrigir uma
+             frase, dentro de uma lista onde cada comentário inteiro ocupa
+             menos que isso. Agora o campo e as duas ações dividem a mesma
+             linha, e as ações viram ícone: "Salvar" e "Cancelar" escritos
+             custavam mais largura que o texto sendo editado.
+
+             Enter salva e Esc cancela, que é como se sai de uma edição em
+             linha em qualquer lugar — sem isso o teclado do celular oferece
+             "enviar" e não acontece nada. */
           <form
             onSubmit={(event) => onSubmitEditComment(event, comment)}
-            className="mt-2 grid gap-2"
+            className="mt-1.5 flex items-center gap-1.5"
           >
             <input
               value={editingDraft}
               onChange={(event) => onEditingDraftChange(event.target.value)}
-              className="min-h-10 rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3 text-sm font-semibold text-[var(--engine-text)] outline-none focus:border-[var(--engine-accent)] dark:text-white"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  onCancelEdit();
+                }
+              }}
+              autoFocus
+              aria-label={t("socialFixes.editComment")}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-2.5 text-sm font-semibold text-[var(--engine-text)] outline-none focus:border-[var(--engine-accent)] dark:text-white"
             />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                className="rounded-lg bg-[var(--engine-accent)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white"
-              >
-                {t("common.save")}
-              </button>
-              <button
-                type="button"
-                onClick={onCancelEdit}
-                className="rounded-lg border border-[var(--engine-border)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-muted)]"
-              >
-                {t("common.cancel")}
-              </button>
-            </div>
+            <button
+              type="submit"
+              title={t("common.save")}
+              aria-label={t("common.save")}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--engine-accent)] text-white transition hover:brightness-95"
+            >
+              <Check size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              title={t("common.cancel")}
+              aria-label={t("common.cancel")}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] text-[var(--engine-text-muted)] transition hover:text-[var(--engine-text)]"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
           </form>
         ) : (
           <>

@@ -861,7 +861,9 @@ export function Messages({ user, settings }) {
                   )}
                 </button>
 
-                {isDesktop && <EmojiPicker onEmojiSelect={handleEmojiSelect} />}
+                {/* Também no celular desde 15/11/2026: ver o cabeçalho de
+                    components/EmojiPicker.jsx para o que impedia. */}
+                <EmojiPicker onEmojiSelect={handleEmojiSelect} />
 
                 <textarea
                   ref={ligaComposer}

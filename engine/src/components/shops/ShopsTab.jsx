@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { CarFront, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { CarFront, Plus, Search, SlidersHorizontal, Store } from "lucide-react";
 import { engineDB } from "../../services/db";
 import {
   PRODUCT_CATEGORIES,
@@ -27,7 +27,7 @@ const fold = (text = "") =>
  * categoria, condição e "o que serve no meu carro" (cruza o "serve em" do
  * produto com os carros da garagem de quem olha — mesmo catálogo FIPE).
  */
-export function ShopsTab({ user, region, onNewProduct }) {
+export function ShopsTab({ user, region, onNewProduct, onOpenPro }) {
   const { t } = useTranslation();
   const regionState = region?.state || "";
   const navigate = useNavigate();
@@ -218,14 +218,31 @@ export function ShopsTab({ user, region, onNewProduct }) {
               partir de 1024px. Como a vitrine nasce vazia, esse era o estado
               de todo mundo que entrasse pela primeira vez. */}
           {!products.length && (
-            <button
-              type="button"
-              onClick={onNewProduct}
-              className="mt-3.5 inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-4 text-sm font-bold text-white transition hover:brightness-95"
-            >
-              <Plus size={16} aria-hidden="true" />
-              {t("shop.browse.advertise")}
-            </button>
+            <div className="mt-3.5 grid w-full max-w-xs gap-2">
+              <button
+                type="button"
+                onClick={onNewProduct}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[var(--engine-accent)] px-4 text-sm font-bold text-white transition hover:brightness-95"
+              >
+                <Plus size={16} aria-hidden="true" />
+                {t("shop.browse.advertise")}
+              </button>
+              {/* A loja com @ próprio. O "Anunciar" acima publica pelo perfil
+                  que já existe — quase sempre o pessoal. Quem está montando
+                  uma LOJA precisa do outro caminho, e no celular ele não
+                  tinha porta nenhuma: a barra do vendedor, que o abre, fica
+                  escondida abaixo de 640px enquanto a pessoa não tem anúncio. */}
+              {onOpenPro && (
+                <button
+                  type="button"
+                  onClick={onOpenPro}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 text-sm font-bold text-[var(--engine-text-muted)] underline underline-offset-4 transition hover:text-[var(--engine-accent)]"
+                >
+                  <Store size={16} aria-hidden="true" />
+                  {t("shop.mode.page")}
+                </button>
+              )}
+            </div>
           )}
         </ShopEmpty>
       )}

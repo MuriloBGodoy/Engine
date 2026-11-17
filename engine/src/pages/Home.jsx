@@ -13,11 +13,11 @@ const MemberHome = lazy(() =>
  * serviços e comunidade). O hero antigo de "meta financeira" saiu em
  * 29/10/2026 — era propaganda para quem já tinha conta.
  */
-export function Home({ user, cars, settings }) {
+export function Home({ user, cars, settings, onRefresh }) {
   if (!user) return <VisitorHome />;
   return (
     <Suspense fallback={<div className="min-h-[60vh]" />}>
-      <MemberHome user={user} cars={cars} settings={settings} />
+      <MemberHome user={user} cars={cars} settings={settings} onRefresh={onRefresh} />
     </Suspense>
   );
 }

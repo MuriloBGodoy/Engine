@@ -12,7 +12,13 @@ export function AuthShell({ children, kicker, title, subtitle, compact = false, 
     <div className="auth-screen">
       <div className={shellClass}>
         {/* Lado esquerdo: marca do Engine sobre uma GT-R — o vermelho das
-            lanternas conversa com o accent da aplicação. */}
+            lanternas conversa com o accent da aplicação.
+
+            A palavra "Engine" ao lado do logo só aparece no computador. No
+            celular o herói vira uma faixa de 196px em que o "ENGINE" escrito
+            e o "ENGINE GARAGE" logo abaixo ficam a dois dedos um do outro: a
+            mesma palavra, duas vezes, em dois tamanhos. O símbolo sozinho já
+            diz de quem é a tela. */}
         <section className="auth-hero">
           <div className="auth-hero-top">
             <LogoMark size={34} />
