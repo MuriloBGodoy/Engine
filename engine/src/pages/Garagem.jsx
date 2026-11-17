@@ -6,8 +6,10 @@ import { syncGarageReminders } from "../services/remindersSync";
 import { carPath } from "../services/garageSummary";
 import { CarCard } from "../components/CarCard";
 import { GarageSummary } from "../components/garage/GarageSummary";
+import { FipeAlert } from "../components/cars/FipeAlert";
 import { CAR_TYPE_GOAL, CAR_TYPE_OWNED } from "../services/db";
 import { Button } from "../components/Button";
+import { PullToRefresh } from "../components/ui/PullToRefresh";
 
 const sortCars = (cars, sortMode) => {
   const getProgress = (car) => {
@@ -94,7 +96,8 @@ export function Garagem({
     );
 
   return (
-    <section>
+    <PullToRefresh onRefresh={onRetry}>
+      <section>
       <header className="mb-4 flex items-center justify-between gap-3 sm:mb-5">
         <h1 className="text-2xl font-extrabold tracking-tight text-[var(--engine-text)] sm:text-[26px]">
           {t("garage.title")}
@@ -115,6 +118,12 @@ export function Garagem({
           onOpenCar={(car, tab) => navigate(carPath(car, tab))}
         />
       )}
+
+      {/* Alerta de FIPE: fica entre o resumo e os carros porque é notícia
+          sobre um carro específico, e quem acabou de ler "quanto vale a sua
+          garagem" logo acima é exatamente quem quer saber que um dos valores
+          mudou. Não aparece nada quando não há o que dizer. */}
+      <FipeAlert cars={cars} onApplied={onRetry} />
 
       {section(t("garageV2.sectionOwned"), t("garageV2.countCars", { count: ownedCars.length }), ownedCars, () => ({
         onAddExpense,
@@ -197,6 +206,7 @@ export function Garagem({
           )}
         </div>
       )}
-    </section>
+      </section>
+    </PullToRefresh>
   );
 }
