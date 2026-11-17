@@ -1,10 +1,20 @@
 import { useTranslation } from "react-i18next";
-import { TextField, Toggle } from "../ProUi";
+import { countries } from "../../../services/locations";
+import { maskPhone } from "../../../services/masks";
+import { SelectField, TextField, Toggle } from "../ProUi";
+
+// Os mesmos códigos de país do resto do app, em ordem alfabética de país.
+const DDIs = [...countries].sort((a, b) => a.name.localeCompare(b.name));
 
 /**
  * Passo 2 — como falam com você. WhatsApp é o que vai no botão verde dos
  * anúncios; "esconder contato" é o "não mostrar contato" do Instagram: só
  * sobra o chat do Engine.
+ *
+ * Até 14/11/2026 este era o ÚNICO telefone do app sem máscara: o campo
+ * aceitava "16997996509", "16 99799 6509" ou "(16)997996509", e o WhatsApp da
+ * oficina ficava gravado do jeito que a pessoa digitou. O código do país era
+ * uma caixa de texto livre, enquanto em todas as outras telas é um seletor.
  */
 export function ProStepContact({ value, onChange }) {
   const { t } = useTranslation();
@@ -12,20 +22,19 @@ export function ProStepContact({ value, onChange }) {
   const setData = (key, next) => onChange({ ...value, data: { ...data, [key]: next } });
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2">
-        <TextField
+      <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2">
+        <SelectField
           id="pro-wa-country"
           label={t("pro.fields.countryCode")}
-          value={data.whatsappCountry}
-          onChange={(next) => setData("whatsappCountry", next.replace(/[^\d+]/g, "").slice(0, 6))}
-          maxLength={6}
-          inputMode="tel"
+          value={data.whatsappCountry || "+55"}
+          onChange={(next) => setData("whatsappCountry", next)}
+          options={DDIs.map((pais) => ({ value: pais.dial, label: `${pais.code} ${pais.dial}` }))}
         />
         <TextField
           id="pro-wa"
           label={t("pro.fields.whatsapp")}
-          value={data.whatsapp}
-          onChange={(next) => setData("whatsapp", next.replace(/[^\d\s()+-]/g, ""))}
+          value={maskPhone(data.whatsappCountry || "+55", data.whatsapp)}
+          onChange={(next) => setData("whatsapp", maskPhone(data.whatsappCountry || "+55", next))}
           maxLength={24}
           inputMode="tel"
           placeholder="(16) 99999-0000"

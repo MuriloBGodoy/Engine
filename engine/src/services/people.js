@@ -63,3 +63,25 @@ export const profilePath = (username = "") => {
   const handle = withoutAt(username).trim();
   return handle ? `/community/@${handle}` : "";
 };
+
+/**
+ * A cidade de alguém, para mostrar na tela.
+ *
+ * Existe por causa de uma herança: até 14/11/2026, perfil sem cidade recebia
+ * a string "Engine Garage" como reserva, e ela ia para a tela como se a
+ * pessoa morasse num lugar com esse nome. A origem foi corrigida, mas o valor
+ * já está gravado — no cartão público, e também dentro de cada post,
+ * comentário e notificação escritos antes da correção, que carregam uma cópia
+ * do perfil do dia em que foram criados.
+ *
+ * Reescrever linha de outra pessoa no banco para apagar um texto que o
+ * próprio app inventou é mexer no dado de quem não pediu. Então a limpeza é
+ * na leitura: quem desenha pergunta aqui, e as cópias velhas param de mentir
+ * sem que nada seja regravado.
+ */
+const CIDADE_HERDADA = "engine garage";
+
+export const cityLabel = (value = "") => {
+  const texto = String(value || "").trim();
+  return texto.toLowerCase() === CIDADE_HERDADA ? "" : texto;
+};

@@ -31,7 +31,8 @@ import { useRegion } from "../hooks/RegionProvider";
 import { serviceConversationId, startServiceConversation } from "../services/chat";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarName, formatFipeYear } from "../services/carDisplay";
-import { getCities, getStates } from "../services/locations";
+import { getStates } from "../services/locations";
+import { CityField } from "../components/ui/CityField";
 import { isImageFile } from "../services/photos";
 import {
   categoryIcons,
@@ -63,6 +64,7 @@ import {
   replyToQuoteRequest,
 } from "../services/quotes";
 import { Select } from "../components/ui/Select";
+import { DragHandle } from "../components/DragHandle";
 
 /**
  * Pedido de orçamento — /services/orcamentos.
@@ -130,6 +132,7 @@ function Sheet({ title, eyebrow, onClose, children, footer = null, wide = false,
         className={`engine-modal-panel engine-pop ${wide ? "sm:max-w-4xl" : "sm:max-w-xl"}`}
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex shrink-0 items-center gap-2 border-b border-[var(--engine-border)] px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:pt-2">
           <span className="w-2" />
           <div className="min-w-0 flex-1">
@@ -240,7 +243,6 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
   const [sending, setSending] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
-  const cities = getCities(country, form.state);
   const descriptionLength = form.description.trim().length;
   const maxPhotos = limits.maxPhotos || QUOTE_DEFAULT_LIMITS.maxPhotos;
 
@@ -448,22 +450,19 @@ function RequestForm({ user, cars, limits, onClose, onCreated, prefill = null })
               ))}
             </Select>
           </label>
+          {/* Cidade com busca: o orçamento é levado a oficina perto de casa,
+              então errar a cidade aqui é mandar o pedido para o lugar errado. */}
           <label className="grid gap-2">
             <span className={labelClass}>{t("quotes.form.city")}</span>
-            <input
+            <CityField
+              country={country}
+              state={form.state}
               value={form.city}
-              onChange={set("city")}
-              list="quote-cities"
-              maxLength={80}
+              onChange={(cidade) => setForm((current) => ({ ...current, city: cidade }))}
               required
               placeholder={t("quotes.form.cityPlaceholder")}
               className={`${fieldClass} h-12`}
             />
-            <datalist id="quote-cities">
-              {cities.map((city) => (
-                <option key={city} value={city} />
-              ))}
-            </datalist>
           </label>
         </div>
 

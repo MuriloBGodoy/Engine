@@ -20,6 +20,8 @@ import {
   normalizeClubTag,
 } from "../../services/clubStyles";
 import { Select } from "../ui/Select";
+import { DragHandle } from "../DragHandle";
+import { CityField } from "../ui/CityField";
 
 /**
  * Fundar um clube, com prévia ao vivo.
@@ -170,6 +172,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
         style={clubColorVars(previewClub, isDark)}
         className="engine-modal-panel engine-pop sm:max-w-5xl"
       >
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
             <h2 className="font-display text-[17px] font-extrabold tracking-tight text-[var(--engine-text)] sm:text-xl">
@@ -299,19 +302,10 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
 
             <ClubLookFields club={previewClub} onEmblem={setEmblem} onColors={setColors} />
 
+            {/* Estado antes da cidade, e não o contrário: a lista de cidades
+                é a do estado escolhido, então pedir a cidade primeiro é pedir
+                antes de poder sugerir. */}
             <div className="grid gap-3.5 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className={labelClass} htmlFor="club-city">
-                  {t("clubs.form.city")}
-                </label>
-                <input
-                  id="club-city"
-                  value={draft.city}
-                  onChange={(event) => set({ city: event.target.value })}
-                  placeholder="Campinas"
-                  className={fieldClass}
-                />
-              </div>
               <div className="space-y-1.5">
                 <label className={labelClass} htmlFor="club-state">
                   {t("clubs.form.state")}
@@ -319,7 +313,7 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
                 <Select
                   id="club-state"
                   value={draft.state}
-                  onChange={(event) => set({ state: event.target.value })}
+                  onChange={(event) => set({ state: event.target.value, city: "" })}
                   className={fieldClass}
                 >
                   <option value="">{t("clubs.form.stateAll")}</option>
@@ -329,6 +323,20 @@ export function ClubCreateModal({ isOpen, onClose, onCreate, loading = false }) 
                     </option>
                   ))}
                 </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className={labelClass} htmlFor="club-city">
+                  {t("clubs.form.city")}
+                </label>
+                <CityField
+                  id="club-city"
+                  country={draft.country}
+                  state={draft.state}
+                  value={draft.city}
+                  onChange={(cidade) => set({ city: cidade })}
+                  placeholder="Campinas"
+                  className={fieldClass}
+                />
               </div>
             </div>
 

@@ -4,6 +4,7 @@ import { auth, updateAuthProfile } from '../services/supabase';
 import { engineDB } from '../services/db';
 import { splitPhone, isPhoneValid } from '../services/phone';
 import { PhoneField } from './PhoneField';
+import { CityField } from './ui/CityField';
 import { countries, getStates } from '../services/locations';
 import { AVATAR, BANNER, reduzirImagem } from '../services/imagens';
 import { storeDataUri } from '../services/photos';
@@ -496,16 +497,22 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
                   </Select>
                 </div>
               </div>
+              {/* Cidade com busca, igual aos dois de cima. Era uma caixa de
+                  texto vazia embaixo de dois menus: cada um escrevia de um
+                  jeito e o filtro de cidade nunca casava. */}
               <div>
-                <label className="text-sm font-medium text-[var(--engine-text)]">Cidade</label>
-                <input
-                  type="text"
-                  placeholder="São Paulo"
-                  maxLength={80}
-                  value={formData.city}
-                  onChange={(e) => handleFieldChange('city', e.target.value)}
-                  className="w-full px-3 py-2.5 mt-2 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm transition focus:outline-none focus:border-[var(--engine-accent)]"
-                />
+                <label htmlFor="engine-perfil-cidade" className="text-sm font-medium text-[var(--engine-text)]">Cidade</label>
+                <div className="mt-2">
+                  <CityField
+                    id="engine-perfil-cidade"
+                    country={formData.country}
+                    state={formData.state}
+                    value={formData.city}
+                    onChange={(cidade) => handleFieldChange('city', cidade)}
+                    placeholder="São Paulo"
+                    className="w-full px-3 py-2.5 bg-[var(--engine-elevated)] border border-[var(--engine-border)] rounded-lg text-sm transition focus:outline-none focus:border-[var(--engine-accent)]"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -6,7 +6,8 @@ import { useToast } from "./ToastProvider";
 import { eventTypeOptions } from "../services/eventTypes";
 import { engineEvents } from "../services/events";
 import { EventPhotoField } from "./events/EventPhotoField";
-import { countries, getStates, getCities } from "../services/locations";
+import { countries, getStates } from "../services/locations";
+import { CityField } from "./ui/CityField";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { deviceTimeZone, eventInstantFromLocal } from "../services/eventTime";
 import { Select as EngineSelect } from "./ui/Select";
@@ -131,8 +132,6 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
   });
 
   const formStates = getStates(form.country);
-  const formCities = getCities(form.country, form.state);
-  const cityListId = "event-city-suggestions";
   const sellerProfile = {
     displayName: auth.currentUser?.displayName || t("events.form.you"),
     avatar: auth.currentUser?.photoURL || "",
@@ -382,20 +381,17 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
             </Select>
           </Field>
 
+          {/* Cidade do evento: lista do IBGE filtrada pela UF. Encontro de
+              carro acontece muito em cidade pequena, e a lista antiga só
+              tinha as maiores de cada estado. */}
           <Field label={t("events.form.city")}>
-            <TextInput
+            <CityField
+              country={form.country}
+              state={form.state}
               value={form.city}
-              onChange={(e) => handleChange("city", e.target.value)}
+              onChange={(cidade) => handleChange("city", cidade)}
               placeholder={t("events.form.cityPlaceholder")}
-              list={formCities.length ? cityListId : undefined}
             />
-            {formCities.length > 0 && (
-              <datalist id={cityListId}>
-                {formCities.map((city) => (
-                  <option key={city} value={city} />
-                ))}
-              </datalist>
-            )}
           </Field>
 
           <Field label={t("events.form.address")}>

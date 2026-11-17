@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { countries, getCities, getStates } from "../../../services/locations";
-import { SelectField, TextAreaField, TextField } from "../ProUi";
+import { countries, getStates } from "../../../services/locations";
+import { CityFieldPro, SelectField, TextAreaField, TextField } from "../ProUi";
 
 /** Passo 3 — onde e quando: país, estado, cidade, endereço, área e horário. */
 export function ProStepPlace({ value, onChange }) {
@@ -8,7 +8,6 @@ export function ProStepPlace({ value, onChange }) {
   const data = value.data || {};
   const setData = (patch) => onChange({ ...value, data: { ...data, ...patch } });
   const states = getStates(data.country || "BR");
-  const cities = getCities(data.country || "BR", data.state);
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -29,12 +28,14 @@ export function ProStepPlace({ value, onChange }) {
           />
         )}
       </div>
-      <TextField id="pro-city" label={t("pro.fields.city")} value={data.city} onChange={(next) => setData({ city: next })} maxLength={80} list="pro-city-list" />
-      <datalist id="pro-city-list">
-        {cities.map((city) => (
-          <option key={typeof city === "string" ? city : city.name} value={typeof city === "string" ? city : city.name} />
-        ))}
-      </datalist>
+      <CityFieldPro
+        id="pro-city"
+        label={t("pro.fields.city")}
+        country={data.country || "BR"}
+        state={data.state}
+        value={data.city}
+        onChange={(cidade) => setData({ city: cidade })}
+      />
       <TextField
         id="pro-address"
         label={t("pro.fields.address")}

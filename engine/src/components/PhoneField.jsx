@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { countries } from "../services/locations";
 import { maskPhone, splitPhone } from "../services/phone";
 import { Select } from "./ui/Select";
@@ -20,6 +21,7 @@ export function PhoneField({
   inputId,
   placeholder,
 }) {
+  const { t } = useTranslation();
   const { dial, number } = splitPhone(value, defaultDial);
 
   const emit = (nextDial, nextRaw) => {
@@ -30,7 +32,7 @@ export function PhoneField({
   return (
     <div className="phone-row">
       <Select
-        aria-label="País"
+        aria-label={t("auth.country")}
         className={selectClassName}
         value={dial}
         onChange={(event) => emit(event.target.value, number)}

@@ -25,6 +25,8 @@ import {
   normalizeEmblem,
 } from "../../services/clubStyles";
 import { Select } from "../ui/Select";
+import { DragHandle } from "../DragHandle";
+import { CityField } from "../ui/CityField";
 
 /**
  * "Personalizar" o clube depois de fundado: logo, capa, cores, símbolo e as
@@ -259,6 +261,7 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
   return (
     <div className="engine-modal-overlay">
       <div style={clubColorVars(previewClub, isDark)} className="engine-modal-panel engine-pop sm:max-w-2xl">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
             <h2 className="font-display text-[17px] font-extrabold tracking-tight text-[var(--engine-text)] sm:text-xl">
@@ -345,17 +348,8 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
                     className={fieldClass}
                   />
                 </div>
+                {/* Estado primeiro: a lista de cidades depende dele. */}
                 <div className="grid gap-3.5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className={labelClass} htmlFor="club-edit-city">{t("clubs.form.city")}</label>
-                    <input
-                      id="club-edit-city"
-                      value={draft.city}
-                      maxLength={60}
-                      onChange={(event) => set({ city: event.target.value })}
-                      className={fieldClass}
-                    />
-                  </div>
                   <div className="space-y-1.5">
                     <label className={labelClass} htmlFor="club-edit-state">{t("clubs.form.state")}</label>
                     <Select
@@ -369,6 +363,18 @@ function ClubEditContent({ club, role, onClose, onSaved }) {
                         <option key={state.code} value={state.code}>{state.name}</option>
                       ))}
                     </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className={labelClass} htmlFor="club-edit-city">{t("clubs.form.city")}</label>
+                    <CityField
+                      id="club-edit-city"
+                      country={draft.country || "BR"}
+                      state={draft.state}
+                      value={draft.city}
+                      maxLength={60}
+                      onChange={(cidade) => set({ city: cidade })}
+                      className={fieldClass}
+                    />
                   </div>
                 </div>
                 <div className="grid gap-3.5 sm:grid-cols-2">
