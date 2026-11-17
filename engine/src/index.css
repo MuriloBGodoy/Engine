@@ -19,6 +19,16 @@
   --color-brand-strong: #b3121d;
 }
 
+/* O "puxar para atualizar" do navegador fica desligado porque o app tem o
+   dele (components/ui/PullToRefresh). O Chrome do Android recarrega a página
+   inteira quando se puxa no topo — com os dois ligados, o gesto do app era
+   interrompido no meio por um reload de verdade, perdendo o que estava na
+   tela. `contain` também corta o efeito elástico que deixava uma faixa da cor
+   do sistema aparecendo acima do cabeçalho. */
+html {
+  overscroll-behavior-y: contain;
+}
+
 :root {
   color-scheme: light;
   background-color: #e9ebf0;
@@ -168,6 +178,17 @@ h5 {
   outline: 2px solid var(--engine-accent);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* ...menos a própria caixa do diálogo. Modal e folha recebem foco por
+   programa (`tabindex="-1"` + `.focus()`) só para que o teclado comece
+   dentro deles — não é a pessoa mirando no painel. A regra acima desenhava
+   um traço vermelho de 2px contornando a folha inteira toda vez que ela
+   abria. O `outline-none` do Tailwind não dava conta: utilitário vive numa
+   @layer, e regra escrita fora de layer ganha de qualquer layer, por mais
+   específica que a outra seja. */
+:where([role="dialog"], [aria-modal="true"])[tabindex="-1"]:focus-visible {
+  outline: none;
 }
 
 /* Campo composto (ícone + input + botão dentro de uma mesma moldura): quem
@@ -424,15 +445,32 @@ h5 {
   gap: 22px;
   overflow: hidden;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  /* Três camadas, nesta ordem: o brilho vermelho em diagonal, a dissolução
+     para a cor do formulário na borda de encontro, e a foto.
+
+     A dissolução existe porque a foto terminava numa linha reta: o corte
+     caía em cima da traseira da GT-R e sobrava meia lanterna colada na
+     divisória, parecendo imagem quebrada. No computador o herói fica à
+     ESQUERDA do formulário, então ali a dissolução é para a direita; no
+     celular, para baixo.
+
+     A primeira tentativa (29/10/2026) só suavizou: ela chegava a 0,86 de
+     opacidade em 88% e a 100% apenas na borda, ou seja 14% da foto continuava
+     visível justo onde o recorte é imprevisível — `cover` decide o
+     enquadramento pela largura da tela, então em alguns aparelhos a lanterna
+     caía dentro dessa faixa e em outros não. Desde 14/11/2026 a dissolução
+     fecha ANTES da borda (86% no computador, 82% no celular): o encontro é
+     cor plena nos dois casos, e nenhum recorte tem como vazar. */
   background:
     linear-gradient(
       168deg,
       rgba(225, 29, 42, 0.32) 0%,
       rgba(10, 10, 12, 0.28) 40%,
-      rgba(8, 8, 10, 0.94) 100%
+      rgba(8, 8, 10, 0.72) 100%
     ),
+    linear-gradient(90deg, rgba(16, 16, 16, 0) 44%, rgba(16, 16, 16, 0.9) 72%, #101010 86%),
     url("https://images.unsplash.com/photo-1670144320302-a2acaf2a7194?auto=format&fit=crop&w=900&q=80");
-  background-position: center 28%;
+  background-position: center 34%;
   background-size: cover;
   padding: clamp(22px, 2.6vw, 34px);
 }
@@ -564,14 +602,24 @@ h5 {
   gap: 8px;
 }
 
-.auth-field span {
+/* Só o rótulo, que é sempre o primeiro filho. Era `.auth-field span`, que
+   também pegava os <span> de dentro do Select e do PhoneField. */
+.auth-field > span:first-child {
   color: #f4f4f5;
   font-size: 0.86rem;
   font-weight: 800;
 }
 
+/* O `<select>` nativo virou o Select do app (components/ui/Select.jsx), que
+   desenha um <button role="combobox"> no lugar do campo — e o botão não era
+   pego por nenhuma regra daqui. Resultado na tela de cadastro: "País" e
+   "Estado/Região" apareciam como texto solto com uma setinha, sem moldura
+   nem fundo, no meio de seis campos emoldurados; não pareciam campos.
+   O `select` continua na lista por causa do nativo escondido que responde
+   pelo `required`, mas esse é `.sr-only` e fica de fora. */
 .auth-field input,
-.auth-field select {
+.auth-field select:not(.sr-only),
+.auth-field [role="combobox"] {
   min-height: 48px;
   width: 100%;
   min-width: 0;
@@ -587,7 +635,47 @@ h5 {
     background 0.2s ease;
 }
 
-.auth-field select {
+/* Campo com um botão dentro, à direita: hoje só o olho da senha no cadastro.
+   O <input> carrega a folga de 44px no padding direito, para o texto digitado
+   nunca correr por baixo do botão; e o botão é absoluto dentro do invólucro,
+   não um irmão do campo, senão ele empurraria a largura e o campo de senha
+   ficaria mais estreito que o de e-mail logo acima. */
+.auth-field-with-action {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.auth-field-with-action input {
+  padding-right: 44px;
+}
+
+.auth-field-with-action > button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  height: 100%;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: #a1a1aa;
+  cursor: pointer;
+}
+
+.auth-field-with-action > button:hover {
+  color: #f4f4f5;
+}
+
+.auth-field-with-action > button:focus-visible {
+  outline: 2px solid var(--engine-accent);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+
+.auth-field select:not(.sr-only) {
   appearance: none;
   cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
@@ -596,7 +684,8 @@ h5 {
   padding-right: 40px;
 }
 
-.auth-field select:disabled {
+.auth-field select:not(.sr-only):disabled,
+.auth-field [role="combobox"]:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -606,12 +695,29 @@ h5 {
   color: white;
 }
 
+/* O combobox já desenha a própria seta (o ícone do lucide), então não leva a
+   seta de fundo do select nativo — levaria duas. */
+.auth-field [role="combobox"] {
+  cursor: pointer;
+  text-align: left;
+  font-weight: 700;
+}
+
+/* O Select envolve tudo num <span> para posicionar o balão. Sem isto o span
+   fica com a largura do texto e o campo encolhe no meio da coluna. */
+.auth-field > span:has(> [role="combobox"]) {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
 .auth-field input::placeholder {
   color: #71717a;
 }
 
 .auth-field input:focus,
-.auth-field select:focus {
+.auth-field select:not(.sr-only):focus,
+.auth-field [role="combobox"]:focus-visible {
   border-color: #ef4444;
   background: #1f1f23;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
@@ -701,11 +807,27 @@ h5 {
   min-width: 0;
 }
 
-.phone-row > select {
+/* O seletor de DDI também virou o Select do app, que é um <span> com um
+   <button> dentro. A regra antiga só falava com `select`, então o span ficou
+   um item flexível sem largura mínima e encolheu até "BR…" — o código do
+   país, que é a única coisa que o campo mostra, sumia atrás das reticências.
+   `flex: 0 0 auto` + `min-width` devolvem o espaço de "BR +55". */
+.phone-row > select,
+.phone-row > span:has(> [role="combobox"]) {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
   padding-right: 34px;
+}
+
+.phone-row > span:has(> [role="combobox"]) {
+  padding-right: 0;
+}
+
+.phone-row [role="combobox"] {
+  min-width: 6.5rem;
+  justify-content: space-between;
+  padding-right: 12px;
 }
 
 .phone-row > input {
@@ -792,10 +914,21 @@ h5 {
   }
 
   .auth-hero {
-    min-height: 176px;
-    gap: 16px;
+    min-height: 196px;
+    gap: 20px;
     border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 0;
+    background:
+      linear-gradient(
+        168deg,
+        rgba(225, 29, 42, 0.3) 0%,
+        rgba(10, 10, 12, 0.24) 38%,
+        rgba(8, 8, 10, 0.6) 100%
+      ),
+      linear-gradient(180deg, rgba(16, 16, 16, 0) 18%, rgba(16, 16, 16, 0.9) 62%, #101010 82%),
+      url("https://images.unsplash.com/photo-1670144320302-a2acaf2a7194?auto=format&fit=crop&w=900&q=80");
+    background-position: center 30%;
+    background-size: cover;
   }
 
   .auth-panel {
@@ -825,6 +958,12 @@ h5 {
   .auth-hero,
   .auth-panel {
     padding: 22px;
+  }
+
+  /* "ENGINE" escrito ao lado do símbolo e "ENGINE GARAGE" logo abaixo: a
+     mesma palavra duas vezes em 60px de tela. Fica só o símbolo. */
+  .auth-hero-wordmark {
+    display: none;
   }
 
   .auth-register-form {
@@ -1930,4 +2069,600 @@ h5 {
   bottom: 1.25rem;
   z-index: 60;
   align-items: flex-end;
+}
+
+/* ======================================================================
+   A CARTEIRA DE GARAGEM (components/carteira/CarteiraGaragem.jsx)
+
+   O cartão de habilitação do Engine, no formato de uma carteira de verdade:
+   85,6 × 54 mm, a mesma proporção de um cartão de banco.
+
+   TUDO em `em`, e o tamanho inteiro vem de UM `font-size` aqui embaixo.
+   É isso que faz o cartão encolher como uma foto — retrato, letras, grade e
+   assinatura mudam juntos — em vez de quebrar em pedaços quando a tela é
+   estreita. Mexer no `font-size` é mexer no cartão todo.
+
+   As cores do cartão são próprias, e não os tokens do app: o Engine é escuro
+   e um documento é claro. O tema escuro do cartão é opção de quem usa (o
+   botão na folha), não o tema do sistema.
+   ====================================================================== */
+.engine-carteira {
+  position: relative;
+  width: 32.4em;
+  max-width: 100%;
+  aspect-ratio: 85.6 / 54;
+  font-size: 10px;
+  border-radius: 1.1em;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  box-shadow: 0 1.8em 4em rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(0, 0, 0, 0.5);
+
+  --carteira-papel: #f3f1ec;
+  --carteira-grafite: #15181e;
+  --carteira-cinza: #6a6f7a;
+  --carteira-linha: rgba(21, 24, 30, 0.14);
+  --carteira-aco: #33415c;
+
+  background: var(--carteira-papel);
+  color: var(--carteira-grafite);
+}
+
+.engine-carteira[data-tema="escuro"] {
+  --carteira-papel: #11141a;
+  --carteira-grafite: #eef0f4;
+  --carteira-cinza: #8b93a1;
+  --carteira-linha: rgba(255, 255, 255, 0.14);
+  --carteira-aco: #93a7cc;
+}
+
+/* 16px a partir de 560px: abaixo disso o cartão inteiro não caberia na
+   largura da tela sem sobrar margem nenhuma. */
+@media (min-width: 560px) {
+  .engine-carteira {
+    font-size: 13px;
+  }
+}
+@media (min-width: 760px) {
+  .engine-carteira {
+    font-size: 16px;
+  }
+}
+
+/* ---------------------------------------------------- carteira em 3D ---- */
+
+/* O palco só abre a perspectiva; quem gira é o filho. Perspectiva no mesmo
+   elemento que gira não funciona — o ponto de fuga giraria junto. */
+.engine-carteira-palco {
+  perspective: 1400px;
+  perspective-origin: 50% 46%;
+  display: inline-block;
+  /* Arrastar para girar não pode rolar a folha atrás. */
+  touch-action: none;
+  user-select: none;
+}
+
+.engine-carteira-3d {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* A entrada: mostra que o cartão tem lados e para de frente. Uma vez só. */
+.engine-carteira-entrada {
+  animation: engine-carteira-chega 1.1s cubic-bezier(0.24, 0.84, 0.3, 1) both;
+}
+
+@keyframes engine-carteira-chega {
+  0% {
+    transform: rotateY(-34deg) rotateX(12deg) scale(0.9);
+    opacity: 0;
+  }
+  55% {
+    transform: rotateY(12deg) rotateX(-4deg) scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateY(0deg) rotateX(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* A luz que corre no plástico. Fica FORA do cartão (irmã, não filha) para
+   não entrar no PNG salvo: o brilho é da tela, não do documento. */
+.engine-carteira-brilho {
+  position: absolute;
+  inset: -12%;
+  border-radius: 1.4em;
+  pointer-events: none;
+  background: linear-gradient(
+    104deg,
+    transparent 36%,
+    rgba(255, 255, 255, 0.48) 47%,
+    rgba(255, 255, 255, 0.1) 54%,
+    transparent 62%
+  );
+  mix-blend-mode: overlay;
+  transition: transform 0.45s cubic-bezier(0.22, 0.8, 0.3, 1), opacity 0.45s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engine-carteira-entrada {
+    animation: none;
+  }
+  .engine-carteira-brilho {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------- fundo importado ---- */
+
+/* A foto que a pessoa põe atrás de tudo. Abaixo do guilhoché e do ponteiro,
+   que continuam por cima — é o que mantém a cara de documento em vez de
+   virar um story com texto em cima. */
+.engine-carteira-foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Sem este véu, foto clara apaga o texto preto e foto escura apaga o branco.
+   Ele usa a cor do papel do tema, então serve aos dois sem regra extra. */
+.engine-carteira-veu {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--carteira-papel) 86%, transparent) 0%,
+      color-mix(in srgb, var(--carteira-papel) 62%, transparent) 54%,
+      color-mix(in srgb, var(--carteira-papel) 80%, transparent) 100%
+    );
+}
+
+.engine-carteira-fundo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Guilhochê: as linhas finíssimas cruzadas da impressão de segurança. */
+.engine-carteira-guilhoche {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(68deg, var(--carteira-linha) 0 0.055em, transparent 0.055em 0.62em),
+    repeating-linear-gradient(-68deg, var(--carteira-linha) 0 0.055em, transparent 0.055em 0.78em);
+}
+
+.engine-carteira-giro {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.engine-carteira-conteudo {
+  position: relative;
+  height: 100%;
+  padding: 1.05em 1.2em 0.9em;
+  display: grid;
+  grid-template-columns: 7.4em 1fr;
+  column-gap: 1.1em;
+}
+
+.engine-carteira-esquerda {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  min-width: 0;
+}
+
+.engine-carteira-retrato {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 0.3em;
+  border: 0.07em solid var(--carteira-linha);
+  background: linear-gradient(155deg, #9aa3b4 0%, #5b6473 55%, #3a4150 100%);
+  position: relative;
+  overflow: hidden;
+  flex: none;
+}
+.engine-carteira[data-tema="escuro"] .engine-carteira-retrato {
+  background: linear-gradient(155deg, #4a5466, #222831 60%, #161a21);
+}
+.engine-carteira-retrato svg,
+.engine-carteira-retrato img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.engine-carteira-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.07em;
+  height: 1.5em;
+}
+.engine-carteira-barras i {
+  background: var(--carteira-grafite);
+  height: 100%;
+}
+
+.engine-carteira-nome {
+  font-size: 0.78em;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+.engine-carteira-end {
+  font-size: 0.62em;
+  font-weight: 600;
+  color: var(--carteira-cinza);
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.engine-carteira-direita {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.engine-carteira-cabeca {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7em;
+}
+
+/* Onde numa carteira americana vai o estado (HAWAII, CALIFORNIA). */
+.engine-carteira-uf {
+  font-family: var(--font-display);
+  font-size: 2.15em;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.035em;
+  line-height: 0.85;
+  color: var(--engine-accent);
+  text-transform: uppercase;
+}
+
+.engine-carteira-tipo {
+  text-align: right;
+  line-height: 1.05;
+  padding-top: 0.15em;
+}
+.engine-carteira-tipo b {
+  display: block;
+  font-size: 0.82em;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--carteira-aco);
+}
+.engine-carteira-tipo span {
+  display: block;
+  font-size: 0.56em;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--carteira-cinza);
+  margin-top: 0.15em;
+}
+
+.engine-carteira-linha-num {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45em;
+  margin-top: 0.5em;
+}
+.engine-carteira-rot {
+  font-size: 0.6em;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--carteira-cinza);
+  white-space: nowrap;
+}
+.engine-carteira-num {
+  font-size: 1.22em;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.engine-carteira-datas {
+  display: flex;
+  gap: 1.3em;
+  margin-top: 0.35em;
+  align-items: baseline;
+}
+.engine-carteira-dado {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
+}
+.engine-carteira-val {
+  font-size: 0.86em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.engine-carteira-val-vermelho {
+  color: var(--engine-accent);
+}
+
+.engine-carteira-grade {
+  display: grid;
+  grid-template-columns: repeat(6, auto);
+  justify-content: start;
+  column-gap: 1.05em;
+  margin-top: 0.62em;
+}
+.engine-carteira-grade2 {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  column-gap: 1.05em;
+  margin-top: 0.55em;
+}
+.engine-carteira-cel {
+  min-width: 0;
+}
+.engine-carteira-cel .engine-carteira-rot {
+  display: block;
+}
+.engine-carteira-v {
+  display: block;
+  font-size: 0.8em;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  margin-top: 0.05em;
+}
+
+.engine-carteira-rodape {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.8em;
+}
+
+/* A assinatura. Caveat é carregada pelo próprio componente; enquanto ela não
+   chega, as alternativas cursivas do sistema seguram o lugar sem pular. */
+.engine-carteira-firma {
+  font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive;
+  font-size: 1.5em;
+  line-height: 0.9;
+  color: var(--carteira-grafite);
+  border-bottom: 0.055em solid var(--carteira-linha);
+  padding: 0 0.6em 0.1em 0.2em;
+  transform: rotate(-2.2deg);
+  transform-origin: left bottom;
+  white-space: nowrap;
+}
+
+.engine-carteira-qr {
+  width: 3.3em;
+  height: 3.3em;
+  flex: none;
+  background: #fff;
+  padding: 0.14em;
+  border-radius: 0.18em;
+  border: 0.055em solid var(--carteira-linha);
+  display: block;
+}
+
+.engine-carteira-micro {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.26em;
+  text-align: center;
+  font-size: 0.26em;
+  letter-spacing: 0.3em;
+  font-weight: 700;
+  color: var(--carteira-cinza);
+  opacity: 0.5;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ======================================================================
+   O ADESIVO DO CARRO (components/cars/Adesivo.jsx)
+
+   Um adesivo de 5 × 5 cm para colar no vidro: o apelido do carro e um QR que
+   abre a página pública dele. É a ponte do app para a rua — a pessoa que
+   parou do lado no semáforo não baixa app nenhum, ela aponta a câmera.
+
+   Mesma técnica da carteira: TUDO em `em`, tamanho inteiro saindo de UM
+   `font-size`. Aqui isso importa mais ainda, porque este desenho vai ser
+   IMPRESSO em tamanho físico: as proporções têm de valer igual na tela de
+   6 polegadas, no print e no papel.
+
+   Por que o QR fica no meio e grande: 5 cm de adesivo com 3 cm de QR é lido
+   por um celular a meio metro. QR pequeno com moldura bonita em volta é
+   enfeite que não funciona, e um QR que não lê transforma o adesivo em
+   sujeira no vidro.
+
+   Cores próprias, não os tokens do app, pelo mesmo motivo da carteira: o
+   claro e o escuro aqui são escolha de impressão (vidro claro, vidro
+   fumê), não o tema do sistema.
+   ====================================================================== */
+.engine-adesivo {
+  position: relative;
+  width: 26em;
+  max-width: 100%;
+  aspect-ratio: 1;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.6em 1.4em 1.5em;
+  border-radius: 1.6em;
+  overflow: hidden;
+  box-shadow: 0 1.2em 3em rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.35);
+
+  --adesivo-fundo: #ffffff;
+  --adesivo-tinta: #0d0f14;
+  --adesivo-fraca: #6a6f7a;
+  --adesivo-marca: #e11d2a;
+
+  background: var(--adesivo-fundo);
+  color: var(--adesivo-tinta);
+}
+
+.engine-adesivo[data-tema="escuro"] {
+  --adesivo-fundo: #0d0f14;
+  --adesivo-tinta: #ffffff;
+  --adesivo-fraca: #9aa3b2;
+  --adesivo-marca: #ff4d58;
+}
+
+/* Redondo é o formato que mais se vê em vidro de carro — e é o que some
+   melhor quando a borda descola. O conteúdo encolhe um pouco porque num
+   círculo os cantos não são área útil. */
+.engine-adesivo[data-forma="redondo"] {
+  border-radius: 50%;
+  padding: 2.6em 2.4em 2.4em;
+}
+
+@media (min-width: 560px) {
+  .engine-adesivo {
+    font-size: 13px;
+  }
+}
+@media (min-width: 760px) {
+  .engine-adesivo {
+    font-size: 15px;
+  }
+}
+
+.engine-adesivo-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  font-family: var(--font-display);
+  font-size: 1.05em;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.engine-adesivo-marca i {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--adesivo-marca);
+  display: block;
+}
+
+/* A moldura branca em volta do QR não é enfeite: é a zona de silêncio que o
+   padrão exige. Em adesivo escuro ela é o que mantém o código legível. */
+.engine-adesivo-qr {
+  width: 60%;
+  aspect-ratio: 1;
+  border-radius: 0.6em;
+  background: #fff;
+  padding: 0.5em;
+  display: flex;
+}
+
+.engine-adesivo-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.engine-adesivo-pe {
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15em;
+}
+
+.engine-adesivo-nome {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 2.1em;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Apelido comprido ("Corsinha da vovó Maria") não pode empurrar o QR nem
+   sair pela borda: a partir de 14 letras o nome encolhe em vez de vazar. */
+.engine-adesivo[data-nome="longo"] .engine-adesivo-nome {
+  font-size: 1.45em;
+}
+
+.engine-adesivo-site {
+  font-size: 0.82em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--adesivo-fraca);
+}
+
+.engine-adesivo-chamada {
+  font-size: 0.78em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--adesivo-fraca);
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* Na impressão sai só o adesivo, no tamanho real: 50 mm. Sem isto a página
+   impressa sairia com o app todo em volta e o adesivo do tamanho errado —
+   e tamanho errado num adesivo é o defeito que só aparece depois de
+   pagar a gráfica. */
+@media print {
+  .engine-adesivo {
+    width: 50mm;
+    font-size: 2.2mm;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}
+
+/* Imprimir SÓ o adesivo.
+   A folha do adesivo põe `engine-print-adesivo` no body um instante antes de
+   `window.print()` e tira depois. Esconder por `visibility` em vez de
+   `display` é de propósito: `display:none` no caminho até o adesivo levaria
+   o adesivo junto, e aí não sobra nada na folha. Posição fixa tira ele de
+   dentro do empilhamento do app e põe no canto da página, com margem de
+   gráfica. */
+@media print {
+  body.engine-print-adesivo * {
+    visibility: hidden;
+  }
+  body.engine-print-adesivo .engine-adesivo,
+  body.engine-print-adesivo .engine-adesivo * {
+    visibility: visible;
+  }
+  body.engine-print-adesivo .engine-adesivo {
+    position: fixed;
+    left: 12mm;
+    top: 12mm;
+  }
 }

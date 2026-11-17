@@ -11,6 +11,7 @@
     "fetch:consumption": "node scripts/fetch-inmetro-consumption.mjs --report",
     "fetch:fipe-sample": "node scripts/fetch-fipe-sample.mjs",
     "check:fipe-parser": "node scripts/check-fipe-parser.mjs",
+    "check:masks": "node scripts/check-masks.mjs",
     "check:mobile": "node scripts/check-mobile-contract.mjs",
     "check:ios": "node scripts/check-ios-contract.mjs",
     "check:android": "node scripts/check-android-contract.mjs",
@@ -27,7 +28,8 @@
     "check:rls": "node scripts/check-rls.mjs",
     "check:reminders": "node scripts/check-reminders.mjs",
     "check:plans": "node scripts/check-plans.mjs",
-    "icons": "node scripts/generate-pwa-icons.mjs"
+    "icons": "node scripts/generate-pwa-icons.mjs",
+    "og": "node scripts/generate-og-image.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.69.0",
@@ -45,7 +47,9 @@
     "konva": "^9.3.22",
     "lucide-react": "^1.7.0",
     "mercadopago": "^3.3.0",
+    "modern-screenshot": "4.7.0",
     "posthog-js": "^1.413.2",
+    "qrcode-generator": "1.4.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-easy-crop": "^6.2.3",

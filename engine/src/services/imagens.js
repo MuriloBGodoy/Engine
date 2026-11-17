@@ -28,6 +28,11 @@ import { blobToDataUrl, decodeImage, drawToCanvas, encodeCanvas } from "./cleanI
 export const AVATAR = { largura: 256, altura: 256, qualidade: 0.85, tetoBytes: 48 * 1024 };
 /** Banner ocupa a largura toda numa faixa baixa. */
 export const BANNER = { largura: 1280, altura: 420, qualidade: 0.82, tetoBytes: 400 * 1024 };
+// Fundo da Carteira de Garagem. A proporção é a do cartão (85,6 × 54 mm), e
+// 1200px de largura chega para o PNG de 3x que a carteira salva. Teto menor
+// que o do banner porque ele mora no mesmo documento de configurações que o
+// resto do perfil.
+export const CARTEIRA = { largura: 1200, altura: 757, qualidade: 0.82, tetoBytes: 300 * 1024 };
 
 /**
  * Cabe a imagem na caixa sem distorcer e sem ampliar.

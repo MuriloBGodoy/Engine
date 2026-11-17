@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { cityLabel } from "../services/people";
 import {
   Heart,
   MessageCircle,
@@ -17,6 +18,7 @@ import {
   AlignLeft,
   MapPin,
   Sparkles,
+  IdCard,
 } from "lucide-react";
 import { engineDB, POST_KIND_POST } from "../services/db";
 import { GoalCard } from "./Community";
@@ -46,6 +48,8 @@ import { PeopleSheet } from "../components/social/PeopleSheet";
 import { fetchLikedPosts } from "../services/likedPosts";
 import { listUserShowcase } from "../services/carShowcase";
 import { postCover, postIsVisual } from "../services/postCover";
+import { CarteiraSheet } from "../components/carteira/CarteiraSheet";
+import { useMemberCard, useMemberNumber } from "../hooks/useMemberNumber";
 import "../services/i18n-profile-hub";
 
 // Banner will be solid color gradient - no default image
@@ -260,6 +264,9 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const [savedKind, setSavedKind] = useState("posts");
   // Os carros que esta pessoa abriu para a comunidade: a aba Garagem.
   const [showcaseCars, setShowcaseCars] = useState([]);
+  // A Carteira de Garagem (components/carteira). Mora na aba Garagem porque
+  // é dos carros que ela fala — câmbio, potência, preparação.
+  const [carteiraAberta, setCarteiraAberta] = useState(false);
   // Publicação sem foto não cabe num quadrado de grade: a grade mostra o
   // que é visual e os textos ficam numa lista, a um toque de distância.
   const [postsKind, setPostsKind] = useState("grid");
@@ -277,6 +284,59 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   const [isEditing, setIsEditing] = useState(false);
   const [publicProfiles, setPublicProfiles] = useState(null);
   const isOwnProfile = currentUserId === profile?.userId;
+
+  // O número da carteira é a ordem de entrada no Engine (ver a migration
+  // 20261115120000). Uma leitura por sessão; 0 enquanto não sabe, e aí o
+  // cartão cai no número antigo em vez de mostrar um buraco.
+  const numeroDeMembro = useMemberNumber(isOwnProfile ? currentUserId : "");
+  // Quando se visita o perfil de outra pessoa, o número e a data de entrada
+  // dela vêm da tabela pública — ver `useMemberCard`.
+  const cartaoDoDono = useMemberCard(isOwnProfile ? "" : profile?.userId || "");
+
+  // A carteira de quem é visitado só abre se a pessoa deixou. Perfil antigo,
+  // salvo antes de 15/11/2026, não tem a chave: `!== false` faz ele valer
+  // como visível, que é o padrão — e não como escondido, que esconderia a
+  // carteira de todo mundo que não salvou o perfil desde então.
+  const carteiraDoDonoVisivel = profile?.carteiraPublica !== false;
+
+  /*
+   * O fundo e a assinatura da carteira moram no perfil, não num documento
+   * novo: são preferência de como a pessoa se apresenta, do mesmo tipo que a
+   * capa e a bio, e gravar junto evita uma segunda leitura toda vez que a
+   * carteira abre. O fundo já entra reduzido (ver `CARTEIRA` em
+   * services/imagens), então cabe aqui.
+   */
+  const gravarNoPerfil = async (patch) => {
+    if (!isOwnProfile || !settings) return;
+    const novo = { ...settings, profile: { ...settings.profile, ...patch } };
+    onSettingsUpdate?.(novo);
+    try {
+      await engineDB.saveSettings(novo, currentUserId);
+    } catch (erro) {
+      console.warn("[carteira] a preferência ficou só neste aparelho.", erro);
+    }
+  };
+
+  const salvarFundoDaCarteira = (fundo) => gravarNoPerfil({ carteiraFundo: fundo });
+  const salvarFirmaDaCarteira = (firma) => gravarNoPerfil({ carteiraFirma: firma });
+  const salvarTemaDaCarteira = (tema) => gravarNoPerfil({ carteiraTema: tema });
+
+  /*
+   * A visibilidade mora em `privacy`, junto do `hideEngineBlock` — e não em
+   * `profile` — porque é a mesma pergunta ("o que o visitante vê do meu
+   * perfil?") e porque é lá que Configurações › Privacidade já olha. O mesmo
+   * interruptor aparece nos dois lugares, lendo esta chave.
+   */
+  const mudarVisibilidadeDaCarteira = async (visivel) => {
+    if (!isOwnProfile || !settings) return;
+    const novo = { ...settings, privacy: { ...settings.privacy, hideCarteira: !visivel } };
+    onSettingsUpdate?.(novo);
+    try {
+      await engineDB.saveSettings(novo, currentUserId);
+    } catch (erro) {
+      console.warn("[carteira] a visibilidade ficou só neste aparelho.", erro);
+    }
+  };
   // Com quatro abas a tira não cabe em 390px (medido em 21/08/2026, mesmo
   // limite que apareceu na Comunidade) e já rola na horizontal — mas a aba
   // ativa não se anunciava: setActiveTab("achievements") nascia fora da
@@ -964,10 +1024,10 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
 
           {/* Cidade, com alfinete. Solta, em cinza pequeno, ela flutuava sem
               dizer que era um lugar. */}
-          {profile.city && (
+          {cityLabel(profile.city) && (
             <p className="mb-4 flex items-center gap-1 text-xs text-[var(--engine-text-muted)]">
               <MapPin size={12} className="shrink-0" aria-hidden="true" />
-              {profile.city}
+              {cityLabel(profile.city)}
             </p>
           )}
 
@@ -1009,9 +1069,39 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 </button>
               </>
             )}
+            {/* A carteira, no cabeçalho (15/11/2026). Ela morava escondida no
+                topo da aba Garagem, que é o terceiro toque de quem já estava
+                no perfil — e ninguém achava. Aqui ela é irmã de Editar e
+                Compartilhar, que é o que ela é: uma forma de se mostrar.
+
+                Ícone e não palavra, porque a linha já tem dois botões de
+                texto disputando a largura; e `IdCard`, que é literalmente um
+                documento com retrato — a 18px ninguém confunde. */}
+            {(isOwnProfile || carteiraDoDonoVisivel) && (
+              <button
+                type="button"
+                onClick={() => setCarteiraAberta(true)}
+                title={t("carteira.open")}
+                aria-label={t("carteira.open")}
+                className="flex w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+              >
+                <IdCard size={18} aria-hidden="true" />
+              </button>
+            )}
             <PostMenu
               label={t("profileHub.menu")}
-              triggerClass="flex w-10 shrink-0 items-center justify-center self-stretch rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text-muted)] transition hover:border-[var(--engine-border-strong)] hover:text-[var(--engine-text)]"
+              /* O "..." é IRMÃO dos dois botões ao lado, não um enfeite: mesma
+                 altura, mesma borda, mesmo fundo e a MESMA cor de texto. Com
+                 os pontinhos em cinza-apagado num quadrado de 40px a terceira
+                 ação parecia desligada, e a linha ficava com dois botões e
+                 uma sobra. 44px é o alvo de toque mínimo.
+
+                 `h-full`, e não `self-stretch`: o `PostMenu` embrulha o botão
+                 numa div (ela é que precisa do menu posicionado em cima), e
+                 `self-stretch` olhava para ESSA div, não para a linha. O
+                 resultado era uma caixinha de 20px de altura ao lado de dois
+                 botões de 40 — medido em 14/11/2026. */
+              triggerClass="flex h-full w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] transition hover:border-[var(--engine-border-strong)] hover:bg-[var(--engine-surface)]"
               items={
                 isOwnProfile
                   ? [
@@ -1428,6 +1518,44 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           }}
         />
       )}
+      <CarteiraSheet
+        open={carteiraAberta}
+        onClose={() => setCarteiraAberta(false)}
+        perfil={profile}
+        carros={showcaseCars}
+        /* "Desde" é a data em que a conta nasceu, e isso só o Supabase sabe
+           da pessoa logada. No perfil dos outros o campo sai com um traço —
+           melhor um traço que uma data inventada. */
+        criadoEm={
+          isOwnProfile
+            ? user?.metadata?.creationTime || auth.currentUser?.metadata?.creationTime || ""
+            : cartaoDoDono.criadoEm
+        }
+        url={shareUrls.profile(profile.username)}
+        posts={userGoals.length}
+        seguidores={followCounts.followers}
+        conquistas={unlockedAchievements?.size || 0}
+        numero={isOwnProfile ? numeroDeMembro : cartaoDoDono.numero}
+        /* No perfil dos outros tudo vem do cartão público deles, não das
+           MINHAS configurações — senão a carteira de quem eu visito sairia
+           com o meu fundo e a minha assinatura. */
+        fundo={
+          isOwnProfile
+            ? settings?.profile?.carteiraFundo || null
+            : profile?.carteiraFundo
+              ? { url: profile.carteiraFundo, enquadramento: profile.carteiraEnquadra || undefined }
+              : null
+        }
+        onFundo={isOwnProfile ? salvarFundoDaCarteira : null}
+        firma={isOwnProfile ? settings?.profile?.carteiraFirma || "nome" : profile?.carteiraFirma || "nome"}
+        onFirma={isOwnProfile ? salvarFirmaDaCarteira : null}
+        tema={isOwnProfile ? settings?.profile?.carteiraTema || "claro" : profile?.carteiraTema || "claro"}
+        onTema={isOwnProfile ? salvarTemaDaCarteira : null}
+        userId={currentUserId || ""}
+        publica={!settings?.privacy?.hideCarteira}
+        onPublica={isOwnProfile ? mudarVisibilidadeDaCarteira : null}
+        somenteVer={!isOwnProfile}
+      />
       <PeopleSheet
         open={Boolean(peopleTab)}
         tab={peopleTab || "followers"}

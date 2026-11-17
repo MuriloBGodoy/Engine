@@ -58,6 +58,12 @@ const defaultSettings = {
     // eventos). Vai para o perfil público como `hideEngineBlock`, que o
     // servidor lê em `profile_engine_presence`.
     hideEngineBlock: false,
+    // A Carteira de Garagem na página pública. Nasce VISÍVEL, como o resto
+    // do perfil: ela é feita para ser mostrada, e quase tudo que ela diz
+    // (nome, @, cidade, posts, seguidores, conquistas, carros na vitrine) já
+    // está na mesma tela logo acima. O que ela acrescenta é o número de
+    // membro e o mês de entrada — e é justamente isso que tem graça.
+    hideCarteira: false,
   },
   // Renda e despesa são da PESSOA, não do carro. Antes disso a renda morava em
   // `car.ownership` e portanto estava duplicada no documento de cada carro:
@@ -632,7 +638,14 @@ const getProfileSnapshot = (settings = {}, userId = currentUserId) => {
       .join("")
       .toUpperCase()
       .slice(0, 2),
-    city: profile.location || "Engine Garage",
+    // Sem cidade informada fica VAZIO, nunca "Engine Garage". Esse texto de
+    // reserva vinha de 2026-07 e vazava para a tela como se fosse um lugar:
+    // em 14/11/2026, quatro dos cinco perfis de produção diziam que a pessoa
+    // era de "Engine Garage" — e quem desenha a linha do post já tinha
+    // reparado, filtrando a string na hora de exibir (VisitorHome) em vez de
+    // consertar aqui. Cidade é dado da pessoa: se ela não deu, não se
+    // inventa.
+    city: profile.location || "",
     note: profile.bio || "",
   };
 };
@@ -646,7 +659,24 @@ const buildPublicProfile = (settings = {}, userId = currentUserId) => {
     // A capa vai só aqui: o retrato acima também é copiado em post,
     // comentário e notificação, e até 400 KB de imagem não cabem em cada um.
     banner: settings.profile?.banner || "",
+    // A UF entra aqui, e NÃO no `getProfileSnapshot`: aquele retrato é
+    // copiado dentro de cada post, comentário e notificação, e não precisa
+    // de mais um campo. Aqui é o perfil em si — e o estado é menos preciso
+    // que a cidade, que já era pública. Quem usa: a Carteira de Garagem e o
+    // filtro por região.
+    state: settings.profile?.state || "",
     hideEngineBlock: Boolean(settings.privacy?.hideEngineBlock),
+    // Três campos minúsculos, e de propósito: o perfil público é lido em
+    // lote para montar feed e listas (`select("*")`), então o que entra aqui
+    // é multiplicado por todo mundo que aparece na tela. O fundo da carteira
+    // vai como ENDEREÇO de uma imagem no Storage, não como a imagem em
+    // base64 — a capa do perfil ainda é base64 por herança, e é exatamente
+    // por isso que não se repete o erro.
+    carteiraPublica: !settings.privacy?.hideCarteira,
+    carteiraFundo: settings.profile?.carteiraFundo?.url || "",
+    carteiraEnquadra: settings.profile?.carteiraFundo?.enquadramento || null,
+    carteiraFirma: settings.profile?.carteiraFirma || "nome",
+    carteiraTema: settings.profile?.carteiraTema || "claro",
     updatedAt: nowIso(),
   };
 };
@@ -814,7 +844,7 @@ export const normalizeCommunityGoal = (goal = {}) => {
         .join("")
         .toUpperCase()
         .slice(0, 2),
-    city: goal.city || "Engine Garage",
+    city: goal.city || "",
     title: goal.title || `${goal.brand || ""} ${goal.model || ""}`.trim(),
     brand: goal.brand || "",
     model: goal.model || "",
@@ -2242,7 +2272,7 @@ export const engineDB = {
       username: pick(profile.username, fromGoals.username, "@engine"),
       avatar: pick(profile.avatar, fromGoals.avatar),
       avatarInitials: pick(profile.avatarInitials, fromGoals.avatarInitials),
-      city: pick(profile.city, fromGoals.city, "Engine Garage"),
+      city: pick(profile.city, fromGoals.city, ""),
       note: pick(profile.note, fromGoals.note),
       goals,
       goalsCount: goals.length,

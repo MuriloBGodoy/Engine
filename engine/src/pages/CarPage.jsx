@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, BellRing, Calculator, CarFront, Fuel, Pencil, PiggyBank, Receipt, Trash2, Trophy, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  BellRing,
+  Calculator,
+  CarFront,
+  Fuel,
+  Pencil,
+  PiggyBank,
+  QrCode as QrCodeIcon,
+  Receipt,
+  Trash2,
+  Trophy,
+  Wrench,
+} from "lucide-react";
 import { CAR_TYPE_OWNED } from "../services/db";
 import { formatCarBrand, formatCarName, formatFipeYear } from "../services/carDisplay";
 import { resolveVehicleSpecSheet, canEditSpecSheet } from "../services/carSpecSheet";
@@ -17,6 +30,8 @@ import { GarageReminders } from "../components/reminders/GarageReminders";
 import { ReminderSettingsModal } from "../components/reminders/ReminderSettingsModal";
 import { SpecSheetView } from "../components/specsheet/SpecSheetView";
 import { myShowcase, publishCar, unpublishCar } from "../services/carShowcase";
+import { CarAddress } from "../components/cars/CarAddress";
+import { AdesivoSheet } from "../components/cars/AdesivoSheet";
 import { useToast } from "../components/ToastProvider";
 import "../services/i18n-cars";
 
@@ -231,6 +246,7 @@ function ShowcaseToggle({ car }) {
   const [slug, setSlug] = useState("");
   const [cover, setCover] = useState("");
   const [busy, setBusy] = useState(false);
+  const [adesivo, setAdesivo] = useState(false);
 
   // Todas as fotos do carro, sem repetir: a capa da garagem costuma ser
   // também a primeira da lista.
@@ -358,13 +374,31 @@ function ShowcaseToggle({ car }) {
           </div>
         </div>
       )}
+      {/* O endereço e o adesivo só existem depois de publicado: os dois
+          apontam para a página pública, que só existe aí. */}
       {on && slug && (
-        <Link
-          to={`/carro/${slug}`}
-          className="mt-2 inline-block text-[13px] font-bold text-[var(--engine-accent-text)]"
-        >
-          {t("cars.viewPublic")}
-        </Link>
+        <>
+          <CarAddress car={car} slug={slug} onSlug={setSlug} />
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Link to={`/carro/${slug}`} className="text-[13px] font-bold text-[var(--engine-accent-text)]">
+              {t("cars.viewPublic")}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setAdesivo(true)}
+              className="flex min-h-11 items-center gap-1.5 text-[13px] font-bold text-[var(--engine-accent-text)]"
+            >
+              <QrCodeIcon size={15} aria-hidden="true" />
+              {t("adesivo.open")}
+            </button>
+          </div>
+          <AdesivoSheet
+            open={adesivo}
+            onClose={() => setAdesivo(false)}
+            slug={slug}
+            nickname={car.nickname || ""}
+          />
+        </>
       )}
     </div>
   );
@@ -431,9 +465,16 @@ function CarHero({ car, t, locale, onBack, children }) {
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">
           {formatCarBrand(car.brand)} · {formatFipeYear(car.year, t("car.zeroKm"))}
         </p>
+        {/* Com apelido, o título é o apelido e o modelo desce uma linha: é
+            assim que o dono fala do carro ("a Bruxa", não "o meu Corsa Wind
+            1.0"). Sem apelido, nada muda — continua o modelo no título e
+            nenhuma linha extra. */}
         <h1 className="mt-0.5 line-clamp-2 font-display text-xl font-extrabold italic leading-tight text-white sm:text-2xl">
-          {car.model}
+          {car.nickname?.trim() || car.model}
         </h1>
+        {car.nickname?.trim() && (
+          <p className="truncate text-[12.5px] font-semibold text-white/70">{car.model}</p>
+        )}
         {specs.length > 0 && <p className="mt-0.5 truncate text-xs font-semibold text-white/75">{specs.join(" · ")}</p>}
       </div>
     </div>
