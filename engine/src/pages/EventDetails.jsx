@@ -20,6 +20,7 @@ import {
 import { auth } from "../services/supabase";
 import { engineEvents } from "../services/events";
 import { useToast } from "../components/ToastProvider";
+import { DownloadPhotoButton } from "../components/ui/DownloadPhotoButton";
 import { eventTypeLabel } from "../services/eventTypes";
 import { formatEventDay, formatEventEndDay } from "../services/eventTime";
 import { useSocialReport } from "../hooks/useSocialReport";
@@ -266,9 +267,14 @@ export function EventDetails() {
               key={foto}
               className={`overflow-hidden rounded-xl bg-[var(--engine-surface-2)] ${
                 fotos.length > 1 && indice === 0 ? "sm:col-span-2" : ""
-              } ${fotos.length > 1 && indice > 0 ? "h-48" : "h-80"}`}
+              } ${fotos.length > 1 && indice > 0 ? "h-48" : "h-80"} relative`}
             >
               <img src={foto} alt={event.title} className="h-full w-full object-cover" />
+              <DownloadPhotoButton
+                url={foto}
+                nome={event.title}
+                className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 disabled:opacity-60"
+              />
             </div>
           ))}
         </div>

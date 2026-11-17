@@ -31,6 +31,7 @@ import {
   serviceListingUrl,
 } from "../services/serviceListingPublic";
 import { MapPreview, PortfolioLinks, WhatsAppIcon } from "../components/services/ListingParts";
+import { DownloadPhotoButton } from "../components/ui/DownloadPhotoButton";
 import { ShareListingButton } from "../components/services/ShareListing";
 import { ServiceReviews } from "../components/services/ServiceReviews";
 import { useToast } from "../components/ToastProvider";
@@ -109,6 +110,12 @@ function Gallery({ listing, t }) {
             {index + 1}/{photos.length}
           </span>
         )}
+        {/* No alto, porque o contador mora no pé. */}
+        <DownloadPhotoButton
+          url={photos[Math.min(index, photos.length - 1)]}
+          nome={listing.title}
+          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 disabled:opacity-60"
+        />
       </div>
 
       {photos.length > 1 && (

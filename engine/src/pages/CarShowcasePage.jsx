@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bookmark, Heart, Send, Share2, Trash2 } from "lucide-react";
@@ -10,8 +10,12 @@ import {
   likeCar,
 } from "../services/carShowcase";
 import { engineDB } from "../services/db";
+import { formatCarBrand, formatFipeYear } from "../services/carDisplay";
+import { resolveVehicleSpecSheet } from "../services/carSpecSheet";
+import { stageLabel, summaryTokens } from "../components/specsheet/labels";
 import { PersonLink } from "../components/social/PersonLink";
 import { profilePath, withoutAt } from "../services/people";
+import { DownloadPhotoButton } from "../components/ui/DownloadPhotoButton";
 import { useSavedCars } from "../hooks/useSavedCars";
 import { useRequireAccount } from "../hooks/useRequireAccount";
 import { auth } from "../services/supabase";
@@ -27,7 +31,7 @@ import "../services/i18n-cars";
  */
 export function CarShowcasePage() {
   const { slug } = useParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showToast = useToast();
   const [car, setCar] = useState(undefined);
   const [owner, setOwner] = useState(null);
@@ -35,11 +39,34 @@ export function CarShowcasePage() {
   const [likes, setLikes] = useState(0);
   const [comments, setComments] = useState([]);
   const [draft, setDraft] = useState("");
+  // Qual foto da galeria está à vista (ver o `onScroll` dela).
+  const [foto, setFoto] = useState(0);
   const [sending, setSending] = useState(false);
   const meuUid = auth.currentUser?.uid || "";
   const { isSaved, toggleSaved } = useSavedCars(meuUid);
   // Visitante que toca em salvar vai para o login e volta para este carro.
   const requireAccount = useRequireAccount(meuUid ? { uid: meuUid } : null);
+
+  /**
+   * As quatro etiquetas da ficha: cilindrada, combustível, câmbio e potência.
+   *
+   * O mesmo cálculo do card da garagem. Nada aqui vem de coluna nova: o que a
+   * FIPE já diz é deduzido da versão, e o que o dono declarou chega no
+   * `specs` da cópia pública. Antes esta tela não mostrava número nenhum —
+   * o carro aparecia para um estranho sem uma só informação técnica.
+   *
+   * Fica num `useMemo` acima dos `return` de carregando/não encontrado
+   * porque hook não pode ficar depois de uma saída condicional.
+   */
+  const fichas = useMemo(() => {
+    if (!car) return [];
+    try {
+      return summaryTokens(t, i18n.language, resolveVehicleSpecSheet(car));
+    } catch {
+      // Carro com marca ou modelo fora do padrão não derruba a página.
+      return [];
+    }
+  }, [car, t, i18n.language]);
 
   useEffect(() => {
     let alive = true;
@@ -129,34 +156,76 @@ export function CarShowcasePage() {
 
   return (
     <article className="space-y-4 pb-10">
+      {/* Galeria: uma foto por vez, largura inteira, arrastando de lado com
+          encaixe — era uma fileira de miniaturas de altura fixa, em que a
+          segunda foto ficava cortada na borda e ninguém percebia que havia
+          mais de uma. Os pontinhos dizem quantas são. */}
       {images.length > 0 && (
-        <div className="engine-scroll-x flex gap-2 overflow-x-auto">
-          {images.map((src) => (
-            <img
-              key={src}
-              src={src}
-              alt={car.title}
-              className="h-64 w-auto shrink-0 rounded-xl object-cover sm:h-80"
-            />
-          ))}
+        <div className="relative">
+          <div
+            className="engine-scroll-x flex snap-x snap-mandatory gap-2 overflow-x-auto rounded-2xl"
+            // Qual foto está à vista: serve para as bolinhas (que antes
+            // marcavam sempre a primeira, por mais que a pessoa arrastasse)
+            // e para o botão de baixar levar a foto certa.
+            onScroll={(evento) => {
+              const alvo = evento.currentTarget;
+              const largura = alvo.clientWidth || 1;
+              setFoto(Math.max(0, Math.min(images.length - 1, Math.round(alvo.scrollLeft / largura))));
+            }}
+          >
+            {images.map((src) => (
+              <img
+                key={src}
+                src={src}
+                alt={car.title}
+                className="aspect-[4/3] w-full shrink-0 snap-center rounded-2xl object-cover"
+              />
+            ))}
+          </div>
+          <DownloadPhotoButton
+            url={images[Math.min(foto, images.length - 1)]}
+            nome={car.nickname || car.title}
+            className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 disabled:opacity-60"
+          />
+          {car.stage && car.stage !== "stock" && (
+            <span className="absolute bottom-3 left-3 rounded-lg bg-black/65 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-white backdrop-blur">
+              {stageLabel(t, car.stage)}
+            </span>
+          )}
+          {images.length > 1 && (
+            <span className="absolute bottom-3 right-3 flex gap-1.5" aria-hidden="true">
+              {images.map((src, index) => (
+                <i
+                  key={src}
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    index === foto ? "bg-white" : "bg-white/45"
+                  }`}
+                />
+              ))}
+            </span>
+          )}
         </div>
       )}
 
       <header className="flex flex-wrap items-start gap-3">
+        {/* O título era o texto cru da FIPE — "GM - Chevrolet Corsa Sedan 1.8
+            MPFI FlexPower 8V 4p" — em três linhas, com a marca repetida. A
+            marca e o ano sobem para uma linha pequena e o carro fica com o
+            nome dele. */}
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-extrabold tracking-tight text-[var(--engine-text)] sm:text-2xl">
-            {car.title}
-          </h1>
-          <p className="mt-0.5 text-[13px] font-semibold text-[var(--engine-text-muted)]">
-            {[car.year, car.city, car.state].filter(Boolean).join(" · ")}
+          <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[var(--engine-text-subtle)]">
+            {[formatCarBrand(car.brand), formatFipeYear(car.year)].filter(Boolean).join(" · ")}
           </p>
-          {owner && (
-            <Link
-              to={profilePath(owner.username) || "/community"}
-              className="mt-1 inline-block text-[13px] font-bold text-[var(--engine-accent-text)]"
-            >
-              {t("cars.ownerSince")} {owner.author || `@${withoutAt(owner.username)}`}
-            </Link>
+          <h1 className="mt-1 font-display text-[22px] font-extrabold leading-[1.08] tracking-[-0.02em] text-[var(--engine-text)] sm:text-[26px]">
+            {car.nickname?.trim() || car.model || car.title}
+          </h1>
+          {/* Com apelido, o modelo desce para cá: um estranho que chegou pelo
+              QR do vidro precisa dos dois — o nome pelo qual o carro é
+              conhecido e o que ele é. */}
+          {car.nickname?.trim() && (
+            <p className="mt-0.5 text-[13px] font-semibold text-[var(--engine-text-muted)]">
+              {car.model || car.title}
+            </p>
           )}
         </div>
         <div className="flex items-center gap-1.5">
@@ -207,6 +276,56 @@ export function CarShowcasePage() {
           </button>
         </div>
       </header>
+
+      {/* O dono era uma linha de texto vermelha que não levava a lugar nenhum.
+          É por aqui que alguém que gostou do carro chega na pessoa. */}
+      {owner && (
+        <Link
+          to={profilePath(owner.username) || "/community"}
+          className="-mx-1 flex items-center gap-2.5 rounded-xl px-1 py-1.5 transition-colors hover:bg-[var(--engine-surface-2)]"
+        >
+          {owner.avatar ? (
+            <img
+              src={owner.avatar}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--engine-accent)] text-[12px] font-black uppercase text-white">
+              {owner.avatarInitials || withoutAt(owner.username).slice(0, 2)}
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className="block truncate text-[14px] font-bold leading-tight text-[var(--engine-text)]">
+              {owner.author || `@${withoutAt(owner.username)}`}
+            </span>
+            <span className="block truncate text-[12.5px] leading-tight text-[var(--engine-text-muted)]">
+              {[`@${withoutAt(owner.username)}`, [car.city, car.state].filter(Boolean).join(", ")]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </span>
+        </Link>
+      )}
+
+      {/* As quatro etiquetas da ficha. A última é a potência, destacada:
+          é o número que todo mundo procura primeiro. */}
+      {fichas.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5">
+          {fichas.map((texto, indice) => (
+            <li
+              key={texto}
+              className={`rounded-lg border px-2.5 py-1.5 text-[13px] font-bold ${
+                indice === fichas.length - 1 && fichas.length > 1
+                  ? "border-[var(--engine-accent)]/45 bg-[var(--engine-accent-soft)] text-[var(--engine-accent-text)]"
+                  : "border-[var(--engine-border-strong)] bg-[var(--engine-surface-2)] text-[var(--engine-text)]"
+              }`}
+            >
+              {texto}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* A preparação contada pelo dono. Número declarado continua declarado:
           quem desenha a ficha é o mesmo componente do post, que carimba isso. */}

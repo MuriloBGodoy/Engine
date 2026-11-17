@@ -105,6 +105,28 @@ export const storeDataUri = async (dataUri, { userId, folder }) => {
   }
 };
 
+/**
+ * Apaga do Storage uma foto que ESTE app subiu, pelo endereço público dela.
+ *
+ * Existe por causa de um caso só, mas importante: a pessoa sobe a foto do
+ * carro no feed, vê que a placa está legível e manda esconder. A foto tratada
+ * sobe como arquivo novo — e a primeira, com a placa inteira, ficaria no
+ * bucket público para sempre, alcançável por quem tivesse o endereço. Então a
+ * antiga é apagada, senão "esconder a placa" teria escondido nada.
+ *
+ * Melhor esforço: falhou, segue a vida (a foto antiga não está em post
+ * nenhum). Só mexe em endereço do nosso próprio bucket.
+ */
+export const removeStoredPhoto = async (url) => {
+  const texto = String(url || "");
+  const marca = `/storage/v1/object/public/${BUCKET}/`;
+  const corte = texto.indexOf(marca);
+  if (corte < 0) return;
+  const path = decodeURIComponent(texto.slice(corte + marca.length).split("?")[0]);
+  if (!path) return;
+  await supabase.storage.from(BUCKET).remove([path]).catch(() => {});
+};
+
 export const uploadUserPhoto = async (file, { userId, folder }) => {
   if (!isImageFile(file)) throw new Error("Arquivo não é uma imagem.");
   if (isFileTooBig(file)) throw new Error("Imagem maior que 6 MB.");

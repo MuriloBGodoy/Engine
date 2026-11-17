@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronLeft, ChevronRight, Info, MessageCircle, Share2 } from "lucide-react";
+import { DownloadPhotoButton } from "../ui/DownloadPhotoButton";
 import { WhatsAppIcon } from "../services/ListingParts";
 import { ProfileLogo } from "./ShopPrimitives";
 import "../../services/i18n-shop";
@@ -73,6 +74,19 @@ export function ProductDetail({
             >
               <Share2 size={18} aria-hidden="true" />
             </button>
+          )}
+          {/* Baixar a foto do produto. Embaixo do compartilhar, na mesma
+              coluna da direita: são as duas ações sobre a foto. */}
+          {photos[current] && (
+            <DownloadPhotoButton
+              url={photos[current]}
+              nome={product.title}
+              className={`absolute right-2.5 grid h-11 w-11 place-items-center rounded-full bg-black/60 text-white backdrop-blur disabled:opacity-60 ${
+                onShare
+                  ? "top-[calc(3.875rem+env(safe-area-inset-top))] lg:top-[3.75rem]"
+                  : "top-[calc(0.625rem+env(safe-area-inset-top))] lg:top-2.5"
+              }`}
+            />
           )}
           {photos.length > 1 && (
             <>
