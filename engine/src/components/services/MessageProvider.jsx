@@ -20,6 +20,7 @@ import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { useToast } from "../ToastProvider";
 import { WhatsAppIcon } from "./ListingParts";
 import { interestMessage, productPath } from "../../services/shops";
+import { DragHandle } from "../DragHandle";
 
 /**
  * "Mensagem" no anúncio: abre (ou reabre) o fio cliente ↔ prestador em
@@ -211,6 +212,7 @@ function ContactSheet({ listing, user, onClose }) {
         onSubmit={submit}
         className="engine-modal-panel engine-pop sm:max-w-lg"
       >
+        <DragHandle onClose={onClose} />
         <header className="flex shrink-0 items-center gap-2 border-b border-[var(--engine-border)] px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:pt-2">
           <span className="w-2" />
           <div className="min-w-0 flex-1">

@@ -11,6 +11,7 @@ import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { EventPhotoField } from "./EventPhotoField";
 import "../../services/i18n-editing";
 import { Select } from "../ui/Select";
+import { DragHandle } from "../DragHandle";
 
 /**
  * Editar o evento (organizador e co-organizadores; o banco confere).
@@ -118,6 +119,7 @@ function EditContent({ event, onClose, onSaved }) {
   return (
     <div className="engine-modal-overlay">
       <div role="dialog" aria-modal="true" aria-labelledby="event-edit-title" className="engine-modal-panel engine-pop sm:max-w-lg">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pt-5">
           <h2 id="event-edit-title" className="font-display text-[17px] font-extrabold text-[var(--engine-text)]">
             {t("eventTeam.edit.title")}

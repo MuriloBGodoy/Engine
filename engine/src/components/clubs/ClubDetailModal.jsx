@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { ClubDetail } from "./ClubDetail";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
+import { DragHandle } from "../DragHandle";
 
 /**
  * O clube aberto de dentro da Comunidade, sem sair da aba.
@@ -19,6 +20,7 @@ export function ClubDetailModal({ clubId, onClose }) {
   return (
     <div className="engine-modal-overlay">
       <div className="engine-modal-panel engine-pop sm:max-w-4xl">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-center justify-end border-b border-[var(--engine-border)] px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:pt-3">
           <button
             type="button"

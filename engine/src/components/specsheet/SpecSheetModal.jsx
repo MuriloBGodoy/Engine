@@ -6,6 +6,7 @@ import { SpecSheetEditor } from "./SpecSheetEditor";
 import { SpecSheetView } from "./SpecSheetView";
 import { formatCarName, formatFipeYear } from "../../services/carDisplay";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
+import { DragHandle } from "../DragHandle";
 
 /**
  * A ficha tecnica, nas tres entradas.
@@ -91,6 +92,7 @@ export function SpecSheetModal({ car, onClose, onSave }) {
         className="engine-modal-panel engine-pop sm:max-w-2xl"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3.5 sm:px-6">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--engine-accent)]">

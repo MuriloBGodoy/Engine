@@ -7,6 +7,7 @@ import { MentionTextarea } from "../mentions/MentionTextarea";
 import { captionLimit } from "../../services/db";
 import { MAX_HASHTAGS, extractHashtags } from "../../services/socialText";
 import "../../services/i18n-social-posts";
+import { DragHandle } from "../DragHandle";
 
 const PERSON_ONLY = ["person"];
 
@@ -48,6 +49,7 @@ export function CaptionEditor({ goal, onClose, onSave }) {
         className="engine-modal-panel engine-pop sm:max-w-lg"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3.5">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--engine-accent)]">

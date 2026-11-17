@@ -8,7 +8,8 @@ import { localISODate, validateExpense } from "../services/garageInput";
 import { useConfirm } from "./ConfirmProvider";
 import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
-import { formatCarName } from "../services/carDisplay";
+import { carTitle } from "../services/carDisplay";
+import { DragHandle } from "./DragHandle";
 
 // Fuso do aparelho. Era `toISOString()` (UTC): no Brasil, depois das 21h o
 // gasto nascia com a data de amanha.
@@ -202,6 +203,7 @@ export function ExpensesModal({ car, onClose, onSaved }) {
         className="engine-modal-panel engine-pop sm:max-w-xl"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex items-start justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]">
@@ -212,7 +214,7 @@ export function ExpensesModal({ car, onClose, onSaved }) {
                 {t("expenses.title")}
               </h2>
               <p className="truncate text-xs text-[var(--engine-text-muted)]">
-                {formatCarName(car)}
+                {carTitle(car)}
               </p>
             </div>
           </div>

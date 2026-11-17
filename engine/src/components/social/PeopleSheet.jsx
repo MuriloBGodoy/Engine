@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Search, UserMinus, X } from "lucide-react";
 import { PostMenu } from "./PostMenu";
 import { getInitials, withoutAt } from "../../services/people";
+import { DragHandle } from "../DragHandle";
 
 /**
  * Seguidores e seguindo — a folha que abre pelo contador do perfil.
@@ -168,6 +169,7 @@ export function PeopleSheet({
   return createPortal(
     <div className="engine-modal-overlay" role="dialog" aria-modal="true">
       <div className="engine-modal-panel engine-pop sm:max-w-md">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-4 pt-4">
           <div className="flex gap-5">
             {abas.map((aba) => (

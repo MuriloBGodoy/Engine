@@ -15,6 +15,7 @@ import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatCarName, formatFipeYear } from "../services/carDisplay";
 import { useToast } from "./ToastProvider";
 import { Select } from "./ui/Select";
+import { DragHandle } from "./DragHandle";
 
 /*
  * Simulador enxuto, 06/10/2026.
@@ -214,6 +215,7 @@ function ComingSoon({ car, onClose }) {
   return (
     <div className="engine-modal-overlay">
       <div className="engine-modal-panel engine-pop sm:max-w-md">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--engine-text-muted)]">
@@ -443,6 +445,7 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
   return (
     <div className="engine-modal-overlay">
       <div className="engine-modal-panel engine-pop sm:max-w-2xl">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--engine-text-muted)]">

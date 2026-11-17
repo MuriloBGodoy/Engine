@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Image as ImageIcon, Loader2, Play, Scissors, Volume2, VolumeX, X } from "lucide-react";
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { VIDEO_LIMITS, captureFrame, clampTrim, seekTo } from "../../services/postVideo";
+import { DragHandle } from "../DragHandle";
 
 const fmt = (seconds) => {
   const total = Math.max(0, Number(seconds) || 0);
@@ -140,6 +141,7 @@ export function VideoEditor({ source, initial = null, onCancel, onConfirm }) {
         className="engine-modal-panel engine-pop sm:max-w-lg"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onCancel} />
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3">
           <h2 className="text-base font-black text-[var(--engine-text)]">{t("socialPosts.video.editTitle")}</h2>
           <button

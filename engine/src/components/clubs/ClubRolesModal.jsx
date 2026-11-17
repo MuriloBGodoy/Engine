@@ -16,6 +16,7 @@ import {
   sortRoles,
 } from "../../services/clubRoles";
 import { Select } from "../ui/Select";
+import { DragHandle } from "../DragHandle";
 
 /**
  * Cargos do clube (só o Fundador): nome, cor da paleta, permissões, ordem
@@ -136,6 +137,7 @@ function RolesContent({ club, onClose, onSaved }) {
   return (
     <div className="engine-modal-overlay">
       <div role="dialog" aria-modal="true" aria-labelledby="club-roles-title" className="engine-modal-panel engine-pop sm:max-w-2xl">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
             <h2 id="club-roles-title" className="font-display text-[17px] font-extrabold tracking-tight text-[var(--engine-text)] sm:text-xl">

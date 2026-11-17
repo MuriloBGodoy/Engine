@@ -14,6 +14,7 @@ import {
 import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { Button } from "../Button";
 import { useToast } from "../ToastProvider";
+import { DragHandle } from "../DragHandle";
 
 const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
 const StripeEmbeddedCheckout = lazyNamed(() => import("./StripeEmbeddedCheckout"), "StripeEmbeddedCheckout");
@@ -138,6 +139,7 @@ export function CheckoutSheet({ offerId, subscription, country = "BR", currency 
         className="engine-modal-panel engine-pop sm:max-w-xl"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} enabled={!busy} />
         <header className="flex shrink-0 items-center gap-2 border-b border-[var(--engine-border)] px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:pt-2">
           {step === "checkout" ? (
             <button

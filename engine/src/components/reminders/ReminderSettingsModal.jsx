@@ -23,6 +23,7 @@ import {
   reminderTone,
 } from "../../services/reminderLabels";
 import { Select } from "../ui/Select";
+import { DragHandle } from "../DragHandle";
 
 const fieldClass =
   "w-full rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-3.5 py-2.5 text-[var(--engine-text)] outline-none transition-colors focus:border-[var(--engine-accent)]";
@@ -141,6 +142,7 @@ export function ReminderSettingsModal({ car, onClose, onSave }) {
         className="engine-modal-panel engine-pop sm:max-w-xl"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex items-start justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]">

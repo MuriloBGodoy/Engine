@@ -7,6 +7,7 @@ import { trackEvent } from "../services/observability";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { useConfirm } from "./ConfirmProvider";
 import { localISODate, validateContribution } from "../services/garageInput";
+import { DragHandle } from "./DragHandle";
 
 // Fuso do aparelho. Era `toISOString()` (UTC): no Brasil, depois das 21h o
 // aporte nascia com a data de amanhã.
@@ -127,6 +128,7 @@ export function ContributionModal({ car, onClose, onSaved }) {
         className="engine-modal-panel engine-pop sm:max-w-lg"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex items-start justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--engine-accent-soft)] text-[var(--engine-accent)]">
