@@ -74,8 +74,53 @@ export const formatNotificationTime = (createdAt) => {
   }).format(date);
 };
 
+/*
+ * O caminho antigo do perfil de alguém: `/community?user=<uuid>`.
+ *
+ * Ele não leva ao perfil — leva à COMUNIDADE, que carrega o feed inteiro e
+ * só então troca o id pelo @ e navega. Quem toca em "fulano começou a seguir
+ * você" vê a comunidade piscar no meio do caminho, e se o id não estiver
+ * entre os perfis que o feed carregou ainda espera uma leitura a mais.
+ *
+ * Existia por um detalhe de ordem: a rota do perfil é pelo @, e quem gravou
+ * o aviso tinha o id em mãos. Só que o @ TAMBÉM está gravado — a `notify`
+ * põe `actorUsername` em toda notificação, de todo tipo. Então quando ele
+ * está lá, o caminho antigo é trocado pelo direto, inclusive nos avisos que
+ * já estavam na caixa de alguém.
+ */
+const CAMINHO_ANTIGO_DE_PERFIL = /^\/community\?user=/;
+
+/*
+ * E tem uma geração ANTERIOR a essa, de 14/07/2026: avisos de "começou a
+ * seguir você" gravados com `targetPath` igual a `/community` e mais nada.
+ * Levam ao feed e param ali — nem o id do perfil eles carregavam.
+ *
+ * O respaldo da migration 20261115150000 não os alcançou de propósito: o
+ * `where` dela procura o formato `/community?user=`, que é outro. Como o `@`
+ * de quem seguiu está gravado nos três (conferido em produção em 17/11/2026),
+ * dá para corrigir na leitura, sem tocar em linha nenhuma do banco.
+ *
+ * Só vale para "follow": em curtida e comentário o destino certo é o post, e
+ * mandar para o perfil ali seria trocar um defeito por outro.
+ */
+const FEED_SEM_DESTINO = (notification) =>
+  notification.type === "follow" && String(notification.targetPath).replace(/\/+$/, "") === "/community";
+
+const perfilDireto = (notification) => {
+  const arroba = String(notification.actorUsername || "").replace(/^@+/, "").trim();
+  return arroba ? `/community/@${encodeURIComponent(arroba)}` : "";
+};
+
 export const getNotificationTarget = (notification) => {
-  if (notification.targetPath) return notification.targetPath;
+  const direto = perfilDireto(notification);
+
+  if (notification.targetPath) {
+    // Só o caminho de PERFIL é corrigido. Curtida e comentário têm destino
+    // próprio (o post), e trocar por perfil ali seria outro defeito.
+    const velho =
+      CAMINHO_ANTIGO_DE_PERFIL.test(notification.targetPath) || FEED_SEM_DESTINO(notification);
+    return velho && direto ? direto : notification.targetPath;
+  }
 
   if (notification.conversationId)
     return `/messages/${notification.conversationId}`;
@@ -92,8 +137,10 @@ export const getNotificationTarget = (notification) => {
   // Convite e cargo novo levam ao clube, que é onde se aceita ou se vê.
   if (notification.clubId) return `/clubs/${encodeURIComponent(notification.clubId)}`;
 
-  // Sem meta: leva ao perfil de quem interagiu.
+  // Sem meta: leva ao perfil de quem interagiu. Pelo @ quando se sabe; o id
+  // fica de reserva para o aviso antigo que não guardou o @.
   if (["follow", "like", "comment", "rating"].includes(notification.type)) {
+    if (direto) return direto;
     return notification.actorId
       ? `/community?user=${encodeURIComponent(notification.actorId)}`
       : "/community";
