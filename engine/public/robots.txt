@@ -1,0 +1,20 @@
+# Quem pede isto antes de qualquer outra coisa e o robo de busca. Ate
+# 17/11/2026 o arquivo nao existia: o _redirects manda tudo que nao for
+# arquivo para o index.html, entao /robots.txt respondia 200 com o HTML do
+# app inteiro. Arquivo de verdade em public/ e servido antes do fallback.
+
+User-agent: *
+Allow: /
+
+# Telas que so existem para quem esta logado. Nao tem conteudo publico para
+# indexar e gastam rastreamento a toa.
+Disallow: /dashboard
+Disallow: /garagem
+Disallow: /messages
+Disallow: /settings
+Disallow: /moderacao
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+
+Sitemap: https://enginegarage.com.br/sitemap.xml

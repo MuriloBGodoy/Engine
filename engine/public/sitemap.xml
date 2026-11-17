@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  So as paginas que existem sem login e nao mudam de endereco. O conteudo da
+  comunidade (post, perfil, clube, evento, anuncio) fica de fora de proposito:
+  nasce e some o tempo todo, e listar aqui a mao envelheceria no mesmo dia.
+  Esse conteudo e descoberto pelos links do proprio site, e cada um ja tem
+  cartao e canonical pelas edge functions social-og e service-og.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://enginegarage.com.br/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://enginegarage.com.br/servicos</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://enginegarage.com.br/community</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://enginegarage.com.br/events</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://enginegarage.com.br/clubs</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://enginegarage.com.br/sobre</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://enginegarage.com.br/ajuda</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://enginegarage.com.br/planos</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://enginegarage.com.br/anuncie</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://enginegarage.com.br/apoie</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://enginegarage.com.br/termos</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://enginegarage.com.br/privacidade</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>

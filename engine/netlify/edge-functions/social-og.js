@@ -196,6 +196,11 @@ const resolvers = {
   },
 };
 
+// og:*, twitter:* e o canonical que o index.html carrega para a página
+// inicial. `[^>]*` não atravessa a tag, então nada além delas é tocado.
+const TAGS_DA_RAIZ =
+  /\s*<(?:meta\s+(?:property="og:[^"]*"|name="twitter:[^"]*")|link\s+rel="canonical")[^>]*>/gi;
+
 const injectTags = (html, { title, description, image, url }) => {
   const tags = [
     `<meta property="og:type" content="website" />`,
@@ -215,6 +220,11 @@ const injectTags = (html, { title, description, image, url }) => {
   return html
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
     .replace(/<meta\s+name="description"[\s\S]*?\/>/i, `<meta name="description" content="${escapeHtml(description)}" />`)
+    // Desde 17/11/2026 o index.html já traz o cartão da RAIZ escrito à mão.
+    // Sem tirar o que veio de lá, a página funda ficaria com DOIS og:title, e
+    // o raspador fica com o primeiro que encontra — que é o genérico. Some o
+    // da raiz, entra o desta página.
+    .replace(TAGS_DA_RAIZ, "")
     .replace(/<\/head>/i, `    ${tags}\n  </head>`);
 };
 

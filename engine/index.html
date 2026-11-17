@@ -51,6 +51,41 @@
       content="Engine — organize sua garagem, acompanhe metas e conecte-se com a comunidade automotiva."
     />
 
+    <!-- Cartão de link da PÁGINA INICIAL (17/11/2026).
+         Post, perfil, carro, clube, evento e anúncio já ganhavam cartão pelas
+         edge functions social-og e service-og. A raiz não tinha nenhum — e a
+         raiz é exatamente o link que vai na bio do Instagram e no story:
+         compartilhar enginegarage.com.br mostrava a URL crua, sem imagem,
+         sem título e sem frase.
+         Aqui é escrito à mão porque não depende de nada do banco; quando a
+         rota é funda, as edge functions apagam estas tags antes de pôr as
+         delas (ver TAGS_DA_RAIZ), senão sobrariam dois og:title e o raspador
+         fica com o primeiro, que é este genérico.
+         A imagem sai de `npm run og` (scripts/generate-og-image.mjs) e é
+         versionada; o endereço precisa ser absoluto, porque quem lê o cartão
+         não resolve caminho relativo. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Engine" />
+    <meta property="og:title" content="Engine — sua garagem virou rede" />
+    <meta
+      property="og:description"
+      content="Metas, custos, manutenção e a comunidade automotiva em um só lugar."
+    />
+    <meta property="og:url" content="https://enginegarage.com.br/" />
+    <meta property="og:image" content="https://enginegarage.com.br/og-engine.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Engine — sua garagem virou rede" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Engine — sua garagem virou rede" />
+    <meta
+      name="twitter:description"
+      content="Metas, custos, manutenção e a comunidade automotiva em um só lugar."
+    />
+    <meta name="twitter:image" content="https://enginegarage.com.br/og-engine.png" />
+    <link rel="canonical" href="https://enginegarage.com.br/" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -64,7 +99,12 @@
          protege os dados é a RLS. -->
     <meta name="engine:supabase-url" content="%VITE_SUPABASE_URL%" />
     <meta name="engine:supabase-key" content="%VITE_SUPABASE_PUBLISHABLE_KEY%" />
-    <title>Engine</title>
+    <!-- O que o Google mostra na lista de resultados e o que vira o nome
+         da aba e do favorito. "Engine" sozinho nao diz o que o site e, e
+         disputa a palavra com motor de busca, motor de jogo e afins. As
+         telas que tem titulo proprio (paginas legais, produto publico)
+         continuam trocando este valor ao abrir. -->
+    <title>Engine — sua garagem virou rede</title>
   </head>
   <body>
     <div id="root"></div>
