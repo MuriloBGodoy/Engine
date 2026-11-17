@@ -216,3 +216,81 @@ function pickData(data = {}) {
   }
   return out;
 }
+
+/* ------------------------------------------------------------ diretório -- */
+
+const escapeLike = (value) => String(value || "").replace(/[\\%_,()]/g, (char) => `\\${char}`);
+
+/**
+ * Quem atende: o diretório público de contas profissionais e páginas.
+ *
+ * Isto faltava, e a falta era grave. Até aqui dava para CRIAR uma conta
+ * profissional e para abrir uma pelo @ (`fetchProProfileByHandle`), mas não
+ * havia como LISTAR nenhuma — nem em Serviços, nem na Buscar. Uma oficina
+ * montava a conta e ficava invisível: só achava quem já soubesse o @ dela.
+ * Numa praça onde o prestador é quem paga, a vitrine dele não pode depender
+ * de alguém já conhecê-lo.
+ *
+ * Não precisou de migration: a política "pro: vitrine publica" já libera o
+ * SELECT de qualquer perfil não suspenso (migration 20261101130000), e a
+ * suspensão da conta da pessoa é conferida lá dentro, no
+ * `pro_profile_visible`. Aqui só se pergunta.
+ *
+ * Devolve `[{ profile, person, path }]`. `person` vem do cartão público e só
+ * existe em kind "person" — é de lá que sai o @ (a linha de pro_profiles tem
+ * `handle` nulo nesse caso, por regra da própria tabela) e o retrato.
+ */
+export async function listProProfiles({ term = "", category = "", state = "", limit = 24 } = {}) {
+  let consulta = supabase.from("pro_profiles").select("*").eq("suspended", false);
+
+  if (category) consulta = consulta.eq("data->>category", category);
+  if (state) consulta = consulta.eq("data->>state", state);
+
+  const alvo = String(term || "").trim();
+  if (alvo.length >= 2) {
+    // O nome serve para os dois tipos; o @ só existe na página. Quem procura
+    // pelo @ de uma PESSOA cai na busca de perfis, que já existe.
+    const like = `%${escapeLike(alvo)}%`;
+    consulta = consulta.or(`name.ilike.${like},handle.ilike.${like}`);
+  }
+
+  const rows = must(await consulta.order("updated_at", { ascending: false }).limit(Math.max(1, limit)));
+  const perfis = rows.map(proProfileFromRow);
+
+  // Os cartões das pessoas em uma leitura só, não uma por perfil.
+  const pessoas = new Map();
+  const ids = perfis.filter((perfil) => perfil.kind === "person" && perfil.userId).map((perfil) => perfil.userId);
+  if (ids.length) {
+    const cartoes = must(
+      await supabase.from("public_profiles").select("user_id, username, author, data").in("user_id", ids),
+    );
+    for (const cartao of cartoes) {
+      pessoas.set(cartao.user_id, {
+        username: cartao.username || "",
+        author: cartao.author || "",
+        avatar: cartao.data?.avatar || "",
+        cover: cartao.data?.cover || "",
+      });
+    }
+  }
+
+  return perfis
+    .map((profile) => {
+      const person = profile.kind === "person" ? pessoas.get(profile.userId) || null : null;
+      return { profile, person, path: proProfilePath(profile, person?.username || "") };
+    })
+    // Sem caminho não há para onde levar: perfil pessoal cujo @ ainda não
+    // existe no cartão público fica de fora em vez de virar link morto.
+    .filter((item) => Boolean(item.path));
+}
+
+/** O diretório filtrado pelo que a pessoa digitou, sem ir ao servidor por tecla. */
+export const proMatchesTerm = (item, alvo = "") => {
+  if (!alvo) return true;
+  const { profile, person } = item;
+  return [profile.name, profile.handle, person?.author, person?.username, profile.data.city, profile.data.state]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(alvo.toLowerCase());
+};

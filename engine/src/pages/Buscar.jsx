@@ -10,6 +10,7 @@ import {
   CalendarDays,
   ChevronRight,
   MapPin,
+  Store,
 } from "lucide-react";
 import { engineDB } from "../services/db";
 import { useProfileSearch } from "../hooks/useProfileSearch";
@@ -17,6 +18,9 @@ import { discoverClubs, clubImageUrl } from "../services/clubs";
 import { engineEvents } from "../services/events";
 import { profilePath, withoutAt } from "../services/people";
 import { ListingPhoto } from "../components/services/ListingParts";
+import { ProDirectoryCard } from "../components/pro/ProDirectoryCard";
+import { useProDirectory } from "../hooks/useProDirectory";
+import { proMatchesTerm } from "../services/proProfiles";
 import {
   categoryIcons,
   getServiceCategoryLabel,
@@ -52,6 +56,7 @@ const ABAS = [
   { chave: "tudo", rotulo: "search.tabs.all" },
   { chave: "pessoas", rotulo: "search.tabs.people" },
   { chave: "servicos", rotulo: "search.tabs.services" },
+  { chave: "oficinas", rotulo: "search.tabs.pros" },
   { chave: "clubes", rotulo: "search.tabs.clubs" },
   { chave: "eventos", rotulo: "search.tabs.events" },
 ];
@@ -139,8 +144,9 @@ function Avatar({ src, nome, quadrado = false }) {
   return <span className={classe}>{iniciais(nome)}</span>;
 }
 
-export function Buscar() {
+export function Buscar({ user = null }) {
   const { t, i18n } = useTranslation();
+  const uid = user?.uid || "";
   const [termo, setTermo] = useState("");
   const [aba, setAba] = useState("tudo");
 
@@ -149,6 +155,10 @@ export function Buscar() {
   const alvo = semAcento(limpo);
 
   const pessoas = useProfileSearch(limpo, { enabled: buscando, max: 8 });
+
+  // Quem atende: oficina, loja, detalhador. Vem inteiro e filtra aqui, como
+  // serviço e evento — ver o cabeçalho deste arquivo.
+  const { items: oficinas } = useProDirectory({ limit: 24 });
 
   // Serviços e eventos vêm inteiros e são filtrados aqui: são poucos, e um
   // filtro no navegador responde a cada letra sem ir ao servidor.
@@ -230,6 +240,15 @@ export function Buscar() {
       .slice(0, 8);
   }, [servicos, buscando, alvo, t]);
 
+  // O próprio perfil profissional fica DE FORA aqui: ninguém procura por si
+  // mesmo, e na Buscar não há como gerenciá-lo — quem quer mexer no seu vai
+  // por Serviços, onde o cartão vem marcado e com o botão de gerenciar.
+  const oficinasAchadas = useMemo(() => {
+    const minhas = oficinas.filter((item) => item.profile.userId !== uid);
+    const base = buscando ? minhas.filter((item) => proMatchesTerm(item, limpo)) : minhas;
+    return base.slice(0, buscando ? 8 : 3);
+  }, [oficinas, buscando, limpo, uid]);
+
   const eventosAchados = useMemo(() => {
     const base = buscando
       ? eventos.filter((evento) =>
@@ -259,6 +278,7 @@ export function Buscar() {
     buscando &&
     !pessoas.length &&
     !servicosAchados.length &&
+    !oficinasAchadas.length &&
     !clubes.length &&
     !eventosAchados.length;
 
@@ -331,6 +351,19 @@ export function Buscar() {
                   </Link>
                 );
               })}
+            </div>
+          </Secao>
+
+          <Secao
+            icone={Store}
+            titulo={t("search.sections.pros")}
+            verTudo="/services"
+            vazio={oficinasAchadas.length ? "" : t("search.noPros")}
+          >
+            <div className="grid gap-2 pt-1 sm:grid-cols-2">
+              {oficinasAchadas.map((item) => (
+                <ProDirectoryCard key={item.profile.id} item={item} />
+              ))}
             </div>
           </Secao>
 
@@ -433,6 +466,16 @@ export function Buscar() {
                   }
                 />
               ))}
+            </Secao>
+          )}
+
+          {mostra("oficinas") && oficinasAchadas.length > 0 && (
+            <Secao icone={Store} titulo={t("search.sections.pros")} verTudo="/services">
+              <div className="grid gap-2 pt-1 sm:grid-cols-2">
+                {oficinasAchadas.map((item) => (
+                  <ProDirectoryCard key={item.profile.id} item={item} />
+                ))}
+              </div>
             </Secao>
           )}
 

@@ -43,7 +43,6 @@ import { compressPhotoForUpload, isImageFile, uploadToStorage } from "../service
 import {
   countries,
   getStates,
-  getCities,
   getCountryName,
   getStateName,
   isCityInCountry,
@@ -51,6 +50,10 @@ import {
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { AdSlot } from "../components/AdSlot";
+import { ProDirectoryCard } from "../components/pro/ProDirectoryCard";
+import { PullToRefresh } from "../components/ui/PullToRefresh";
+import { useProDirectory } from "../hooks/useProDirectory";
+import { proMatchesTerm } from "../services/proProfiles";
 import { ServiceRatingBadge, ServiceReviews } from "../components/services/ServiceReviews";
 import { useRegion } from "../hooks/RegionProvider";
 import {
@@ -68,6 +71,9 @@ import {
   serviceCategories,
 } from "../services/serviceListingDisplay";
 import { serviceListingPath } from "../services/serviceListingPublic";
+import { cityKey, sameCity } from "../services/places";
+import { maskPhone } from "../services/masks";
+import { CityField } from "../components/ui/CityField";
 import {
   ListingPhoto,
   ListingPhotoPlaceholder,
@@ -106,6 +112,7 @@ import { ProductEditor } from "../components/shops/ProductEditor";
 import { MediaPickerButton } from "../components/MediaPickerButton";
 import { useMyPro } from "../hooks/useMyPro";
 import { Select as EngineSelect } from "../components/ui/Select";
+import { DownloadPhotoButton } from "../components/ui/DownloadPhotoButton";
 
 // Publicar serviço é grátis para sempre (decisão de 24/10/2026). O plano Pro
 // vende as ferramentas em volta do anúncio, nunca o anúncio em si.
@@ -207,45 +214,15 @@ const stripPhoneCountry = (value = "", countryCode = "+55") => {
   return digits.startsWith(cleanCountry) ? digits.slice(cleanCountry.length) : digits;
 };
 
-const formatPhoneInput = (value = "", countryCode = "+55") => {
-  const digits = String(value).replace(/\D/g,"").slice(0, 14);
-
-  if (countryCode === "+55") {
-    const localDigits = stripPhoneCountry(digits, countryCode).slice(0, 11);
-    const areaCode = localDigits.slice(0, 2);
-    const firstPart = localDigits.length > 10
-      ? localDigits.slice(2, 7)
-      : localDigits.slice(2, 6);
-    const secondPart = localDigits.length > 10
-      ? localDigits.slice(7, 11)
-      : localDigits.slice(6, 10);
-
-    let formatted = "";
-    if (areaCode) formatted += `(${areaCode}`;
-    if (areaCode.length === 2) formatted += ") ";
-    if (firstPart) formatted += firstPart;
-    if (secondPart) formatted += `-${secondPart}`;
-    return formatted;
-  }
-
-  if (countryCode === "+1") {
-    const localDigits = stripPhoneCountry(digits, countryCode).slice(0, 10);
-    const areaCode = localDigits.slice(0, 3);
-    const firstPart = localDigits.slice(3, 6);
-    const secondPart = localDigits.slice(6, 10);
-
-    let formatted = "";
-    if (areaCode) formatted += `(${areaCode}`;
-    if (areaCode.length === 3) formatted += ") ";
-    if (firstPart) formatted += firstPart;
-    if (secondPart) formatted += `-${secondPart}`;
-    return formatted;
-  }
-
-  return stripPhoneCountry(digits, countryCode)
-    .replace(/(\d{3})(?=\d)/g, "$1 ")
-    .trim();
-};
+// A máscara de telefone é UMA só no app (services/phone.js). Esta função
+// continua existindo porque o formulário de serviço guarda o DDI num campo
+// separado: aqui o prefixo do país é removido do que foi digitado antes de
+// mascarar, para quem cola "+5516997996509" não virar "(55) 16997-9965".
+//
+// Até 14/11/2026 havia uma segunda implementação inteira aqui, com regras
+// próprias para BR e EUA. Duas máscaras de telefone é uma a mais.
+const formatPhoneInput = (value = "", countryCode = "+55") =>
+  maskPhone(countryCode, stripPhoneCountry(value, countryCode));
 
 const splitStoredPhone = (value = "", fallbackCountry = "+55") => {
   const cleanValue = String(value || "").trim();
@@ -342,13 +319,14 @@ function Field({ label, children, wide = false, required = false, optional = fal
   );
 }
 
+// Uma constante, não uma string repetida: o campo de cidade virou um
+// componente próprio (com lista de sugestões) e precisa parecer exatamente um
+// `TextInput` ao lado dos outros.
+const TEXT_INPUT_CLASS =
+  "min-h-12 w-full min-w-0 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 text-sm font-bold text-[var(--engine-text)] outline-none transition placeholder:text-[var(--engine-text-subtle)] focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:placeholder:text-[var(--engine-text-muted)] dark:focus:bg-[var(--engine-elevated)]";
+
 function TextInput(props) {
-  return (
-    <input
-      {...props}
-      className="min-h-12 w-full min-w-0 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 text-sm font-bold text-[var(--engine-text)] outline-none transition placeholder:text-[var(--engine-text-subtle)] focus:border-[var(--engine-accent)] focus:bg-[var(--engine-surface)] dark:text-white dark:[color-scheme:dark] dark:placeholder:text-[var(--engine-text-muted)] dark:focus:bg-[var(--engine-elevated)]"
-    />
-  );
+  return <input {...props} className={TEXT_INPUT_CLASS} />;
 }
 
 function TextArea(props) {
@@ -1165,6 +1143,11 @@ function PhotoLightbox({
           >
             <ZoomIn size={18} />
           </button>
+          <DownloadPhotoButton
+            url={activePhoto}
+            nome={listing.title}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--engine-surface)]/10 transition hover:bg-[var(--engine-surface)]/20 disabled:opacity-60"
+          />
           <button
             type="button"
             onClick={onClose}
@@ -1360,8 +1343,6 @@ function ListingEditorModal({
   const showAddress = ["place", "hybrid"].includes(form.serviceMode);
   const showServiceArea = ["mobile", "hybrid"].includes(form.serviceMode);
   const formStates = getStates(form.country);
-  const formCities = getCities(form.country, form.state);
-  const cityListId = "listing-city-suggestions";
   const photos = form.photos || [];
   // "Publicado como": a página escolhida (logo, nome, @) ou a própria pessoa.
   // Até 02/11/2026 o seletor mudava e o cartão continuava mostrando a pessoa.
@@ -1645,23 +1626,23 @@ function ListingEditorModal({
                     ))}
                   </Select>
                 </Field>
+                {/* Cidade: lista do IBGE inteira, filtrada pela UF. Era um
+                    `datalist` com as ~5 maiores cidades do estado — quem
+                    atende em cidade do interior (a maioria de quem presta
+                    serviço) digitava do próprio jeito, e o filtro de cidade
+                    da vitrine nunca achava o anúncio. */}
                 <Field label={t("services.fields.city")} required>
-                  <TextInput
+                  <CityField
                     id="svc-city"
+                    country={form.country || "BR"}
+                    state={form.state || ""}
                     value={form.city}
-                    onChange={(event) => onChange("city", event.target.value)}
+                    onChange={(cidade) => onChange("city", cidade)}
                     placeholder={t("services.placeholders.city")}
-                    list={formCities.length ? cityListId : undefined}
                     autoComplete="address-level2"
                     aria-required="true"
+                    className={TEXT_INPUT_CLASS}
                   />
-                  {formCities.length > 0 && (
-                    <datalist id={cityListId}>
-                      {formCities.map((city) => (
-                        <option key={city} value={city} />
-                      ))}
-                    </datalist>
-                  )}
                 </Field>
                 {showAddress && (
                   <Field
@@ -2539,14 +2520,38 @@ export function Services({ user, settings }) {
   );
 
   // Produto (Lojas) mora na mesma tabela; a vitrine de serviços só serviço.
+  //
+  // `recargaDaVitrine` entra nas dependências para o "puxar para atualizar"
+  // refazer a assinatura — é ela que dispara a leitura nova. A promessa do
+  // gesto só se resolve quando os anúncios chegam, senão o indicador sumiria
+  // antes de a tela mudar.
+  const [recargaDaVitrine, setRecargaDaVitrine] = useState(0);
+  const esperandoVitrine = useRef(null);
+
   useEffect(
     () =>
       engineDB.subscribeServiceListings(
-        (all) => setListings(all.filter((listing) => listing.kind !== "product")),
+        (all) => {
+          setListings(all.filter((listing) => listing.kind !== "product"));
+          esperandoVitrine.current?.();
+          esperandoVitrine.current = null;
+        },
         { userId: user?.uid, isAdmin },
       ),
-    [isAdmin, user?.uid],
+    [isAdmin, user?.uid, recargaDaVitrine],
   );
+
+  const atualizarVitrine = () =>
+    new Promise((resolve) => {
+      esperandoVitrine.current = resolve;
+      setRecargaDaVitrine((n) => n + 1);
+      window.setTimeout(() => {
+        if (esperandoVitrine.current === resolve) {
+          esperandoVitrine.current = null;
+          resolve();
+        }
+      }, 6000);
+    });
 
   // O `publish=1` já foi lido na montagem; sai da barra de endereço para um
   // recarregar não reabrir o formulário.
@@ -2657,22 +2662,40 @@ export function Services({ user, settings }) {
 
   // Cidades presentes, respeitando país + estado selecionados (+ a escolhida).
   const cityOptions = useMemo(() => {
-    const cities = new Set(
-      approvedListings
-        .filter(
-          (listing) =>
-            (countryFilter === "all" ||
-              !listing.country ||
-              listing.country === countryFilter) &&
-            (stateFilter === "all" ||
-              !listing.state ||
-              listing.state === stateFilter),
-        )
-        .map((listing) => listing.city?.trim())
-        .filter(Boolean),
-    );
-    if (cityFilter !== "all") cities.add(cityFilter);
-    return Array.from(cities).sort((a, b) => a.localeCompare(b));
+    // Agrupa por chave: "Araraquara" e "araraquara" são uma opção só, e a que
+    // aparece é a melhor grafia (a com acento e maiúscula). Antes o seletor
+    // mostrava a mesma cidade duas ou três vezes, cada uma filtrando um
+    // pedaço dos anúncios.
+    // Objeto simples, e NÃO `new Map()`: esta tela importa o ícone `Map` do
+    // lucide, que sombreia o `Map` do JavaScript. `new Map()` aqui dentro
+    // estoura com "Map is not a constructor" e derruba a página inteira.
+    const porChave = Object.create(null);
+    approvedListings
+      .filter(
+        (listing) =>
+          (countryFilter === "all" ||
+            !listing.country ||
+            listing.country === countryFilter) &&
+          (stateFilter === "all" ||
+            !listing.state ||
+            listing.state === stateFilter),
+      )
+      .map((listing) => listing.city?.trim())
+      .filter(Boolean)
+      .forEach((nome) => {
+        const chave = cityKey(nome);
+        if (!chave) return;
+        const atual = porChave[chave];
+        // Fica a grafia com acento/maiúscula: "São Paulo" vence "sao paulo".
+        if (!atual || (nome !== nome.toLowerCase() && atual === atual.toLowerCase())) {
+          porChave[chave] = nome;
+        }
+      });
+    const escolhida = cityKey(cityFilter);
+    if (cityFilter !== "all" && escolhida && !porChave[escolhida]) {
+      porChave[escolhida] = cityFilter;
+    }
+    return Object.values(porChave).sort((a, b) => a.localeCompare(b));
   }, [approvedListings, countryFilter, stateFilter, cityFilter]);
 
   const stats = useMemo(() => {
@@ -2731,7 +2754,12 @@ export function Services({ user, settings }) {
     const inScope = (listing, scope) =>
       (scope.country === "all" || !listing.country || listing.country === scope.country) &&
       (scope.state === "all" || !listing.state || listing.state === scope.state) &&
-      (scope.city === "all" || (listing.city?.trim() || "") === scope.city);
+      // Cidade por chave, não por string: o que está gravado veio de texto
+      // livre ("Araraquara", "araraquara", "Araraquara-SP") e comparação
+      // literal fazia o filtro de cidade zerar quase sempre — e, com a
+      // proteção anti-tela-vazia logo abaixo, devolver o catálogo inteiro.
+      // Para quem usa, era um filtro que não fazia nada.
+      (scope.city === "all" || sameCity(listing.city, scope.city));
 
     const requested = { country: countryFilter, state: stateFilter, city: cityFilter };
     const scopes = [requested];
@@ -2753,6 +2781,55 @@ export function Services({ user, settings }) {
     return { items: [], widened: false, requestedLabel: scopeLabel(requested), shownLabel: "" };
   }, [approvedListings, category, mode, countryFilter, stateFilter, cityFilter, query, t]);
   const filteredListings = regionResult.items;
+
+  // Quem atende: os PERFIS profissionais, não os anúncios. Uma oficina que
+  // montou a conta aparece aqui no mesmo dia, antes de publicar qualquer
+  // coisa — e até 14/11/2026 não aparecia em lugar nenhum do app, porque não
+  // existia consulta que listasse perfis (ver `listProProfiles`).
+  const { items: proProfiles } = useProDirectory({ limit: 60 });
+  // Quantas oficinas a seção mostra antes de "ver mais". Seis cabem em duas
+  // linhas no computador e não empurram a grade de anúncios para longe.
+  const [prosExpandido, setProsExpandido] = useState(false);
+  // Quais da lista são meus: o pessoal e as páginas em que estou na equipe.
+  // Página tem `userId` nulo por regra da tabela, então comparar só por dono
+  // deixaria de fora justamente quem administra uma oficina com sócios.
+  const meusProIds = useMemo(
+    () => new Set(pro.publishable.map((entry) => entry.profile.id)),
+    [pro.publishable],
+  );
+  /*
+   * As oficinas que a seção mostra, com os MESMOS filtros da página: a
+   * categoria escolhida nas pílulas, a UF do painel de filtros e o que foi
+   * digitado na busca. Antes elas ignoravam tudo isso e apareciam sempre as
+   * mesmas oito — o que funciona com duas cadastradas e vira uma lista
+   * aleatória com duzentas.
+   *
+   * A ordem é por proximidade de quem olha: mesma cidade primeiro, depois
+   * mesma UF, depois o resto. Quem procura oficina quer a mais perto, e não
+   * a que se cadastrou por último.
+   */
+  const prosFiltrados = useMemo(() => {
+    const alvo = query.trim();
+    const minhaCidade = String(region?.city || "").toLowerCase();
+    const minhaUf = String(region?.state || "").toLowerCase();
+    const perto = (item) => {
+      const cidade = String(item.profile.data.city || "").toLowerCase();
+      const uf = String(item.profile.data.state || "").toLowerCase();
+      if (minhaCidade && cidade === minhaCidade) return 0;
+      if (minhaUf && uf === minhaUf) return 1;
+      return 2;
+    };
+    return proProfiles
+      .filter((item) => (category === "all" ? true : item.profile.data.category === category))
+      .filter((item) => (stateFilter === "all" ? true : item.profile.data.state === stateFilter))
+      .filter((item) => (alvo.length >= 2 ? proMatchesTerm(item, alvo) : true))
+      .sort((a, b) => perto(a) - perto(b));
+  }, [proProfiles, category, stateFilter, query, region]);
+
+  const prosShown = useMemo(
+    () => (prosExpandido ? prosFiltrados : prosFiltrados.slice(0, 6)),
+    [prosFiltrados, prosExpandido],
+  );
 
   const activeFilterCount =
     (category !== "all" ? 1 : 0) +
@@ -3061,6 +3138,7 @@ export function Services({ user, settings }) {
        resultados vêm primeiro; o painel de quem anuncia e o convite de
        orçamento descem para depois da lista, e continuam a um gesto de
        distância. De 640px para cima a ordem volta a ser a do código. */
+    <PullToRefresh onRefresh={atualizarVitrine}>
     <section className="flex flex-col gap-5 pb-28 sm:gap-8 sm:pb-10">
 
       <header className="order-8 -mx-4 overflow-hidden border-y border-[var(--engine-border)] bg-[var(--engine-surface)] text-[var(--engine-text)] shadow-none sm:order-none sm:mx-0 sm:rounded-2xl sm:border sm:shadow-xl dark:text-white dark:shadow-none">
@@ -3112,8 +3190,20 @@ export function Services({ user, settings }) {
           Sem nenhum anúncio ela não aparece no celular (`max-sm:hidden`): um
           contador zerado no topo não informa nada, e quem convida a criar o
           primeiro é o botão do bloco vazio, logo abaixo. No desktop sobra
-          largura e ela continua aparecendo sempre. */}
-      <div className={`order-2 sm:order-none ${myListings.length ? "" : "max-sm:hidden"}`}>
+          largura e ela continua aparecendo sempre.
+
+          Com uma ressalva que custou caro (15/11/2026): quem TEM conta
+          profissional vê a barra de qualquer jeito, mesmo com zero anúncios.
+          O botão do retrato aqui é a ÚNICA porta para o painel da conta
+          profissional — onde se edita, se troca a categoria e se apaga o
+          perfil. Escondendo a barra, quem tinha perfil e nenhum anúncio
+          ficava com um perfil público que não conseguia alcançar: dava para
+          vê-lo na vitrine e não dava para mexer nele. */}
+      <div
+        className={`order-2 sm:order-none ${
+          myListings.length || pro.publishable.length ? "" : "max-sm:hidden"
+        }`}
+      >
         <SellerBar
           sellerProfile={sellerProfile}
           listingCount={myListings.length}
@@ -3135,7 +3225,12 @@ export function Services({ user, settings }) {
           Serviços|Lojas no celular, e o título da página ia para o fim. */}
       {tab === "shops" && (
         <div className="order-3 sm:order-none">
-          <ShopsTab user={user} region={region} onNewProduct={() => openProductEditor()} />
+          <ShopsTab
+            user={user}
+            region={region}
+            onNewProduct={() => openProductEditor()}
+            onOpenPro={() => (user?.uid ? setSellerProfileOpen(true) : setGateOpen(true))}
+          />
         </div>
       )}
 
@@ -3414,6 +3509,46 @@ export function Services({ user, settings }) {
         </div>
       )}
 
+      {/* Quem atende, antes da grade de anúncios: numa praça nova é mais
+          provável existir uma oficina cadastrada do que um anúncio publicado,
+          e era exatamente esse o caso em 14/11/2026 — duas contas
+          profissionais no ar, nenhum anúncio. Sem esta lista, as duas eram
+          invisíveis. */}
+      {prosShown.length > 0 && (
+        <section aria-labelledby="services-pros" className="order-5 sm:order-none">
+          <div className="mb-2.5 flex items-baseline justify-between gap-3">
+            <h2
+              id="services-pros"
+              className="font-display text-sm font-bold tracking-tight text-[var(--engine-text)] sm:text-base"
+            >
+              {t("search.sections.pros")}
+            </h2>
+            <span className="text-[12px] font-semibold text-[var(--engine-text-muted)]">
+              {t("services.pros.count", { count: prosFiltrados.length })}
+            </span>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {prosShown.map((item) => (
+              <ProDirectoryCard
+                key={item.profile.id}
+                item={item}
+                meu={meusProIds.has(item.profile.id)}
+                onManage={() => setSellerProfileOpen(true)}
+              />
+            ))}
+          </div>
+          {prosFiltrados.length > prosShown.length && (
+            <button
+              type="button"
+              onClick={() => setProsExpandido(true)}
+              className="mt-2.5 flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 text-[13px] font-bold text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]"
+            >
+              {t("services.pros.more", { count: prosFiltrados.length - prosShown.length })}
+            </button>
+          )}
+        </section>
+      )}
+
       {/* Duas colunas no celular. Até aqui a grade era `minmax(280px, 1fr)`,
           que num aparelho de 390px resolve para UMA coluna — e uma coluna de
           cartão alto mostra um serviço e meio por tela. Com duas, a foto
@@ -3481,6 +3616,21 @@ export function Services({ user, settings }) {
                   <ClipboardList size={16} aria-hidden="true" />
                   {t("quotes.entry.cta")}
                 </Link>
+                {/* Quem anuncia por uma LOJA não quer o próprio @ no anúncio:
+                    quer o @ da loja, com logo, capa e equipe. Isso existe
+                    desde 01/11/2026 (o `kind: "page"` do perfil
+                    profissional), mas a única porta era a barra do vendedor —
+                    que no celular some justamente para quem ainda não tem
+                    anúncio nenhum, ou seja, para todo mundo que chega. No
+                    celular não havia como criar uma loja com @ próprio. */}
+                <button
+                  type="button"
+                  onClick={() => (user?.uid ? setSellerProfileOpen(true) : setGateOpen(true))}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 text-sm font-bold text-[var(--engine-text-muted)] underline underline-offset-4 transition hover:text-[var(--engine-accent)]"
+                >
+                  <Store size={16} aria-hidden="true" />
+                  {t("shop.mode.page")}
+                </button>
               </div>
             )}
           </div>
@@ -3594,6 +3744,7 @@ export function Services({ user, settings }) {
 
       {moderation.modal}
     </section>
+    </PullToRefresh>
   );
 }
 

@@ -5,6 +5,8 @@ import { useHistoryDismiss } from "../../hooks/useHistoryDismiss";
 import { SwitchKnob } from "../shop/ShopPrimitives";
 import { MediaPickerButton } from "../MediaPickerButton";
 import { Select } from "../ui/Select";
+import { DragHandle } from "../DragHandle";
+import { CityField } from "../ui/CityField";
 
 /**
  * Peças de tela da conta profissional e de Lojas. Versão funcional, nos
@@ -27,6 +29,7 @@ export function Sheet({ title, eyebrow = "", onClose, children, footer = null, w
         onClick={(event) => event.stopPropagation()}
         className={`engine-modal-panel engine-pop ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex shrink-0 items-center gap-2 border-b border-[var(--engine-border)] px-4 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:pt-2">
           <div className="min-w-0 flex-1">
             {eyebrow && (
@@ -83,6 +86,28 @@ export function TextField({ id, label, value, onChange, hint, optional, maxLengt
         value={value ?? ""}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
+        className={`${inputClass} min-h-[52px]`}
+        {...rest}
+      />
+    </FieldLabel>
+  );
+}
+
+/**
+ * Cidade com busca, na moldura dos campos do editor profissional.
+ *
+ * Precisa de `country`/`state` porque a lista é por UF — é o que diferencia
+ * "sugere a cidade certa" de "mostra as cinco maiores do estado".
+ */
+export function CityFieldPro({ id, label, value, onChange, country, state, hint, optional, ...rest }) {
+  return (
+    <FieldLabel htmlFor={id} label={label} hint={hint} optional={optional}>
+      <CityField
+        id={id}
+        country={country}
+        state={state}
+        value={value}
+        onChange={onChange}
         className={`${inputClass} min-h-[52px]`}
         {...rest}
       />
