@@ -8,7 +8,7 @@
  *
  * Então três gatilhos, nesta ordem de importância:
  *   1. ao voltar para o app (a pessoa abriu de novo: é o momento certo),
- *   2. de hora em hora enquanto está aberto,
+ *   2. a cada 15 minutos enquanto está aberto,
  *   3. o botão em Configurações, para quando ela quiser forçar.
  *
  * Mora num módulo, e não no hook, porque Configurações precisa alcançar o
@@ -16,7 +16,14 @@
  * service workers disputando quem assume.
  */
 
-const DE_HORA_EM_HORA = 60 * 60 * 1000;
+/*
+ * De quanto em quanto tempo o app ABERTO pergunta. Era de hora em hora, e na
+ * semana de lançamento isso é tempo demais entre subir uma correção e a
+ * pessoa poder tocar em "Atualizar" — ela fica até 60 minutos numa versão que
+ * já não existe mais. A pergunta é uma requisição condicional de 5 kB que
+ * volta 304 quando não há nada novo, então encurtar não custa banda.
+ */
+const INTERVALO_DE_CHECAGEM = 15 * 60 * 1000;
 
 let registration = null;
 let applyUpdate = null;
@@ -70,7 +77,7 @@ export function startPwaUpdates() {
         onRegisteredSW(_url, reg) {
           registration = reg || null;
           if (!registration) return;
-          window.setInterval(checkForUpdate, DE_HORA_EM_HORA);
+          window.setInterval(checkForUpdate, INTERVALO_DE_CHECAGEM);
         },
       });
       applyUpdate = () => update(true);
