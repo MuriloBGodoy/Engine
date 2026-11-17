@@ -8,11 +8,13 @@ import { MediaPickerButton } from "./MediaPickerButton";
 import { ImageCropper } from "./ImageCropper";
 import { useHistoryDismiss } from "../hooks/useHistoryDismiss";
 import { formatFipeYear } from "../services/carDisplay";
+import { limparApelido } from "../services/carHandle";
 import { fipeService } from "../services/fipeService";
 import { localISODate } from "../services/garageInput";
 import { useConfirm } from "./ConfirmProvider";
 import { getStates } from "../services/locations";
 import { Select } from "./ui/Select";
+import { DragHandle } from "./DragHandle";
 
 
 // Busca por palavras soltas, sem acento e sem caixa: "onix 1.0 aut" acha
@@ -70,6 +72,9 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
     carToEdit?.type || (initialType === CAR_TYPE_OWNED ? CAR_TYPE_OWNED : CAR_TYPE_GOAL),
   );
   const isOwned = carType === CAR_TYPE_OWNED;
+  // O apelido: como o dono chama o carro. Vale para meta também — quem está
+  // juntando para comprar já batizou o carro que ainda não tem.
+  const [nickname, setNickname] = useState(carToEdit?.nickname || "");
   // Lembretes: UF e SÓ o último dígito da placa (o resto mora no modal de
   // lembretes da Garagem). Opcionais e só para carro que a pessoa tem.
   const [reminderUf, setReminderUf] = useState(carToEdit?.reminders?.uf || "");
@@ -134,6 +139,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
         setTargetValue(carToEdit.targetValue || 0);
         setPriceSource(carToEdit.priceSource || null);
         setPricedAt(carToEdit.pricedAt || null);
+        setNickname(carToEdit.nickname || "");
       } else {
         setSavedValue(0);
         setTargetValue(0);
@@ -143,6 +149,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
         setSelectedModel("");
         setSelectedYear("");
         setFipeCode("");
+        setNickname("");
       }
     }, 0);
 
@@ -410,6 +417,9 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
       brand: brandName,
       model: modelName,
       year: yearName,
+      // Apelido vazio é apagado em vez de virar "": assim `carTitle` decide
+      // pela presença da chave e não precisa saber de string vazia.
+      nickname: limparApelido(nickname) || undefined,
       fipe: resolvedFipe || keptFipe,
       type: carType,
       targetValue: targetValue,
@@ -442,6 +452,7 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
   return (
     <div className="engine-modal-overlay">
       <div className="engine-modal-panel engine-pop sm:max-w-4xl">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-5 py-4 sm:px-7">
           <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)]">
             {carToEdit ? t("modalCar.editTitle") : t("modalCar.newTitle")}
@@ -641,6 +652,30 @@ export function ModalNewCar({ isOpen, onClose, onSave, carToEdit = null, initial
                   </option>
                 ))}
               </Select>
+
+              {/* O apelido. Último campo do bloco do veículo porque é o único
+                  que não vem da FIPE: marca, modelo e ano são o que o carro
+                  é; o apelido é como o dono chama. Opcional — e o rótulo diz
+                  isso, em vez de deixar a pessoa adivinhar se trava o
+                  salvamento. */}
+              <div className="space-y-1">
+                <label htmlFor="engine-car-nickname" className={`${fieldLabelClass} text-[var(--engine-text-subtle)]`}>
+                  {t("modalCar.nickname")}
+                </label>
+                <input
+                  id="engine-car-nickname"
+                  type="text"
+                  value={nickname}
+                  onChange={(event) => setNickname(limparApelido(event.target.value))}
+                  maxLength={40}
+                  autoComplete="off"
+                  placeholder={t("modalCar.nicknamePlaceholder")}
+                  className={fieldClass}
+                />
+                <p className="ml-1 text-[11px] text-[var(--engine-text-muted)]">
+                  {t("modalCar.nicknameHint")}
+                </p>
+              </div>
 
               {fipeError && (
                 <div

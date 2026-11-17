@@ -35,6 +35,10 @@ export function showcasePayload(car = {}, { state = "", city = "", cover = "" } 
     brand: texto(car.brand, 80),
     model: texto(car.model, 120),
     year: texto(car.year, 40),
+    // O apelido vai na cópia pública porque é o nome pelo qual as pessoas
+    // conhecem o carro — e é dele que o banco tira o endereço quando o carro
+    // estreia na vitrine (`publish_car`, 20261114120000).
+    nickname: texto(car.nickname, 40),
     title: texto(`${car.brand || ""} ${car.model || ""}`, 160),
     image: texto(escolhida || car.image || images[0] || "", 500),
     images: images.slice(0, 10),
@@ -78,6 +82,37 @@ export async function unpublishCar(carId) {
  * A tela do carro precisa dos três — do id para o interruptor, do endereço
  * para o link e da capa para marcar qual foto está valendo.
  */
+/**
+ * Refaz o retrato público de um carro que JÁ está na vitrine.
+ *
+ * `publishCar` tira uma foto do carro no instante em que a pessoa liga o
+ * "mostrar na comunidade" — e essa foto nunca mais era revista. Quem ligava
+ * a vitrine e só depois preenchia a ficha (o caminho natural: primeiro
+ * mostra o carro, depois conta dele) ficava com uma página pública dizendo
+ * "o dono ainda não contou a preparação" para sempre, mesmo com stage,
+ * modificações e potência preenchidos na garagem. Foi o que aconteceu com os
+ * dois carros que existem hoje: os dois têm ficha, e os dois aparecem vazios
+ * lá fora.
+ *
+ * Então: salvou o carro, o retrato se atualiza. A capa escolhida é mantida —
+ * ela é uma decisão à parte, tomada na tela da vitrine.
+ *
+ * Nunca derruba quem chamou: a garagem é o que importa, a vitrine é cópia.
+ * Se a atualização falhar, o carro foi salvo do mesmo jeito e o retrato
+ * conserta no próximo salvamento.
+ */
+export async function refreshShowcase(car) {
+  if (!car?.id) return;
+  try {
+    const publicados = await myShowcase();
+    const atual = publicados[String(car.id)];
+    if (!atual) return;
+    await publishCar(car, null, atual.cover || "");
+  } catch (error) {
+    console.warn("[vitrine] não deu para atualizar o retrato público.", error);
+  }
+}
+
 export async function myShowcase() {
   const uid = auth.currentUser?.uid;
   if (!uid) return {};
@@ -182,11 +217,54 @@ export async function listUserShowcase(userId, { limit = 60 } = {}) {
   return (rows || []).map(fromRow);
 }
 
+/**
+ * O carro de um endereço público.
+ *
+ * Tenta o endereço atual e, se não achar, pergunta ao banco se aquele
+ * endereço JÁ FOI de algum carro. Isto não é zelo com link velho de
+ * WhatsApp: o endereço do carro vai IMPRESSO num adesivo colado no vidro.
+ * Quem troca o apelido depois não vai raspar o adesivo — então endereço
+ * aposentado continua levando ao carro, para sempre.
+ *
+ * A segunda ida ao banco só acontece no caminho do erro, que é raro.
+ */
 export async function getShowcaseBySlug(slug) {
+  const limpo = String(slug || "").trim().toLowerCase();
+  if (!limpo) return null;
   const row = must(
-    await supabase.from("car_showcase").select("*").eq("slug", String(slug)).maybeSingle(),
+    await supabase.from("car_showcase").select("*").eq("slug", limpo).maybeSingle(),
   );
-  return row ? fromRow(row) : null;
+  if (row) return fromRow(row);
+
+  const carId = must(await supabase.rpc("car_id_for_slug", { p_slug: limpo }));
+  if (!carId) return null;
+  const antigo = must(
+    await supabase.from("car_showcase").select("*").eq("id", String(carId)).maybeSingle(),
+  );
+  return antigo ? { ...fromRow(antigo), slugAntigo: limpo } : null;
+}
+
+/**
+ * Troca o endereço público do carro. Devolve o endereço gravado.
+ *
+ * Erros sobem com a mensagem do banco no `message` (`slug-taken`,
+ * `bad-slug`, `too-many-slugs`, `car-not-shown`), e é a tela que traduz —
+ * cada um deles tem uma frase diferente a dizer.
+ */
+export async function setCarSlug(carId, slug) {
+  return must(
+    await supabase.rpc("set_car_slug", {
+      p_car_id: String(carId),
+      p_slug: String(slug || "").trim().toLowerCase(),
+    }),
+  );
+}
+
+/** O endereço está livre? Para avisar ANTES de a pessoa tentar salvar. */
+export async function isCarSlugFree(slug) {
+  const limpo = String(slug || "").trim().toLowerCase();
+  if (!limpo) return false;
+  return Boolean(must(await supabase.rpc("car_slug_free", { p_slug: limpo })));
 }
 
 export async function didILike(carId) {

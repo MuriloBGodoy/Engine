@@ -27,6 +27,30 @@ export function formatCarBrand(raw) {
   return normalizeFipeBrand(raw) || String(raw ?? "").trim();
 }
 
+/**
+ * O NOME que o carro usa na tela: o apelido quando o dono deu um, senão
+ * marca + modelo.
+ *
+ * Existe porque "Bruxa" e "Chevrolet Corsa Wind" não competem — um é como o
+ * dono chama o carro, o outro é o que o carro é. Onde cabe uma linha só (card
+ * da garagem, lembrete, lista de orçamento), vai o apelido; onde cabem duas,
+ * o apelido em cima e `formatCarName` embaixo, que é o papel de
+ * `carSubtitle`.
+ */
+export function carTitle(car = {}) {
+  const nick = String(car.nickname ?? "").trim();
+  return nick || formatCarName(car);
+}
+
+/**
+ * A linha de baixo: o nome técnico, mas só quando a de cima é o apelido.
+ * Sem apelido devolve "" — repetir "Corsa Wind" embaixo de "Corsa Wind" é
+ * ruído.
+ */
+export function carSubtitle(car = {}) {
+  return String(car.nickname ?? "").trim() ? formatCarName(car) : "";
+}
+
 /** Marca normalizada + modelo, sem repetir a marca quando o modelo já a traz. */
 export function formatCarName(car = {}) {
   const brand = formatCarBrand(car.brand);

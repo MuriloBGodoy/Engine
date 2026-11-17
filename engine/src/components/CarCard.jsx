@@ -124,10 +124,18 @@ export function CarCard({
             <span className="block text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/80">
               {formatCarBrand(car.brand)} · {formatFipeYear(car.year, t("car.zeroKm"))}
             </span>
+            {/* Com apelido, o nome do carro é o apelido e o modelo passa a
+                dividir a linha de baixo com a ficha. Sem apelido, nada muda:
+                o modelo continua sendo o título do card. */}
             <span className="mt-0.5 line-clamp-2 block font-display text-[17px] font-extrabold italic leading-tight tracking-tight text-white">
-              {car.model}
+              {car.nickname?.trim() || car.model}
             </span>
-            {specs.length > 0 && (
+            {car.nickname?.trim() && (
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-white/75">
+                {[car.model, ...specs].filter(Boolean).join(" · ")}
+              </span>
+            )}
+            {!car.nickname?.trim() && specs.length > 0 && (
               <span className="mt-0.5 block truncate text-[11px] font-semibold text-white/75">
                 {specs.join(" · ")}
               </span>
