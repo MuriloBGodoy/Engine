@@ -14,10 +14,11 @@ import {
   Users,
 } from "lucide-react";
 import { AdSlot } from "../AdSlot";
+import { PullToRefresh } from "../ui/PullToRefresh";
 import { useRegion } from "../../hooks/RegionProvider";
 import { applyRegionFilter } from "../../services/region";
 import { CAR_TYPE_OWNED } from "../../services/db";
-import { formatCarName } from "../../services/carDisplay";
+import { carTitle } from "../../services/carDisplay";
 import { garageUpcoming, hasAnyReminderSetting, localISODate } from "../../services/reminders";
 import { formatDueDate, reminderStatusText, reminderTitle } from "../../services/reminderLabels";
 import { getServiceCategoryLabel } from "../../services/serviceListingDisplay";
@@ -149,7 +150,7 @@ function Reminders({ cars }) {
                     {reminderTitle(t, item)}
                   </span>
                   <span className="block truncate text-[12px] text-[var(--engine-text-muted)]">
-                    {formatCarName(item.car) || t("reminders.yourCar")}
+                    {carTitle(item.car) || t("reminders.yourCar")}
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
@@ -200,7 +201,7 @@ function CarTile({ car }) {
         </span>
       </div>
       <div className="p-3.5">
-        <p className="line-clamp-1 text-sm font-bold text-[var(--engine-text)]">{formatCarName(car)}</p>
+        <p className="line-clamp-1 text-sm font-bold text-[var(--engine-text)]">{carTitle(car)}</p>
         {isGoal ? (
           <div className="mt-2 flex items-center gap-2">
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--engine-surface-2)]">
@@ -455,16 +456,29 @@ function Community() {
   );
 }
 
-export function MemberHome({ user, cars = [], settings }) {
+export function MemberHome({ user, cars = [], settings, onRefresh }) {
   const name = settings?.profile?.displayName || user?.displayName || "";
+  // Puxar para atualizar relê TUDO: a garagem (que mora no App) e as quatro
+  // leituras desta tela. O `key` é o jeito honesto de refazer as leituras —
+  // cada seção tem a sua, com o seu próprio estado de carregando e de erro,
+  // e remontá-las é exatamente o que uma atualização deve fazer.
+  const [recarga, setRecarga] = useState(0);
+
+  const atualizar = async () => {
+    setRecarga((n) => n + 1);
+    await onRefresh?.();
+  };
+
   return (
-    <div className="flex flex-col gap-8 pb-4 pt-1 sm:gap-10 sm:pt-2">
-      <Greeting name={name} />
-      <Reminders cars={cars} />
-      <Garage cars={cars} />
-      <Services userId={user?.uid} />
-      <Community />
-      <AdSlot slot="home-footer" format="horizontal" className="mx-auto w-full max-w-4xl" />
-    </div>
+    <PullToRefresh onRefresh={atualizar}>
+      <div className="flex flex-col gap-8 pb-4 pt-1 sm:gap-10 sm:pt-2">
+        <Greeting name={name} />
+        <Reminders cars={cars} />
+        <Garage cars={cars} />
+        <Services key={`servicos-${recarga}`} userId={user?.uid} />
+        <Community key={`comunidade-${recarga}`} />
+        <AdSlot slot="home-footer" format="horizontal" className="mx-auto w-full max-w-4xl" />
+      </div>
+    </PullToRefresh>
   );
 }

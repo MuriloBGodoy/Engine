@@ -44,6 +44,7 @@ import { useProfileSearch } from "../hooks/useProfileSearch";
 import { ClubTag } from "../components/clubs/ClubEmblem";
 import { Events } from "./Events";
 import { engineDB, POST_KIND_POST } from "../services/db";
+import { PullToRefresh } from "../components/ui/PullToRefresh";
 import { postBadgeTier } from "../services/achievements";
 import { normalizeFipeBrand } from "../services/fipeVersion";
 import { AchievementBadge } from "../components/achievements/AchievementBadge";
@@ -65,7 +66,7 @@ import {
   CommentsPanel,
   CommentsSheet,
 } from "../components/social/Comments";
-import { getInitials, withoutAt } from "../services/people";
+import { cityLabel, getInitials, withoutAt } from "../services/people";
 import { useCommentComposer } from "../hooks/useCommentComposer";
 import { PersonLink } from "../components/social/PersonLink";
 import { PostMenu } from "../components/social/PostMenu";
@@ -86,6 +87,8 @@ import { CreateFeedPostModal } from "../components/CreateFeedPostModal";
 import { useRegion } from "../hooks/RegionProvider";
 import { applyRegionFilter } from "../services/region";
 import { formatFipeYear } from "../services/carDisplay";
+import { DragHandle } from "../components/DragHandle";
+import { DownloadPhotoButton } from "../components/ui/DownloadPhotoButton";
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1598209279122-8541213a0387?q=80&w=900";
@@ -211,7 +214,7 @@ const profileFromSettings = (settings, user) => {
     username: settings.profile.username || `@engine.${String(user?.uid || "").slice(0, 6)}`,
     avatar: settings.profile.avatar || user?.photoURL || "",
     avatarInitials: getInitials(name),
-    city: settings.profile.location || "Engine Garage",
+    city: settings.profile.location || "",
     note: settings.profile.bio || "",
   };
 };
@@ -262,7 +265,7 @@ const buildUserGoals = (cars, settings, user) => {
     author: displayName,
     username,
     avatar: settings.profile.avatar || getInitials(displayName),
-    city: settings.profile.location || "Engine Garage",
+    city: settings.profile.location || "",
     title: `${car.brand} ${car.model}`,
     brand: car.brand,
     model: car.model,
@@ -405,7 +408,20 @@ const clampMediaRatio = (width, height) =>
     ? Math.min(Math.max(width / height, MEDIA_MIN_RATIO), MEDIA_MAX_RATIO)
     : 1;
 
-function PostGallery({ images, videoUrl = "", alt, t, onOpen, onDoubleTap, box = null, onRatio }) {
+function PostGallery({
+  images,
+  videoUrl = "",
+  alt,
+  t,
+  onOpen,
+  onDoubleTap,
+  box = null,
+  onRatio,
+  // Baixar só na publicação ABERTA, não na rolagem do feed: um botão por cima
+  // de cada foto do feed seria enfeite em 20 fotos para ser usado em uma, e
+  // ficaria disputando espaço com o toque duplo que curte.
+  comBaixar = false,
+}) {
   const [index, setIndex] = useState(0);
   const [ratio, setRatio] = useState(1);
   /* Vídeo do YouTube entra como mais um item do carrossel, não como bloco
@@ -530,6 +546,17 @@ function PostGallery({ images, videoUrl = "", alt, t, onOpen, onDoubleTap, box =
           ),
         )}
       </div>
+
+      {/* Baixar a foto que está à vista. Canto de cima à direita: as flechas
+          ficam no meio dos lados e as bolinhas no pé, então não briga com
+          nenhum dos dois. Fora do YouTube, que não é foto para baixar. */}
+      {comBaixar && !onVideo && slides[current]?.src && (
+        <DownloadPhotoButton
+          url={slides[current].src}
+          nome={alt}
+          className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 disabled:opacity-60"
+        />
+      )}
 
       {/* A foto é o "abrir publicação" — mesmo gesto de qualquer feed — e o
           toque duplo curte. `touch-manipulation` tira o zoom de toque duplo
@@ -1042,7 +1069,7 @@ export function GoalCard({
               {goal.username}
             </button>
           </div>
-          {(goal.clubTag || goal.createdAt || (isModal && goal.city)) && (
+          {(goal.clubTag || goal.createdAt || (isModal && cityLabel(goal.city))) && (
             <div className="mt-px flex min-w-0 items-center gap-1.5 overflow-hidden text-xs text-[var(--engine-text-muted)]">
               {/* Post publicado a partir de um clube carrega a sigla dele: é
                   assim que a crew aparece no feed geral (CLUBES-CONTRATO §2). */}
@@ -1062,8 +1089,8 @@ export function GoalCard({
                   className="shrink-0 hover:text-[var(--engine-text)]"
                 />
               ) : null}
-              {isModal && goal.city ? (
-                <span className="min-w-0 truncate">· {goal.city}</span>
+              {isModal && cityLabel(goal.city) ? (
+                <span className="min-w-0 truncate">· {cityLabel(goal.city)}</span>
               ) : null}
             </div>
           )}
@@ -1131,6 +1158,9 @@ export function GoalCard({
           alt={goal.title}
           t={t}
           onOpen={openable ? () => onOpenPost(goal.id) : undefined}
+          // Sem "abrir publicação" quer dizer que a publicação JÁ está
+          // aberta (tela do post, folha do celular): é onde baixar entra.
+          comBaixar={!openable}
           onDoubleTap={() => {
             if (!liked) onLike(goal.id);
           }}
@@ -1303,6 +1333,7 @@ function ShareModal({
   return (
     <div className="engine-modal-overlay">
       <div className="engine-modal-panel engine-pop sm:max-w-2xl">
+        <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] p-4 sm:p-6">
           <div className="min-w-0">
             <h2 className="text-lg font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
@@ -1496,6 +1527,7 @@ function PeopleSearchModal({
         className="engine-modal-panel engine-pop sm:max-w-lg"
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] px-4 py-3.5">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--engine-accent)]">
@@ -1553,7 +1585,7 @@ function PeopleSearchModal({
                       </p>
                       <p className="truncate text-xs font-medium text-[var(--engine-text-subtle)]">
                         @{withoutAt(person.username) || "engine"}
-                        {person.city ? ` · ${person.city}` : ""}
+                        {cityLabel(person.city) ? ` · ${cityLabel(person.city)}` : ""}
                       </p>
                     </button>
                     <button
@@ -1670,6 +1702,7 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
         style={lightbox ? { width: lightbox.panelWidth, maxWidth: "none" } : undefined}
         onClick={(event) => event.stopPropagation()}
       >
+        <DragHandle onClose={onClose} />
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--engine-border)] py-1.5 pl-4 pr-2">
           <h2 className="text-sm font-bold text-[var(--engine-text)]">
             {goal ? t("community.postTitle") : t("common.loading")}
@@ -1701,6 +1734,7 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
                   alt={goal.title}
                   t={t}
                   box={{ maxWidth: lightbox.width, maxHeight: lightbox.height }}
+                  comBaixar
                   onRatio={(value) =>
                     setRatioByPost((current) =>
                       current[goal.id] === value ? current : { ...current, [goal.id]: value },
@@ -1943,13 +1977,37 @@ export function Community({ cars = [], settings, user }) {
     };
   }, []);
 
+  /*
+   * Puxar para atualizar refaz a assinatura do feed, que é o que dispara uma
+   * leitura nova da primeira página. A promessa só se resolve quando o dado
+   * CHEGA — sem isso o indicador sumiria no mesmo instante em que a pessoa
+   * soltasse o dedo, e ela não saberia se atualizou coisa alguma.
+   */
+  const [recargaDoFeed, setRecargaDoFeed] = useState(0);
+  const esperandoFeed = useRef(null);
+
   useEffect(() => {
     const unsubscribe = engineDB.subscribeCommunityGoals((goals, meta) => {
       setCommunityGoals(goals);
       setHasMoreGoals(Boolean(meta?.hasMore));
+      esperandoFeed.current?.();
+      esperandoFeed.current = null;
     });
     return () => unsubscribe();
-  }, []);
+  }, [recargaDoFeed]);
+
+  const atualizarFeed = () =>
+    new Promise((resolve) => {
+      esperandoFeed.current = resolve;
+      setRecargaDoFeed((n) => n + 1);
+      // Rede ruim não pode prender o indicador para sempre.
+      window.setTimeout(() => {
+        if (esperandoFeed.current === resolve) {
+          esperandoFeed.current = null;
+          resolve();
+        }
+      }, 6000);
+    });
 
   useEffect(() => {
     let alive = true;
@@ -2365,7 +2423,11 @@ export function Community({ cars = [], settings, user }) {
           (item) => ![goal.id, `user-${goal.id}`, goalId, legacyGoalId].includes(item),
         ),
       }));
-      flash(t("community.unsharedNotice"));
+      // O mesmo botão serve a duas coisas: tirar do feed um carro da garagem
+      // (que continua na garagem) e APAGAR uma publicação livre, que não volta.
+      // O aviso dizia "Meta removida do perfil" nos dois casos — quem apagava
+      // uma publicação recebia o nome de outra coisa.
+      flash(t(goal.kind === POST_KIND_POST ? "community.unsharedPostNotice" : "community.unsharedNotice"));
     } catch (error) {
       console.error(error);
       flash(t("community.unshareError"), "error");
@@ -2532,7 +2594,8 @@ export function Community({ cars = [], settings, user }) {
   }, [composeFree, shareRequested, user?.uid, searchParams, setSearchParams]);
 
   return (
-    <section className="pb-4 sm:pb-8">
+    <PullToRefresh onRefresh={atualizarFeed} className="pb-4 sm:pb-8">
+      <section>
       {/* Coluna única centrada + trilho à direita, como as redes que servem
           de referência. O hero (título gigante, estatísticas e o painel de
           publicação) saiu do topo: no celular ele comia a tela inteira antes
@@ -2540,7 +2603,19 @@ export function Community({ cars = [], settings, user }) {
           botão de publicar aqui em cima. */}
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="mx-auto w-full min-w-0 max-w-[620px]">
-          {/* Uma barra só: seções à esquerda, ações à direita. */}
+          {/* Uma barra só: seções à esquerda, ações à direita.
+
+              Ela já grudou no topo no desktop (o que o X e o Instagram fazem
+              com o cabeçalho da coluna). Saiu em 14/11/2026: o feed do Engine
+              é feito de FOTO DE CARRO ocupando a largura inteira, e uma faixa
+              translúcida com desfoque passando por cima de um painel ou de
+              uma lanterna vira um borrão no meio da imagem — some a foto e
+              some a barra. Em rede de texto o truque funciona porque o que
+              passa por baixo é letra miúda; aqui não.
+
+              Rolando com ela parada o problema aparecia em TODO post; o que
+              ela resolvia (trocar de aba sem subir) acontece uma vez a cada
+              muitas rolagens. */}
           <div className="mb-4 flex w-full items-center gap-2">
             {/* Com cinco seções os rótulos não cabem lado a lado num celular:
                 medido em 21/08/2026 davam 51px por aba e viravam "F.", "V.",
@@ -2794,9 +2869,14 @@ export function Community({ cars = [], settings, user }) {
           {topLevelTab === "carros" && <CarsTab region={region} user={user} />}
         </div>
 
-        {/* Sidebar (only shown for Goals tab) */}
+        {/* Trilho da direita, só na aba de metas.
+
+            `self-start` é obrigatório: num item de grid o padrão é esticar até
+            a altura da linha, e aí `sticky` não tem para onde grudar. O
+            `max-h` + `overflow-y-auto` cobrem o caso de o trilho ficar mais
+            alto que a tela — sem isso o fim dele seria inalcançável. */}
         {topLevelTab === "goals" && (
-          <aside className="hidden space-y-5 xl:block">
+          <aside className="hidden space-y-5 xl:block xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto xl:pb-4">
             <div className="engine-card divide-y divide-[var(--engine-border)] px-4">
               <RailStat icon={Users} label={t("community.stats.goals")} value={goals.length} />
               <RailStat
@@ -2986,7 +3066,8 @@ export function Community({ cars = [], settings, user }) {
         settings={settings}
         onClose={() => setPostToShare(null)}
       />
-    </section>
+      </section>
+    </PullToRefresh>
   );
 }
 
