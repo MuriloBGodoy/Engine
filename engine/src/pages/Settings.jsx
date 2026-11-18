@@ -34,6 +34,7 @@ import {
   Heart,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useTranslation } from "react-i18next";
 import { engineDB } from "../services/db";
 import {
@@ -742,7 +743,7 @@ function PlanGroup({ t, i18n, user }) {
     try {
       window.location.href = await openBillingPortal();
     } catch (error) {
-      toast(error.message);
+      toast(error.message, "error");
       setOpening(false);
     }
   };
@@ -1180,6 +1181,14 @@ export function Settings({ user, settings, onSettingsUpdate }) {
     }
   };
 
+  /* A escolha de navegação (barra lateral x menu superior) só existe no
+     computador: no celular a navegação é a barra de baixo, sempre, e as duas
+     opções não mudavam nada na tela de quem estava lendo. A dica embaixo do
+     rótulo dizia isso por escrito — e uma opção que precisa se explicar como
+     "não vale aqui" é uma opção que não devia estar aqui. 1024px é o mesmo
+     ponto em que o App troca de layout. */
+  const noComputador = useMediaQuery("(min-width: 1024px)");
+
   // O que foi digitado na busca (ver `achatar` e `paraSeletor`).
   const [busca, setBusca] = useState("");
   // Uma condição por palavra, todas exigidas e em qualquer ordem: quem digita
@@ -1486,17 +1495,19 @@ export function Settings({ user, settings, onSettingsUpdate }) {
                     ]}
                   />
                 </Row>
-                <Row label={t("settings.fields.navLayout")} hint={t("settings.app.navHint")}>
-                  <Select
-                    className={selectClass}
-                    aria-label={t("settings.fields.navLayout")}
-                    value={prefs.navLayout || "sidebar"}
-                    onChange={(e) => updateSetting("preferences", "navLayout", e.target.value)}
-                  >
-                    <option value="sidebar">{t("settings.options.navSidebar")}</option>
-                    <option value="topnav">{t("settings.options.navTopnav")}</option>
-                  </Select>
-                </Row>
+                {noComputador && (
+                  <Row label={t("settings.fields.navLayout")}>
+                    <Select
+                      className={selectClass}
+                      aria-label={t("settings.fields.navLayout")}
+                      value={prefs.navLayout || "sidebar"}
+                      onChange={(e) => updateSetting("preferences", "navLayout", e.target.value)}
+                    >
+                      <option value="sidebar">{t("settings.options.navSidebar")}</option>
+                      <option value="topnav">{t("settings.options.navTopnav")}</option>
+                    </Select>
+                  </Row>
+                )}
               </Group>
 
               <Group title={t("settings.app.languageRegion")} footer={t("settings.app.regionHint")}>
