@@ -91,11 +91,6 @@ export function CarteiraGaragem({
             <img
               src={fundo.url}
               alt=""
-              /* Pedir COM CORS já na tela: assim a cópia que fica no cache é
-                 legível, e a exportação não precisa baixar de novo. O Storage
-                 responde `Access-Control-Allow-Origin: *`, então isto não
-                 muda nada para quem só está vendo o cartão. */
-              crossOrigin="anonymous"
               className="engine-carteira-foto"
               style={estiloDoEnquadramento(fundo.enquadramento)}
             />
@@ -129,7 +124,7 @@ export function CarteiraGaragem({
         <div className="engine-carteira-esquerda">
           <div className="engine-carteira-retrato">
             {dados.avatar ? (
-              <img src={dados.avatar} alt="" crossOrigin="anonymous" />
+              <img src={dados.avatar} alt="" />
             ) : (
               <svg viewBox="0 0 60 80" aria-hidden="true">
                 <circle cx="30" cy="29" r="13" fill="rgba(255,255,255,0.22)" />
