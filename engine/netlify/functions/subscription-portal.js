@@ -38,8 +38,28 @@ export default async (request) => {
 
     return json({ url: portal.url });
   } catch (error) {
-    const status = error.status || 500;
+    /* `statusCode` ANTES de `status`: o SDK do Stripe grava o código HTTP em
+       `error.statusCode`, e lendo só `status` todo erro dele virava 500 — ou
+       seja, virava a frase genérica "Não foi possível abrir o gerenciamento.",
+       que não diz o que houve nem o que fazer. Aconteceu em 17/11/2026 com uma
+       assinatura gravada no banco que não existe nesta chave do Stripe. */
+    const status = error.statusCode || error.status || 500;
     console.error("subscription-portal", error);
+
+    /* Assinatura que o banco conhece e o Stripe não. Acontece quando a linha
+       veio de um teste (chave de teste) e a chave em uso é a de produção, ou
+       quando a assinatura foi apagada lá direto. Quem lê precisa entender que
+       não é falha de rede e que tentar de novo não resolve. */
+    if (error.code === "resource_missing") {
+      return json(
+        {
+          error:
+            "Esta assinatura não existe mais no provedor de pagamento. Fale com a gente para acertar o seu plano.",
+        },
+        409,
+      );
+    }
+
     return json(
       { error: status < 500 ? error.message : "Não foi possível abrir o gerenciamento." },
       status,
