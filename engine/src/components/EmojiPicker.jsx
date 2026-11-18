@@ -1,148 +1,204 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Smile } from "lucide-react";
+import { BottomSheet } from "./BottomSheet";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import { EMOJI_GRUPOS } from "../services/emojis";
 import "../services/i18n-editing";
 
 /**
  * O botão de emoji do compositor.
  *
- * Ele existia desde sempre, mas **só no computador** — a chamada no chat era
- * `{isDesktop && <EmojiPicker />}`. O raciocínio original se defende (o
- * teclado do celular tem a tecla de emoji), mas não é o que as pessoas
- * esperam: WhatsApp, Telegram e Instagram mostram o botão no celular mesmo
- * assim, e aqui o botão de GIF ao lado aparecia, então a barra parecia ter
- * perdido uma peça. Três coisas impediam de simplesmente ligar:
+ * Duas coisas estavam erradas e as duas vinham da mesma origem — a folha era
+ * um painel preso ao botão, com uma lista escrita à mão:
  *
- *  1. **A folha tinha largura fixa de 320px** presa à esquerda. Num aparelho
- *     de 360px, com o "+" antes dela, ela saía pela borda direita. Agora ela
- *     ocupa a largura disponível e para na borda.
- *  2. **Só fechava com `mousedown`.** No toque, tocar fora não fechava nada —
- *     a folha ficava aberta por cima da conversa. Agora é `pointerdown`, que
- *     é um evento só para mouse, dedo e caneta.
- *  3. **O `💯` estava repetido na lista** e a chave do React é o próprio
- *     emoji: dois irmãos com a mesma chave. Saiu o repetido.
+ *  1. **Saía torta no celular.** O painel nascia no canto esquerdo do botão e
+ *     tinha largura própria. O botão fica no começo da barra do chat, depois
+ *     do "+", então o painel começava a uns 50 px da borda e ia até passar da
+ *     tela: o que sobrava ficava cortado no lado direito. Limitar a largura
+ *     não resolve, porque o problema é ONDE ele começa, não quanto ele mede.
+ *  2. **Tinha 42 emojis.** Era uma lista digitada na mão, com o que coube.
+ *     Quem procurava um foguete, um cachorro ou um bolo não achava e ia para
+ *     o teclado do sistema — e nesse caso o botão só atrapalha.
  *
- * E a lista ganhou carro. Era estranho um app de carro oferecer 🎯 e 📱 e não
- * ter 🚗 nem 🔧 — os primeiros da fila agora são os do assunto da casa.
+ * Agora: no celular é a folha de baixo do app (`BottomSheet`), a mesma de
+ * anexar e de filtrar, que ocupa a largura inteira e não tem canto para
+ * estourar; no computador continua um painel preso ao botão, onde sobra tela
+ * e uma folha no meio seria pesada demais para escolher uma carinha. É o
+ * mesmo critério do `ui/Select`.
+ *
+ * A lista vem de `services/emojis.js`, gerada do arquivo oficial do Unicode
+ * (1.588 emojis, em grupos e na ordem dos teclados). A Garagem vem primeiro
+ * porque é um app de carro.
  */
 
-const EMOJIS = [
-  // A casa primeiro: é um app de carro.
-  "🚗", "🏎️", "🏁", "🔧", "🛞", "⛽",
-  "🔥", "💨", "🛠️", "🚨", "🏆", "⚙️",
-  // O resto do dia a dia.
-  "😀", "😂", "😍", "🥰", "😎", "🤔",
-  "👍", "👌", "🙌", "👏", "🤝", "🙏",
-  "💯", "✨", "🎉", "🚀", "💪", "😅",
-  "😭", "😡", "🤷", "❤️", "💔", "💚",
-  "✅", "❌", "💡", "⚡", "⏰", "🤌",
-];
-
 const RECENTES = "engine:emoji:recentes";
+const QUANTOS_RECENTES = 8;
 
 const lerRecentes = () => {
   try {
     const cru = JSON.parse(window.localStorage.getItem(RECENTES) || "[]");
-    return Array.isArray(cru) ? cru.filter((e) => typeof e === "string").slice(0, 6) : [];
+    return Array.isArray(cru)
+      ? cru.filter((item) => typeof item === "string").slice(0, QUANTOS_RECENTES)
+      : [];
   } catch {
+    // Sem armazenamento não há "recentes" — o resto funciona igual.
     return [];
   }
 };
 
-export function EmojiPicker({ onEmojiSelect, className = "" }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  // Os recentes são lidos na hora de ABRIR, não num efeito depois de abrir:
-  // guardar em estado e preencher no efeito renderizaria a folha uma vez sem
-  // eles e outra com, e a grade saltaria no olho de quem acabou de tocar.
-  const [recentes, setRecentes] = useState(lerRecentes);
-
-  const alternar = () => {
-    if (!open) setRecentes(lerRecentes());
-    setOpen((atual) => !atual);
-  };
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    // `pointerdown` cobre dedo, mouse e caneta de uma vez. Com `mousedown` a
-    // folha não fechava ao tocar fora no celular.
-    const fora = (evento) => {
-      if (ref.current && !ref.current.contains(evento.target)) setOpen(false);
-    };
-    const tecla = (evento) => {
-      if (evento.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", fora);
-    document.addEventListener("keydown", tecla);
-    return () => {
-      document.removeEventListener("pointerdown", fora);
-      document.removeEventListener("keydown", tecla);
-    };
-  }, [open]);
-
-  const escolher = (emoji) => {
-    onEmojiSelect(emoji);
-    setOpen(false);
-    try {
-      const nova = [emoji, ...lerRecentes().filter((item) => item !== emoji)].slice(0, 6);
-      window.localStorage.setItem(RECENTES, JSON.stringify(nova));
-    } catch {
-      // Sem armazenamento não há "recentes". A folha funciona igual.
-    }
-  };
-
-  const grade = (lista, chave) => (
-    <div key={chave} className="grid grid-cols-6 gap-1">
-      {lista.map((emoji, i) => (
+function Grade({ emojis, aoEscolher }) {
+  return (
+    <div className="grid grid-cols-8 gap-0.5 sm:grid-cols-9">
+      {emojis.map((emoji) => (
         <button
-          key={`${chave}-${emoji}-${i}`}
+          key={emoji}
           type="button"
-          onClick={() => escolher(emoji)}
+          onClick={() => aoEscolher(emoji)}
           title={emoji}
-          className="flex h-10 items-center justify-center rounded-lg text-xl transition hover:bg-[var(--engine-accent-soft)]"
+          className="flex h-10 items-center justify-center rounded-lg text-[22px] leading-none transition hover:bg-[var(--engine-accent-soft)]"
         >
           {emoji}
         </button>
       ))}
     </div>
   );
+}
+
+export function EmojiPicker({ onEmojiSelect, className = "" }) {
+  const { t } = useTranslation();
+  const celular = useMediaQuery("(max-width: 639px)");
+  const [aberto, setAberto] = useState(false);
+  const [grupo, setGrupo] = useState(EMOJI_GRUPOS[0].key);
+  const ref = useRef(null);
+
+  // Os recentes são lidos na hora de ABRIR, não num efeito depois de abrir:
+  // preencher depois renderiza a grade uma vez sem eles e outra com, e ela
+  // salta no olho de quem acabou de tocar.
+  const [recentes, setRecentes] = useState(lerRecentes);
+
+  const alternar = () => {
+    if (!aberto) setRecentes(lerRecentes());
+    setAberto((atual) => !atual);
+  };
+
+  const fechar = () => setAberto(false);
+
+  // Fechar o painel do computador ao tocar fora ou apertar Esc. A folha do
+  // celular já faz isso sozinha (o escurecido é dela).
+  useEffect(() => {
+    if (!aberto || celular) return undefined;
+
+    const fora = (evento) => {
+      if (ref.current && !ref.current.contains(evento.target)) fechar();
+    };
+    const tecla = (evento) => {
+      if (evento.key === "Escape") fechar();
+    };
+    // `pointerdown` cobre dedo, mouse e caneta de uma vez.
+    document.addEventListener("pointerdown", fora);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("pointerdown", fora);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [aberto, celular]);
+
+  const escolher = (emoji) => {
+    onEmojiSelect(emoji);
+    setAberto(false);
+    try {
+      const nova = [emoji, ...lerRecentes().filter((item) => item !== emoji)].slice(
+        0,
+        QUANTOS_RECENTES,
+      );
+      window.localStorage.setItem(RECENTES, JSON.stringify(nova));
+    } catch {
+      // Idem: sem armazenamento, só não há histórico.
+    }
+  };
+
+  const emojisDoGrupo = useMemo(
+    () => EMOJI_GRUPOS.find((item) => item.key === grupo)?.emojis || [],
+    [grupo],
+  );
+
+  const abas = (
+    /* A tira de grupos rola sozinha: são nove, e nove não cabem em 360px sem
+       virar letra de bula. `shrink-0` em cada uma para elas não se espremerem
+       até caber — espremidas, todas ficam ilegíveis em vez de algumas ficarem
+       fora da vista, que é o que a rolagem resolve. */
+    <div className="engine-scroll-x -mx-1 flex gap-1 overflow-x-auto pb-2">
+      {EMOJI_GRUPOS.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => setGrupo(item.key)}
+          className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
+            item.key === grupo
+              ? "bg-[var(--engine-accent-soft)] text-[var(--engine-accent-text)]"
+              : "text-[var(--engine-text-muted)] hover:text-[var(--engine-text)]"
+          }`}
+        >
+          {t(`emoji.groups.${item.key}`)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const conteudo = (
+    <>
+      {recentes.length > 0 && (
+        <>
+          <p className="px-0.5 pb-1 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
+            {t("emoji.recent")}
+          </p>
+          <Grade emojis={recentes} aoEscolher={escolher} />
+          <div className="my-2 h-px bg-[var(--engine-border)]" />
+        </>
+      )}
+      {abas}
+      <div className="engine-scroll max-h-64 overflow-y-auto">
+        <Grade emojis={emojisDoGrupo} aoEscolher={escolher} />
+      </div>
+    </>
+  );
+
+  const botao = (
+    <button
+      type="button"
+      onClick={alternar}
+      title={t("emoji.title")}
+      aria-label={t("emoji.title")}
+      aria-haspopup="dialog"
+      aria-expanded={aberto}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] sm:h-11 sm:w-11"
+    >
+      <Smile size={18} aria-hidden="true" />
+    </button>
+  );
+
+  if (celular) {
+    return (
+      <div className={className}>
+        {botao}
+        <BottomSheet open={aberto} onClose={fechar} title={t("emoji.title")}>
+          <div className="px-4 pb-4">{conteudo}</div>
+        </BottomSheet>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={alternar}
-        title={t("emoji.title")}
-        aria-label={t("emoji.title")}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] hover:text-[var(--engine-accent)] sm:h-11 sm:w-11"
-      >
-        <Smile size={18} aria-hidden="true" />
-      </button>
-
-      {open && (
+      {botao}
+      {aberto && (
         <div
           role="dialog"
           aria-label={t("emoji.title")}
-          /* Presa à esquerda do botão e limitada pela largura da tela: era
-             `w-80` fixo, que num celular de 360px saía pela borda direita.
-             `max-w-[min(20rem,calc(100vw-2rem))]` deixa ela crescer até 320px
-             onde couber e encolher onde não couber. */
-          className="absolute bottom-14 left-0 z-50 w-[min(20rem,calc(100vw-2rem))] max-w-[20rem] space-y-2 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 shadow-[var(--engine-shadow-md)]"
+          className="absolute bottom-14 left-0 z-50 w-[22rem] rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-3 shadow-[var(--engine-shadow-md)]"
         >
-          {recentes.length > 0 && (
-            <>
-              <p className="px-0.5 text-[10px] font-black uppercase tracking-widest text-[var(--engine-text-subtle)]">
-                {t("emoji.recent")}
-              </p>
-              {grade(recentes, "recentes")}
-              <div className="h-px bg-[var(--engine-border)]" />
-            </>
-          )}
-          <div className="max-h-56 overflow-y-auto">{grade(EMOJIS, "todos")}</div>
+          {conteudo}
         </div>
       )}
     </div>

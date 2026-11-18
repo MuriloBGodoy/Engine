@@ -9,7 +9,21 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
-  emoji: { title: "Emojis", recent: "Recentes" },
+  emoji: {
+    title: "Emojis",
+    recent: "Recentes",
+    groups: {
+      garagem: "Garagem",
+      rostos: "Rostos",
+      pessoas: "Pessoas",
+      natureza: "Natureza",
+      comida: "Comida",
+      viagem: "Viagem",
+      atividades: "Atividades",
+      objetos: "Objetos",
+      simbolos: "Símbolos",
+    },
+  },
   pullToRefresh: {
     pull: "Puxe para atualizar",
     release: "Solte para atualizar",
@@ -60,7 +74,21 @@ const ptBR = {
 };
 
 const enUS = {
-  emoji: { title: "Emojis", recent: "Recent" },
+  emoji: {
+    title: "Emojis",
+    recent: "Recent",
+    groups: {
+      garagem: "Garage",
+      rostos: "Smileys",
+      pessoas: "People",
+      natureza: "Nature",
+      comida: "Food",
+      viagem: "Travel",
+      atividades: "Activities",
+      objetos: "Objects",
+      simbolos: "Symbols",
+    },
+  },
   pullToRefresh: {
     pull: "Pull to refresh",
     release: "Release to refresh",
@@ -104,7 +132,21 @@ const enUS = {
 };
 
 const esES = {
-  emoji: { title: "Emojis", recent: "Recientes" },
+  emoji: {
+    title: "Emojis",
+    recent: "Recientes",
+    groups: {
+      garagem: "Garaje",
+      rostos: "Caras",
+      pessoas: "Personas",
+      natureza: "Naturaleza",
+      comida: "Comida",
+      viagem: "Viajes",
+      atividades: "Actividades",
+      objetos: "Objetos",
+      simbolos: "Símbolos",
+    },
+  },
   pullToRefresh: {
     pull: "Desliza para actualizar",
     release: "Suelta para actualizar",
