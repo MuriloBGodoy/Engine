@@ -12,6 +12,7 @@ import {
   Calendar,
   CarFront,
   Car,
+  ExternalLink,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -838,6 +839,62 @@ function PostFicha({ goal, t, language, full, isGoal, progress, rating, onRate, 
 }
 
 /** "autor legenda… mais". O @ do autor abre o perfil como o nome no topo. */
+/**
+ * A linha que fica COLADA na descrição: o carro do post e o link de fora.
+ *
+ * Antes, as duas coisas disputavam o lugar da mídia. O carro era uma barra
+ * acima da foto (que faz sentido quando o carro É a publicação, como na
+ * garagem) e o link virava mais um quadro no carrossel — então um post com
+ * foto, vídeo e link virava três blocos empilhados, e a foto, que é o motivo
+ * de alguém parar de rolar, ficava espremida no meio.
+ *
+ * É a estrutura do TikTok: a mídia ocupa a tela, e embaixo dela, junto do
+ * texto, ficam as etiquetas pequenas — o som lá, o carro e o link aqui. Elas
+ * não disputam espaço com a mídia; elas pertencem à legenda.
+ */
+function PostTags({ goal, t, isFreePost, onOpenSpecs }) {
+  const temCarro = isFreePost && (goal.brand || goal.model);
+  // O link só vira etiqueta quando NÃO é a mídia do post. Sozinho, ele
+  // continua abrindo como player (é o conteúdo, não um apêndice).
+  const temLink = Boolean(goal.videoUrl) && (Boolean(goal.video) || (goal.images?.length || goal.image));
+  if (!temCarro && !temLink) return null;
+
+  const etiqueta =
+    "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-[var(--engine-border)] px-2.5 text-[12px] font-bold text-[var(--engine-text-muted)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)]";
+
+  let host = "";
+  if (temLink) {
+    try {
+      host = new URL(goal.videoUrl).hostname.replace(/^www\./, "");
+    } catch {
+      host = t("community.openLink");
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-3 pb-2 sm:px-4">
+      {temCarro ? (
+        <button type="button" onClick={onOpenSpecs} className={etiqueta}>
+          <Car size={13} aria-hidden="true" className="shrink-0" />
+          <span className="min-w-0 truncate">{getVehicleTitleShort(goal)}</span>
+        </button>
+      ) : null}
+      {temLink ? (
+        <a
+          href={goal.videoUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          className={etiqueta}
+          title={goal.videoUrl}
+        >
+          <ExternalLink size={13} aria-hidden="true" className="shrink-0" />
+          <span className="min-w-0 truncate">{host}</span>
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 function PostCaption({ goal, t, full, onExpand }) {
   const text = goal.note || "";
   const cut = full || text.length <= CAPTION_PREVIEW_CHARS
@@ -1139,10 +1196,12 @@ export function GoalCard({
         <PostMenu items={menuItems} label={t("community.postOptions")} />
       </header>
 
-      {/* Ficha ANTES da mídia, como o card de atividade do Strava: o carro e a
-          meta são a manchete, a foto é a prova. Post livre só tem ficha quando
-          foi publicado a partir de um carro. */}
-      {(!isFreePost || goal.title) && (goal.brand || goal.model) && (
+      {/* Ficha ANTES da mídia quando o carro É a publicação (garagem, meta):
+          ali ele é a manchete e a foto é a prova, como no card do Strava.
+          No POST LIVRE o carro é só uma referência — ele desceu para junto da
+          legenda, como etiqueta (ver PostTags). Em cima, empurrava a foto para
+          baixo da dobra num assunto que nem sempre era sobre o carro. */}
+      {!isFreePost && (goal.brand || goal.model) && (
         <PostFicha
           goal={goal}
           t={t}
@@ -1156,12 +1215,16 @@ export function GoalCard({
         />
       )}
 
-      {/* Foto e vídeo do YouTube no mesmo carrossel; vídeo nativo continua
-          com o player próprio, que tem corte, capa e som definidos no envio. */}
-      {!hideMedia && photos.length > 0 && (
+      {/* UMA MÍDIA POR POST: vídeo OU foto, nunca os dois empilhados.
+          Um post com os dois mostrava a foto inteira e o vídeo inteiro, um
+          embaixo do outro — duas vezes a mesma história e nenhuma delas com a
+          tela toda. O vídeo ganha, porque é o que foi gravado para ser visto.
+          O link externo, que antes entrava como mais um quadro do carrossel,
+          virou etiqueta embaixo da legenda. */}
+      {!hideMedia && !goal.video && photos.length > 0 && (
         <PostGallery
           images={photos}
-          videoUrl={goal.video ? "" : goal.videoUrl}
+          videoUrl=""
           alt={goal.title}
           t={t}
           onOpen={openable ? () => onOpenPost(goal.id) : undefined}
@@ -1237,6 +1300,11 @@ export function GoalCard({
           full={isModal || captionOpen}
           onExpand={() => setCaptionOpen(true)}
         />
+      )}
+
+      {/* Carro e link, colados na legenda (ver PostTags). */}
+      {!hideMedia && (
+        <PostTags goal={goal} t={t} isFreePost={isFreePost} onOpenSpecs={() => setSpecsOpen(true)} />
       )}
 
       {/* Prévia dos comentários, como no Instagram: "ver todos os N" e o
@@ -1734,10 +1802,13 @@ export function PostModal({ goal, loading, openComments, t, onClose, cardProps }
               className="flex shrink-0 items-center justify-center overflow-hidden bg-[var(--engine-surface-2)]"
               style={{ width: lightbox.width, height: lightbox.height }}
             >
-              {gallery.length > 0 ? (
+              {/* Mesma regra do cartão: vídeo manda, foto é a alternativa,
+                  nunca os dois. Aqui a coluna tem a altura da mídia — com os
+                  dois, ela ficava com o dobro e metade saía da tela. */}
+              {!goal.video && gallery.length > 0 ? (
                 <PostGallery
                   images={gallery}
-                  videoUrl={goal.video ? "" : goal.videoUrl}
+                  videoUrl=""
                   alt={goal.title}
                   t={t}
                   box={{ maxWidth: lightbox.width, maxHeight: lightbox.height }}

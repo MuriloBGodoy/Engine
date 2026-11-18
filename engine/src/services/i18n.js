@@ -316,6 +316,7 @@ const resources = {
       },
       common: {
         appName: "Engine",
+        back: "Voltar",
         close: "Fechar",
         options: "Opções",
         filter: "Filtrar",
@@ -1562,6 +1563,7 @@ const resources = {
         blockError: "Não foi possível bloquear o usuário.",
         postOptions: "Mais opções",
         copyLink: "Copiar link",
+        openLink: "Abrir link",
         commentsAction: "Comentários",
         beFirstToComment: "Seja o primeiro a comentar",
         title: "A garagem agora também é uma rede.",
@@ -2242,6 +2244,7 @@ const resources = {
       },
       common: {
         appName: "Engine",
+        back: "Back",
         close: "Close",
         options: "Options",
         filter: "Filter",
@@ -3474,6 +3477,7 @@ const resources = {
         blockError: "Could not block the user.",
         postOptions: "More options",
         copyLink: "Copy link",
+        openLink: "Open link",
         commentsAction: "Comments",
         beFirstToComment: "Be the first to comment",
         title: "The garage is a network now.",
@@ -4146,6 +4150,7 @@ const resources = {
       },
       common: {
         appName: "Engine",
+        back: "Volver",
         close: "Cerrar",
         options: "Opciones",
         filter: "Filtrar",
@@ -5383,6 +5388,7 @@ const resources = {
         blockError: "No se pudo bloquear al usuario.",
         postOptions: "Más opciones",
         copyLink: "Copiar enlace",
+        openLink: "Abrir enlace",
         commentsAction: "Comentarios",
         beFirstToComment: "Sé el primero en comentar",
         title: "El garaje ahora también es una red.",
