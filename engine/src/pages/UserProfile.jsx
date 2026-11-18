@@ -42,6 +42,7 @@ import { useRequireAccount } from "../hooks/useRequireAccount";
 import { useSocialReport } from "../hooks/useSocialReport";
 import { BioWithMentions } from "../components/mentions/BioWithMentions";
 import { EngineBlock } from "../components/mentions/EngineBlock";
+import { useDeslizarAbas } from "../hooks/useDeslizarAbas";
 import { useEnginePresence } from "../hooks/useEnginePresence";
 import { PostMenu } from "../components/social/PostMenu";
 import { PeopleSheet } from "../components/social/PeopleSheet";
@@ -79,8 +80,13 @@ const statValueClass =
 // perfil / Compartilhar" no seu, "Seguir / Mensagem" no dos outros. Antes o
 // seu tinha um botão vermelho de ponta a ponta para editar o próprio perfil
 // — a ação menos urgente da tela com o peso visual máximo.
+/* `whitespace-nowrap`: o rótulo nunca quebra em duas linhas. Quando quebrava,
+   o botão crescia em altura e ficava mais alto que os vizinhos da mesma fila
+   — foi o que aconteceu com "Editar perfil" num celular de 360px, antes de o
+   rótulo virar só "Editar". Faltando espaço, o texto some com reticências em
+   vez de empurrar a fila. */
 const profileActionBase =
-  "flex min-h-10 flex-1 items-center justify-center rounded-lg px-3 text-[13px] font-bold transition";
+  "flex min-h-10 flex-1 items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-lg px-3 text-[13px] font-bold transition";
 const profileActionClass = `${profileActionBase} border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] hover:border-[var(--engine-border-strong)]`;
 
 
@@ -775,6 +781,37 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
     setSearchParams(next, { replace: true });
   };
 
+  /* As abas, na ordem em que aparecem na tira. Saiu de dentro do JSX porque
+     agora tem um segundo dono: o gesto de deslizar precisa da ORDEM para
+     saber qual é a próxima. Escrita em dois lugares, ela divergiria no
+     primeiro ajuste — e o dedo passaria para uma aba que não é a vizinha. */
+  const abasDoPerfil = [
+    { id: "posts", label: t("socialFeed.postsTab") },
+    ...(showcaseCars.length || isOwnProfile ? [{ id: "garage", label: t("profileHub.garage") }] : []),
+    ...(enginePresence.hasPresence ? [{ id: "engine", label: t("engineBlock.title") }] : []),
+    { id: "achievements", label: t("profile.tabs.achievements") },
+    ...(isOwnProfile && ["saved", "archived", "liked"].includes(activeTab)
+      ? [
+          {
+            id: activeTab,
+            label: t(
+              activeTab === "saved"
+                ? "socialPosts.saved.tab"
+                : activeTab === "archived"
+                  ? "community.archivedTab"
+                  : "profileHub.liked",
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  const deslizarAbas = useDeslizarAbas({
+    ordem: abasDoPerfil.map((aba) => aba.id),
+    atual: activeTab,
+    aoTrocar: setActiveTab,
+  });
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -927,12 +964,20 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
   return (
     <div className="min-h-screen bg-[var(--engine-bg)]">
       <div className="mx-auto w-full max-w-2xl">
-        {/* Capa: só aparece quem escolheu uma. */}
+        {/* Capa: só aparece quem escolheu uma.
+
+            PROPORÇÃO FIXA, 3:1 — o mesmo do X e o mesmo que a capa de clube
+            já usa aqui (ClubPhotoPicker). Antes a altura é que era fixa (128px
+            no celular, 176px daí para cima), e altura fixa com largura
+            elástica significa proporção diferente em cada aparelho: a mesma
+            foto aparecia cortada num lugar no celular e noutro no computador,
+            e quem escolheu a capa não tinha como saber o que ia sobrar. Com a
+            proporção presa, o enquadramento é um só em qualquer tela. */}
         {banner && (
           <img
             src={banner}
             alt=""
-            className="h-32 w-full object-cover sm:mt-4 sm:h-44 sm:rounded-2xl"
+            className="aspect-[3/1] w-full object-cover sm:mt-4 sm:rounded-2xl"
           />
         )}
 
@@ -941,7 +986,18 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
           {/* Avatar + Name/Username Row */}
           <div className="mb-4 flex items-start gap-4 sm:gap-6">
             {/* Avatar */}
-            <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-full border-2 border-[var(--engine-border)] bg-[var(--engine-surface-2)] sm:h-24 sm:w-24">
+            {/* Com capa, a foto sobe e monta sobre ela, como no X: é o que
+                amarra as duas numa coisa só, em vez de duas faixas empilhadas.
+                O anel é da cor do fundo da página — sem ele a foto encosta na
+                capa e some dentro dela quando a capa é clara. Sem capa não há
+                o que montar, e a foto fica onde sempre esteve. */}
+            <div
+              className={`h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-[var(--engine-surface-2)] sm:h-24 sm:w-24 ${
+                banner
+                  ? "-mt-12 ring-4 ring-[var(--engine-bg)] sm:-mt-14"
+                  : "border-2 border-[var(--engine-border)]"
+              }`}
+            >
               {avatar ? (
                 <img
                   src={avatar}
@@ -1138,30 +1194,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
                 "Minhas coisas" ainda entra aqui quando o endereço pede
                 (`?tab=saved`, vindo de Configurações) — a aba existe, só
                 não ocupa a tira. */}
-            {[
-              { id: "posts", label: t("socialFeed.postsTab") },
-              ...(showcaseCars.length || isOwnProfile
-                ? [{ id: "garage", label: t("profileHub.garage") }]
-                : []),
-              ...(enginePresence.hasPresence
-                ? [{ id: "engine", label: t("engineBlock.title") }]
-                : []),
-              { id: "achievements", label: t("profile.tabs.achievements") },
-              ...(isOwnProfile && ["saved", "archived", "liked"].includes(activeTab)
-                ? [
-                    {
-                      id: activeTab,
-                      label: t(
-                        activeTab === "saved"
-                          ? "socialPosts.saved.tab"
-                          : activeTab === "archived"
-                            ? "community.archivedTab"
-                            : "profileHub.liked",
-                      ),
-                    },
-                  ]
-                : []),
-            ].map((tab) => {
+            {abasDoPerfil.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -1228,8 +1261,9 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         )}
         </div>
 
-        {/* Tab Content */}
-        <div className="px-4 py-6 sm:px-6">
+        {/* Tab Content — e a área onde o dedo passa de aba (useDeslizarAbas).
+            O gesto fica no conteúdo, não na tira: é onde a mão já está. */}
+        <div className="px-4 py-6 sm:px-6" {...deslizarAbas}>
           {activeTab === "posts" && (
             <div>
               {/* Grade é para o que é visual. Publicação só de texto num
