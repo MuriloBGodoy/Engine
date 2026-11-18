@@ -1653,6 +1653,8 @@ const resources = {
         rankingTitle: "Ranking Engine",
         rankingSubtitle:
           "Pontuação baseada em progresso, curtidas, nota e constância.",
+        rankingEmpty:
+          "Ainda não há metas publicadas. O ranking é delas: publicação livre não entra, porque não tem progresso para comparar.",
         shareModalTitle: "Compartilhar meta",
         shareModalCopy:
           "Publique ou remova apenas metas da sua garagem. Para metas de outros usuários, o botão de compartilhar só copia o link.",
@@ -3550,6 +3552,8 @@ const resources = {
         rankingTitle: "Engine Ranking",
         rankingSubtitle:
           "Score based on progress, likes, rating, and consistency.",
+        rankingEmpty:
+          "No goals posted yet. The ranking is theirs: a free post has no progress to compare.",
         shareModalTitle: "Share goal",
         shareModalCopy:
           "Publish or remove only goals from your garage. For other users' goals, share only copies the link.",
@@ -5451,6 +5455,8 @@ const resources = {
         rankingTitle: "Ranking Engine",
         rankingSubtitle:
           "Puntuación basada en progreso, likes, nota y constancia.",
+        rankingEmpty:
+          "Todavía no hay metas publicadas. El ranking es de ellas: una publicación libre no tiene progreso que comparar.",
         shareModalTitle: "Compartir meta",
         shareModalCopy:
           "Publica o quita solo metas de tu garaje. Para metas de otros usuarios, compartir solo copia el link.",

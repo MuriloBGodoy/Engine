@@ -57,6 +57,7 @@ import "../services/i18n-social-posts";
 import "../services/i18n-editing";
 import { CaptionEditor } from "../components/social/CaptionEditor";
 import { ReelsFeed } from "../components/social/ReelsFeed";
+import { useDeslizarAbas } from "../hooks/useDeslizarAbas";
 import { TrendingTags } from "../components/social/TrendingTags";
 import { normalizeTag, tagPath } from "../services/socialText";
 import { RichText } from "../components/social/RichText";
@@ -2550,6 +2551,16 @@ export function Community({ cars = [], settings, user }) {
     activeSectionRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [activeSection]);
 
+  /* Passar de seção com o dedo, na mesma ordem da tira (useDeslizarAbas).
+     Reaproveita `selectSection`, que é quem sabe mexer na URL — o endereço
+     continua sendo a verdade sobre onde a pessoa está, deslizando ou
+     tocando. */
+  const deslizarSecoes = useDeslizarAbas({
+    ordem: sections.map((secao) => secao.id),
+    atual: activeSection,
+    aoTrocar: selectSection,
+  });
+
 
   // Abre o compositor já apontado para o clube quando a pessoa chega da
   // página dele. Busca o clube pelo id: é uma leitura, e é o que garante que
@@ -2602,7 +2613,7 @@ export function Community({ cars = [], settings, user }) {
           do primeiro post. O que importava dele foi para o trilho e para o
           botão de publicar aqui em cima. */}
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="mx-auto w-full min-w-0 max-w-[620px]">
+        <div className="mx-auto w-full min-w-0 max-w-[620px]" {...deslizarSecoes}>
           {/* Uma barra só: seções à esquerda, ações à direita.
 
               Ela já grudou no topo no desktop (o que o X e o Instagram fazem
@@ -3216,6 +3227,16 @@ function RankingPanel({ ranking, t }) {
         </div>
       </header>
 
+      {/* Lista vazia não pode virar cabeçalho sozinho numa caixa oca: parece
+          tela quebrada, e foi o que aconteceu — a comunidade nova só tinha
+          publicação livre, que o ranking não classifica de propósito (não há
+          progresso para comparar). Dizer isso é a diferença entre "ainda não"
+          e "defeito". A barra lateral já fazia; o painel não fazia. */}
+      {!ranking.length ? (
+        <p className="border-t border-[var(--engine-border)] px-4 py-6 text-[13px] font-medium leading-relaxed text-[var(--engine-text-muted)] sm:px-6">
+          {t("community.rankingEmpty")}
+        </p>
+      ) : (
       <ol className="divide-y divide-[var(--engine-border)] border-t border-[var(--engine-border)]">
         {ranking.map((goal, index) => {
           const progress = getProgress(goal);
@@ -3268,6 +3289,7 @@ function RankingPanel({ ranking, t }) {
           );
         })}
       </ol>
+      )}
     </section>
   );
 }
