@@ -303,7 +303,7 @@ export function Messages({ user, settings }) {
       navigate(`/messages/${id}`);
     } catch (error) {
       console.error(error);
-      toast(t("messages.startError"));
+      toast(t("messages.startError"), "error");
     }
   };
 
@@ -336,6 +336,7 @@ export function Messages({ user, settings }) {
               ? "socialPosts.messages.editWindowClosed"
               : "socialPosts.messages.editError",
           ),
+          "error",
         );
       } finally {
         setSending(false);
@@ -356,6 +357,7 @@ export function Messages({ user, settings }) {
           chatErrorKey(error) ||
             (/blocked/.test(String(error?.message || error?.code || "")) ? "socialFixes.blockedAction" : "messages.sendError"),
         ),
+        "error",
       );
     } finally {
       setSending(false);
@@ -383,7 +385,7 @@ export function Messages({ user, settings }) {
       navigate("/messages");
     } catch (error) {
       console.error(error);
-      toast(t("community.blockError"));
+      toast(t("community.blockError"), "error");
     }
   };
 
@@ -399,7 +401,7 @@ export function Messages({ user, settings }) {
       await deleteMessage(conversationId, message.id, message);
     } catch (error) {
       console.error(error);
-      toast(t("messages.deleteError"));
+      toast(t("messages.deleteError"), "error");
     }
   };
 
@@ -414,7 +416,7 @@ export function Messages({ user, settings }) {
       setPreviewImage(dataUrl);
     } catch (error) {
       console.error(error);
-      toast(t("messages.imageError"));
+      toast(t("messages.imageError"), "error");
     }
   };
 
@@ -430,7 +432,7 @@ export function Messages({ user, settings }) {
     } catch (error) {
       console.error(error);
       const code = VIDEO_ERRORS_SHOWN.includes(error?.code) ? error.code : "upload";
-      toast(t(`socialPosts.videoErrors.${code}`, { mb: VIDEO_MB }));
+      toast(t(`socialPosts.videoErrors.${code}`, { mb: VIDEO_MB }), "error");
     } finally {
       setSendingVideo(false);
     }
@@ -460,7 +462,7 @@ export function Messages({ user, settings }) {
       setPreviewImage(await readFileAsDataUrl(file));
     } catch (error) {
       console.error(error);
-      toast(t("messages.imageError"));
+      toast(t("messages.imageError"), "error");
     }
   };
 
@@ -484,7 +486,7 @@ export function Messages({ user, settings }) {
       });
     } catch (error) {
       console.error(error);
-      toast(t(chatErrorKey(error) || "messages.sendError"));
+      toast(t(chatErrorKey(error) || "messages.sendError"), "error");
     } finally {
       setSending(false);
       setCompressing(false);
@@ -510,7 +512,7 @@ export function Messages({ user, settings }) {
       });
     } catch (error) {
       console.error(error);
-      toast(t(chatErrorKey(error) || "messages.sendError"));
+      toast(t(chatErrorKey(error) || "messages.sendError"), "error");
     } finally {
       setSending(false);
     }
@@ -536,7 +538,7 @@ export function Messages({ user, settings }) {
       );
     } catch (error) {
       console.error(error);
-      toast(t("serviceChat.status.error"));
+      toast(t("serviceChat.status.error"), "error");
     } finally {
       setStatusBusy(false);
     }

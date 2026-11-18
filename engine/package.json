@@ -12,6 +12,7 @@
     "fetch:fipe-sample": "node scripts/fetch-fipe-sample.mjs",
     "check:fipe-parser": "node scripts/check-fipe-parser.mjs",
     "check:masks": "node scripts/check-masks.mjs",
+    "check:toasts": "node scripts/check-toasts.mjs",
     "check:mobile": "node scripts/check-mobile-contract.mjs",
     "check:ios": "node scripts/check-ios-contract.mjs",
     "check:android": "node scripts/check-android-contract.mjs",

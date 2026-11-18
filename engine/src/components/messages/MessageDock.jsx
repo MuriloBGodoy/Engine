@@ -186,7 +186,7 @@ export function MessageDock({ user }) {
     } catch (error) {
       console.error(error);
       setDraft(text);
-      toast(t(chatErrorKey(error) || "messages.sendError"));
+      toast(t(chatErrorKey(error) || "messages.sendError"), "error");
     } finally {
       setSending(false);
     }
@@ -198,7 +198,7 @@ export function MessageDock({ user }) {
       setPreviewImage(await readFileAsDataUrl(file));
     } catch (error) {
       console.error(error);
-      toast(t("messages.imageError"));
+      toast(t("messages.imageError"), "error");
     }
   };
 
@@ -211,7 +211,7 @@ export function MessageDock({ user }) {
     } catch (error) {
       console.error(error);
       const code = VIDEO_ERRORS_SHOWN.includes(error?.code) ? error.code : "upload";
-      toast(t(`socialPosts.videoErrors.${code}`, { mb: VIDEO_MB }));
+      toast(t(`socialPosts.videoErrors.${code}`, { mb: VIDEO_MB }), "error");
     } finally {
       setSendingVideo(false);
     }
@@ -226,7 +226,7 @@ export function MessageDock({ user }) {
       setPreviewImage(await readFileAsDataUrl(file));
     } catch (error) {
       console.error(error);
-      toast(t("messages.imageError"));
+      toast(t("messages.imageError"), "error");
     }
   };
 
@@ -241,7 +241,7 @@ export function MessageDock({ user }) {
       await sendMessage(activeId, { senderId: userId, text: caption || "", imageData: compressed });
     } catch (error) {
       console.error(error);
-      toast(t(chatErrorKey(error) || "messages.sendError"));
+      toast(t(chatErrorKey(error) || "messages.sendError"), "error");
     } finally {
       setSending(false);
       setCompressing(false);
@@ -259,7 +259,7 @@ export function MessageDock({ user }) {
       await deleteMessage(activeId, message.id, message);
     } catch (error) {
       console.error(error);
-      toast(t("messages.deleteError"));
+      toast(t("messages.deleteError"), "error");
     }
   };
 
