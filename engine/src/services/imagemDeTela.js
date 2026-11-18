@@ -41,6 +41,25 @@ export async function elementoParaPng(elemento, { escala = 3, fundo = null } = {
     scale: escala,
     type: "image/png",
     backgroundColor: fundo,
+    /* A FOTO SUMIA DA IMAGEM EXPORTADA (17/11/2026).
+     *
+     * Para desenhar uma imagem de outro domínio, a biblioteca precisa LER os
+     * bytes dela, e para isso refaz o download com CORS. Só que o padrão dela
+     * é `cache: "force-cache"` — e a foto já estava no cache do navegador,
+     * baixada pela própria tela como `<img>` comum, sem CORS. O navegador
+     * devolve aquela cópia, que é opaca: dá para desenhar na tela, não dá para
+     * ler. A leitura falha, a biblioteca troca a foto por um pixel
+     * transparente (é o `placeholderImage` padrão dela) e não avisa ninguém —
+     * o cartão sai inteiro, com um retângulo vazio no lugar do rosto.
+     *
+     * O Storage do Supabase responde `Access-Control-Allow-Origin: *` e manda
+     * `max-age` de um ano, então sem isto a cópia errada ficaria valendo por
+     * um ano. Pedir sem cache custa um download a mais no momento de exportar,
+     * e só nele. */
+    fetch: {
+      requestInit: { mode: "cors", cache: "no-cache" },
+      bypassingCache: true,
+    },
     // A folha de estilo do app inteiro não precisa entrar no SVG: só o que
     // afeta este pedaço. Sem isto, o desenho de 500 px carrega 200 kB de CSS
     // de telas que ele não usa.
