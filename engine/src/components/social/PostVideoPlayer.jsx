@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Play, Volume2, VolumeX } from "lucide-react";
+import { captureError } from "../../services/observability";
 
 // Som ligado vale para a sessão inteira, como no Instagram: quem ligou o som
 // num vídeo não quer religar em cada um ao rolar.
@@ -131,7 +132,21 @@ export function PostVideoPlayer({ video, mode = "inline", active, autoPlay = tru
         }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onError={() => setFailed(true)}
+        onError={(evento) => {
+          setFailed(true);
+          /* `Este navegador não consegue tocar este vídeo` é o que a pessoa
+             vê, e não diz nada a quem vai consertar. O elemento guarda o
+             motivo em `error.code` (1 abortado, 2 rede, 3 decodificação,
+             4 formato/endereço) — e 4 com um endereço que existe é outra
+             conversa que 2 com o arquivo faltando. */
+          const falha = evento.currentTarget?.error;
+          captureError(new Error(`video-nao-toca:${falha?.code || "?"}`), {
+            url: String(video?.url || "").slice(0, 200),
+            codigo: falha?.code,
+            mensagem: falha?.message || "",
+            modo: mode,
+          });
+        }}
         className={isReel ? "h-full w-full object-contain" : "h-full w-full object-cover"}
       />
 

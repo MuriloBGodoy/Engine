@@ -1,5 +1,6 @@
 import { must, supabase } from "./supabase";
 import { uploadToStorage } from "./photos";
+import { captureError } from "./observability";
 import { podeRecodificar, precisaRecodificar, recodificarTrecho } from "./videoEncode";
 
 /**
@@ -208,16 +209,48 @@ export const uploadPostVideo = async (file, edit, { userId, onEncodeProgress } =
   const contentType = recodificado ? recodificado.type : contentTypeFor(file);
   const stamp = `${Date.now()}-${crypto.randomUUID()}`;
   const path = `users/${userId}/posts/${stamp}.${extensionFor(contentType)}`;
-  must(
-    await withTimeout(
-      supabase.storage.from(VIDEO_BUCKET).upload(path, corpo, {
-        contentType,
-        cacheControl: "31536000",
-        upsert: false,
-      }),
-      UPLOAD_TIMEOUT_MS,
-    ),
-  );
+  /* O ENVIO DO VÍDEO NUNCA CHEGOU AO FIM EM PRODUÇÃO.
+   *
+   * Em 17/11/2026 o bucket `videos` estava vazio — nenhum vídeo, de ninguém,
+   * desde que o recurso existe (a migration 20261113200000 já dizia o mesmo
+   * em 13/11). A capa, que sobe logo DEPOIS desta linha, estava lá: ou seja,
+   * a tentativa passa por aqui e o arquivo não fica.
+   *
+   * Sem o erro do aparelho de quem postou não dá para saber onde quebra —
+   * política do Storage, tipo recusado, tempo esgotado no 4G, recodificação
+   * que devolve um blob vazio. Então o erro passa a ser RELATADO com o que
+   * importa para distinguir esses casos, em vez de virar só "upload" na tela.
+   *
+   * Nada aqui muda o que a pessoa vê: o erro continua subindo como antes. */
+  const envio = await withTimeout(
+    supabase.storage.from(VIDEO_BUCKET).upload(path, corpo, {
+      contentType,
+      cacheControl: "31536000",
+      upsert: false,
+    }),
+    UPLOAD_TIMEOUT_MS,
+  ).catch((erro) => {
+    captureError(erro, {
+      passo: "upload-video",
+      bucket: VIDEO_BUCKET,
+      contentType,
+      bytes: corpo?.size || 0,
+      recodificado: Boolean(recodificado),
+    });
+    throw erro;
+  });
+
+  if (envio?.error) {
+    captureError(envio.error, {
+      passo: "upload-video-recusado",
+      bucket: VIDEO_BUCKET,
+      contentType,
+      bytes: corpo?.size || 0,
+      recodificado: Boolean(recodificado),
+      status: envio.error.statusCode || envio.error.status || "",
+    });
+  }
+  must(envio);
 
   let posterPath = "";
   if (edit.posterBlob) {
