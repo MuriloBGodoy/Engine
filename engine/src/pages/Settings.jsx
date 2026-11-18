@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useId, useRef, useState } from "r
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
+  ArrowLeft,
   Bell,
   BellOff,
   CalendarClock,
@@ -1210,6 +1211,19 @@ export function Settings({ user, settings, onSettingsUpdate }) {
   return (
     <section className="space-y-6 sm:space-y-8">
       <div className="border-b border-[var(--engine-border)] pb-4 sm:pb-2">
+        {/* A seta existe porque a barra de baixo não está mais aqui: ajustes
+            é tela empilhada, como no Instagram, e tela empilhada se fecha
+            pelo caminho de onde veio. Sem histórico (link direto), volta
+            para o início em vez de não fazer nada. Só no celular — no
+            computador a barra lateral nunca saiu da tela. */}
+        <button
+          type="button"
+          onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate("/"))}
+          className="-ml-2 mb-1 flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[13px] font-bold text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent)] lg:hidden"
+        >
+          <ArrowLeft size={18} />
+          {t("common.back")}
+        </button>
         <PageHeader eyebrow="Engine Control" title={t("settings.title")} subtitle={t("settings.subtitle")} />
       </div>
 

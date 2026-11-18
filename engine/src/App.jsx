@@ -887,6 +887,33 @@ function AppLayout({
   const isChatThread =
     Boolean(user) && /^\/messages\/[^/]+/.test(location.pathname);
 
+  /* TELA EMPILHADA NÃO TEM BARRA (17/11/2026).
+   *
+   * A regra é a mesma no Instagram, no TikTok e no X, e é a que a mão já
+   * espera: a barra de baixo pertence às SEÇÕES de topo — Início, Buscar,
+   * Garagem, Comunidade, Serviços. Quando você abre algo de dentro de uma
+   * delas (uma publicação, um carro, uma conversa, os ajustes), a tela sobe
+   * por cima e troca a barra por um cabeçalho com seta de voltar. É por isso
+   * que no Instagram a publicação aberta mostra só "← Posts".
+   *
+   * Duas coisas que a regra ganha: a foto ocupa a tela inteira em vez de
+   * dividir espaço com duas barras, e a seta diz de onde você veio — a barra
+   * não dizia (ela mostra onde você PODE ir, que é outra pergunta).
+   *
+   * Só entra aqui a tela que tem o próprio jeito de voltar, e que funciona
+   * para quem chegou por link, sem histórico: publicação (seta com volta para
+   * a comunidade), carro (seta sobre a foto, volta para a garagem), anúncio e
+   * produto (cabeçalho próprio com a marca), ajustes (seta acrescentada
+   * agora). Esconder a barra de quem não tem para onde voltar é pior do que
+   * a barra.
+   *
+   * No computador nada disso vale: lá a navegação é a barra lateral, que não
+   * disputa espaço com nada.
+   */
+  const semBarraNoCelular =
+    /^\/(post|garagem|servicos|produtos)\/[^/]+/.test(location.pathname) ||
+    location.pathname === "/settings";
+
   return (
     <div
       className={`flex min-h-[100dvh] flex-col bg-[var(--engine-bg)] font-sans text-[var(--engine-text)] transition-colors ${
@@ -896,7 +923,7 @@ function AppLayout({
       {/* No mobile a rolagem é a do documento (barra de endereço recolhe,
           pull-to-refresh funciona); o painel com rolagem interna só entra
           no desktop, onde a sidebar precisa ficar fixa. */}
-      {!isChatThread && (
+      {!isChatThread && !semBarraNoCelular && (
         <MobileNav
           profileSettings={settings.profile}
           settings={settings}
@@ -927,7 +954,12 @@ function AppLayout({
         className={`engine-app-main engine-scroll flex min-h-0 min-w-0 flex-1 flex-col ${
           isChatThread
             ? "p-0 lg:px-10 lg:py-8"
-            : "px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8"
+            : semBarraNoCelular
+              ? /* Sem barra embaixo não há barra a desviar: some o respiro de
+                   5,5rem que existia só para o último item não ficar debaixo
+                   dela. Fica o da área segura, que é do aparelho. */
+                "px-4 py-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8"
+              : "px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-10 lg:py-8 lg:pb-8"
         } ${isTopNav ? "" : "lg:h-[100dvh] lg:overflow-y-auto"}`}
       >
         {/* No layout sidebar, a Topbar global fica no topo do conteúdo (só
