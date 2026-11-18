@@ -116,7 +116,18 @@ export function BottomSheet({
   return createPortal(
     <div
       className="engine-sheet-scrim"
-      onClick={fechar}
+      /* `pointerdown`, não `click`: o clique só nasce quando o dedo desce e
+         sobe no MESMO elemento, e aqui a folha sobe animada debaixo da mão —
+         o alvo muda no meio do toque e o clique não acontece. Era o caso de
+         "toquei fora e não fechou". O mesmo valia para o seletor de emoji,
+         que fechava só com `mousedown` e por isso não fechava no celular.
+
+         `event.target === event.currentTarget` garante que só o toque no
+         escurecido fecha: o que começa dentro do painel sobe por bolha e
+         seria lido aqui como "tocou fora". */
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) fechar();
+      }}
       data-testid="bottom-sheet-scrim"
     >
       <div
