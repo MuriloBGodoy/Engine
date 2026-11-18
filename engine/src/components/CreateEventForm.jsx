@@ -102,6 +102,11 @@ function MapPreview({ event, compact = false }) {
  * "Em alta" ficavam vazios. Quem pode criar evento de clube (capitão e
  * fundador) é o banco que decide.
  */
+/*
+ * Cidade do evento: a lista é a do IBGE, filtrada pela UF (ui/CityField).
+ * Encontro de carro acontece muito em cidade pequena, e a lista antiga só
+ * trazia as maiores de cada estado.
+ */
 export function CreateEventForm({ onSuccess, onCancel, club = null }) {
   const { t } = useTranslation();
   const showToast = useToast();
@@ -381,9 +386,6 @@ export function CreateEventForm({ onSuccess, onCancel, club = null }) {
             </Select>
           </Field>
 
-          {/* Cidade do evento: lista do IBGE filtrada pela UF. Encontro de
-              carro acontece muito em cidade pequena, e a lista antiga só
-              tinha as maiores de cada estado. */}
           <Field label={t("events.form.city")}>
             <CityField
               country={form.country}

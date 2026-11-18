@@ -162,9 +162,19 @@ check(
   const owned = simulateCar(onix, { profile: SP });
   check("Onix quitado: abre à vista", owned.inputs.purchaseMode, "cash");
   check("Onix quitado: sem parcela", owned.monthly.financing, 0);
-  // R$ 855/mês na auditoria = 1.000 km a 11,1 km/l padrão + IPVA e
-  // licenciamento diluídos. Com o INMETRO (13,4 km/l) a conta comparável cai.
-  within("Onix quitado SP: comparável entre R$ 700 e R$ 900/mês", owned.comparableMonthly, 700, 900);
+  /* A faixa subiu em 17/11/2026, e não por bug: seguro e manutenção voltaram
+     para a soma (ver o cabeçalho de services/ownership.js). O que o número
+     mede mudou — antes era combustível + IPVA + licenciamento, agora é o
+     custo de manter o carro de verdade.
+     Composição medida neste caso (Onix 2024, R$ 80.000, SP, à vista, perfil
+     padrão 18-25 com cobertura completa e garagem):
+       IPVA 267 + licenciamento 15 + seguro 641 + combustível 476 +
+       manutenção 100 = 1.499/mês.
+     O seguro é 9,6% do valor ao ano, que é a taxa SUSEP da faixa 18-25 — o
+     padrão do simulador é a faixa mais cara, de propósito. A faixa larga
+     abaixo existe porque o preço do combustível vem do market-data.json da
+     semana e anda sozinho. */
+  within("Onix quitado SP: comparável entre R$ 1.300 e R$ 1.700/mês", owned.comparableMonthly, 1300, 1700);
   const legacy = simulateCar({ ...onix, ownership: { purchaseMode: "finance", ...SP } });
   check("Onix quitado com simulação antiga 'finance': vira à vista", legacy.monthly.financing, 0);
   const chosen = simulateCar({
