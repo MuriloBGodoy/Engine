@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import {
   simulateCar,
   resolveOwnershipInputs,
+  AGE_BANDS,
+  COVERAGE_TYPES,
   FUEL_TYPES,
   isSimulatorAvailable,
   MARKET_DATA_DATES,
@@ -439,12 +441,19 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
     ? t("ownership.lean.plusYearlyNoState")
     : t("ownership.lean.plusYearly", { value: money(yearly) });
 
+  const seguroInformado = inputs.insuranceMonthly > 0;
+  const manutencaoInformada = inputs.maintenanceMonthly > 0;
+  const temFaixa = Boolean(result.totals.estimated);
+  /* "R$ 54 a R$ 100" numa linha só. Os dois extremos com o símbolo repetido
+     ("R$ 54 a R$ 100") é o jeito que não deixa ninguém ler 54 como centavos. */
+  const faixa = (baixo, alto) => t("ownership.lean.range", { low: money(baixo), high: money(alto) });
+
   const carName = formatCarName(car);
   const carYear = formatFipeYear(String(car.year || "").split(" ")[0], t("car.zeroKm"));
 
   return (
     <div className="engine-modal-overlay">
-      <div className="engine-modal-panel engine-pop sm:max-w-2xl">
+      <div className="engine-modal-panel engine-pop sm:max-w-2xl lg:max-w-5xl">
         <DragHandle onClose={onClose} />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--engine-border)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
@@ -467,7 +476,14 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </button>
         </div>
 
-        <div className="engine-modal-body engine-scroll grid content-start gap-5 px-4 py-5 sm:px-6 sm:py-6">
+        {/* DUAS COLUNAS NO COMPUTADOR (17/11/2026). Numa coluna só, mexer no
+            estado ou no prazo empurrava o resultado para fora da tela: a
+            pessoa trocava o campo, rolava para cima para ver o número, rolava
+            de volta. Com o resultado grudado ao lado, cada ajuste responde na
+            mesma olhada — que é o que uma tela larga tem a oferecer. No
+            celular continua uma coluna, resultado primeiro. */}
+        <div className="engine-modal-body engine-scroll grid content-start gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-2 lg:items-start lg:gap-7">
+          <div className="grid content-start gap-5 lg:col-start-1">
           {/* ============================ a resposta ============================ */}
           {/* Duas contas que NÃO se misturam, porque não se pagam do mesmo jeito.
               O que sai todo mês fica em cima; IPVA e licenciamento são boletos
@@ -478,12 +494,26 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
             <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--engine-slab-fg-muted)]">
               {t("ownership.lean.kicker")}
             </p>
+            {/* Um número grande e, embaixo, a faixa de onde ele saiu.
+                Mostrar só a faixa ("R$ 703 a R$ 799") tira da tela a coisa
+                que a pessoa veio buscar — um número para carregar na cabeça;
+                mostrar só o número esconde que ele tem folga. Os dois juntos
+                é como se responde isso em voz alta: "uns R$ 750, entre 700 e
+                800". O `≈` só aparece quando há estimativa na conta. */}
             <p className="mt-3 font-display text-[44px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--engine-slab-fg)]">
-              {money(monthlyOnly)}
+              {temFaixa ? `≈ ${money(monthlyOnly)}` : money(monthlyOnly)}
               <span className="ml-1.5 text-[15px] font-semibold tracking-normal text-[var(--engine-slab-fg-muted)]">
                 {t("ownership.lean.perMonth")}
               </span>
             </p>
+            {temFaixa ? (
+              <p className="mt-2 text-[14px] font-medium leading-snug text-[var(--engine-slab-fg-muted)]">
+                {t("ownership.lean.rangeLine", {
+                  low: money(result.headline.monthlyLow),
+                  high: money(result.headline.monthlyHigh),
+                })}
+              </p>
+            ) : null}
             <p className="mt-3 text-[16px] font-semibold leading-snug text-[var(--engine-slab-fg)]">
               {yearlyText}
             </p>
@@ -516,19 +546,42 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
                 source={fuelSource}
                 value={money(result.monthly.fuel)}
               />
+              {/* Estimativa com a premissa dita, não "fora". Ver o cabeçalho
+                  de services/ownership.js: faixa é informação, zero é mentira
+                  por omissão. Quem informa o próprio valor fecha a faixa. */}
               <Line
                 label={t("ownership.results.insurance")}
-                source={inputs.insuranceMonthly > 0 ? t("ownership.lean.yourValue") : t("ownership.lean.insuranceMissing")}
-                value={inputs.insuranceMonthly > 0 ? money(result.monthly.insurance) : t("ownership.lean.outside")}
-                missing={!(inputs.insuranceMonthly > 0)}
+                source={
+                  seguroInformado
+                    ? t("ownership.lean.yourValue")
+                    : t("ownership.lean.insuranceEstimate", {
+                        age: t(`ownership.ageBands.${inputs.driverAgeBand}`),
+                        coverage: t(
+                          result.insurance.coverage === "thirdparty" ||
+                            result.insurance.coverage === "thirdparty_forced"
+                            ? "ownership.coverageOptions.thirdparty"
+                            : "ownership.coverageOptions.full",
+                        ),
+                      })
+                }
+                value={
+                  seguroInformado
+                    ? money(result.monthly.insurance)
+                    : faixa(result.insurance.low, result.insurance.high)
+                }
               />
               <Line
                 label={t("ownership.results.maintenance")}
                 source={
-                  inputs.maintenanceMonthly > 0 ? t("ownership.lean.yourValue") : t("ownership.lean.maintenanceMissing")
+                  manutencaoInformada
+                    ? t("ownership.lean.yourValue")
+                    : t("ownership.lean.maintenanceEstimate", { age: result.carAge, km: inputs.kmPerMonth })
                 }
-                value={inputs.maintenanceMonthly > 0 ? money(result.monthly.maintenance) : t("ownership.lean.outside")}
-                missing={!(inputs.maintenanceMonthly > 0)}
+                value={
+                  manutencaoInformada
+                    ? money(result.monthly.maintenance)
+                    : faixa(result.maintenance.low, result.maintenance.high)
+                }
               />
               {/* Vindos da tela antiga: valores que a pessoa informou e que
                   continuam na conta — então continuam à vista. */}
@@ -613,11 +666,13 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
 
           {/* Aviso de estimativa: boa prática (pesquisa do Han, 24/10/2026) —
               o simulador planeja, não oferece crédito nem recomenda. */}
-          <p className="px-1 text-[12px] leading-relaxed text-[var(--engine-text-muted)]">
+          <p className="px-1 text-[12px] leading-relaxed text-[var(--engine-text-muted)] lg:col-start-1">
             {t("ownership.lean.estimateNotice")}
           </p>
+          </div>
 
           {/* ============================ o ajuste ============================ */}
+          <div className="grid content-start gap-5 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-0">
           {/* O estado vem primeiro: ele decide IPVA e licenciamento, e sem ele
               os dois ficam fora da soma. No fim da tela, no celular, ninguém
               chegava nele antes de ler um número incompleto. */}
@@ -783,7 +838,55 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
           </Section>
 
           <Section title={t("ownership.lean.extrasTitle")} hint={t("ownership.lean.extrasHint")}>
+            {/* OS CAMPOS QUE MOVEM O SEGURO voltaram em 17/11/2026.
+                Enquanto seguro ficava fora da conta eles não serviam para
+                nada e saíram da tela, certo. Agora que a linha existe como
+                faixa, a premissa dela precisa ser corrigível por quem lê —
+                senão é um número sobre uma pessoa que talvez não seja você.
+                Idade de quem dirige muda o prêmio em mais de 2×; garagem,
+                ~24%. O padrão é 18-25 sem informar, que é a faixa mais cara:
+                a estimativa erra para cima enquanto ninguém diz o contrário. */}
             <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("ownership.fields.driverAge")} htmlFor="engine-own-age">
+                <Select
+                  id="engine-own-age"
+                  className={fieldClass}
+                  value={inputs.driverAgeBand}
+                  onChange={(e) => set("driverAgeBand", e.target.value)}
+                >
+                  {AGE_BANDS.map((band) => (
+                    <option key={band} value={band}>
+                      {t(`ownership.ageBands.${band}`)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t("ownership.fields.coverage")} htmlFor="engine-own-coverage">
+                <Select
+                  id="engine-own-coverage"
+                  className={fieldClass}
+                  value={inputs.coverage}
+                  onChange={(e) => set("coverage", e.target.value)}
+                >
+                  {COVERAGE_TYPES.map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {t(`ownership.coverageOptions.${tipo}`)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <label className="mt-4 flex min-h-11 items-center gap-2.5 text-[13px] font-medium text-[var(--engine-text)]">
+              <input
+                type="checkbox"
+                checked={inputs.hasGarage}
+                onChange={(e) => set("hasGarage", e.target.checked)}
+                className="h-4 w-4 shrink-0 accent-[var(--engine-accent)]"
+              />
+              {t("ownership.fields.hasGarage")}
+            </label>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field label={t("ownership.lean.insuranceField")} htmlFor="engine-own-insurance">
                 <MoneyInput
                   id="engine-own-insurance"
@@ -806,12 +909,13 @@ function OwnershipDialog({ car, cars, settings, onClose, onSave, onSettingsUpdat
               <MoneyInput id="engine-own-income" value={income} onChange={setIncome} />
             </Field>
           </Section>
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--engine-border)] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-4">
           <p className="min-w-0 text-[13px] leading-snug text-[var(--engine-text-muted)]">
             <span className="font-display text-[18px] font-bold tabular-nums text-[var(--engine-text)]">
-              {money(monthlyOnly)}
+              {temFaixa ? `≈ ${money(monthlyOnly)}` : money(monthlyOnly)}
             </span>{" "}
             {t("ownership.lean.perMonth")}
             <span className="block text-[12px]">{yearlyText}</span>

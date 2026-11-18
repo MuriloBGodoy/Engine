@@ -1125,20 +1125,65 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
   );
   const tax = taxResult.annual;
   const licensing = annualLicensing(country, state);
-  // Seguro e manutenção saíram do cálculo automático em 06/10/2026, a pedido
-  // do Murilo ("algo mais enxuto, que acerte de verdade"). As duas curvas não
-  // têm fonte que diga quanto ESTE carro custa — a de seguro nem olha o modelo,
-  // e a de manutenção cobra igual de um Lancer e de um Onix do mesmo preço.
-  // Agora entram só quando a pessoa informa o número dela. As estimativas
-  // continuam exportadas (estimateInsuranceAnnual / estimateMaintenanceAnnual)
-  // para voltar no dia em que houver fonte; nenhuma tela as usa.
+  /* SEGURO E MANUTENÇÃO: FAIXA, NÃO AUSÊNCIA (17/11/2026)
+   *
+   * Em 06/10/2026 as duas saíram do cálculo automático, com uma razão certa:
+   * a curva de seguro não olha o modelo e a de manutenção cobra igual de um
+   * Lancer e de um Onix do mesmo preço. Número cravado ali seria invenção.
+   *
+   * Só que a saída escolhida foi pior que o problema: quem não digitasse o
+   * próprio número recebia a conta de um carro QUE NINGUÉM SEGURA E NINGUÉM
+   * LEVA NA OFICINA — as duas maiores despesas variáveis depois do
+   * combustível, fora do total, e a tela dizendo "fora da conta" como se
+   * fosse detalhe. O número que saía dali não dá para comparar com a vida
+   * real, e é justamente o número que decide se a pessoa assina ou não um
+   * financiamento.
+   *
+   * O que falta à estimativa é PRECISÃO, não ordem de grandeza. Então ela
+   * volta como o que de fato é: uma faixa, com a premissa dita na tela
+   * ("perfil 26-35, com garagem, SP"). É assim que se responde "quanto custa
+   * manter esse carro?" sem inventar: um intervalo honesto é informação; um
+   * zero é mentira por omissão.
+   *
+   * A folga de cada uma vem do que varia dentro da MESMA premissa:
+   *   seguro ±30% — modelo, índice de roubo e perfil de quem dirige, que a
+   *     curva não enxerga (duas cotações do mesmo carro variam isso fácil);
+   *   manutenção ±25% — marca, oficina e o que o carro já pede na idade dele.
+   *
+   * Quem informa o próprio valor troca a faixa por aquele número, e aí a
+   * linha deixa de ser estimativa. O total alto é o que manda na fatia da
+   * renda: errar para cima não coloca ninguém numa parcela que não paga.
+   */
+  const FOLGA_SEGURO = 0.3;
+  const FOLGA_MANUTENCAO = 0.25;
+
   const insuranceResult = inputs.insuranceMonthly > 0
     ? { annual: inputs.insuranceMonthly * 12, basis: "user" }
-    : { annual: 0, basis: "not_informed" };
+    : (() => {
+        const estimado = annualInsurance(value, carAge, inputs, country, state);
+        return {
+          annual: estimado.annual,
+          basis: estimado.annual > 0 ? "estimate" : estimado.basis,
+          coverage: estimado.basis,
+          low: estimado.annual * (1 - FOLGA_SEGURO),
+          high: estimado.annual * (1 + FOLGA_SEGURO),
+        };
+      })();
   const insurance = insuranceResult.annual;
   const fuelResult = monthlyFuel(inputs, country, state);
   const fuel = fuelResult.monthly;
-  const maintenance = inputs.maintenanceMonthly * 12;
+  const maintenanceResult = inputs.maintenanceMonthly > 0
+    ? { annual: inputs.maintenanceMonthly * 12, basis: "user" }
+    : (() => {
+        const estimado = annualMaintenance(value, carAge, inputs, country);
+        return {
+          annual: estimado,
+          basis: "estimate",
+          low: estimado * (1 - FOLGA_MANUTENCAO),
+          high: estimado * (1 + FOLGA_MANUTENCAO),
+        };
+      })();
+  const maintenance = maintenanceResult.annual;
   const depreciation = (value * annualDepreciationRate(carAge)) / 12;
 
   const monthly = {
@@ -1163,9 +1208,25 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
     monthly.tolls;
   const monthlyTotal = monthlyMaintain + monthly.financing;
 
+  /* O mesmo total nos dois extremos da faixa. O que não é estimativa entra
+     igual nos dois — só seguro e manutenção abrem. `estimated` diz à tela se
+     há faixa a mostrar ou se está tudo informado (aí piso = teto = total). */
+  const folgaBaixa =
+    (insuranceResult.low !== undefined ? (insuranceResult.low - insurance) : 0) / 12 +
+    (maintenanceResult.low !== undefined ? (maintenanceResult.low - maintenance) : 0) / 12;
+  const folgaAlta =
+    (insuranceResult.high !== undefined ? (insuranceResult.high - insurance) : 0) / 12 +
+    (maintenanceResult.high !== undefined ? (maintenanceResult.high - maintenance) : 0) / 12;
+  const monthlyTotalLow = monthlyTotal + folgaBaixa;
+  const monthlyTotalHigh = monthlyTotal + folgaAlta;
+  const estimated = folgaAlta > folgaBaixa;
+
   // --- Recomendações ----------------------------------------------------
   const share = inputs.incomeSharePct / 100;
-  const requiredIncomeTotal = monthlyTotal / share;
+  /* A renda necessária sai do TETO da faixa, não do meio: quem planeja pelo
+     meio descobre o teto no mês em que o seguro chega. Errar para cima aqui
+     custa uma parcela menor; errar para baixo custa o carro. */
+  const requiredIncomeTotal = monthlyTotalHigh / share;
   const requiredIncomeMaintain = monthlyMaintain / share;
   const emergencyFund = Math.max(monthlyMaintain * 3, value * 0.02);
 
@@ -1193,7 +1254,17 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
     // que a pessoa pediu. Ver annualInsurance.
     insurance: {
       basis: insuranceResult.basis,
+      // A cobertura que a estimativa de fato usou (pode não ser a pedida:
+      // carro velho não tem completo — ver annualInsurance).
+      coverage: insuranceResult.coverage || insuranceResult.basis,
+      low: (insuranceResult.low ?? insuranceResult.annual) / 12,
+      high: (insuranceResult.high ?? insuranceResult.annual) / 12,
       fullCoverageMaxAge: INSURANCE_FULL_COVERAGE_MAX_AGE,
+    },
+    maintenance: {
+      basis: maintenanceResult.basis,
+      low: (maintenanceResult.low ?? maintenanceResult.annual) / 12,
+      high: (maintenanceResult.high ?? maintenanceResult.annual) / 12,
     },
     // Se a taxa de licenciamento desta UF foi conferida ou é aproximação.
     licensingVerified: country === "BR" && LICENSING_BR_VERIFIED.has(state),
@@ -1217,6 +1288,9 @@ export function estimateOwnership(car, rawInputs = {}, location = {}) {
     totals: {
       monthlyMaintain,
       monthlyTotal,
+      monthlyTotalLow,
+      monthlyTotalHigh,
+      estimated,
       annualMaintain: monthlyMaintain * 12,
       annualTotal: monthlyTotal * 12,
     },
@@ -1429,6 +1503,11 @@ export function simulateCar(car, { inputs, location, profile } = {}) {
     modelConsumption,
     headline: {
       monthly: result.totals.monthlyTotal - yearly / 12,
+      monthlyLow: result.totals.monthlyTotalLow - yearly / 12,
+      monthlyHigh: result.totals.monthlyTotalHigh - yearly / 12,
+      // Há faixa a mostrar? (falso quando a pessoa informou seguro E
+      // manutenção: aí o número é dela, não nosso.)
+      estimated: result.totals.estimated,
       yearly,
       needsState: result.needsState,
     },

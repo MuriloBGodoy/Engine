@@ -932,7 +932,7 @@ const resources = {
           perMonth: "por mês",
           share: "{{pct}}% da sua renda de {{income}}, já contando IPVA e licenciamento divididos no ano",
           promise:
-            "Só entra na soma o que tem lei, conta ou número seu por trás. O que a gente não sabe com certeza fica de fora — e aparece aqui como fora.",
+            "O que tem lei ou conta por trás entra com valor exato. O que varia de pessoa para pessoa — seguro e manutenção — entra como faixa, com a premissa escrita na linha. Nada fica fora da soma: a conta de renda usa o teto da faixa.",
           rateAverage: "taxa média do Banco Central ({{month}}); coloque a sua se já tiver",
           fuelPrice: "Preço médio da ANP em {{state}}, coleta até {{date}}.",
           fuelPriceBR: "Preço médio da ANP no Brasil, coleta até {{date}} — escolha o estado para o preço de lá.",
@@ -949,7 +949,13 @@ const resources = {
           useMeasured: "Usar o que você roda de verdade: {{km}} km/mês, medido no {{car}}",
           extrasTitle: "Seguro e manutenção",
           extrasHint:
-            "Opcional. A gente não chuta esses dois: uma cotação de seguro varia até 50% entre seguradoras. Se você já tem o número, ele entra na conta.",
+            "Os dois entram como FAIXA, calculada pelo perfil abaixo — um número exato só sai da sua cotação. Tem o número? Coloque, e a faixa fecha nele.",
+          range: "{{low}} a {{high}}",
+          rangeLine: "Entre {{low}} e {{high}} por mês: seguro e manutenção são estimativas.",
+          insuranceEstimate:
+            "estimativa para {{age}}, {{coverage}} — ponha sua cotação lá embaixo e a faixa fecha",
+          maintenanceEstimate:
+            "estimativa para um carro de {{age}} anos rodando {{km}} km/mês — ponha o seu e a faixa fecha",
           insuranceField: "Seguro por mês (R$)",
           maintenanceField: "Manutenção por mês (R$)",
           whereTitle: "Onde o carro vai rodar",
@@ -2849,7 +2855,7 @@ const resources = {
           perMonth: "per month",
           share: "{{pct}}% of your {{income}} income, with IPVA and licensing spread over the year",
           promise:
-            "Only what has a law, a formula or your own number behind it is added up. What we can't know for sure stays out — and is shown here as out.",
+            "What has a law or a formula behind it is added up exactly. What varies from person to person — insurance and maintenance — is added as a range, with the assumption written on the line. Nothing is left out of the total: the income figure uses the top of the range.",
           rateAverage: "Central Bank average rate ({{month}}); enter yours if you have it",
           fuelPrice: "ANP average price in {{state}}, collected up to {{date}}.",
           fuelPriceBR: "ANP average price in Brazil, collected up to {{date}} — pick the state for its price.",
@@ -2866,7 +2872,13 @@ const resources = {
           useMeasured: "Use what you really drive: {{km}} km/month, measured on the {{car}}",
           extrasTitle: "Insurance and maintenance",
           extrasHint:
-            "Optional. We don't guess these two: an insurance quote varies up to 50% between insurers. If you already have the number, it goes into the total.",
+            "Both enter as a RANGE, worked out from the profile below — an exact figure only comes from your own quote. Have it? Enter it, and the range closes on it.",
+          range: "{{low}} to {{high}}",
+          rangeLine: "Between {{low}} and {{high}} a month: insurance and maintenance are estimates.",
+          insuranceEstimate:
+            "estimated for {{age}}, {{coverage}} — enter your quote below and the range closes",
+          maintenanceEstimate:
+            "estimated for a {{age}}-year-old car driven {{km}} km/month — enter yours and the range closes",
           insuranceField: "Insurance per month (R$)",
           maintenanceField: "Maintenance per month (R$)",
           whereTitle: "Where the car will be driven",
@@ -4751,7 +4763,7 @@ const resources = {
           perMonth: "por mes",
           share: "{{pct}}% de tus ingresos de {{income}}, contando IPVA y licencia repartidos en el año",
           promise:
-            "Solo se suma lo que tiene una ley, una cuenta o un número tuyo detrás. Lo que no sabemos con certeza queda afuera — y aparece aquí como afuera.",
+            "Lo que tiene una ley o una cuenta detrás se suma exacto. Lo que varía de persona a persona — seguro y mantenimiento — entra como franja, con la premisa escrita en la línea. Nada queda fuera de la suma: la cuenta de ingresos usa el techo de la franja.",
           rateAverage: "tasa media del Banco Central ({{month}}); pon la tuya si ya la tienes",
           fuelPrice: "Precio medio de la ANP en {{state}}, recolectado hasta {{date}}.",
           fuelPriceBR: "Precio medio de la ANP en Brasil, recolectado hasta {{date}} — elige el estado para su precio.",
@@ -4768,7 +4780,13 @@ const resources = {
           useMeasured: "Usar lo que realmente recorres: {{km}} km/mes, medido en el {{car}}",
           extrasTitle: "Seguro y mantenimiento",
           extrasHint:
-            "Opcional. No adivinamos estos dos: una cotización de seguro varía hasta 50% entre aseguradoras. Si ya tienes el número, entra en la cuenta.",
+            "Los dos entran como FRANJA, calculada con el perfil de abajo — un número exacto solo sale de tu cotización. ¿Lo tienes? Ponlo y la franja se cierra en él.",
+          range: "{{low}} a {{high}}",
+          rangeLine: "Entre {{low}} y {{high}} al mes: seguro y mantenimiento son estimaciones.",
+          insuranceEstimate:
+            "estimación para {{age}}, {{coverage}} — pon tu cotización abajo y la franja se cierra",
+          maintenanceEstimate:
+            "estimación para un auto de {{age}} años recorriendo {{km}} km/mes — pon el tuyo y la franja se cierra",
           insuranceField: "Seguro por mes (R$)",
           maintenanceField: "Mantenimiento por mes (R$)",
           whereTitle: "Dónde va a circular el auto",
