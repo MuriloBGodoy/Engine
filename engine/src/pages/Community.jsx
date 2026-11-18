@@ -513,6 +513,12 @@ function PostGallery({
       }
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      /* O gesto horizontal AQUI é o de passar de foto, e não o de passar de
+         aba (useDeslizarAbas). O carrossel não é um elemento que rola — ele
+         anda por `transform` —, então a checagem de "já rola de lado" do
+         gesto de aba não o enxergaria: sem esta marca, arrastar para ver a
+         segunda foto também trocaria a seção da Comunidade. */
+      data-gesto-horizontal="1"
     >
       <div
         className="flex h-full transition-transform duration-300 ease-out"

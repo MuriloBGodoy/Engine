@@ -21,7 +21,13 @@ import "../services/i18n-editing";
 import { Select } from "./ui/Select";
 import { DragHandle } from "./DragHandle";
 
-const MAX_PHOTOS = 3;
+/* Três era pouco: um rolê rende dez fotos, e quem tinha dez escolhia três ou
+   publicava três posts seguidos — que é como o feed de todo mundo vira o
+   feed de uma pessoa só. Dez é o número do Instagram, e o carrossel do feed
+   já mostra quantas forem (ele percorre a lista; não havia nada preso ao 3).
+   O custo é de quem publica, não de quem lê: cada foto é limpa e reduzida
+   antes de subir, e a rolagem carrega uma de cada vez. */
+const MAX_PHOTOS = 10;
 const MAX_TEXT = 1000;
 const PERSON_ONLY = ["person"];
 const MB = Math.round(VIDEO_LIMITS.maxBytes / (1024 * 1024));

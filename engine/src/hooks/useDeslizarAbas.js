@@ -46,6 +46,11 @@ const TEMPO_MAXIMO = 800;
 const dentroDeRolagemHorizontal = (alvo, limite) => {
   let no = alvo instanceof Element ? alvo : null;
   while (no && no !== limite) {
+    /* Quem anda de lado por conta própria se declara com esta marca. O
+       carrossel de fotos do post é o caso: ele não rola, ele anda por
+       `transform`, então a conta de `scrollWidth` abaixo não o enxerga — e
+       sem a marca, arrastar para ver a segunda foto trocava de aba junto. */
+    if (no.dataset?.gestoHorizontal === "1") return true;
     if (no.scrollWidth - no.clientWidth > 8) {
       const estilo = window.getComputedStyle(no);
       if (/(auto|scroll)/.test(estilo.overflowX)) return true;
