@@ -1,0 +1,22 @@
+# Cabeçalhos do Engine.
+#
+# Por que aqui e não na netlify.toml: em 18/11/2026 as regras de
+# `[[headers]]` da netlify.toml não pegaram em produção — o `sw.js` continuou
+# vindo com o `max-age=14400` padrão do Netlify, enquanto os `[[redirects]]`
+# do MESMO arquivo funcionavam (o subdomínio redireciona). Ou seja, o arquivo
+# é lido e a seção de cabeçalhos não vale; a suspeita é a `base = "engine"`,
+# que muda a raiz de onde os caminhos são resolvidos.
+#
+# Este arquivo não tem esse problema: ele viaja DENTRO da pasta publicada
+# (public/ vira dist/), do mesmo jeito que o _redirects ao lado, que sempre
+# funcionou.
+
+# O arquivo que descobre que existe versão nova não pode ser servido do cache.
+# São 5 kB buscados só quando o app já decidiu perguntar "tem versão nova?" —
+# não há nada a ganhar guardando a resposta velha por quatro horas.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+# O manifesto é o que o celular lê na hora de instalar o app na tela inicial.
+/manifest.webmanifest
+  Cache-Control: public, max-age=0, must-revalidate

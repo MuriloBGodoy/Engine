@@ -73,25 +73,9 @@
   force = true
 
 
-# O arquivo que descobre que existe versão nova não pode ser servido do cache.
+# Cabeçalhos: ver engine/public/_headers.
 #
-# Por padrão o Netlify manda `max-age=14400` no sw.js: quatro horas em que a
-# pergunta "tem versão nova?" pode ser respondida pela cópia velha, que por
-# definição não sabe de nada. O navegador normalmente revalida o script do
-# service worker por conta própria, mas isso depende de `updateViaCache` e da
-# versão dele — e aqui não há nada a ganhar com o cache: é um arquivo de 5 kB
-# que só é buscado quando o app já decidiu perguntar.
-#
-# O que está DENTRO dele continua com cache longo: workbox e os assets têm o
-# hash do conteúdo no nome, então nome novo é arquivo novo.
-[[headers]]
-  for = "/sw.js"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
-
-# Mesma razão: o registro aponta para cá, e o manifesto é o que o celular lê
-# quando a pessoa instala o app na tela inicial.
-[[headers]]
-  for = "/manifest.webmanifest"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
+# Eles moravam aqui e NÃO pegavam em produção (18/11/2026): o `sw.js` seguia
+# com o `max-age=14400` padrão do Netlify, enquanto os `[[redirects]]` deste
+# mesmo arquivo funcionavam. Foram para o `_headers`, que viaja dentro da
+# pasta publicada e é o mesmo mecanismo do `_redirects` ao lado dele.
