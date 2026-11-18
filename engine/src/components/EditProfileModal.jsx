@@ -8,7 +8,9 @@ import { CityField } from './ui/CityField';
 import { countries, getStates } from '../services/locations';
 import { AVATAR, BANNER, reduzirImagem } from '../services/imagens';
 import { storeDataUri } from '../services/photos';
+import { X } from 'lucide-react';
 import { useToast } from './ToastProvider';
+import '../services/i18n-editing';
 import { useHistoryDismiss } from '../hooks/useHistoryDismiss';
 import { MentionTextarea } from './mentions/MentionTextarea';
 import { useMediaPicker } from "../hooks/useMediaPicker";
@@ -329,12 +331,15 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
           {/* Media Section */}
           <div>
             {/* Banner */}
+            {/* `aspect-[3/1]`: a MESMA proporção em que o perfil mostra a capa.
+                Com altura fixa aqui e proporção lá, a pessoa enquadrava uma
+                coisa e via outra. */}
             <div
               onClick={handleBannerClick}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, 'banner')}
-              className="relative w-full h-44 mb-4 bg-[var(--engine-surface-2)] border-2 border-dashed border-[var(--engine-border)] rounded-lg cursor-pointer transition hover:border-[var(--engine-accent)] overflow-hidden flex items-center justify-center"
+              className="relative w-full aspect-[3/1] mb-4 bg-[var(--engine-surface-2)] border-2 border-dashed border-[var(--engine-border)] rounded-lg cursor-pointer transition hover:border-[var(--engine-accent)] overflow-hidden flex items-center justify-center"
               style={{
                 backgroundImage: preview.banner ? `url('${preview.banner}')` : 'none',
                 backgroundSize: 'cover',
@@ -344,13 +349,31 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
               {bannerPicker.elementos}
               {!preview.banner && (
                 <div className="text-center pointer-events-none">
-                  <p className="text-sm font-medium text-[var(--engine-text-muted)]">Clique ou arraste uma imagem</p>
+                  <p className="text-sm font-medium text-[var(--engine-text-muted)]">{t('editProfile.dropImage')}</p>
                 </div>
+              )}
+              {/* TIRAR A CAPA. Até aqui só dava para TROCAR: quem subiu a foto
+                  errada ficava com ela até subir outra. `stopPropagation`
+                  porque a caixa inteira abre o seletor — sem isso, remover
+                  abriria a galeria em seguida. */}
+              {preview.banner && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreview((atual) => ({ ...atual, banner: '' }));
+                  }}
+                  aria-label={t('common.remove')}
+                  title={t('common.remove')}
+                  className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
+                >
+                  <X size={16} />
+                </button>
               )}
             </div>
 
             {/* Avatar */}
-            <div className="flex justify-center pb-8">
+            <div className="flex flex-col items-center gap-2 pb-8">
               <div
                 onClick={handleAvatarClick}
                 className="relative w-24 h-24 rounded-full overflow-hidden bg-[var(--engine-surface-2)] border-4 border-[var(--engine-surface)] cursor-pointer transition hover:border-[var(--engine-accent)] flex items-center justify-center group"
@@ -366,9 +389,21 @@ export function EditProfileModal({ isOpen, onClose, onSave, settings = {} }) {
                   <div className="text-3xl">A</div>
                 )}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-full transition text-white text-sm">
-                  Editar
+                  {t('socialFixes.profile.edit')}
                 </div>
               </div>
+              {/* Fora do círculo, não por cima: por cima ele tamparia o rosto
+                  justo na hora de decidir se a foto serve. */}
+              {preview.avatar && (
+                <button
+                  type="button"
+                  onClick={() => setPreview((atual) => ({ ...atual, avatar: '' }))}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-bold text-[var(--engine-text-muted)] transition hover:text-[var(--engine-accent)]"
+                >
+                  <X size={14} />
+                  {t('editProfile.removePhoto')}
+                </button>
+              )}
             </div>
           </div>
 

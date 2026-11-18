@@ -9,6 +9,10 @@ import i18n from "./i18n";
  */
 
 const ptBR = {
+  editProfile: {
+    dropImage: "Clique ou arraste uma imagem",
+    removePhoto: "Remover foto",
+  },
   emoji: {
     title: "Emojis",
     recent: "Recentes",
@@ -74,6 +78,10 @@ const ptBR = {
 };
 
 const enUS = {
+  editProfile: {
+    dropImage: "Click or drag an image",
+    removePhoto: "Remove photo",
+  },
   emoji: {
     title: "Emojis",
     recent: "Recent",
@@ -132,6 +140,10 @@ const enUS = {
 };
 
 const esES = {
+  editProfile: {
+    dropImage: "Haz clic o arrastra una imagen",
+    removePhoto: "Quitar foto",
+  },
   emoji: {
     title: "Emojis",
     recent: "Recientes",
