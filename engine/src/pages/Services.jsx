@@ -2504,8 +2504,18 @@ export function Services({ user, settings }) {
   // botão do hero ou pelo aviso de convite (?pro=1).
   const [sellerProfileOpen, setSellerProfileOpen] = useState(() => searchParams.get("pro") === "1" && Boolean(user?.uid));
   const pro = useMyPro(user?.uid);
-  // Serviços | Lojas (?aba=lojas).
-  const [tab, setTab] = useState(() => (searchParams.get("aba") === "lojas" ? "shops" : "services"));
+  // Serviços | Lojas | Empresas (?aba=lojas, ?aba=empresas).
+  //
+  // Empresas entrou em 23/11/2026: os perfis profissionais já existiam e já
+  // apareciam como uma seção dentro de Serviços ("Quem atende"), espremida
+  // entre os anúncios e cortada em seis. Quem procura OFICINA, e não um
+  // anúncio avulso, não tinha onde olhar.
+  const [tab, setTab] = useState(() => {
+    const aba = searchParams.get("aba");
+    if (aba === "lojas") return "shops";
+    if (aba === "empresas") return "pros";
+    return "services";
+  });
   const [productEditor, setProductEditor] = useState(null); // { profileId }
   const [sellerListingsOpen, setSellerListingsOpen] = useState(false);
   const { isAdmin } = useServiceAdmin(user);
@@ -2576,6 +2586,7 @@ export function Services({ user, settings }) {
       (current) => {
         const params = new URLSearchParams(current);
         if (next === "shops") params.set("aba", "lojas");
+        else if (next === "pros") params.set("aba", "empresas");
         else params.delete("aba");
         return params;
       },
@@ -3177,9 +3188,10 @@ export function Services({ user, settings }) {
         </div>
       </header>
 
-      {/* Serviços | Lojas no segmento do protótipo aprovado (01/11/2026). */}
-      <div className="order-1 sm:order-none">
-        <ShopSegment value={tab === "shops" ? "shops" : "services"} onChange={switchTab} />
+      {/* Serviços | Lojas | Empresas no segmento do protótipo aprovado
+          (01/11/2026; a terceira aba entrou em 23/11/2026). */}
+      <div data-tour="services-tabs" className="order-1 sm:order-none">
+        <ShopSegment value={tab} onChange={switchTab} ids={["services", "shops", "pros"]} />
       </div>
 
       {/* A barra do vendedor subiu para cá em 11/11/2026. Ela vivia dentro do
@@ -3200,6 +3212,7 @@ export function Services({ user, settings }) {
           ficava com um perfil público que não conseguia alcançar: dava para
           vê-lo na vitrine e não dava para mexer nele. */}
       <div
+        data-tour="services-publish"
         className={`order-2 sm:order-none ${
           myListings.length || pro.publishable.length ? "" : "max-sm:hidden"
         }`}
@@ -3234,9 +3247,68 @@ export function Services({ user, settings }) {
         </div>
       )}
 
+      {/* --------------------------------------------------- Empresas ---
+          A lista inteira de quem tem conta profissional, sem o corte de seis
+          da seção dentro de Serviços. É a aba que responde "qual oficina
+          existe perto de mim?", que é outra pergunta de "qual anúncio existe
+          perto de mim?". */}
+      {tab === "pros" && (
+        <div className="order-3 space-y-3 sm:order-none">
+          <div className="engine-card p-4 sm:p-5">
+            <h2 className="font-display text-base font-bold text-[var(--engine-text)] sm:text-lg">
+              {t("shop.browse.prosTitle")}
+            </h2>
+            <p className="mt-1 text-[13px] font-medium leading-5 text-[var(--engine-text-muted)]">
+              {t("shop.browse.prosHint")}
+            </p>
+            <label className="mt-3 flex h-12 items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 transition-colors focus-within:border-[var(--engine-accent)]">
+              <Search size={18} className="shrink-0 text-[var(--engine-text-subtle)]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("shop.browse.prosSearch")}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[var(--engine-text)] outline-none placeholder:text-[var(--engine-text-subtle)]"
+              />
+            </label>
+            <p className="mt-2 text-[12px] font-semibold text-[var(--engine-text-muted)]">
+              {t("services.pros.count", { count: prosFiltrados.length })}
+            </p>
+          </div>
+
+          {prosFiltrados.length ? (
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {prosFiltrados.map((item) => (
+                <ProDirectoryCard
+                  key={item.profile.id}
+                  item={item}
+                  meu={meusProIds.has(item.profile.id)}
+                  onManage={() => setSellerProfileOpen(true)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="engine-card space-y-3 p-6 text-center">
+              <p className="font-display text-base font-bold text-[var(--engine-text)]">
+                {t("shop.browse.prosEmpty")}
+              </p>
+              <p className="text-[13px] font-medium text-[var(--engine-text-muted)]">
+                {t("shop.browse.prosEmptyHint")}
+              </p>
+              <button
+                type="button"
+                onClick={() => (user?.uid ? setSellerProfileOpen(true) : setGateOpen(true))}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--engine-accent)] px-5 text-sm font-bold text-white transition hover:opacity-90"
+              >
+                {t("shop.browse.prosCreate")}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === "services" && (
       <>
-      <div className="order-4 sm:order-none">
+      <div data-tour="services-quote" className="order-4 sm:order-none">
         <QuoteEntryCard user={user} isProvider={Boolean(myBioListing)} />
       </div>
 

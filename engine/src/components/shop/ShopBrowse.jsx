@@ -76,12 +76,16 @@ export function ShopBrowseHeader({
 }
 
 /** Serviços | Lojas. */
-export function ShopSegment({ value, onChange }) {
+/**
+ * A chave Serviços | Lojas | Empresas.
+ *
+ * `ids` existe porque a mesma chave serve duas telas: na vitrine de Serviços
+ * ela tem três abas (Empresas entrou em 23/11/2026), e dentro da Loja ela
+ * continua com duas. Quem chama diz quais quer, em vez de a chave adivinhar.
+ */
+export function ShopSegment({ value, onChange, ids = ["services", "shops"] }) {
   const { t } = useTranslation();
-  const options = [
-    ["services", t("shop.browse.services")],
-    ["shops", t("shop.browse.shops")],
-  ];
+  const options = ids.map((id) => [id, t(`shop.browse.${id}`)]);
   return (
     <div
       role="tablist"

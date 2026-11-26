@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ExternalLink, Package, Pencil, Plus, Store, Trash2, UserRound, Users } from "lucide-react";
+import { BarChart3, ExternalLink, Package, Pencil, Plus, Store, Trash2, UserRound, Users } from "lucide-react";
 import { ChoiceCard } from "../shop/ShopPrimitives";
 import { deleteProProfile, proErrorKey, proProfilePath, respondInvite } from "../../services/proProfiles";
 import { useConfirm } from "../ConfirmProvider";
@@ -9,6 +9,7 @@ import { useToast } from "../ToastProvider";
 import { GhostButton, PrimaryButton, ProAvatar, Sheet } from "./ProUi";
 import { ProProfileEditor } from "./ProProfileEditor";
 import { ProTeamPanel } from "./ProTeamPanel";
+import { ProResultsPanel } from "./ProResultsPanel";
 
 /**
  * "Conta profissional" — substitui o antigo modal "Perfil de vendedor".
@@ -28,6 +29,9 @@ export function ProAccountHub({ user, pro, seed, username = "", onClose, onNewSe
   const confirm = useConfirm();
   const [editor, setEditor] = useState(null); // { kind, profile? }
   const [team, setTeam] = useState(null); // { profile, role }
+  // "Meus resultados" (20261123130000): o que o Engine trouxe e o que a
+  // pessoa fechou. Dono e admin, porque ali tem dinheiro.
+  const [results, setResults] = useState(null); // profile
 
   const answer = async (entry, accept) => {
     try {
@@ -70,6 +74,9 @@ export function ProAccountHub({ user, pro, seed, username = "", onClose, onNewSe
         }}
       />
     );
+  }
+  if (results) {
+    return <ProResultsPanel profile={results} onClose={() => setResults(null)} />;
   }
   if (team) {
     return (
@@ -127,6 +134,12 @@ export function ProAccountHub({ user, pro, seed, username = "", onClose, onNewSe
             <button type="button" onClick={() => setEditor({ kind: profile.kind, profile })} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 text-xs font-bold text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)]">
               <Pencil size={14} aria-hidden="true" />
               {t("pro.edit")}
+            </button>
+          )}
+          {canEdit && (
+            <button type="button" onClick={() => setResults(profile)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 text-xs font-bold text-[var(--engine-text-muted)] hover:text-[var(--engine-accent)]">
+              <BarChart3 size={14} aria-hidden="true" />
+              {t("proResults.openPanel")}
             </button>
           )}
           {page && (
