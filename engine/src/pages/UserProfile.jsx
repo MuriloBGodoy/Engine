@@ -891,8 +891,16 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             cobriria esta. No desktop NÃO existe barra fixa — a Topbar rola
             junto com o conteúdo dentro do <main> —, então `lg:top-16`
             deixava esta aqui pairando 64px abaixo do topo e o post passava
-            por baixo, à vista, na faixa de cima. */}
-        <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:top-0">
+            por baixo, à vista, na faixa de cima.
+
+            `lg:top-0` sozinho também não resolvia: quem rola no desktop é o
+            <main>, e ele tem `lg:py-8`. O grude acontece na CAIXA DE
+            CONTEÚDO, não no topo da janela, então a barra parava 32px abaixo
+            e o post continuava desfilando nessa faixa. Puxamos a barra 32px
+            para cima (`-mt-8`), devolvemos os 32px por dentro (`pt-10` =
+            py-2 + 2rem) e grudamos em `-top-8`: o texto fica no mesmo lugar
+            de antes e o fundo da barra cobre a faixa do padding. */}
+        <header className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 flex items-center gap-3 border-b border-[var(--engine-border)] bg-[var(--engine-bg)] px-2 py-2 sm:px-4 lg:-mt-8 lg:-top-8 lg:pt-10">
           <button
             type="button"
             onClick={closeFeed}
@@ -1136,6 +1144,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
             {(isOwnProfile || carteiraDoDonoVisivel) && (
               <button
                 type="button"
+                data-tour="profile-wallet"
                 onClick={() => setCarteiraAberta(true)}
                 title={t("carteira.open")}
                 aria-label={t("carteira.open")}
@@ -1179,7 +1188,7 @@ export function UserProfile({ settings = {}, user = null, onSettingsUpdate }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-stretch border-b border-[var(--engine-border)]">
+        <div data-tour="profile-tabs" className="flex items-stretch border-b border-[var(--engine-border)]">
           <div className="relative min-w-0 flex-1">
           <div className="flex gap-5 overflow-x-auto px-4 pr-8 [scrollbar-width:none] sm:gap-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
             {/* A tira só tem CONTEÚDO desta pessoa, e cada aba é um tipo de

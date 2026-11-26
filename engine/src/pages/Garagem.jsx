@@ -87,7 +87,7 @@ export function Garagem({
           <h2 className="text-[15px] font-extrabold text-[var(--engine-text)]">{title}</h2>
           <span className="text-xs font-semibold text-[var(--engine-text-muted)]">{count}</span>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+        <div data-tour="garage-list" className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           {list.map((car) => (
             <CarCard key={car.id} {...cardProps(car)} {...extra(car)} />
           ))}
@@ -103,7 +103,7 @@ export function Garagem({
           {t("garage.title")}
         </h1>
         {cars.length > 0 && (
-          <Button onClick={() => onOpenModal()} aria-label={t("garage.addCar")}>
+          <Button data-tour="garage-add" onClick={() => onOpenModal()} aria-label={t("garage.addCar")}>
             <Plus size={17} />
             <span className="max-sm:hidden">{t("garage.addCar")}</span>
             <span className="sm:hidden">{t("garageV2.add")}</span>
@@ -168,6 +168,12 @@ export function Garagem({
               <button
                 key={door.key}
                 type="button"
+                /* Alvo do guia (services/tour.js). O botão de cadastrar do
+                   cabeçalho só existe com a garagem cheia — e quem está
+                   fazendo o guia é justamente quem ainda não tem carro
+                   nenhum. A porta "carro que é seu" é o alvo nesse caso;
+                   só uma das duas está na tela por vez. */
+                data-tour={door.primary ? "garage-add" : undefined}
                 onClick={() => onOpenModal(null, { type: door.type })}
                 className="engine-card engine-card-hover flex flex-col items-start gap-2 p-4 text-left"
               >

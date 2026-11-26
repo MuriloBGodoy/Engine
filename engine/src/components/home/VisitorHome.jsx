@@ -17,6 +17,7 @@ import {
   Link2,
   MapPin,
   MessageSquareQuote,
+  PlayCircle,
   Receipt,
   Shield,
   ShieldCheck,
@@ -37,6 +38,7 @@ import { formatCarName } from "../../services/carDisplay";
 import { formatEventDay } from "../../services/eventTime";
 import { eventTypeLabel } from "../../services/eventTypes";
 import { authPath } from "../../services/authRedirect";
+import { useTour } from "../tour/TourProvider";
 
 /**
  * Home de quem ainda não entrou.
@@ -164,6 +166,7 @@ const PILLARS = [
 
 function Hero() {
   const { t } = useTranslation();
+  const { startJourney } = useTour();
 
   return (
     <section className="relative grid gap-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-12">
@@ -189,10 +192,20 @@ function Hero() {
             {t("visitorHome.ctaRegister")}
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
-          <Link to="/services" className={`${linkSecondary} w-full sm:w-auto`}>
-            <Wrench size={17} aria-hidden="true" />
-            {t("visitorHome.ctaServices")}
-          </Link>
+          {/* A segunda porta é o GUIA, não "explorar serviços".
+              Quem chega por QR code num encontro ou por link de amigo não
+              veio contratar oficina: veio descobrir o que é isto. A
+              pergunta é "o que esse app faz?", e quem responde isso em um
+              minuto, sem pedir conta, é a volta guiada. Serviços continua a
+              um toque no cartão do pilar, aqui do lado. */}
+          <button
+            type="button"
+            onClick={() => startJourney?.("")}
+            className={`${linkSecondary} w-full sm:w-auto`}
+          >
+            <PlayCircle size={17} aria-hidden="true" />
+            {t("visitorHome.ctaTour")}
+          </button>
         </div>
         <p className="mt-3 text-[13px] text-[var(--engine-text-muted)]">
           {t("visitorHome.haveAccount")}{" "}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 
@@ -34,6 +34,7 @@ const STORAGE_KEY = "engine_guest_hint_dismissed";
 
 export function GuestLoginHint({ placement = "top" }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -53,7 +54,16 @@ export function GuestLoginHint({ placement = "top" }) {
     }
   };
 
-  if (!visible) return null;
+  /*
+   * Na Home, não.
+   *
+   * A Home de visitante já é o convite inteiro: o título, "Criar conta
+   * grátis" no alto, e de novo no fim da página. Com esta barra eram QUATRO
+   * pedidos de conta na primeira tela de quem acabou de chegar — e no
+   * celular ela ainda cobria os cartões. Nas outras telas ela continua: lá
+   * a pessoa está vendo conteúdo e o convite é novidade, não repetição.
+   */
+  if (!visible || pathname === "/") return null;
 
   if (placement === "dock") {
     if (typeof document === "undefined") return null;

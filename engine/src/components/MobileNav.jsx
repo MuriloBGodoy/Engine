@@ -18,6 +18,8 @@ import { Logo } from "./Logo";
 import { Topbar } from "./TopBar";
 import { GuestLoginHint } from "./GuestLoginHint";
 import { RegionPicker } from "./RegionPicker";
+import { HelpButton } from "./tour/HelpButton";
+import { navTourId } from "../services/tour";
 
 const getInitials = (name) => {
   if (!name) return "U";
@@ -102,6 +104,10 @@ export function MobileNav({
 
         <div className="flex shrink-0 items-center gap-1">
           <RegionPicker compact className="mr-0.5" />
+          {/* Para quem tem conta, a ajuda vem dentro da Topbar (que só
+              aparece logado). Quem está sem login também precisa dela — e é
+              justamente quem mais precisa, porque acabou de chegar. */}
+          {isGuest && <HelpButton />}
           {settings && onSettingsUpdate && !isGuest && (
             <Topbar
               settings={settings}
@@ -183,6 +189,7 @@ export function MobileNav({
             <Link
               key={item.path}
               to={item.path}
+              data-tour={navTourId(item.path) || undefined}
               aria-current={active ? "page" : undefined}
               className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0 min-[360px]:px-0.5 py-1.5 text-[11px] font-semibold leading-tight tracking-tighter min-[360px]:tracking-tight transition-colors ${
                 active

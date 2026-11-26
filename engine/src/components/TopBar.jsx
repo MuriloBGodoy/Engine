@@ -9,6 +9,7 @@ import {
   getNotificationTarget,
   isNotificationMuted,
 } from "../services/notifications";
+import { HelpButton } from "./tour/HelpButton";
 
 function TopbarIconButton({ className = "", onClick, title, active = false, children }) {
   return (
@@ -111,6 +112,11 @@ export function Topbar({ settings, onSettingsUpdate, user }) {
   return (
     <>
       <div className="flex items-center gap-1">
+        {/* "O que eu faço nesta tela?" — o botão muda com a rota aberta
+            (23/11/2026). No header do celular ele sai abaixo de 380px, onde
+            já não cabia nem o botão de tema (ver index.css). */}
+        <HelpButton />
+
         <TopbarIconButton
           onClick={() => setNotificationsOpen(true)}
           title={t("notifications.title")}

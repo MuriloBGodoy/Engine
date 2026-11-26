@@ -1525,6 +1525,15 @@ h5 {
   }
 }
 
+/* O ponto de interrogação sai do header em celular muito estreito: abaixo de
+   380px a barra já estava no limite (foi por isso que o botão de tema saiu).
+   A ajuda continua inteira na Central de Ajuda, no rodapé. */
+@media (max-width: 379px) {
+  .engine-mobile-header .engine-help-button {
+    display: none;
+  }
+}
+
 /* Header logado em celular de 320–379px: o pino da região perde a seta
    para tudo caber sem rolar. */
 @media (max-width: 379px) {

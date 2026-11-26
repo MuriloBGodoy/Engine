@@ -21,6 +21,7 @@ import { useServiceAdmin } from "../hooks/useServiceAdmin";
 import { Logo } from "./Logo";
 import { GuestLoginHint } from "./GuestLoginHint";
 import { InstallButton } from "./InstallButton";
+import { navTourId } from "../services/tour";
 
 const getInitials = (name) => {
   if (!name) return "U";
@@ -111,6 +112,10 @@ export function Sidebar({
             <Link
               key={item.path}
               to={item.path}
+              /* Alvo do tour (services/tour.js). Não é classe: classe muda
+                 quando o visual muda, e tour apontando para o lugar errado é
+                 pior que tour nenhum. */
+              data-tour={navTourId(item.path) || undefined}
               title={collapsed ? item.name : undefined}
               className={`group relative flex h-11 items-center rounded-xl text-[14px] font-medium transition-colors ${
                 collapsed ? "mx-auto w-11 justify-center" : "gap-3 px-3"

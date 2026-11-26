@@ -2723,6 +2723,7 @@ export function Community({ cars = [], settings, user }) {
                        direto em ?tab=eventos ela nascia fora de vista à direita e
                        a tela parecia estar no Feed. */
                     ref={isActive ? activeSectionRef : undefined}
+                    data-tour={`community-tab-${section.id}`}
                     onClick={() => selectSection(section.id)}
                     className={`flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-colors sm:min-w-0 sm:flex-1 sm:shrink sm:px-2.5 sm:text-xs ${
                       isActive
@@ -2763,6 +2764,7 @@ export function Community({ cars = [], settings, user }) {
             {topLevelTab === "goals" && (
               <button
                 type="button"
+                data-tour="community-post"
                 onClick={() => {
                   if (requireAccount("/community?compose=1")) return;
                   setPostModalOpen(true);
@@ -2872,7 +2874,7 @@ export function Community({ cars = [], settings, user }) {
                        no celular: o olho acha a fronteira sem procurar. O fundo
                        (#08090c) contra o cartão (#101216) tem contraste para
                        isso nos dois temas. */
-                    <div className="-mx-4 space-y-2 sm:mx-0 sm:space-y-5">
+                    <div data-tour="community-feed" className="-mx-4 space-y-2 sm:mx-0 sm:space-y-5">
                       {filteredGoals.map((goal, index) => (
                         <Fragment key={goal.id}>
                           <GoalCard
@@ -2982,6 +2984,7 @@ export function Community({ cars = [], settings, user }) {
             <div className="engine-card space-y-2 p-4">
               <button
                 type="button"
+                data-tour="community-post"
                 onClick={() => setPostModalOpen(true)}
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-[var(--engine-accent)] px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white transition hover:brightness-95"
               >
@@ -3055,6 +3058,7 @@ export function Community({ cars = [], settings, user }) {
         createPortal(
           <button
             type="button"
+            data-tour="community-post"
             onClick={() => {
               if (requireAccount("/community?compose=1")) return;
               setPostModalOpen(true);

@@ -153,11 +153,12 @@ export function Events({ embedded = false, user = null }) {
         createLabel={t("events.create")}
         createShortLabel={t("events.createShort")}
         onCreate={openCreate}
+        tourId="events-create"
       />
 
       {/* Filtros: só em Descobrir, e como linha, não como cartão. */}
       {activeTab === "discover" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div data-tour="events-filters" className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label className={labelClass}>{t("events.filters.type")}</label>
             <Select
@@ -241,7 +242,7 @@ export function Events({ embedded = false, user = null }) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div data-tour="events-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => (
             <EventCard key={event.id} event={event} />
           ))}

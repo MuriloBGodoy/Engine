@@ -289,7 +289,11 @@ export function Buscar({ user = null }) {
           {t("search.title")}
         </h1>
 
-        <label className="flex h-12 items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 transition-colors focus-within:border-[var(--engine-accent)]">
+        <label
+          /* Alvo do guia (services/tour.js). */
+          data-tour="search-input"
+          className="flex h-12 items-center gap-3 rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] px-4 transition-colors focus-within:border-[var(--engine-accent)]"
+        >
           <SearchIcon size={18} className="shrink-0 text-[var(--engine-text-subtle)]" />
           <input
             value={termo}

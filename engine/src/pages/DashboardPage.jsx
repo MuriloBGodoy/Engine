@@ -161,7 +161,7 @@ export function DashboardPage({ cars = [], settings, onOpenOwnership }) {
     <div>
       <PageHeader title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />
 
-      <div className="engine-card relative overflow-hidden p-4 sm:p-8">
+      <div data-tour="dashboard-top" className="engine-card relative overflow-hidden p-4 sm:p-8">
         {chartData.length === 0 ? (
           <div className="flex h-56 items-center justify-center text-center text-sm font-medium text-[var(--engine-text-subtle)] sm:h-[420px]">
             {/* A corrida só tem metas (carro próprio ficaria sempre em 100%).

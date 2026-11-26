@@ -219,7 +219,12 @@ function SwitchRow({ icon: Icon, label, hint, checked, onChange }) {
  */
 function SettingsSection({ id, icon: Icon, title, children }) {
   return (
-    <section id={`settings-${id}`} data-secao className="scroll-mt-24 space-y-4">
+    <section
+      id={`settings-${id}`}
+      data-secao
+      data-tour={`settings-${id}`}
+      className="scroll-mt-24 space-y-4"
+    >
       <h2 className="flex items-center gap-2.5 px-1 text-[17px] font-extrabold tracking-tight text-[var(--engine-text)] dark:text-white">
         {Icon && <Icon size={19} aria-hidden="true" className="shrink-0 text-[var(--engine-accent)]" />}
         {title}

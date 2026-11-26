@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { onAuthChange } from "./services/supabase";
-import { CAR_TYPE_OWNED, engineDB } from "./services/db";
+import { CAR_TYPE_OWNED, engineDB, publicUsername } from "./services/db";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { captureError, identifyUser, resetUser, trackPageView } from "./services/observability";
 import { AchievementAnnouncer } from "./components/achievements/AchievementAnnouncer";
@@ -23,6 +23,7 @@ import { RequireAuth } from "./components/RequireAuth";
 import { Footer } from "./components/Footer";
 import { RegionPicker } from "./components/RegionPicker";
 import { useConfirm } from "./components/ConfirmProvider";
+import { TourProvider } from "./components/tour/TourProvider";
 import { Home } from "./pages/Home";
 import { Garagem } from "./pages/Garagem";
 
@@ -915,6 +916,21 @@ function AppLayout({
     location.pathname === "/settings";
 
   return (
+    /* O guia (23/11/2026) envolve o shell inteiro porque ele precisa de duas
+       coisas que só existem aqui: a rota aberta (para saber QUE tela
+       explicar) e os elementos do menu (que são o alvo do tour de chegada).
+       Fora do shell — login, termos, link direto de post — não há o que
+       guiar. */
+    <TourProvider
+      userId={user?.uid || ""}
+      /* O capítulo do perfil precisa do endereço dele, e o endereço depende
+         do @ de quem está logado — coisa que o catálogo do guia não tem como
+         saber. Vem daqui, de onde a sidebar e a barra do celular já tiram o
+         mesmo link. */
+      profilePath={
+        user?.uid ? `/community/@${publicUsername(settings.profile?.username, user.uid)}` : ""
+      }
+    >
     <div
       className={`flex min-h-[100dvh] flex-col bg-[var(--engine-bg)] font-sans text-[var(--engine-text)] transition-colors ${
         isTopNav ? "" : "lg:h-[100dvh] lg:flex-row lg:overflow-hidden"
@@ -1059,6 +1075,7 @@ function AppLayout({
           aqui em cima para nao depender de qual delas estava aberta. */}
       <AchievementAnnouncer userId={user?.uid} />
     </div>
+    </TourProvider>
   );
 }
 

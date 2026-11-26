@@ -73,6 +73,7 @@ const ptBR = {
     subtitle: "Sua garagem, quem cuida do seu carro e quem anda com você. Num lugar só.",
     ctaRegister: "Criar conta grátis",
     ctaServices: "Explorar serviços",
+    ctaTour: "Ver como funciona",
     haveAccount: "Já tem conta?",
     signIn: "Entrar",
     pillars: {
@@ -246,6 +247,7 @@ const enUS = {
     subtitle: "Your garage, the people who look after your car and the people you ride with. All in one place.",
     ctaRegister: "Create a free account",
     ctaServices: "Explore services",
+    ctaTour: "See how it works",
     haveAccount: "Already have an account?",
     signIn: "Sign in",
     pillars: {
@@ -419,6 +421,7 @@ const esES = {
     subtitle: "Tu garaje, quien cuida tu coche y con quien sales a rodar. Todo en un solo lugar.",
     ctaRegister: "Crear cuenta gratis",
     ctaServices: "Explorar servicios",
+    ctaTour: "Ver cómo funciona",
     haveAccount: "¿Ya tienes cuenta?",
     signIn: "Entrar",
     pillars: {
