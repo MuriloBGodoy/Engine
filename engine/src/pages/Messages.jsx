@@ -92,6 +92,9 @@ export function Messages({ user, settings }) {
   const confirm = useConfirm();
   const { conversationId = "" } = useParams();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+  // Mesmo corte do EmojiPicker, o vizinho de botão no compositor: abaixo de
+  // 640px a escolha sobe de baixo (folha); acima, ela nasce colada no botão.
+  const celular = useMediaQuery("(max-width: 639px)");
 
   const [conversations, setConversations] = useState([]);
   // Erro de leitura da lista. Sem isto, falha virava "nenhuma conversa".
@@ -107,6 +110,7 @@ export function Messages({ user, settings }) {
   const [anexosAbertos, setAnexosAbertos] = useState(false);
   const galeriaRef = useRef(null);
   const cameraRef = useRef(null);
+  const anexosRef = useRef(null);
   const [tab, setTab] = useState("direct");
   const [statusFilter, setStatusFilter] = useState("all");
   const [statusBusy, setStatusBusy] = useState(false);
@@ -450,6 +454,81 @@ export function Messages({ user, settings }) {
     if (file.type.startsWith("video/")) handleVideoSelected(file);
     else handleImageSelected(file);
   };
+
+  /*
+   * As três origens de anexo, escritas uma vez.
+   *
+   * Elas aparecem em dois lugares: a folha de baixo no celular e o popover
+   * ancorado no "+" no computador. Escritas duas vezes, divergiriam no
+   * primeiro item novo — e a lista é a mesma, o que muda é só onde ela
+   * nasce.
+   */
+  const opcoesDeAnexo = [
+    {
+      chave: "midia",
+      icone: <Image size={21} />,
+      rotulo: t("messages.attachPhotoVideo"),
+      acao: () => {
+        setAnexosAbertos(false);
+        galeriaRef.current?.click();
+      },
+    },
+    {
+      chave: "camera",
+      icone: <Camera size={21} />,
+      rotulo: t("messages.attachCamera"),
+      acao: () => {
+        setAnexosAbertos(false);
+        cameraRef.current?.click();
+      },
+    },
+    {
+      chave: "gif",
+      // Ícone, e não as três letras: com "GIF" dentro do círculo e "GIF"
+      // embaixo, o botão dizia a mesma coisa duas vezes.
+      icone: <Sticker size={21} />,
+      rotulo: t("socialPosts.messages.gif"),
+      acao: () => {
+        setAnexosAbertos(false);
+        setShowGiphyPicker(true);
+      },
+    },
+  ];
+
+  const botaoDeAnexo = (item) => (
+    <button
+      key={item.chave}
+      type="button"
+      onClick={item.acao}
+      className="flex min-h-[4.5rem] flex-col items-center gap-1.5 rounded-xl p-1 text-[11px] font-bold leading-tight text-[var(--engine-text-muted)] transition hover:bg-[var(--engine-surface-2)] active:scale-95"
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-accent)]">
+        {item.icone}
+      </span>
+      <span className="w-full text-center">{item.rotulo}</span>
+    </button>
+  );
+
+  /*
+   * Fechar o popover do computador ao clicar fora ou apertar Esc — a folha
+   * do celular já faz isso sozinha, com o escurecido dela. Mesmo desenho do
+   * EmojiPicker, que é o vizinho de botão no compositor.
+   */
+  useEffect(() => {
+    if (!anexosAbertos || celular) return undefined;
+    const fora = (evento) => {
+      if (anexosRef.current && !anexosRef.current.contains(evento.target)) setAnexosAbertos(false);
+    };
+    const tecla = (evento) => {
+      if (evento.key === "Escape") setAnexosAbertos(false);
+    };
+    document.addEventListener("pointerdown", fora);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("pointerdown", fora);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [anexosAbertos, celular]);
 
   // Ctrl+V com uma foto na área de transferência cai na MESMA prévia do
   // seletor de arquivo: legenda, editor e envio continuam um caminho só.
@@ -846,22 +925,57 @@ export function Messages({ user, settings }) {
                     o texto parecia cortado. Com um botão só sobram ~190px.
                     O emoji fica só no computador: o teclado do celular já tem
                     emoji, e ali o botão só ocupava lugar. */}
-                <button
-                  type="button"
-                  onClick={() => setAnexosAbertos(true)}
-                  disabled={sending || compressing || sendingVideo || Boolean(editing)}
-                  title={t("messages.attach")}
-                  aria-label={t("messages.attach")}
-                  aria-haspopup="dialog"
-                  aria-expanded={anexosAbertos}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-40 sm:h-11 sm:w-11"
-                >
-                  {sendingVideo || compressing ? (
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
-                  ) : (
-                    <Plus size={19} />
+                {/* O menu de anexo nasce NO "+", e não no meio da tela.
+                    Até 25/11/2026 ele era a folha de baixo também no
+                    computador: a caixinha aparecia flutuando no meio do
+                    chat, sem ligação nenhuma com o botão que a abriu — a
+                    pessoa tocava embaixo e a resposta vinha lá em cima. No
+                    celular a folha continua certa (fica debaixo do polegar);
+                    no computador, popover colado no botão, igual ao
+                    EmojiPicker ao lado. */}
+                <div ref={anexosRef} className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setAnexosAbertos((atual) => !atual)}
+                    disabled={sending || compressing || sendingVideo || Boolean(editing)}
+                    title={t("messages.attach")}
+                    aria-label={t("messages.attach")}
+                    aria-haspopup="dialog"
+                    aria-expanded={anexosAbertos}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-text)] transition hover:border-[var(--engine-accent)] hover:text-[var(--engine-accent)] disabled:opacity-40 sm:h-11 sm:w-11"
+                  >
+                    {sendingVideo || compressing ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--engine-border)] border-t-[var(--engine-accent)]" />
+                    ) : (
+                      <Plus size={19} />
+                    )}
+                  </button>
+
+                  {/* O painel de GIF nasce no mesmo lugar do menu de
+                      anexos — em cima do botão que o abriu. No celular ele
+                      vira folha de baixo e se vira sozinho (ver
+                      components/GiphyPicker.jsx). */}
+                  {showGiphyPicker && (
+                    <GiphyPicker
+                      onSelect={handleGiphySelect}
+                      onClose={() => setShowGiphyPicker(false)}
+                    />
                   )}
-                </button>
+
+                  {!celular && anexosAbertos && (
+                    <div
+                      role="dialog"
+                      aria-label={t("messages.attach")}
+                      className="engine-pop absolute bottom-14 left-0 z-50 flex gap-1 rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface)] p-2 shadow-[var(--engine-shadow-md)]"
+                    >
+                      {opcoesDeAnexo.map((item) => (
+                        <div key={item.chave} className="w-[5.5rem]">
+                          {botaoDeAnexo(item)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Também no celular desde 15/11/2026: ver o cabeçalho de
                     components/EmojiPicker.jsx para o que impedia. */}
@@ -908,13 +1022,6 @@ export function Messages({ user, settings }) {
               />
             )}
 
-            {showGiphyPicker && (
-              <GiphyPicker
-                onSelect={handleGiphySelect}
-                onClose={() => setShowGiphyPicker(false)}
-              />
-            )}
-
             {/* Os dois campos ficam FORA da folha: a folha fecha assim que a
                 pessoa escolhe o que quer, e um input que some junto com ela
                 nunca chega a abrir o seletor do sistema. */}
@@ -936,58 +1043,18 @@ export function Messages({ user, settings }) {
               tabIndex={-1}
             />
 
-            <BottomSheet
-              open={anexosAbertos}
-              onClose={() => setAnexosAbertos(false)}
-              ariaLabel={t("messages.attach")}
-              bare
-            >
-              <div className="grid grid-cols-4 gap-x-2 gap-y-4 pb-1 pt-1">
-                {[
-                  {
-                    chave: "midia",
-                    icone: <Image size={21} />,
-                    rotulo: t("messages.attachPhotoVideo"),
-                    acao: () => {
-                      setAnexosAbertos(false);
-                      galeriaRef.current?.click();
-                    },
-                  },
-                  {
-                    chave: "camera",
-                    icone: <Camera size={21} />,
-                    rotulo: t("messages.attachCamera"),
-                    acao: () => {
-                      setAnexosAbertos(false);
-                      cameraRef.current?.click();
-                    },
-                  },
-                  {
-                    chave: "gif",
-                    // Ícone, e não as três letras: com "GIF" dentro do círculo
-                    // e "GIF" embaixo, o botão dizia a mesma coisa duas vezes.
-                    icone: <Sticker size={21} />,
-                    rotulo: t("socialPosts.messages.gif"),
-                    acao: () => {
-                      setAnexosAbertos(false);
-                      setShowGiphyPicker(true);
-                    },
-                  },
-                ].map((item) => (
-                  <button
-                    key={item.chave}
-                    type="button"
-                    onClick={item.acao}
-                    className="flex min-h-[4.5rem] flex-col items-center gap-1.5 rounded-xl p-1 text-[11px] font-bold leading-tight text-[var(--engine-text-muted)] transition active:scale-95"
-                  >
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--engine-border)] bg-[var(--engine-surface-2)] text-[var(--engine-accent)]">
-                      {item.icone}
-                    </span>
-                    <span className="w-full text-center">{item.rotulo}</span>
-                  </button>
-                ))}
-              </div>
-            </BottomSheet>
+            {celular && (
+              <BottomSheet
+                open={anexosAbertos}
+                onClose={() => setAnexosAbertos(false)}
+                ariaLabel={t("messages.attach")}
+                bare
+              >
+                <div className="grid grid-cols-4 gap-x-2 gap-y-4 pb-1 pt-1">
+                  {opcoesDeAnexo.map((item) => botaoDeAnexo(item))}
+                </div>
+              </BottomSheet>
+            )}
           </div>
         ) : (
           <div className="hidden min-w-0 flex-1 flex-col items-center justify-center px-6 text-center lg:flex">
