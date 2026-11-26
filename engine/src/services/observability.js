@@ -15,7 +15,25 @@
  * clique e navegação, sem o que é digitado, e o Sentry só envia pilha de erro.
  */
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || "";
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || "";
+
+/**
+ * `npm run dev` mandava evento para o MESMO projeto do site, e a conta do
+ * lancamento saiu inflada: em 13-22/11/2026, 336 dos 841 pageviews eram
+ * localhost. Desenvolvimento nao e visita, entao em dev a chave fica vazia e
+ * nada sobe - o mesmo contrato de "sem chave, sem evento" que o resto do
+ * arquivo ja segue.
+ *
+ * Para conferir instrumentacao nova na mao, ligue VITE_POSTHOG_DEV=1 no .env
+ * local. Lembre de desligar: enquanto estiver 1, cada recarga do dev server
+ * suja o relatorio.
+ *
+ * O Sentry continua ligado em dev de proposito - ele marca `environment` em
+ * cada evento, entao da para filtrar depois. O PostHog nao tem esse campo.
+ */
+const POSTHOG_KEY =
+  import.meta.env.DEV && import.meta.env.VITE_POSTHOG_DEV !== "1"
+    ? ""
+    : import.meta.env.VITE_POSTHOG_KEY || "";
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
 
 let sentry = null;
@@ -95,9 +113,21 @@ export function resetUser() {
   withPosthog(() => posthog.reset());
 }
 
-/** Uma tela vista. O Engine é SPA, então isso não sai de graça. */
+/**
+ * Uma tela vista. O Engine é SPA, então isso não sai de graça.
+ *
+ * Vai com domínio (`https://enginegarage.com.br/garagem`) e não só o
+ * pathname: sem ele o relatório não consegue separar o site de verdade do
+ * localhost e do deploy de preview — foi assim que os primeiros números
+ * saíram errados.
+ *
+ * Mas a URL é montada à mão em vez de usar `location.href`, de propósito: o
+ * href carrega `?` e `#`, e o retorno do login do Supabase chega com
+ * `#access_token=…` ali. Token não vai para o analytics.
+ */
 export function trackPageView(path) {
-  withPosthog(() => posthog.capture("$pageview", { $current_url: path }));
+  const url = `${window.location.origin}${path}`;
+  withPosthog(() => posthog.capture("$pageview", { $current_url: url }));
 }
 
 /** Um evento de produto: `trackEvent("meta_criada", { marca })`. */
