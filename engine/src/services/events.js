@@ -32,7 +32,37 @@ const contarVarios = async (eventIds) => {
 
 const contarParticipantes = async (eventId) => (await contarVarios([eventId])).get(String(eventId)) || 0;
 
-const EVENT_COLUMN_KEYS = ["id", "createdBy", "clubId", "eventDate", "type", "state", "createdAt", "updatedAt"];
+/**
+ * Quantos curtiram, para vários eventos numa ida só. Mesma forma da presença
+ * e pelo mesmo motivo: a LISTA de quem curtiu é de quem tem conta, o TOTAL é
+ * de todo mundo — e um visitante tem de ver o número sem ler linha nenhuma.
+ */
+const contarCurtidasVarias = async (eventIds) => {
+  const ids = [...new Set(eventIds.map(String))].filter(Boolean);
+  if (!ids.length) return new Map();
+  try {
+    const rows = must(await supabase.rpc("event_like_counts", { p_event_ids: ids }));
+    return new Map(rows.map((row) => [String(row.event_id), Number(row.total) || 0]));
+  } catch {
+    return new Map();
+  }
+};
+
+const EVENT_COLUMN_KEYS = [
+  "id",
+  "createdBy",
+  "clubId",
+  "eventDate",
+  "type",
+  "state",
+  "createdAt",
+  "updatedAt",
+  // Colunas de 20261123120000: comentário é coluna do evento, não campo do
+  // `data`. Sem estes nomes aqui, salvar o evento copiaria a lista inteira
+  // de comentários para dentro do `data` a cada edição.
+  "comments",
+  "commentCount",
+];
 
 export const eventFromRow = (row) => ({
   ...(row.data || {}),
@@ -44,6 +74,8 @@ export const eventFromRow = (row) => ({
   state: row.state,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  comments: Array.isArray(row.comments) ? row.comments : [],
+  commentCount: Number(row.comment_count) || 0,
 });
 
 const eventToRow = (event) => ({
@@ -157,8 +189,13 @@ export const engineEvents = {
 
     // O contador nao mora no evento; vem da contagem. Uma por evento, em
     // paralelo — nao le linha nenhuma, so conta.
-    const contagens = await contarVarios(eventos.map((e) => e.id));
-    return eventos.map((evento) => ({ ...evento, participantCount: contagens.get(String(evento.id)) || 0 }));
+    const ids = eventos.map((e) => e.id);
+    const [contagens, curtidas] = await Promise.all([contarVarios(ids), contarCurtidasVarias(ids)]);
+    return eventos.map((evento) => ({
+      ...evento,
+      participantCount: contagens.get(String(evento.id)) || 0,
+      likeCount: curtidas.get(String(evento.id)) || 0,
+    }));
   },
 
   /**
@@ -186,8 +223,13 @@ export const engineEvents = {
     const lista = [...porId.values()]
       .sort((a, b) => String(a.eventDate).localeCompare(String(b.eventDate)))
       .slice(0, resultLimit);
-    const contagens = await contarVarios(lista.map((e) => e.id));
-    return lista.map((e) => ({ ...e, participantCount: contagens.get(String(e.id)) || 0 }));
+    const ids = lista.map((e) => e.id);
+    const [contagens, curtidas] = await Promise.all([contarVarios(ids), contarCurtidasVarias(ids)]);
+    return lista.map((e) => ({
+      ...e,
+      participantCount: contagens.get(String(e.id)) || 0,
+      likeCount: curtidas.get(String(e.id)) || 0,
+    }));
   },
 
   async updateEvent(eventId, updates) {
@@ -326,5 +368,100 @@ export const engineEvents = {
     } catch {
       return false;
     }
+  },
+
+  /* --------------------------------------------------- curtir e comentar ---
+   *
+   * Confirmar presença é a resposta cara (eu apareço no sábado). Curtir e
+   * comentar são o degrau de baixo — e é por ele que a maioria entra: quem
+   * pergunta "tem estacionamento?" no comentário é quem talvez confirme
+   * depois. Ver 20261123120000_event_likes_and_comments.sql.
+   */
+
+  /** Quantos curtiram. Contagem, como a de confirmados — nunca sai do lugar. */
+  async countLikes(eventId) {
+    return (await contarCurtidasVarias([eventId])).get(String(eventId)) || 0;
+  },
+
+  async hasLiked(eventId) {
+    if (!auth.currentUser) return false;
+    try {
+      const row = must(
+        await supabase
+          .from("event_likes")
+          .select("uid")
+          .eq("event_id", String(eventId))
+          .eq("uid", auth.currentUser.uid)
+          .maybeSingle(),
+      );
+      return Boolean(row);
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Curtir é um botão só: liga e desliga. Devolve o estado NOVO para a tela
+   * não ter de perguntar de novo.
+   */
+  async toggleLike(eventId, curtido) {
+    if (!auth.currentUser) throw new Error("Usuário não autenticado.");
+    const uid = auth.currentUser.uid;
+
+    if (curtido) {
+      must(
+        await supabase
+          .from("event_likes")
+          .delete()
+          .eq("event_id", String(eventId))
+          .eq("uid", uid)
+          .select("uid"),
+      );
+      return false;
+    }
+
+    const { error } = await supabase
+      .from("event_likes")
+      .insert({ event_id: String(eventId), uid });
+    // 23505 é "já curtiu": dois toques rápidos não viram erro na cara da
+    // pessoa, viram o estado que ela já esperava.
+    if (error && error.code !== "23505") throw error;
+    return true;
+  },
+
+  /**
+   * Os comentários moram no próprio evento (coluna `comments`), então eles já
+   * chegam em `getEventById`. Esta função existe para RECARREGAR a lista
+   * depois de escrever, sem puxar o evento inteiro de novo.
+   */
+  async getComments(eventId) {
+    const row = must(
+      await supabase.from("events").select("comments").eq("id", String(eventId)).maybeSingle(),
+    );
+    return Array.isArray(row?.comments) ? row.comments : [];
+  },
+
+  /** O autor é carimbado pelo banco: daqui vai só o texto. */
+  async addComment(eventId, text) {
+    if (!auth.currentUser) throw new Error("Usuário não autenticado.");
+    const limpo = String(text || "").trim();
+    if (!limpo) throw new Error("Escreva alguma coisa antes de enviar.");
+
+    return must(
+      await supabase.rpc("add_event_comment", {
+        p_event_id: String(eventId),
+        p_comment: { text: limpo.slice(0, 300) },
+      }),
+    );
+  },
+
+  async deleteComment(eventId, commentId) {
+    if (!auth.currentUser) throw new Error("Usuário não autenticado.");
+    must(
+      await supabase.rpc("delete_event_comment", {
+        p_event_id: String(eventId),
+        p_comment_id: String(commentId),
+      }),
+    );
   },
 };

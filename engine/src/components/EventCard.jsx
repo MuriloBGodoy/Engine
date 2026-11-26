@@ -9,6 +9,7 @@ import {
   Calendar,
   DollarSign,
   Share2,
+  Heart,
   MessageCircle,
   ExternalLink,
 } from "lucide-react";
@@ -35,6 +36,12 @@ export function EventCard({ event }) {
   const spotsLeft = event.maxParticipants
     ? Math.max(0, event.maxParticipants - (event.participantCount || 0))
     : null;
+
+  // Curtida e comentário (20261123120000) aparecem no card só quando existem:
+  // evento recém-publicado não precisa anunciar dois zeros. Quando aparecem,
+  // são o sinal de que ali já tem gente conversando — que é o que faz alguém
+  // abrir um cartaz entre dez.
+  const temConversa = (event.likeCount || 0) > 0 || (event.commentCount || 0) > 0;
 
   return (
     <div
@@ -93,6 +100,23 @@ export function EventCard({ event }) {
               {spotsLeft !== null && ` • ${t("events.spotsLeft", { count: spotsLeft })}`}
             </span>
           </div>
+
+          {temConversa && (
+            <div className="flex items-center gap-4 text-[var(--engine-text-muted)]">
+              {event.likeCount > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <Heart size={16} className="text-[var(--engine-accent)]" />
+                  {event.likeCount}
+                </span>
+              )}
+              {event.commentCount > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <MessageCircle size={16} className="text-[var(--engine-accent)]" />
+                  {event.commentCount}
+                </span>
+              )}
+            </div>
+          )}
 
           {event.isPaid && (
             <div className="flex items-center gap-2 text-[var(--engine-accent)] font-semibold">

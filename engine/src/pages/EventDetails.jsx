@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -27,6 +27,7 @@ import { useSocialReport } from "../hooks/useSocialReport";
 import { authPath } from "../services/authRedirect";
 import { EventTeamBadge, EventTeamPanel } from "../components/events/EventTeamPanel";
 import { EventEditModal } from "../components/events/EventEditModal";
+import { EventComments, EventGoing, EventReactions } from "../components/events/EventSocial";
 import { openShareSheet, shareUrls } from "../services/shareLinks";
 import "../services/i18n-social-posts";
 
@@ -53,6 +54,11 @@ export function EventDetails() {
   // Equipe (20261101150000): co-organizador edita; staff e convidado são selo.
   const [team, setTeam] = useState([]);
   const [editing, setEditing] = useState(false);
+  // Conversa em volta do evento (20261123120000). Os comentários vêm dentro
+  // do próprio evento; o estado existe para a lista mudar sozinha depois de
+  // escrever, sem recarregar a página inteira.
+  const [comentarios, setComentarios] = useState([]);
+  const caixaDeComentarios = useRef(null);
 
   const [rsvpForm, setRsvpForm] = useState({
     carBrand: "",
@@ -67,6 +73,7 @@ export function EventDetails() {
         engineEvents.countParticipants(eventId),
       ]);
       setEvent({ ...data, participantCount });
+      setComentarios(Array.isArray(data.comments) ? data.comments : []);
 
       if (auth.currentUser) {
         const rsvped = await engineEvents.isUserRsvped(eventId);
@@ -86,6 +93,12 @@ export function EventDetails() {
 
   const loadTeam = useCallback(() => {
     engineEvents.getEventTeam(eventId).then(setTeam).catch(() => setTeam([]));
+  }, [eventId]);
+
+  // Depois de comentar ou apagar: relê só a lista, não o evento inteiro.
+  const recarregarComentarios = useCallback(async () => {
+    const lista = await engineEvents.getComments(eventId).catch(() => null);
+    if (lista) setComentarios(lista);
   }, [eventId]);
 
   useEffect(() => {
@@ -280,6 +293,19 @@ export function EventDetails() {
         </div>
       )}
 
+      {/* A conversa em volta do evento, logo abaixo das fotos: é onde a
+          pessoa termina de olhar o cartaz e decide o que fazer com ele. No
+          fim da página ninguém chega. */}
+      <EventReactions
+        event={event}
+        eventId={event.id || eventId}
+        comentarios={comentarios.length}
+        participantes={event.participantCount || 0}
+        onIrParaComentarios={() =>
+          caixaDeComentarios.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Coluna principal */}
         <div className="lg:col-span-2 space-y-6">
@@ -415,6 +441,14 @@ export function EventDetails() {
               </div>
             </div>
           )}
+
+          <EventComments
+            eventId={event.id || eventId}
+            event={event}
+            comentarios={comentarios}
+            onMudou={recarregarComentarios}
+            ancora={caixaDeComentarios}
+          />
         </div>
 
         {/* Coluna lateral - RSVP */}
@@ -549,6 +583,8 @@ export function EventDetails() {
               )}
             </div>
           )}
+
+          <EventGoing eventId={event.id || eventId} total={event.participantCount || 0} />
         </div>
       </div>
       <EventEditModal event={event} isOpen={editing} onClose={() => setEditing(false)} onSaved={loadEvent} />
