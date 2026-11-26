@@ -1200,7 +1200,11 @@ h5 {
   }
 
   .engine-sheet {
-    width: min(420px, 100%);
+    /* 420px serve a uma lista de opções. Folha com conteúdo que tem largura
+       própria (a carteira é um cartão de 85,6 × 54 mm) pede mais, e pede no
+       CSS: uma classe `max-w-*` do Tailwind não aumenta nada aqui, porque
+       `max-width` só limita — quem manda na largura é este `width`. */
+    width: min(var(--engine-sheet-largura, 420px), 100%);
     max-height: min(84vh, 42rem);
     border-width: 1px;
     border-radius: 1rem;
@@ -1580,16 +1584,21 @@ h5 {
   background: var(--engine-accent);
 }
 
+/* Balão ancorado na pílula — do tablet para cima. Abaixo de 640px o painel
+   não é este: é a folha de baixo do app (ver RegionPicker.jsx).
+   Havia aqui uma segunda forma, centralizada e quase da largura da tela, que
+   era a do celular. Ela sumiu junto com o problema: ficava solta no meio da
+   tela enquanto o gatilho estava no canto, e no celular tapava a página sem
+   escurecer nada. */
 .region-pop {
   position: fixed;
-  left: 50%;
+  right: 16px;
   /* O header cresce com a barra de status no PWA; o painel acompanha. */
   top: calc(60px + env(safe-area-inset-top));
-  transform: translateX(-50%);
   z-index: 999;
-  width: calc(100vw - 32px);
-  max-width: 360px;
-  max-height: 70vh;
+  width: 264px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 100px);
   padding: 16px;
   border-radius: 16px;
   border: 1px solid var(--engine-border);
@@ -1601,13 +1610,10 @@ h5 {
   overflow-y: auto;
 }
 
+/* Acima de 1024px o header é o de computador, mais alto. */
 @media (min-width: 1024px) {
   .region-pop {
-    left: auto;
-    right: 16px;
-    transform: none;
     top: 70px;
-    width: 264px;
   }
 }
 
@@ -1636,22 +1642,28 @@ h5 {
   color: var(--engine-text-subtle);
 }
 
-.region-pop-field select {
-  height: 40px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid var(--engine-border);
-  background: var(--engine-surface-2);
-  color: var(--engine-text);
-  font-size: 0.86rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
-  outline: none;
+/* Aqui havia `.region-pop-field select { ... }`, que desenhava a caixa do
+   campo. Ela parou de ter efeito quando o `<select>` virou `<Select>`: o
+   componente mantém um `<select class="sr-only">` escondido para o `required`
+   e o autopreenchimento, e era NELE que a regra passou a bater — o botão
+   visível ficava sem borda, sem fundo e sem altura, com cara de texto solto.
+   O estilo do campo agora vai por `className` no próprio `<Select>`, como em
+   todas as outras telas (ver `campoClasse` em RegionPicker.jsx). */
+
+/* Folha de baixo (celular). O cabeçalho e a área segura de baixo são do
+   BottomSheet; aqui fica só o miolo. */
+.region-sheet-hint {
+  margin-bottom: 14px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--engine-text-subtle);
 }
 
-.region-pop-field select:focus {
-  border-color: var(--engine-accent);
+.region-sheet-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 8px;
 }
 
 .region-pop-clear {
@@ -2135,6 +2147,30 @@ h5 {
   .engine-carteira {
     font-size: 16px;
   }
+}
+
+/* O cartão encolhe pelo ESPAÇO QUE TEM, não pela largura da janela. As
+   media queries acima olham a tela inteira; dentro de uma folha de 420px no
+   computador isso dava um cartão de 518px, que vazava para fora e aparecia
+   cortado com barra de rolagem. `cqw` é a largura da caixa que o segura
+   (`.engine-carteira-caixa`), então 32,4em × 3cqw = 97% dela — sempre cabe.
+
+   Navegador sem container query ignora a declaração inteira (unidade
+   desconhecida) e cai nas media queries acima, que continuam valendo. */
+.engine-carteira-caixa {
+  container-type: inline-size;
+  width: 100%;
+  /* O brilho do 3D é um `inset: -12%` que passa 60px de cada lado do cartão
+     de propósito (é o que faz a luz "sair" dele ao girar). Ele não é
+     conteúdo: só pintura. Sem este corte ele estica a folha e nasce uma
+     barra de rolagem horizontal. `clip` só na horizontal porque a sombra do
+     cartão cai para baixo e precisa continuar aparecendo. */
+  overflow-x: clip;
+  overflow-clip-margin: 0.5rem;
+}
+
+.engine-carteira-caixa .engine-carteira {
+  font-size: min(16px, 3cqw);
 }
 
 /* ---------------------------------------------------- carteira em 3D ---- */

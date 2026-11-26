@@ -228,9 +228,19 @@ export function CarteiraSheet({
   );
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={t("carteira.title")} className="sm:max-w-2xl">
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title={t("carteira.title")}
+      /* A folha padrão tem 420px no computador — largura de lista de opções.
+         O cartão tem largura própria (85,6 × 54 mm) e não cabia ali: saía
+         cortado, com barra de rolagem na horizontal. `--engine-sheet-largura`
+         abre espaço para ele; `engine-carteira-caixa` garante que, se a
+         janela for menor que isso, quem encolhe é o cartão. */
+      className="[--engine-sheet-largura:36rem]"
+    >
       <div className="grid gap-4">
-        <div className="flex justify-center py-1">
+        <div className="engine-carteira-caixa flex justify-center py-1">
           <Carteira3D ativo={modo === MODO_VER}>{cartao}</Carteira3D>
         </div>
 
